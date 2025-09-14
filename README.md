@@ -1,102 +1,125 @@
-# Cottage Tandoori Desktop POS
 
-Professional Windows desktop application for Cottage Tandoori restaurant point-of-sale system.
+# Cottage Tandoori POS - Professional Desktop Application
 
-## 🌟 Features
+A professional Windows desktop application for restaurant point of sale operations with USB thermal printing support.
 
-- **Desktop POS Interface**: Wraps POSII in a professional desktop app
-- **Thermal Printing**: Silent printing to Epson TM-T20III printers
-- **Configuration System**: Easy settings management via GUI
-- **Auto-Start**: Automatically starts with Windows
-- **Auto-Updates**: Seamless updates via GitHub Releases
-- **System Tray**: Runs in background with system tray integration
+## 🎯 Features
 
-## 🖥️ System Requirements
+- **Professional Desktop App** - Installs like GitHub Desktop or Spotify
+- **USB Thermal Printing** - Silent printing to Epson TM-T20III
+- **Auto-Updates** - Seamless background updates via GitHub Releases
+- **System Tray Integration** - Runs in background when minimized
+- **Global Hotkeys** - Quick test printing with Ctrl+Shift+P
+- **Menu Bar** - Professional application menu with settings
 
-- **Operating System**: Windows 11 (recommended) or Windows 10
-- **Node.js**: Version 16 or higher
-- **Printer**: Epson TM-T20III with Windows driver installed
-- **Permissions**: Administrator privileges for initial setup
+## 📦 Installation
 
-## 🚀 Quick Installation
+### For Staff (End Users)
+1. Download the installer from [GitHub Releases](https://github.com/Bodzaman/cottage-pos-desktop/releases)
+2. Run `Cottage Tandoori POS-Setup-1.0.0.exe` as Administrator
+3. Follow the installation wizard
+4. Launch from desktop shortcut "Cottage Tandoori POS"
 
-### For Restaurant Staff (Simple)
-
-1. **Download the installer** from [Releases](https://github.com/Bodzaman/cottage-pos-desktop/releases)
-2. **Run the installer** as Administrator
-3. **Launch** the app from Desktop shortcut
-4. **Configure** settings via POS > Settings menu
-
-### For Developers (Manual)
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Bodzaman/cottage-pos-desktop.git
-   cd cottage-pos-desktop
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Start the application**:
-   ```bash
-   npm start
-   ```
-
-## ⚙️ Configuration
-
-Access settings via **POS > Settings** menu:
-
-### Connection Settings
-- **POSII URL**: Configure your restaurant's POS interface URL
-
-### Printing Settings  
-- **Default Printer**: Select Epson thermal printer
-- **Paper Width**: 58mm or 80mm thermal paper
-- **Silent Printing**: Enable automatic printing without dialogs
-
-### Startup Settings
-- **Auto-start**: Start with Windows
-- **Update Channel**: Stable or Beta releases
-- **Start Minimized**: Launch minimized to system tray
-
-### Advanced Settings
-- **Window Mode**: Normal or Kiosk mode
-- **Developer Tools**: Enable F12 debugging (if needed)
+### For Developers
+1. Clone this repository
+2. Install Node.js 16+ and npm
+3. Run `npm install`
+4. Start development: `npm start`
+5. Build installer: `npm run build-win`
 
 ## 🖨️ Printer Setup
 
-1. **Install Epson driver** from the manufacturer's website
-2. **Connect printer** via USB cable
-3. **Set as default** in Windows Settings > Printers & scanners
-4. **Test printing** via POS > Test Print menu
+1. Install Epson TM-T20III driver from [Epson website](https://epson.com/support)
+2. Connect printer via USB
+3. Set printer as default in Windows Settings
+4. Test print from Windows to verify driver works
+5. Use **Ctrl+Shift+P** in the app to test thermal printing
 
-## ⌨️ Keyboard Shortcuts
+## 🚀 Usage
 
-- `Ctrl + ,` - Open Settings
-- `Ctrl + Shift + P` - Test Print Receipt
-- `Ctrl + Shift + R` - Restart Application
-- `Ctrl + Q` - Quit Application
-- `F12` - Developer Tools (if enabled)
+### Desktop Application
+- **Start**: Click desktop shortcut or Start Menu
+- **Test Print**: Ctrl+Shift+P (or File menu)
+- **System Tray**: Right-click tray icon for quick access
+- **Updates**: Automatic background updates
+- **Exit**: File → Exit or Ctrl+Q
 
-## 🔄 Updates
+### Features
+- Resizable window (not kiosk mode)
+- Standard window controls (minimize/maximize/close)
+- Professional menu bar with File, View, Help menus
+- System tray for background operation
+- Auto-update notifications
 
-The app automatically checks for updates and notifies you when new versions are available. Updates are downloaded from GitHub Releases.
+## 🛠️ Build Configuration
 
-## 🆘 Support
+### Scripts
+```bash
+npm start          # Start development
+npm run build      # Build for all platforms
+npm run build-win  # Build Windows installer
+npm run dist       # Build without publishing
+npm run release    # Build and publish to GitHub
+```
 
-- **Setup Guide**: See [SETUP.md](SETUP.md)
-- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/Bodzaman/cottage-pos-desktop/issues)
+### Installer Features
+- **NSIS-based** professional Windows installer
+- **Desktop shortcut** "Cottage Tandoori POS"
+- **Start Menu entry** in "Restaurant Management" category
+- **Uninstaller** with clean removal
+- **Admin privileges** for USB printer access
+- **Custom icon** and branding
 
-## 📝 Version History
+## 🔄 Auto-Updates
 
-- **v1.2.0** - Enhanced configuration system with comprehensive settings UI
-- **v1.1.0** - Auto-updates and Windows installer
-- **v1.0.0** - Initial desktop POS with thermal printing
+The app automatically checks for updates using electron-updater:
+- Updates downloaded in background
+- User notified when update ready
+- Seamless installation on restart
+- Update channel detection
+
+## 📁 Project Structure
+
+```
+cottage-pos-desktop/
+├── main.js              # Main Electron process
+├── preload.js           # IPC bridge
+├── package.json         # Dependencies & build config
+├── build/
+│   ├── icon.ico         # App icon
+│   └── installer.nsh    # NSIS installer script
+├── assets/              # Application assets
+├── scripts/             # Build scripts
+└── .github/workflows/   # CI/CD automation
+```
+
+## 🐛 Troubleshooting
+
+### Printer Issues
+- **No printer found**: Check Windows Printer Settings
+- **Print failed**: Ensure printer online with paper loaded
+- **Driver issues**: Reinstall Epson driver as Administrator
+
+### Application Issues
+- **Won't start**: Run installer as Administrator
+- **Update failed**: Check internet connection
+- **Missing shortcut**: Reinstall application
+
+### Development Issues
+- **Build failed**: Ensure Node.js 16+ installed
+- **Icon missing**: Add icon.ico to build/ directory
+- **Signing errors**: Disable code signing in package.json
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/Bodzaman/cottage-pos-desktop/issues)
+- **Releases**: [GitHub Releases](https://github.com/Bodzaman/cottage-pos-desktop/releases)
+- **Documentation**: This README and inline comments
+
+## 📄 License
+
+MIT License - see LICENSE file for details
 
 ---
 
-**© 2024 Cottage Tandoori Restaurant** - Professional POS Desktop Application
+**Cottage Tandoori Restaurant** - Professional POS Solutions
