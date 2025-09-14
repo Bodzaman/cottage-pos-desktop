@@ -1,58 +1,73 @@
 {
   "name": "cottage-tandoori-pos",
   "version": "1.2.0",
-  "description": "Professional desktop POS with thermal printing and configuration system",
+  "description": "Cottage Tandoori POS - Professional Desktop Application",
   "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "build": "electron-builder --publish=never",
-    "dist": "electron-builder --publish=always",
-    "pack": "electron-builder --dir"
-  },
+  "homepage": "https://github.com/Bodzaman/cottage-pos-desktop#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/Bodzaman/cottage-pos-desktop.git"
   },
-  "author": "Cottage Tandoori",
-  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --no-sandbox",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "release": "electron-builder --publish=always",
+    "pack": "electron-builder --dir"
+  },
   "dependencies": {
     "auto-launch": "^5.0.5",
-    "electron-updater": "^6.1.1"
+    "electron-updater": "^6.1.0",
+    "electron-log": "^5.0.0"
   },
   "devDependencies": {
-    "electron": "^22.0.0",
-    "electron-builder": "^24.0.0"
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.0"
   },
   "build": {
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
+    "copyright": "© 2024 Cottage Tandoori Restaurant",
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
-      "preload.js",
+      "preload.js", 
       "settings-preload.js",
       "settings.html",
       "package.json",
       "node_modules/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "publish": ["github"]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Cottage Tandoori POS"
+      "shortcutName": "Cottage Tandoori POS",
+      "artifactName": "cottage-tandoori-pos-setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
     },
     "publish": {
       "provider": "github",
       "owner": "Bodzaman",
       "repo": "cottage-pos-desktop"
     }
-  }
+  },
+  "author": {
+    "name": "Cottage Tandoori Restaurant",
+    "email": "info@cottagetandoori.co.uk"
+  },
+  "license": "MIT"
 }
