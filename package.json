@@ -1,4 +1,3 @@
-
 {
   "name": "cottage-tandoori-pos",
   "version": "1.2.0",
@@ -6,9 +5,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
+    "dev": "electron . --dev",
+    "build": "electron-builder --publish=never",
     "dist": "electron-builder --publish=always",
-    "postinstall": "electron-builder install-app-deps"
+    "pack": "electron-builder --dir"
   },
   "repository": {
     "type": "git",
@@ -21,8 +21,8 @@
     "electron-updater": "^6.1.1"
   },
   "devDependencies": {
-    "electron": "^26.0.0",
-    "electron-builder": "^24.6.3"
+    "electron": "^22.0.0",
+    "electron-builder": "^24.0.0"
   },
   "build": {
     "appId": "com.cottagetandoori.pos",
@@ -35,18 +35,15 @@
       "preload.js",
       "settings-preload.js",
       "settings.html",
-      "assets/**/*",
+      "package.json",
       "node_modules/**/*"
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico",
-      "publisherName": "Cottage Tandoori",
-      "verifyUpdateCodeSignature": false
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
