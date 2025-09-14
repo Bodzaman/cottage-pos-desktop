@@ -1,0 +1,404 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Settings - Cottage Tandoori POS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .header h1 {
+            color: #8B4513;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .settings-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title::before {
+            content: "";
+            width: 4px;
+            height: 20px;
+            background: #8B4513;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        input[type="text"], input[type="url"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.15s ease-in-out;
+        }
+        
+        input[type="text"]:focus, input[type="url"]:focus, select:focus {
+            outline: none;
+            border-color: #8B4513;
+            box-shadow: 0 0 0 0.2rem rgba(139, 69, 19, 0.25);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        
+        .description {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .button-group {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        button {
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
+        }
+        
+        .btn-primary {
+            background-color: #8B4513;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #7a3f12;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        
+        .printer-info {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Cottage Tandoori POS Settings</h1>
+            <p>Configure your desktop POS application</p>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">🌐 Connection Settings</div>
+            
+            <div class="form-group">
+                <label for="posiiUrl">POSII URL:</label>
+                <input type="url" id="posiiUrl" placeholder="https://databutton.com/...">
+                <div class="description">The URL for your restaurant's POS interface</div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">🖨️ Printing Settings</div>
+            
+            <div class="form-group">
+                <label for="defaultPrinter">Default Printer:</label>
+                <select id="defaultPrinter">
+                    <option value="">Select a printer...</option>
+                </select>
+                <div class="description">Choose your thermal receipt printer</div>
+                <div id="printerInfo" class="printer-info" style="display: none;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="thermalWidth">Thermal Paper Width:</label>
+                <select id="thermalWidth">
+                    <option value="58">58mm</option>
+                    <option value="80" selected>80mm</option>
+                </select>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoSilentPrint">
+                <label for="autoSilentPrint">Enable silent printing (no print dialogs)</label>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">🚀 Startup & Updates</div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="autostart">
+                <label for="autostart">Start automatically when Windows starts</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="startMinimized">
+                <label for="startMinimized">Start minimized to system tray</label>
+            </div>
+            
+            <div class="form-group">
+                <label for="updateChannel">Update Channel:</label>
+                <select id="updateChannel">
+                    <option value="stable">Stable (Recommended)</option>
+                    <option value="beta">Beta (Early features)</option>
+                </select>
+                <div class="description">Stable: Tested releases only | Beta: Latest features with potential bugs</div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">⚙️ Advanced Settings</div>
+            
+            <div class="form-group">
+                <label for="windowMode">Window Mode:</label>
+                <select id="windowMode">
+                    <option value="normal">Normal (Recommended)</option>
+                    <option value="kiosk">Kiosk Mode</option>
+                </select>
+                <div class="description">Normal: Regular desktop app | Kiosk: Full-screen dedicated mode</div>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="enableDevTools">
+                <label for="enableDevTools">Enable Developer Tools (F12)</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="showSplash">
+                <label for="showSplash">Show splash screen on startup</label>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button type="button" class="btn-secondary" onclick="cancelSettings()">Cancel</button>
+            <button type="button" class="btn-primary" onclick="saveSettings()">Save Settings</button>
+        </div>
+    </div>
+    
+    <script>
+        let currentConfig = {};
+        
+        // Load configuration when window opens
+        window.settingsAPI.onLoadConfig((config) => {
+            currentConfig = config;
+            loadConfigIntoForm(config);
+            loadPrinters();
+        });
+        
+        async function loadConfigIntoForm(config) {
+            document.getElementById('posiiUrl').value = config.posiiUrl || '';
+            document.getElementById('autostart').checked = config.autostart || false;
+            document.getElementById('updateChannel').value = config.updateChannel || 'stable';
+            document.getElementById('windowMode').value = config.windowMode || 'normal';
+            
+            // Print settings
+            if (config.printSettings) {
+                document.getElementById('thermalWidth').value = config.printSettings.thermalWidth || 80;
+                document.getElementById('autoSilentPrint').checked = config.printSettings.autoSilentPrint || false;
+            }
+            
+            // App settings
+            if (config.appSettings) {
+                document.getElementById('startMinimized').checked = config.appSettings.startMinimized || false;
+                document.getElementById('enableDevTools').checked = config.appSettings.enableDevTools || false;
+                document.getElementById('showSplash').checked = config.appSettings.showSplash || true;
+            }
+        }
+        
+        async function loadPrinters() {
+            try {
+                const printers = await window.settingsAPI.getPrinters();
+                const select = document.getElementById('defaultPrinter');
+                
+                // Clear existing options except first
+                select.innerHTML = '<option value="">Select a printer...</option>';
+                
+                printers.forEach(printer => {
+                    const option = document.createElement('option');
+                    option.value = printer.name;
+                    option.textContent = `${printer.name} (${printer.status})`;
+                    select.appendChild(option);
+                });
+                
+                // Set current default
+                if (currentConfig.printSettings?.defaultPrinter) {
+                    select.value = currentConfig.printSettings.defaultPrinter;
+                    showPrinterInfo(currentConfig.printSettings.defaultPrinter, printers);
+                }
+                
+                // Add change listener
+                select.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        showPrinterInfo(e.target.value, printers);
+                    } else {
+                        hidePrinterInfo();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to load printers:', error);
+            }
+        }
+        
+        function showPrinterInfo(printerName, printers) {
+            const printer = printers.find(p => p.name === printerName);
+            if (printer) {
+                const info = document.getElementById('printerInfo');
+                const statusClass = printer.available ? 'status-online' : 'status-offline';
+                const statusText = printer.available ? 'Online' : 'Offline';
+                
+                info.innerHTML = `
+                    <strong>Printer Information:</strong><br>
+                    <span class="status-indicator ${statusClass}"></span>
+                    Status: ${statusText}<br>
+                    Driver: ${printer.driver}<br>
+                    ${printer.name.toLowerCase().includes('epson') && printer.name.toLowerCase().includes('tm-t') ? 
+                        '<span style="color: #28a745;">✓ Thermal printer detected</span>' : 
+                        '<span style="color: #ffc107;">⚠ Non-thermal printer - formatting may vary</span>'
+                    }
+                `;
+                info.style.display = 'block';
+            }
+        }
+        
+        function hidePrinterInfo() {
+            document.getElementById('printerInfo').style.display = 'none';
+        }
+        
+        async function saveSettings() {
+            const newConfig = {
+                ...currentConfig,
+                posiiUrl: document.getElementById('posiiUrl').value,
+                autostart: document.getElementById('autostart').checked,
+                updateChannel: document.getElementById('updateChannel').value,
+                windowMode: document.getElementById('windowMode').value,
+                printSettings: {
+                    ...currentConfig.printSettings,
+                    defaultPrinter: document.getElementById('defaultPrinter').value,
+                    thermalWidth: parseInt(document.getElementById('thermalWidth').value),
+                    autoSilentPrint: document.getElementById('autoSilentPrint').checked
+                },
+                appSettings: {
+                    ...currentConfig.appSettings,
+                    startMinimized: document.getElementById('startMinimized').checked,
+                    enableDevTools: document.getElementById('enableDevTools').checked,
+                    showSplash: document.getElementById('showSplash').checked
+                }
+            };
+            
+            try {
+                const result = await window.settingsAPI.saveConfig(newConfig);
+                if (result.success) {
+                    // Show success message
+                    alert('Settings saved successfully! Some changes may require an app restart.');
+                    window.close();
+                } else {
+                    alert('Failed to save settings. Please try again.');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Error saving settings: ' + error.message);
+            }
+        }
+        
+        function cancelSettings() {
+            window.close();
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                currentConfig = await window.settingsAPI.getConfig();
+                loadConfigIntoForm(currentConfig);
+                loadPrinters();
+            } catch (error) {
+                console.error('Failed to load initial config:', error);
+            }
+        });
+    </script>
+</body>
+</html>
