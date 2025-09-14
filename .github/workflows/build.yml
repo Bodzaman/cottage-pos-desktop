@@ -1,38 +1,28 @@
-name: Build and Release Windows Desktop App
+name: Build and Release Windows App
 
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  build-windows:
+  release:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Check out Git repository
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: 18
+          cache: 'npm'
 
-      - name: Install dependencies (flexible)
-        run: |
-          echo "Installing dependencies with npm install..."
-          npm install
-
-      - name: Build Windows app
-        run: npm run build-win
-        env:
-          GH_TOKEN: ${{ secrets.COTTAGE_POS_PERSONAL_TOKEN }}
-
-      - name: Upload artifacts (backup)
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Build/release Electron app
+        uses: samuelmeuli/action-electron-builder@v1
         with:
-          name: windows-installer
-          path: dist/*.exe
-          retention-days: 30
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true  # Always create release when workflow runs
+          max_attempts: 3
