@@ -159,7 +159,6 @@
     },
     "compression": "maximum",
     "generateUpdatesFilesForAllChannels": true,
-    "detectUpdateChannel": true,
-    "beforeBuild": "scripts/beforeBuild.js"
+    "detectUpdateChannel": true
   }
 }
