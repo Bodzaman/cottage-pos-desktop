@@ -1,0 +1,61 @@
+
+{
+  "name": "cottage-tandoori-pos",
+  "version": "1.2.0",
+  "description": "Professional desktop POS with thermal printing and configuration system",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=always",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bodzaman/cottage-pos-desktop.git"
+  },
+  "author": "Cottage Tandoori",
+  "license": "MIT",
+  "dependencies": {
+    "auto-launch": "^5.0.5",
+    "electron-updater": "^6.1.1"
+  },
+  "devDependencies": {
+    "electron": "^26.0.0",
+    "electron-builder": "^24.6.3"
+  },
+  "build": {
+    "appId": "com.cottagetandoori.pos",
+    "productName": "Cottage Tandoori POS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "settings-preload.js",
+      "settings.html",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "publisherName": "Cottage Tandoori",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cottage Tandoori POS"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Bodzaman",
+      "repo": "cottage-pos-desktop"
+    }
+  }
+}
