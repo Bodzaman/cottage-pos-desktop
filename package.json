@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Cottage Tandoori POS - Professional Desktop Application",
   "main": "main.js",
   "homepage": "https://github.com/Bodzaman/cottage-pos-desktop#readme",
@@ -124,8 +124,6 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
-      "include": "build/installer.nsh",
-      "script": "build/installer.nsh",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
       "menuCategory": "Restaurant Management",
