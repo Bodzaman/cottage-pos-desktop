@@ -10,31 +10,34 @@ jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 30
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
+
     permissions:
-      contents: write  # Needed for creating releases
+      contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Electron App
-        uses: x6Pnda/action-electron-compiler@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
-          package_manager: NPM
+      - name: Build Electron app for Windows
+        run: npm run build-win
         env:
-          # Disable code signing for now (can be enabled later)
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm run release
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
