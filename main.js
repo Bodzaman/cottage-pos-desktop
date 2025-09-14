@@ -1,39 +1,32 @@
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
 const path = require('path');
 const fs = require('fs').promises;
 const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
-const { autoUpdater } = require('electron-updater');
-const AutoLaunch = require('auto-launch');
+
+// Configure logging
+log.transports.file.level = 'info';
+autoUpdater.logger = log;
 
 class CottageTandooriPOS {
     constructor() {
         this.mainWindow = null;
-        this.settingsWindow = null;
         this.tray = null;
         this.defaultPrinter = null;
-        this.config = null;
-        this.autoLauncher = null;
+        this.isProduction = !process.defaultApp;
         
         this.init();
     }
 
-    async init() {
-        // Load configuration first
-        await this.loadConfig();
-        
-        // Setup auto-launcher
-        this.autoLauncher = new AutoLaunch({
-            name: 'Cottage Tandoori POS',
-            path: process.execPath,
-        });
-        
+    init() {
         // Prevent multiple instances
         const gotTheLock = app.requestSingleInstanceLock();
         if (!gotTheLock) {
-            console.log('Another instance is already running');
+            log.info('Another instance is already running');
             app.quit();
             return;
         }
@@ -51,11 +44,13 @@ class CottageTandooriPOS {
             this.setupSystemTray();
             this.setupGlobalShortcuts();
             this.setupAutoUpdater();
-            this.applyAutostartSetting();
         });
 
         app.on('window-all-closed', () => {
-            // Keep running in background unless explicitly quit
+            // Keep running in background on Windows
+            if (process.platform !== 'darwin') {
+                // Don't quit, stay in system tray
+            }
         });
 
         app.on('activate', () => {
@@ -65,399 +60,167 @@ class CottageTandooriPOS {
         });
     }
 
-    async loadConfig() {
-        const configPath = path.join(app.getPath('userData'), 'pos-config.json');
-        
-        // Default configuration
-        const defaultConfig = {
-            posiiUrl: 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/devx/ui/POSII',
-            autostart: true,
-            updateChannel: 'stable', // stable, beta
-            windowMode: 'normal', // normal, kiosk
-            printSettings: {
-                defaultPrinter: null,
-                thermalWidth: 80,
-                autoSilentPrint: true
-            },
-            appSettings: {
-                startMinimized: false,
-                showSplash: true,
-                enableDevTools: false
-            }
-        };
-        
-        try {
-            const configData = await fs.readFile(configPath, 'utf8');
-            this.config = { ...defaultConfig, ...JSON.parse(configData) };
-            console.log('Configuration loaded:', this.config);
-        } catch (error) {
-            console.log('Using default configuration, creating config file...');
-            this.config = defaultConfig;
-            await this.saveConfig();
-        }
-    }
-
-    async saveConfig() {
-        const configPath = path.join(app.getPath('userData'), 'pos-config.json');
-        try {
-            await fs.writeFile(configPath, JSON.stringify(this.config, null, 2));
-            console.log('Configuration saved successfully');
-        } catch (error) {
-            console.error('Failed to save configuration:', error);
-        }
-    }
-
     createMainWindow() {
         const windowConfig = {
-            width: 1400,
-            height: 900,
+            width: 1200,
+            height: 800,
+            minWidth: 1000,
+            minHeight: 600,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
-                preload: path.join(__dirname, 'preload.js')
+                preload: path.join(__dirname, 'preload.js'),
+                webSecurity: true
             },
             title: 'Cottage Tandoori POS',
             show: false,
-            icon: path.join(__dirname, 'assets', 'icon.png')
+            icon: path.join(__dirname, 'assets', 'icon.png'),
+            autoHideMenuBar: false,
+            titleBarStyle: 'default'
         };
-
-        // Apply window mode from config
-        if (this.config.windowMode === 'kiosk') {
-            windowConfig.kiosk = true;
-            windowConfig.alwaysOnTop = true;
-        }
-        
-        // Apply dev tools setting
-        windowConfig.webPreferences.devTools = this.config.appSettings.enableDevTools;
 
         this.mainWindow = new BrowserWindow(windowConfig);
 
-        // Load POSII URL from config
-        this.mainWindow.loadURL(this.config.posiiUrl);
+        // Create application menu
+        this.createApplicationMenu();
+
+        // Load POSII URL
+        const posiiUrl = this.isProduction 
+            ? 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/ui/POSII'
+            : 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/devx/ui/POSII';
+            
+        this.mainWindow.loadURL(posiiUrl);
 
         this.mainWindow.once('ready-to-show', () => {
-            if (!this.config.appSettings.startMinimized) {
-                this.mainWindow.show();
-            }
-            console.log('POS window loaded successfully');
+            this.mainWindow.show();
+            this.mainWindow.focus();
+            log.info('POS window loaded successfully');
         });
 
         this.mainWindow.on('closed', () => {
             this.mainWindow = null;
         });
-        
-        // Create application menu
-        this.createAppMenu();
+
+        // Handle external links
+        this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+            require('electron').shell.openExternal(url);
+            return { action: 'deny' };
+        });
     }
-    
-    createAppMenu() {
+
+    createApplicationMenu() {
         const template = [
             {
-                label: 'POS',
+                label: 'File',
                 submenu: [
                     {
-                        label: 'Settings...',
-                        accelerator: 'Ctrl+,',
-                        click: () => this.openSettings()
-                    },
-                    { type: 'separator' },
-                    {
                         label: 'Test Print',
-                        accelerator: 'Ctrl+Shift+P',
-                        click: () => this.printTestReceipt()
+                        accelerator: 'CmdOrCtrl+Shift+P',
+                        click: async () => {
+                            await this.printTestReceipt();
+                        }
                     },
                     { type: 'separator' },
                     {
-                        label: 'Check for Updates...',
-                        click: () => this.checkForUpdates()
-                    },
-                    { type: 'separator' },
-                    {
-                        label: 'Restart App',
-                        accelerator: 'Ctrl+Shift+R',
-                        click: () => this.restartApp()
-                    },
-                    {
-                        label: 'Quit',
+                        label: 'Exit',
                         accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-                        click: () => app.quit()
+                        click: () => {
+                            app.quit();
+                        }
                     }
                 ]
             },
             {
                 label: 'View',
                 submenu: [
-                    {
-                        label: 'Reload',
-                        accelerator: 'Ctrl+R',
-                        click: () => {
-                            if (this.mainWindow) {
-                                this.mainWindow.reload();
-                            }
-                        }
-                    },
-                    {
-                        label: 'Developer Tools',
-                        accelerator: 'F12',
-                        click: () => {
-                            if (this.mainWindow && this.config.appSettings.enableDevTools) {
-                                this.mainWindow.webContents.toggleDevTools();
-                            }
-                        }
-                    },
+                    { role: 'reload' },
+                    { role: 'forceReload' },
+                    { role: 'toggleDevTools' },
                     { type: 'separator' },
-                    {
-                        label: 'Actual Size',
-                        accelerator: 'Ctrl+0',
-                        click: () => {
-                            if (this.mainWindow) {
-                                this.mainWindow.webContents.setZoomLevel(0);
-                            }
-                        }
-                    },
-                    {
-                        label: 'Zoom In',
-                        accelerator: 'Ctrl+Plus',
-                        click: () => {
-                            if (this.mainWindow) {
-                                const currentZoom = this.mainWindow.webContents.getZoomLevel();
-                                this.mainWindow.webContents.setZoomLevel(currentZoom + 0.5);
-                            }
-                        }
-                    },
-                    {
-                        label: 'Zoom Out',
-                        accelerator: 'Ctrl+-',
-                        click: () => {
-                            if (this.mainWindow) {
-                                const currentZoom = this.mainWindow.webContents.getZoomLevel();
-                                this.mainWindow.webContents.setZoomLevel(currentZoom - 0.5);
-                            }
-                        }
-                    }
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' }
                 ]
             },
             {
                 label: 'Help',
                 submenu: [
                     {
-                        label: 'Setup Guide',
-                        click: () => shell.openExternal('https://github.com/Bodzaman/cottage-pos-desktop/blob/main/SETUP.md')
+                        label: 'Check for Updates',
+                        click: () => {
+                            autoUpdater.checkForUpdatesAndNotify();
+                        }
                     },
-                    {
-                        label: 'Troubleshooting',
-                        click: () => shell.openExternal('https://github.com/Bodzaman/cottage-pos-desktop/blob/main/TROUBLESHOOTING.md')
-                    },
-                    { type: 'separator' },
                     {
                         label: 'About',
-                        click: () => this.showAbout()
+                        click: () => {
+                            dialog.showMessageBox(this.mainWindow, {
+                                type: 'info',
+                                title: 'About Cottage Tandoori POS',
+                                message: 'Cottage Tandoori POS v1.0.0',
+                                detail: 'Professional Restaurant Point of Sale System
+
+Built with Electron
+Copyright © 2024 Cottage Tandoori Restaurant'
+                            });
+                        }
                     }
                 ]
             }
         ];
-        
+
         const menu = Menu.buildFromTemplate(template);
         Menu.setApplicationMenu(menu);
     }
 
-    openSettings() {
-        if (this.settingsWindow) {
-            this.settingsWindow.focus();
+    setupAutoUpdater() {
+        if (!this.isProduction) {
+            log.info('Auto-updater disabled in development');
             return;
         }
 
-        this.settingsWindow = new BrowserWindow({
-            width: 600,
-            height: 700,
-            parent: this.mainWindow,
-            modal: true,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                preload: path.join(__dirname, 'settings-preload.js')
-            },
-            title: 'Settings - Cottage Tandoori POS',
-            resizable: false
-        });
-
-        this.settingsWindow.loadFile('settings.html');
-
-        this.settingsWindow.on('closed', () => {
-            this.settingsWindow = null;
-        });
-        
-        // Send current config to settings window
-        this.settingsWindow.webContents.once('did-finish-load', () => {
-            this.settingsWindow.webContents.send('load-config', this.config);
-        });
-    }
-    
-    async applyAutostartSetting() {
-        try {
-            const isEnabled = await this.autoLauncher.isEnabled();
-            
-            if (this.config.autostart && !isEnabled) {
-                await this.autoLauncher.enable();
-                console.log('Autostart enabled');
-            } else if (!this.config.autostart && isEnabled) {
-                await this.autoLauncher.disable();
-                console.log('Autostart disabled');
-            }
-        } catch (error) {
-            console.error('Failed to apply autostart setting:', error);
-        }
-    }
-
-    setupAutoUpdater() {
-        // Configure update channel
-        autoUpdater.channel = this.config.updateChannel;
-        autoUpdater.autoDownload = false;
-        
-        autoUpdater.on('checking-for-update', () => {
-            console.log('Checking for update...');
-        });
-        
-        autoUpdater.on('update-available', (info) => {
-            console.log('Update available:', info.version);
-            
-            dialog.showMessageBox(this.mainWindow, {
-                type: 'info',
-                title: 'Update Available',
-                message: `A new version (${info.version}) is available. Do you want to download it now?`,
-                buttons: ['Download', 'Later'],
-                defaultId: 0
-            }).then(result => {
-                if (result.response === 0) {
-                    autoUpdater.downloadUpdate();
-                }
-            });
-        });
-        
-        autoUpdater.on('update-not-available', () => {
-            console.log('Update not available.');
-        });
-        
-        autoUpdater.on('error', (err) => {
-            console.error('Error in auto-updater:', err);
-        });
-        
-        autoUpdater.on('download-progress', (progressObj) => {
-            const logMessage = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
-            console.log(logMessage);
-        });
-        
-        autoUpdater.on('update-downloaded', () => {
-            dialog.showMessageBox(this.mainWindow, {
-                type: 'info',
-                title: 'Update Ready',
-                message: 'Update downloaded. The application will restart to apply the update.',
-                buttons: ['Restart Now', 'Later'],
-                defaultId: 0
-            }).then(result => {
-                if (result.response === 0) {
-                    autoUpdater.quitAndInstall();
-                }
-            });
-        });
-        
-        // Check for updates on startup (after 5 seconds)
-        setTimeout(() => {
-            autoUpdater.checkForUpdatesAndNotify();
-        }, 5000);
-    }
-    
-    checkForUpdates() {
         autoUpdater.checkForUpdatesAndNotify();
-    }
-    
-    restartApp() {
-        app.relaunch();
-        app.exit();
-    }
-    
-    showAbout() {
-        dialog.showMessageBox(this.mainWindow, {
-            type: 'info',
-            title: 'About Cottage Tandoori POS',
-            message: 'Cottage Tandoori POS',
-            detail: `Version: ${app.getVersion()}
-Electron: ${process.versions.electron}
-Node: ${process.versions.node}
 
-A professional desktop POS application with thermal printing capabilities.`,
-            buttons: ['OK']
+        autoUpdater.on('checking-for-update', () => {
+            log.info('Checking for updates...');
         });
-    }
 
-    setupSystemTray() {
-        const trayIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray-icon.png'));
-        this.tray = new Tray(trayIcon);
-        
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: 'Show POS',
-                click: () => {
-                    if (this.mainWindow) {
-                        this.mainWindow.show();
-                        this.mainWindow.focus();
-                    }
-                }
-            },
-            {
-                label: 'Settings',
-                click: () => this.openSettings()
-            },
-            { type: 'separator' },
-            {
-                label: 'Test Print',
-                click: () => this.printTestReceipt()
-            },
-            { type: 'separator' },
-            {
-                label: 'Quit',
-                click: () => app.quit()
-            }
-        ]);
-        
-        this.tray.setContextMenu(contextMenu);
-        this.tray.setToolTip('Cottage Tandoori POS');
-        
-        this.tray.on('double-click', () => {
-            if (this.mainWindow) {
-                this.mainWindow.show();
-                this.mainWindow.focus();
-            }
+        autoUpdater.on('update-available', (info) => {
+            log.info('Update available:', info.version);
         });
-    }
 
-    setupGlobalShortcuts() {
-        // Test print shortcut
-        globalShortcut.register('Ctrl+Shift+P', () => {
-            this.printTestReceipt();
+        autoUpdater.on('update-not-available', (info) => {
+            log.info('Update not available:', info.version);
         });
-        
-        // Settings shortcut
-        globalShortcut.register('Ctrl+Shift+S', () => {
-            this.openSettings();
+
+        autoUpdater.on('error', (err) => {
+            log.error('Error in auto-updater:', err);
         });
-        
-        // Restart shortcut
-        globalShortcut.register('Ctrl+Shift+R', () => {
-            this.restartApp();
+
+        autoUpdater.on('download-progress', (progressObj) => {
+            let log_message = "Download speed: " + progressObj.bytesPerSecond;
+            log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+            log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+            log.info(log_message);
+        });
+
+        autoUpdater.on('update-downloaded', (info) => {
+            log.info('Update downloaded:', info.version);
+            autoUpdater.quitAndInstall();
         });
     }
 
     setupPrinting() {
         this.initializePrinter();
         
-        // Handle print-receipt IPC
         ipcMain.handle('print-receipt', async (event, data) => {
             try {
-                console.log('Received print-receipt request:', data.receipt?.receipt_number);
+                log.info('Received print-receipt request:', data.receipt?.receipt_number);
                 return await this.printReceipt(data);
             } catch (error) {
-                console.error('Print receipt error:', error);
+                log.error('Print receipt error:', error);
                 return { success: false, error: error.message };
             }
         });
@@ -469,53 +232,21 @@ A professional desktop POS application with thermal printing capabilities.`,
         ipcMain.handle('get-printers', async () => {
             return await this.discoverPrinters();
         });
-        
-        // Configuration IPC handlers
-        ipcMain.handle('get-config', () => {
-            return this.config;
-        });
-        
-        ipcMain.handle('save-config', async (event, newConfig) => {
-            this.config = { ...this.config, ...newConfig };
-            await this.saveConfig();
-            
-            // Apply autostart setting
-            await this.applyAutostartSetting();
-            
-            // Reload main window if URL changed
-            if (newConfig.posiiUrl && this.mainWindow) {
-                this.mainWindow.loadURL(this.config.posiiUrl);
-            }
-            
-            return { success: true };
-        });
     }
 
     async initializePrinter() {
         try {
             const printers = await this.discoverPrinters();
             
-            // Use configured printer or find Epson thermal printer
-            if (this.config.printSettings.defaultPrinter) {
-                this.defaultPrinter = this.config.printSettings.defaultPrinter;
-            } else {
-                const epsonPrinter = printers.find(p => 
-                    p.name.toLowerCase().includes('epson') && 
-                    (p.name.toLowerCase().includes('tm-t20') || p.name.toLowerCase().includes('tm-t88'))
-                );
-                
-                this.defaultPrinter = epsonPrinter ? epsonPrinter.name : printers[0]?.name;
-                
-                // Save discovered printer to config
-                if (this.defaultPrinter) {
-                    this.config.printSettings.defaultPrinter = this.defaultPrinter;
-                    await this.saveConfig();
-                }
-            }
+            const epsonPrinter = printers.find(p => 
+                p.name.toLowerCase().includes('epson') && 
+                (p.name.toLowerCase().includes('tm-t20') || p.name.toLowerCase().includes('tm-t88'))
+            );
             
-            console.log('Default printer set to:', this.defaultPrinter);
+            this.defaultPrinter = epsonPrinter ? epsonPrinter.name : printers[0]?.name;
+            log.info('Default printer set to:', this.defaultPrinter);
         } catch (error) {
-            console.error('Printer initialization error:', error);
+            log.error('Printer initialization error:', error);
         }
     }
 
@@ -535,49 +266,108 @@ A professional desktop POS application with thermal printing capabilities.`,
                 available: printer.PrinterStatus === 'Normal'
             }));
         } catch (error) {
-            console.error('Failed to discover printers:', error);
+            log.error('Failed to discover printers:', error);
             return [];
         }
     }
 
     async printTestReceipt() {
+        const testReceipt = {
+            receipt_number: 'TEST001',
+            order_id: 'TEST_ORDER',
+            order_type: 'TEST',
+            order_date: new Date().toISOString(),
+            business: {
+                name: 'COTTAGE TANDOORI',
+                address: 'Test Receipt',
+                phone: 'Printer Test'
+            },
+            items: [
+                { name: 'Test Item 1', quantity: 1, price: 10.00, total: 10.00 },
+                { name: 'Test Item 2', quantity: 2, price: 5.50, total: 11.00 }
+            ],
+            totals: {
+                subtotal: 21.00,
+                total: 21.00
+            },
+            footer_message: 'TEST PRINT SUCCESSFUL'
+        };
+
+        return await this.printReceipt({ receipt: testReceipt });
+    }
+
+    setupSystemTray() {
+        const iconPath = path.join(__dirname, 'assets', 'icon.png');
+        let trayIcon;
+        
         try {
-            const testReceipt = {
-                header: {
-                    restaurantName: "Cottage Tandoori",
-                    address: "Test Location",
-                    phone: "01903 000000"
-                },
-                items: [
-                    { name: "Test Item", price: "£5.00", quantity: 1 }
-                ],
-                total: "£5.00",
-                timestamp: new Date().toISOString()
-            };
-            
-            const result = await this.printReceipt({ receipt: testReceipt, test_mode: true });
-            
-            if (result.success) {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'Test Print',
-                    message: 'Test receipt printed successfully!',
-                    buttons: ['OK']
-                });
-            } else {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'error',
-                    title: 'Print Error',
-                    message: `Print failed: ${result.error}`,
-                    buttons: ['OK']
-                });
-            }
-            
-            return result;
-        } catch (error) {
-            console.error('Test print error:', error);
-            return { success: false, error: error.message };
+            trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+        } catch {
+            trayIcon = nativeImage.createEmpty();
         }
+        
+        this.tray = new Tray(trayIcon);
+        
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: 'Show POS',
+                click: () => {
+                    if (this.mainWindow) {
+                        this.mainWindow.show();
+                        this.mainWindow.focus();
+                    } else {
+                        this.createMainWindow();
+                    }
+                }
+            },
+            {
+                label: 'Test Print',
+                click: async () => {
+                    try {
+                        await this.printTestReceipt();
+                        log.info('Test print successful');
+                    } catch (error) {
+                        log.error('Test print failed:', error);
+                    }
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Check for Updates',
+                click: () => {
+                    autoUpdater.checkForUpdatesAndNotify();
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Exit',
+                click: () => app.quit()
+            }
+        ]);
+        
+        this.tray.setContextMenu(contextMenu);
+        this.tray.setToolTip('Cottage Tandoori POS');
+        
+        this.tray.on('double-click', () => {
+            if (this.mainWindow) {
+                this.mainWindow.show();
+                this.mainWindow.focus();
+            }
+        });
+    }
+
+    setupGlobalShortcuts() {
+        globalShortcut.register('CommandOrControl+Shift+P', async () => {
+            try {
+                log.info('Test print triggered by hotkey');
+                await this.printTestReceipt();
+                log.info('Hotkey test print successful');
+            } catch (error) {
+                log.error('Hotkey test print failed:', error);
+            }
+        });
+
+        log.info('Global shortcuts registered');
     }
 
     async printReceipt(data) {
@@ -588,73 +378,125 @@ A professional desktop POS application with thermal printing capabilities.`,
         const { receipt } = data;
         
         try {
-            // Generate thermal receipt content
-            const receiptContent = this.generateThermalReceipt(receipt);
+            const htmlContent = this.generateReceiptHtml(receipt);
+            const tempFile = path.join(require('os').tmpdir(), `receipt-${Date.now()}.html`);
+            await fs.writeFile(tempFile, htmlContent, 'utf8');
             
-            // Print using Windows thermal printing
-            const { stdout } = await execAsync(
-                `powershell -Command "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${receiptContent}')"`,
-                { timeout: 30000 }
-            );
+            const result = await this.printHtmlFile(tempFile);
             
-            console.log('Receipt printed successfully');
-            return {
-                success: true,
-                message: 'Receipt printed successfully',
-                printer: this.defaultPrinter
-            };
+            await fs.unlink(tempFile);
+            return result;
         } catch (error) {
-            console.error('Print error:', error);
             throw error;
         }
     }
 
-    generateThermalReceipt(receipt) {
-        let content = '';
-        
-        // Header
-        if (receipt.header) {
-            content += `${receipt.header.restaurantName}
-`;
-            content += `${receipt.header.address}
-`;
-            content += `${receipt.header.phone}
-`;
-            content += '--------------------------------
-';
-        }
-        
-        // Items
-        if (receipt.items) {
-            receipt.items.forEach(item => {
-                content += `${item.name}
-`;
-                content += `  ${item.quantity} x ${item.price}
-`;
+    async printHtmlFile(htmlPath) {
+        try {
+            const printWindow = new BrowserWindow({
+                show: false,
+                webPreferences: {
+                    nodeIntegration: false,
+                    contextIsolation: true
+                }
             });
-            content += '--------------------------------
-';
-        }
-        
-        // Total
-        if (receipt.total) {
-            content += `TOTAL: ${receipt.total}
-`;
-        }
-        
-        // Footer
-        content += '
-';
-        content += 'Thank you for your visit!
-';
-        content += '
 
+            await printWindow.loadFile(htmlPath);
 
-';
-        
-        return content;
+            const printOptions = {
+                silent: true,
+                printBackground: false,
+                deviceName: this.defaultPrinter,
+                color: false,
+                margins: {
+                    marginType: 'custom',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                },
+                landscape: false,
+                pageSize: {
+                    width: 80000,
+                    height: 297000
+                }
+            };
+
+            await printWindow.webContents.print(printOptions);
+            printWindow.close();
+
+            log.info('Receipt printed successfully');
+            return {
+                success: true,
+                printer: this.defaultPrinter,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            log.error('Print error:', error);
+            throw error;
+        }
+    }
+
+    generateReceiptHtml(receipt) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: 80mm auto; margin: 2mm; }
+        body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 4mm; width: 76mm; }
+        .center { text-align: center; }
+        .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+        .business-name { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+        .item { margin-bottom: 2px; display: flex; justify-content: space-between; }
+        .totals { border-top: 1px dashed #000; padding-top: 8px; margin-top: 8px; }
+        .total-line { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .grand-total { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding: 4px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="business-name">${receipt.business?.name || 'Cottage Tandoori'}</div>
+        <div>${receipt.business?.address || '123 Restaurant Street'}</div>
+        <div>Tel: ${receipt.business?.phone || '+44 20 1234 5678'}</div>
+    </div>
+    
+    <div>
+        <div>Receipt: ${receipt.receipt_number}</div>
+        <div>Order: ${receipt.order_id}</div>
+        <div>Type: ${receipt.order_type}</div>
+        <div>Date: ${new Date(receipt.order_date).toLocaleString()}</div>
+    </div>
+    
+    <div style="margin: 8px 0;">
+        ${receipt.items.map(item => `
+            <div class="item">
+                <span>${item.quantity}x ${item.name}</span>
+                <span>£${(item.total || item.quantity * item.price).toFixed(2)}</span>
+            </div>
+        `).join('')}
+    </div>
+    
+    <div class="totals">
+        <div class="total-line">
+            <span>Subtotal:</span>
+            <span>£${receipt.totals.subtotal.toFixed(2)}</span>
+        </div>
+        <div class="total-line grand-total">
+            <span>TOTAL:</span>
+            <span>£${receipt.totals.total.toFixed(2)}</span>
+        </div>
+    </div>
+    
+    <div class="center" style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 8px;">
+        ${receipt.footer_message || 'Thank you for dining with us!'}
+    </div>
+</body>
+</html>
+        `;
     }
 }
 
-// Initialize app
-const pos = new CottageTandooriPOS();
+// Start the app
+new CottageTandooriPOS();
