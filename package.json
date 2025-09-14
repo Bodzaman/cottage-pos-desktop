@@ -1,6 +1,7 @@
+
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "description": "Cottage Tandoori POS - Professional Desktop Application",
   "main": "main.js",
   "homepage": "https://github.com/Bodzaman/cottage-pos-desktop#readme",
@@ -8,37 +9,88 @@
     "type": "git",
     "url": "https://github.com/Bodzaman/cottage-pos-desktop.git"
   },
+  "bugs": {
+    "url": "https://github.com/Bodzaman/cottage-pos-desktop/issues"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --no-sandbox",
     "build": "electron-builder",
+    "build-win": "electron-builder --win",
     "dist": "electron-builder --publish=never",
     "release": "electron-builder --publish=always",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "electron", 
+    "pos", 
+    "thermal-printer", 
+    "restaurant", 
+    "cottage-tandoori",
+    "desktop-app",
+    "windows",
+    "epson",
+    "receipt-printer"
+  ],
+  "author": {
+    "name": "Cottage Tandoori Restaurant",
+    "email": "info@cottagetandoori.co.uk",
+    "url": "https://cottagetandoori.co.uk"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   },
   "dependencies": {
-    "auto-launch": "^5.0.5",
     "electron-updater": "^6.1.0",
     "electron-log": "^5.0.0"
   },
   "devDependencies": {
     "electron": "^27.0.0",
-    "electron-builder": "^24.6.0"
+    "electron-builder": "^24.6.0",
+    "typescript": "^5.0.0"
   },
   "build": {
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
-    "copyright": "© 2024 Cottage Tandoori Restaurant",
+    "copyright": "Copyright © 2024 Cottage Tandoori Restaurant",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "resources": "resources",
+      "buildResources": "build"
     },
     "files": [
       "main.js",
-      "preload.js", 
-      "settings-preload.js",
-      "settings.html",
-      "package.json",
-      "node_modules/**/*"
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "target": [
@@ -47,27 +99,54 @@
           "arch": ["x64"]
         }
       ],
-      "publish": ["github"]
+      "icon": "build/icon.ico",
+      "publisherName": "Cottage Tandoori Restaurant",
+      "verifyUpdateCodeSignature": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker",
+      "signingHashAlgorithms": ["sha256"],
+      "signDlls": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
       "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
-      "artifactName": "cottage-tandoori-pos-setup-${version}.${ext}",
-      "deleteAppDataOnUninstall": false
+      "include": "build/installer.nsh",
+      "script": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "menuCategory": "Restaurant Management",
+      "displayLanguageSelector": false,
+      "installerLanguages": ["en_US"],
+      "language": "1033",
+      "multiLanguageInstaller": false,
+      "packElevateHelper": true,
+      "preCompressedFileExtensions": [".avi", ".mov", ".mp4", ".mp3", ".mp2", ".qt"],
+      "warningsAsErrors": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "guid": "12345678-1234-1234-1234-123456789012",
+      "differentialPackage": false
     },
     "publish": {
       "provider": "github",
       "owner": "Bodzaman",
-      "repo": "cottage-pos-desktop"
-    }
-  },
-  "author": {
-    "name": "Cottage Tandoori Restaurant",
-    "email": "info@cottagetandoori.co.uk"
-  },
-  "license": "MIT"
+      "repo": "cottage-pos-desktop",
+      "private": false,
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    },
+    "compression": "maximum",
+    "generateUpdatesFilesForAllChannels": true,
+    "detectUpdateChannel": true,
+    "beforeBuild": "scripts/beforeBuild.js",
+    "afterPack": "scripts/afterPack.js",
+    "afterSign": "scripts/notarize.js"
+  }
 }
