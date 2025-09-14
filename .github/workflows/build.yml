@@ -1,88 +1,38 @@
-
-name: Build and Release Cottage Tandoori POS
+name: Build and Release Windows Desktop App
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g., v1.0.0)'
-        required: true
-        default: 'v1.0.0'
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Create build assets
-      run: |
-        mkdir -p build
-        echo "Creating app icon..."
-        # Icon creation would happen here
-        
-    - name: Build Electron app
-      run: npm run build-win
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Upload installer artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: cottage-tandoori-pos-installer
-        path: dist/*.exe
-        retention-days: 30
-        
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/*.exe
-          dist/latest.yml
-        name: Cottage Tandoori POS ${{ github.ref_name }}
-        body: |
-          ## Changes in ${{ github.ref_name }}
-          
-          ### 🎉 New Features
-          - Professional Windows installer
-          - Desktop and Start Menu shortcuts
-          - Auto-update support
-          - USB thermal printing
-          
-          ### 📦 Installation
-          1. Download the installer below
-          2. Run as Administrator
-          3. Follow the setup wizard
-          4. Launch from desktop shortcut
-          
-          ### 🖨️ Printer Setup
-          1. Install Epson TM-T20III driver
-          2. Set as default printer
-          3. Test with Ctrl+Shift+P in app
-          
-          ### 🐛 Bug Fixes
-          - Improved stability
-          - Better error handling
-          
-          ---
-          
-          **Full Changelog**: https://github.com/Bodzaman/cottage-pos-desktop/compare/v1.0.0...v${{ github.ref_name }}
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (flexible)
+        run: |
+          echo "Installing dependencies with npm install..."
+          npm install
+
+      - name: Build Windows app
+        run: npm run build-win
+        env:
+          GH_TOKEN: ${{ secrets.COTTAGE_POS_PERSONAL_TOKEN }}
+
+      - name: Upload artifacts (backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+          retention-days: 30
