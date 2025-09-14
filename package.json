@@ -160,8 +160,6 @@
     "compression": "maximum",
     "generateUpdatesFilesForAllChannels": true,
     "detectUpdateChannel": true,
-    "beforeBuild": "scripts/beforeBuild.js",
-    "afterPack": "scripts/afterPack.js",
-    "afterSign": "scripts/notarize.js"
+    "beforeBuild": "scripts/beforeBuild.js"
   }
 }
