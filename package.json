@@ -1,4 +1,3 @@
-
 {
   "name": "cottage-tandoori-pos",
   "version": "1.0.0",
@@ -23,10 +22,10 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
-    "electron", 
-    "pos", 
-    "thermal-printer", 
-    "restaurant", 
+    "electron",
+    "pos",
+    "thermal-printer",
+    "restaurant",
     "cottage-tandoori",
     "desktop-app",
     "windows",
@@ -55,10 +54,9 @@
   "build": {
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
-    "copyright": "Copyright © 2024 Cottage Tandoori Restaurant",
+    "copyright": "Copyright \u00a9 2024 Cottage Tandoori Restaurant",
     "directories": {
       "output": "dist",
-      "resources": "resources",
       "buildResources": "build"
     },
     "files": [
@@ -84,19 +82,25 @@
       {
         "from": "assets/",
         "to": "assets/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/",
         "to": "resources/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -104,7 +108,9 @@
       "verifyUpdateCodeSignature": false,
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "requestedExecutionLevel": "asInvoker",
-      "signingHashAlgorithms": ["sha256"],
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
       "signDlls": false
     },
     "nsis": {
@@ -124,11 +130,20 @@
       "runAfterFinish": true,
       "menuCategory": "Restaurant Management",
       "displayLanguageSelector": false,
-      "installerLanguages": ["en_US"],
+      "installerLanguages": [
+        "en_US"
+      ],
       "language": "1033",
       "multiLanguageInstaller": false,
       "packElevateHelper": true,
-      "preCompressedFileExtensions": [".avi", ".mov", ".mp4", ".mp3", ".mp2", ".qt"],
+      "preCompressedFileExtensions": [
+        ".avi",
+        ".mov",
+        ".mp4",
+        ".mp3",
+        ".mp2",
+        ".qt"
+      ],
       "warningsAsErrors": false,
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "guid": "12345678-1234-1234-1234-123456789012",
