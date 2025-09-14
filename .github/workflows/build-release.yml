@@ -1,23 +1,40 @@
-name: Build/release
+name: Build & Release Cottage Tandoori POS
 
-on: push
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: write  # Needed for creating releases
 
     steps:
-      - name: Check out Git repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Node.js and npm
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'npm'
 
-      - name: Build/release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron App
+        uses: x6Pnda/action-electron-compiler@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: true
+          package_manager: NPM
+        env:
+          # Disable code signing for now (can be enabled later)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
