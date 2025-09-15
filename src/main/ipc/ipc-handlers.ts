@@ -1,377 +1,185 @@
-import { ipcMain, shell, app } from 'electron';
+import { ipcMain, app } from 'electron';
 import log from 'electron-log';
-import { DatabaseManager, OrderData } from '../offline/database-manager';
-import { ThermalPrinterManager, ReceiptData } from '../printer/thermal-printer-manager';
-import * as os from 'os';
-import * as path from 'path';
+import { DatabaseManager } from '../offline/database-manager';
+import { ThermalPrinterManager } from '../printer/thermal-printer-manager';
+import { AutoStartManager } from '../windows/auto-start-manager';
 
-export class IPCHandlers {
-  private dbManager!: DatabaseManager;
-  private printerManager!: ThermalPrinterManager;
+// Initialize managers
+const dbManager = new DatabaseManager();
+const printerManager = new ThermalPrinterManager(dbManager);
+const autoStartManager = new AutoStartManager();
 
-  constructor(dbManager: DatabaseManager, printerManager: ThermalPrinterManager) {
-    this.dbManager = dbManager;
-    this.printerManager = printerManager;
-    this.registerHandlers();
-  }
+interface POSOrder {
+  id: string;
+  items: POSOrderItem[];
+  total: number;
+  customer?: {
+    name?: string;
+    phone?: string;
+  };
+  orderType: 'dine-in' | 'takeaway' | 'delivery';
+  tableNumber?: number;
+  timestamp: string;
+}
 
-  private registerHandlers(): void {
-    // System operations
-    ipcMain.handle('get-app-version', () => {
-      return app.getVersion();
-    });
+interface POSOrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  variants?: string[];
+  special_instructions?: string;
+}
 
-    ipcMain.handle('get-system-info', () => {
-      return {
-        platform: process.platform,
-        arch: process.arch,
-        nodeVersion: process.version,
-        electronVersion: process.versions.electron,
-        osVersion: os.release(),
-        totalMemory: Math.round(os.totalmem() / 1024 / 1024), // MB
-        userDataPath: app.getPath('userData')
-      };
-    });
+interface PrintJobData {
+  type: 'receipt' | 'kitchen';
+  order: POSOrder;
+  timestamp: string;
+}
 
-    ipcMain.handle('open-external-url', async (_, url: string) => {
-      try {
-        await shell.openExternal(url);
-        return { success: true };
-      } catch (error) {
-        log.error('Failed to open external URL:', error);
-        return { success: false, error: error.message };
-      }
-    });
+interface DatabaseRecord {
+  id: string;
+  [key: string]: unknown;
+}
 
-    // Printer operations
-    ipcMain.handle('test-print', async () => {
-      try {
-        log.info('🖨️ Test print requested via IPC');
-        const result = await this.printerManager.testPrint();
-        return result.success;
-      } catch (error) {
-        log.error('❌ Test print IPC error:', error);
-        return false;
-      }
-    });
+interface ConfigData {
+  key: string;
+  value: unknown;
+}
 
-    ipcMain.handle('print-receipt', async (_, receiptData: ReceiptData, orderId: string) => {
-      try {
-        log.info(`🖨️ Receipt print requested for order ${receiptData.orderNumber}`);
-        const result = await this.printerManager.printReceipt(receiptData, orderId);
-        return result.success;
-      } catch (error) {
-        log.error('❌ Receipt print IPC error:', error);
-        return false;
-      }
-    });
+export function setupIpcHandlers(): void {
+  log.info('Setting up IPC handlers...');
 
-    ipcMain.handle('print-kitchen-ticket', async (_, receiptData: ReceiptData, orderId: string) => {
-      try {
-        log.info(`🍳 Kitchen ticket requested for order ${receiptData.orderNumber}`);
-        const result = await this.printerManager.printKitchenTicket(receiptData, orderId);
-        return result.success;
-      } catch (error) {
-        log.error('❌ Kitchen ticket IPC error:', error);
-        return false;
-      }
-    });
-
-    ipcMain.handle('get-printer-status', async () => {
-      try {
-        const status = await this.printerManager.checkPrinterStatus();
-        return {
-          connected: status.connected,
-          name: status.name,
-          ready: this.printerManager.isReady()
-        };
-      } catch (error) {
-        log.error('❌ Printer status check error:', error);
-        return { connected: false, name: 'Unknown', ready: false };
-      }
-    });
-
-    ipcMain.handle('process-print-queue', async () => {
-      try {
-        await this.printerManager.processPrintQueue();
-        return { success: true };
-      } catch (error) {
-        log.error('❌ Print queue processing error:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    // Database operations
-    ipcMain.handle('save-offline-order', async (_, orderData: OrderData) => {
-      try {
-        log.info(`💾 Saving offline order ${orderData.orderNumber}`);
-        this.dbManager.saveOrder(orderData);
-        return { success: true };
-      } catch (error) {
-        log.error('❌ Save offline order error:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle('get-offline-orders', async () => {
-      try {
-        const orders = this.dbManager.getUnsyncedOrders();
-        log.info(`📋 Retrieved ${orders.length} unsynced orders`);
-        return orders;
-      } catch (error) {
-        log.error('❌ Get offline orders error:', error);
-        return [];
-      }
-    });
-
-    ipcMain.handle('get-order', async (_, orderId: string) => {
-      try {
-        const order = this.dbManager.getOrder(orderId);
-        return order;
-      } catch (error) {
-        log.error('❌ Get order error:', error);
-        return null;
-      }
-    });
-
-    ipcMain.handle('sync-offline-orders', async () => {
-      try {
-        log.info('🔄 Starting offline order sync');
-        const unsyncedOrders = this.dbManager.getUnsyncedOrders();
-
-        // TODO: Implement actual sync with Supabase
-        // For now, we'll simulate successful sync
-        for (const order of unsyncedOrders) {
-          // Mark as synced (in real implementation, sync with Supabase first)
-          order.synced = true;
-          this.dbManager.saveOrder(order);
-        }
-
-        log.info(`✅ Synced ${unsyncedOrders.length} orders`);
-        return { success: true, syncedCount: unsyncedOrders.length };
-      } catch (error) {
-        log.error('❌ Sync offline orders error:', error);
-        return { success: false, error: error.message, syncedCount: 0 };
-      }
-    });
-
-    // Configuration operations
-    ipcMain.handle('get-config', async (_, key: string) => {
-      try {
-        const value = this.dbManager.getConfig(key);
-        return value;
-      } catch (error) {
-        log.error('❌ Get config error:', error);
-        return null;
-      }
-    });
-
-    ipcMain.handle('set-config', async (_, key: string, value: string) => {
-      try {
-        this.dbManager.setConfig(key, value);
-        log.info(`⚙️ Config updated: ${key} = ${value}`);
-        return { success: true };
-      } catch (error) {
-        log.error('❌ Set config error:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle('get-all-config', async () => {
-      try {
-        // Get common configuration keys
-        const configKeys = [
-          'app_version', 'pos_url', 'printer_name', 'auto_print_receipts',
-          'offline_mode', 'last_sync', 'tax_rate', 'currency'
-        ];
-
-        const config: Record<string, string> = {};
-        for (const key of configKeys) {
-          const value = this.dbManager.getConfig(key);
-          if (value !== null) {
-            config[key] = value;
-          }
-        }
-
-        return config;
-      } catch (error) {
-        log.error('❌ Get all config error:', error);
-        return {};
-      }
-    });
-
-    // Database maintenance
-    ipcMain.handle('cleanup-database', async () => {
-      try {
-        this.dbManager.cleanup();
-        log.info('🧹 Database cleanup completed via IPC');
-        return { success: true };
-      } catch (error) {
-        log.error('❌ Database cleanup error:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    // Development helpers
-    ipcMain.handle('get-app-logs', async () => {
-      try {
-        const logPath = log.transports.file.getFile().path;
-        return { logPath };
-      } catch (error) {
-        return { logPath: null };
-      }
-    });
-
-    ipcMain.handle('open-logs-folder', async () => {
-      try {
-        const logPath = log.transports.file.getFile().path;
-        await shell.showItemInFolder(logPath);
-        return { success: true };
-      } catch (error) {
-        log.error('❌ Open logs folder error:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    // Settings and about dialogs
-    ipcMain.on('open-settings', () => {
-      log.info('⚙️ Settings requested');
-      // TODO: Implement settings window or modal
-    });
-
-    ipcMain.on('show-about', () => {
-      log.info('ℹ️ About dialog requested');
-      // TODO: Implement about dialog
-    });
-
-    // Update operations
-    ipcMain.on('restart-and-update', () => {
-      log.info('🔄 Restart and update requested');
-      app.relaunch();
-      app.exit();
-    });
-
-    // Connection monitoring
-    this.setupConnectionMonitoring();
-
-    log.info('✅ IPC handlers registered successfully');
-  }
-
-  private setupConnectionMonitoring(): void {
-    // Monitor internet connection and notify renderer
-    let isOnline = true;
-
-    const checkConnection = async () => {
-      try {
-        // Simple check by trying to reach a reliable endpoint
-        const response = await fetch('https://www.google.com', { 
-          method: 'HEAD',
-          mode: 'no-cors',
-          timeout: 5000 
-        });
-
-        const newStatus = true; // If we get here, we're online
-        if (newStatus !== isOnline) {
-          isOnline = newStatus;
-          this.broadcastConnectionChange(isOnline);
-        }
-      } catch (error) {
-        const newStatus = false;
-        if (newStatus !== isOnline) {
-          isOnline = newStatus;
-          this.broadcastConnectionChange(isOnline);
-        }
-      }
-    };
-
-    // Check connection every 30 seconds
-    setInterval(checkConnection, 30000);
-
-    // Initial check
-    checkConnection();
-  }
-
-  private broadcastConnectionChange(isOnline: boolean): void {
-    // Broadcast to all renderer processes
-    const { BrowserWindow } = require('electron');
-    const windows = BrowserWindow.getAllWindows();
-
-    windows.forEach(window => {
-      window.webContents.send('connection-change', isOnline);
-    });
-
-    log.info(`📡 Connection status changed: ${isOnline ? 'Online' : 'Offline'}`);
-
-    // Update database config
-    this.dbManager.setConfig('offline_mode', isOnline ? 'false' : 'true');
-
-    // If we're back online, process print queue
-    if (isOnline) {
-      this.printerManager.processPrintQueue().catch(error => {
-        log.error('❌ Auto print queue processing failed:', error);
-      });
+  // Database operations
+  ipcMain.handle('db:query', async (_, sql: string, params: unknown[] = []): Promise<DatabaseRecord[]> => {
+    try {
+      return await dbManager.query(sql, params);
+    } catch (error) {
+      log.error('Database query error:', error);
+      throw error;
     }
-  }
+  });
 
-  // Method to simulate order creation for testing
-  public async createTestOrder(): Promise<void> {
-    const testOrder: OrderData = {
-      id: `test-${Date.now()}`,
-      orderNumber: `TEST${Math.floor(Math.random() * 1000)}`,
-      orderType: 'DINE_IN',
-      tableNumber: '5',
-      customerName: 'Test Customer',
-      subtotal: 25.50,
-      taxAmount: 5.10,
-      discountAmount: 0,
-      totalAmount: 30.60,
-      paymentMethod: 'CARD',
-      paymentStatus: 'PAID',
-      orderStatus: 'NEW',
-      notes: 'Test order for system verification',
-      synced: false,
-      items: [
-        {
-          id: `item-${Date.now()}-1`,
-          menuItemId: 'chicken-tikka-masala',
-          quantity: 1,
-          unitPrice: 15.50,
-          totalPrice: 15.50,
-          specialInstructions: 'Medium spice'
-        },
-        {
-          id: `item-${Date.now()}-2`,
-          menuItemId: 'pilau-rice',
-          quantity: 2,
-          unitPrice: 5.00,
-          totalPrice: 10.00
-        }
-      ]
-    };
+  ipcMain.handle('db:run', async (_, sql: string, params: unknown[] = []): Promise<{ changes: number; lastInsertRowid: number }> => {
+    try {
+      return await dbManager.run(sql, params);
+    } catch (error) {
+      log.error('Database run error:', error);
+      throw error;
+    }
+  });
 
-    this.dbManager.saveOrder(testOrder);
+  // Configuration
+  ipcMain.handle('config:get', async (_, key: string): Promise<unknown> => {
+    try {
+      return await dbManager.getConfig(key);
+    } catch (error) {
+      log.error('Config get error:', error);
+      return null;
+    }
+  });
 
-    // Create receipt data for printing
-    const receiptData: ReceiptData = {
-      orderNumber: testOrder.orderNumber,
-      orderType: testOrder.orderType,
-      items: testOrder.items.map(item => ({
-        name: item.menuItemId.replace('-', ' ').replace(/\w/g, l => l.toUpperCase()),
-        quantity: item.quantity,
-        price: item.unitPrice,
-        total: item.totalPrice
-      })),
-      subtotal: testOrder.subtotal,
-      tax: testOrder.taxAmount,
-      total: testOrder.totalAmount,
-      timestamp: new Date(),
-      customerName: testOrder.customerName,
-      tableNumber: testOrder.tableNumber
-    };
+  ipcMain.handle('config:set', async (_, key: string, value: unknown): Promise<void> => {
+    try {
+      await dbManager.setConfig(key, value);
+    } catch (error) {
+      log.error('Config set error:', error);
+      throw error;
+    }
+  });
 
-    // Add to print queue
-    await this.printerManager.printReceipt(receiptData, testOrder.id);
+  // Printing operations
+  ipcMain.handle('printer:print-receipt', async (_, orderData: POSOrder): Promise<boolean> => {
+    try {
+      return await printerManager.printReceipt(orderData);
+    } catch (error) {
+      log.error('Print receipt error:', error);
+      return false;
+    }
+  });
 
-    log.info(`🧪 Test order created: ${testOrder.orderNumber}`);
-  }
+  ipcMain.handle('printer:print-kitchen-ticket', async (_, orderData: POSOrder): Promise<boolean> => {
+    try {
+      return await printerManager.printKitchenTicket(orderData);
+    } catch (error) {
+      log.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('printer:get-status', async (): Promise<{ connected: boolean; ready: boolean }> => {
+    try {
+      return await printerManager.getStatus();
+    } catch (error) {
+      log.error('Get printer status error:', error);
+      return { connected: false, ready: false };
+    }
+  });
+
+  // Auto-start management
+  ipcMain.handle('autostart:enable', async (): Promise<boolean> => {
+    try {
+      return await autoStartManager.enable();
+    } catch (error) {
+      log.error('Enable auto-start error:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('autostart:disable', async (): Promise<boolean> => {
+    try {
+      return await autoStartManager.disable();
+    } catch (error) {
+      log.error('Disable auto-start error:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('autostart:is-enabled', async (): Promise<boolean> => {
+    try {
+      return await autoStartManager.isEnabled();
+    } catch (error) {
+      log.error('Check auto-start status error:', error);
+      return false;
+    }
+  });
+
+  // App information
+  ipcMain.handle('app:get-version', (): string => {
+    return app.getVersion();
+  });
+
+  ipcMain.handle('app:get-path', (_, name: 'home' | 'appData' | 'userData' | 'cache' | 'temp'): string => {
+    return app.getPath(name);
+  });
+
+  // Offline queue management
+  ipcMain.handle('offline:add-to-queue', async (_, data: POSOrder): Promise<string> => {
+    try {
+      return await dbManager.addToOfflineQueue(data);
+    } catch (error) {
+      log.error('Add to offline queue error:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('offline:get-queue', async (): Promise<DatabaseRecord[]> => {
+    try {
+      return await dbManager.getOfflineQueue();
+    } catch (error) {
+      log.error('Get offline queue error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('offline:process-queue', async (): Promise<number> => {
+    try {
+      return await dbManager.processOfflineQueue();
+    } catch (error) {
+      log.error('Process offline queue error:', error);
+      return 0;
+    }
+  });
+
+  log.info('IPC handlers setup complete');
 }
