@@ -4,7 +4,7 @@
   "description": "Cottage Tandoori Professional POS - Desktop Application with Offline Capabilities",
   "main": "dist/main/index.js",
   "author": {
-    "name": "Cottage Tandoori Restaurant", 
+    "name": "Cottage Tandoori Restaurant",
     "email": "support@cottagetandoori.co.uk"
   },
   "license": "MIT",
@@ -21,7 +21,7 @@
     "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
-    "build:preload": "tsc -p tsconfig.preload.json", 
+    "build:preload": "tsc -p tsconfig.preload.json",
     "build:win": "npm run build && electron-builder --win",
     "build:publish": "npm run build && electron-builder --win --publish=always",
     "start": "electron .",
@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^20.10.0",
+    "@types/node": "^20.12.12",
     "@types/serialport": "^8.0.5",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
@@ -54,7 +54,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "serialport": "^12.0.0",
-    "usb": "^2.11.0"
+    "usb": "^2.11.0",
+    "@electron-toolkit/utils": "^1.0.2",
+    "node-thermal-printer": "^4.1.2"
   },
   "build": {
     "appId": "uk.co.cottagetandoori.pos",
@@ -76,7 +78,9 @@
     "win": {
       "target": {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       },
       "icon": "build/icon.ico",
       "requestedExecutionLevel": "requireAdministrator",
@@ -90,7 +94,7 @@
       "shortcutName": "Cottage Tandoori POS",
       "include": "build/installer.nsh",
       "installerIcon": "build/installer.ico",
-      "uninstallerIcon": "build/installer.ico", 
+      "uninstallerIcon": "build/installer.ico",
       "installerHeaderIcon": "build/icon.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
