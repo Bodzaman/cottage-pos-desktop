@@ -1,57 +1,32 @@
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
 import { app } from 'electron';
+import { join } from 'path';
 import log from 'electron-log';
 
-export interface OrderData {
+interface DatabaseRecord {
   id: string;
-  orderNumber: string;
-  orderType: 'DINE_IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
-  tableNumber?: string;
-  customerName?: string;
-  customerPhone?: string;
-  customerAddress?: string;
-  subtotal: number;
-  taxAmount: number;
-  discountAmount: number;
-  totalAmount: number;
-  paymentMethod?: 'CASH' | 'CARD' | 'ONLINE';
-  paymentStatus: 'PENDING' | 'PAID' | 'FAILED';
-  orderStatus: 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-  notes?: string;
-  synced: boolean;
-  items: OrderItemData[];
+  [key: string]: unknown;
 }
 
-export interface OrderItemData {
-  id: string;
-  menuItemId: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  specialInstructions?: string;
+interface ConfigRecord {
+  key: string;
+  value: string;
 }
 
-export interface MenuItemData {
+interface OfflineQueueRecord {
   id: string;
-  categoryId: string;
-  name: string;
-  description?: string;
-  price: number;
-  imageUrl?: string;
-  allergens?: string[];
-  spiceLevel: number;
-  available: boolean;
-  sortOrder: number;
+  data: string;
+  created_at: string;
+  processed: number;
 }
 
-export interface CategoryData {
+interface PrintJobRecord {
   id: string;
-  name: string;
-  description?: string;
-  sortOrder: number;
-  active: boolean;
+  type: string;
+  data: string;
+  status: string;
+  created_at: string;
+  processed_at?: string;
 }
 
 export class DatabaseManager {
@@ -59,247 +34,234 @@ export class DatabaseManager {
   private dbPath!: string;
 
   constructor() {
-    // Create database directory in user data
-    const userDataPath = app.getPath('userData');
-    const dbDir = path.join(userDataPath, 'database');
-
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-
-    this.dbPath = path.join(dbDir, 'cottage_pos.db');
-    this.initializeDatabase();
+    this.initialize();
   }
 
-  private initializeDatabase(): void {
+  private initialize(): void {
     try {
+      // Set database path in user data directory
+      this.dbPath = join(app.getPath('userData'), 'cottage-pos.db');
+      
+      // Initialize database connection
       this.db = new Database(this.dbPath);
       this.db.pragma('journal_mode = WAL');
-      this.db.pragma('foreign_keys = ON');
-
-      // Read and execute schema
-      const schemaPath = path.join(__dirname, '../database/schema.sql');
-      if (fs.existsSync(schemaPath)) {
-        const schema = fs.readFileSync(schemaPath, 'utf-8');
-        this.db.exec(schema);
-        log.info('✅ Database initialized with schema');
-      } else {
-        log.error('❌ Database schema file not found');
-      }
+      
+      // Create tables if they don't exist
+      this.createTables();
+      
+      log.info(`Database initialized at: ${this.dbPath}`);
     } catch (error) {
-      log.error('❌ Database initialization failed:', error);
+      log.error('Database initialization error:', error);
       throw error;
     }
   }
 
-  // Configuration methods
-  public getConfig(key: string): string | null {
-    const stmt = this.db.prepare('SELECT value FROM config WHERE key = ?');
-    const result = stmt.get(key) as { value: string } | undefined;
-    return result?.value || null;
-  }
-
-  public setConfig(key: string, value: string): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO config (key, value, updated_at) 
-      VALUES (?, ?, CURRENT_TIMESTAMP)
+  private createTables(): void {
+    // Configuration table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
     `);
-    stmt.run(key, value);
+
+    // Offline queue for syncing when online
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS offline_queue (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processed INTEGER DEFAULT 0
+      )
+    `);
+
+    // Print jobs queue
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS print_jobs (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        data TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processed_at DATETIME
+      )
+    `);
+
+    // Orders cache for offline operation
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS orders_cache (
+        id TEXT PRIMARY KEY,
+        order_data TEXT NOT NULL,
+        order_type TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        synced INTEGER DEFAULT 0
+      )
+    `);
+
+    // Menu items cache
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS menu_cache (
+        id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        name TEXT NOT NULL,
+        price REAL NOT NULL,
+        description TEXT,
+        available INTEGER DEFAULT 1,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    log.info('Database tables created/verified');
   }
 
-  // Order methods
-  public saveOrder(order: OrderData): void {
-    const transaction = this.db.transaction((orderData: OrderData) => {
-      // Insert order
-      const orderStmt = this.db.prepare(`
-        INSERT OR REPLACE INTO orders (
-          id, order_number, order_type, table_number, customer_name, 
-          customer_phone, customer_address, subtotal, tax_amount, 
-          discount_amount, total_amount, payment_method, payment_status, 
-          order_status, notes, synced, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
+  async query(sql: string, params: unknown[] = []): Promise<DatabaseRecord[]> {
+    try {
+      const stmt = this.db.prepare(sql);
+      const results = stmt.all(...params) as DatabaseRecord[];
+      return results;
+    } catch (error) {
+      log.error('Database query error:', error);
+      throw error;
+    }
+  }
 
-      orderStmt.run(
-        orderData.id, orderData.orderNumber, orderData.orderType,
-        orderData.tableNumber, orderData.customerName, orderData.customerPhone,
-        orderData.customerAddress, orderData.subtotal, orderData.taxAmount,
-        orderData.discountAmount, orderData.totalAmount, orderData.paymentMethod,
-        orderData.paymentStatus, orderData.orderStatus, orderData.notes, 
-        orderData.synced ? 1 : 0
-      );
+  async run(sql: string, params: unknown[] = []): Promise<{ changes: number; lastInsertRowid: number }> {
+    try {
+      const stmt = this.db.prepare(sql);
+      const result = stmt.run(...params);
+      return {
+        changes: result.changes,
+        lastInsertRowid: Number(result.lastInsertRowid)
+      };
+    } catch (error) {
+      log.error('Database run error:', error);
+      throw error;
+    }
+  }
 
-      // Delete existing order items
-      const deleteItemsStmt = this.db.prepare('DELETE FROM order_items WHERE order_id = ?');
-      deleteItemsStmt.run(orderData.id);
-
-      // Insert order items
-      const itemStmt = this.db.prepare(`
-        INSERT INTO order_items (
-          id, order_id, menu_item_id, quantity, unit_price, 
-          total_price, special_instructions
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const item of orderData.items) {
-        itemStmt.run(
-          item.id, orderData.id, item.menuItemId, item.quantity,
-          item.unitPrice, item.totalPrice, item.specialInstructions
-        );
+  async getConfig(key: string): Promise<unknown> {
+    try {
+      const stmt = this.db.prepare('SELECT value FROM config WHERE key = ?');
+      const result = stmt.get(key) as ConfigRecord | undefined;
+      
+      if (result) {
+        try {
+          return JSON.parse(result.value);
+        } catch {
+          return result.value;
+        }
       }
-
-      // Add to sync queue if not synced
-      if (!orderData.synced) {
-        this.addToSyncQueue('CREATE', 'orders', orderData.id, JSON.stringify(orderData));
-      }
-    });
-
-    transaction(order);
-    log.info(`💾 Order ${order.orderNumber} saved to local database`);
+      
+      return null;
+    } catch (error) {
+      log.error('Get config error:', error);
+      throw error;
+    }
   }
 
-  public getOrder(orderId: string): OrderData | null {
-    const orderStmt = this.db.prepare(`
-      SELECT * FROM orders WHERE id = ?
-    `);
-    const order = orderStmt.get(orderId) as { id: number; status: string; customer_id?: number; items?: string; total?: number; created_at?: string; } | undefined;
-
-    if (!order) return null;
-
-    const itemsStmt = this.db.prepare(`
-      SELECT * FROM order_items WHERE order_id = ?
-    `);
-    const items = itemsStmt.all(orderId) as any[];
-
-    return {
-      id: order.id,
-      orderNumber: order.order_number,
-      orderType: order.order_type,
-      tableNumber: order.table_number,
-      customerName: order.customer_name,
-      customerPhone: order.customer_phone,
-      customerAddress: order.customer_address,
-      subtotal: order.subtotal,
-      taxAmount: order.tax_amount,
-      discountAmount: order.discount_amount,
-      totalAmount: order.total_amount,
-      paymentMethod: order.payment_method,
-      paymentStatus: order.payment_status,
-      orderStatus: order.order_status,
-      notes: order.notes,
-      synced: Boolean(order.synced),
-      items: items.map(item => ({
-        id: item.id,
-        menuItemId: item.menu_item_id,
-        quantity: item.quantity,
-        unitPrice: item.unit_price,
-        totalPrice: item.total_price,
-        specialInstructions: item.special_instructions
-      }))
-    };
+  async setConfig(key: string, value: unknown): Promise<void> {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO config (key, value, updated_at) 
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `);
+      
+      const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
+      stmt.run(key, serializedValue);
+    } catch (error) {
+      log.error('Set config error:', error);
+      throw error;
+    }
   }
 
-  public getUnsyncedOrders(): OrderData[] {
-    const stmt = this.db.prepare(`
-      SELECT id FROM orders WHERE synced = 0 ORDER BY created_at
-    `);
-    const orderIds = stmt.all() as { id: string }[];
-
-    return orderIds.map(row => this.getOrder(row.id)).filter(order => order !== null) as OrderData[];
+  async addToOfflineQueue(data: unknown): Promise<string> {
+    try {
+      const id = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const stmt = this.db.prepare(`
+        INSERT INTO offline_queue (id, data) VALUES (?, ?)
+      `);
+      
+      stmt.run(id, JSON.stringify(data));
+      return id;
+    } catch (error) {
+      log.error('Add to offline queue error:', error);
+      throw error;
+    }
   }
 
-  // Sync queue methods
-  public addToSyncQueue(operation: string, tableName: string, recordId: string, data?: string): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO sync_queue (operation_type, table_name, record_id, data)
-      VALUES (?, ?, ?, ?)
-    `);
-    stmt.run(operation, tableName, recordId, data);
+  async getOfflineQueue(): Promise<DatabaseRecord[]> {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM offline_queue WHERE processed = 0 ORDER BY created_at');
+      return stmt.all() as DatabaseRecord[];
+    } catch (error) {
+      log.error('Get offline queue error:', error);
+      return [];
+    }
   }
 
-  public getSyncQueue(limit = 50): Array<any> {
-    const stmt = this.db.prepare(`
-      SELECT * FROM sync_queue 
-      WHERE attempts < 3 
-      ORDER BY created_at 
-      LIMIT ?
-    `);
-    return stmt.all(limit);
+  async processOfflineQueue(): Promise<number> {
+    try {
+      // Mark all items as processed
+      const stmt = this.db.prepare('UPDATE offline_queue SET processed = 1 WHERE processed = 0');
+      const result = stmt.run();
+      
+      log.info(`Processed ${result.changes} offline queue items`);
+      return result.changes;
+    } catch (error) {
+      log.error('Process offline queue error:', error);
+      return 0;
+    }
   }
 
-  public markSyncItemProcessed(syncId: number): void {
-    const stmt = this.db.prepare('DELETE FROM sync_queue WHERE id = ?');
-    stmt.run(syncId);
+  async addPrintJob(type: string, data: unknown): Promise<string> {
+    try {
+      const id = `print_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const stmt = this.db.prepare(`
+        INSERT INTO print_jobs (id, type, data) VALUES (?, ?, ?)
+      `);
+      
+      stmt.run(id, type, JSON.stringify(data));
+      return id;
+    } catch (error) {
+      log.error('Add print job error:', error);
+      throw error;
+    }
   }
 
-  public markSyncItemFailed(syncId: number, error: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE sync_queue 
-      SET attempts = attempts + 1, last_attempt = CURRENT_TIMESTAMP, error_message = ?
-      WHERE id = ?
-    `);
-    stmt.run(error, syncId);
+  async getPendingPrintJobs(): Promise<PrintJobRecord[]> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM print_jobs 
+        WHERE status = 'pending' 
+        ORDER BY created_at
+      `);
+      return stmt.all() as PrintJobRecord[];
+    } catch (error) {
+      log.error('Get pending print jobs error:', error);
+      return [];
+    }
   }
 
-  // Print queue methods
-  public addPrintJob(orderId: string, printType: string, content: string, printerName?: string): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO print_jobs (order_id, print_type, content, printer_name)
-      VALUES (?, ?, ?, ?)
-    `);
-    stmt.run(orderId, printType, content, printerName);
+  async markPrintJobCompleted(id: string): Promise<void> {
+    try {
+      const stmt = this.db.prepare(`
+        UPDATE print_jobs 
+        SET status = 'completed', processed_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `);
+      stmt.run(id);
+    } catch (error) {
+      log.error('Mark print job completed error:', error);
+      throw error;
+    }
   }
 
-  public getPendingPrintJobs(): Array<any> {
-    const stmt = this.db.prepare(`
-      SELECT * FROM print_jobs 
-      WHERE status = 'PENDING' AND attempts < 3
-      ORDER BY created_at
-    `);
-    return stmt.all();
-  }
-
-  public markPrintJobCompleted(jobId: number): void {
-    const stmt = this.db.prepare(`
-      UPDATE print_jobs 
-      SET status = 'PRINTED', printed_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(jobId);
-  }
-
-  public markPrintJobFailed(jobId: number, error: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE print_jobs 
-      SET status = 'FAILED', attempts = attempts + 1, error_message = ?
-      WHERE id = ?
-    `);
-    stmt.run(error, jobId);
-  }
-
-  // Cleanup methods
-  public cleanup(): void {
-    // Remove old sync queue items (older than 7 days)
-    const cleanupSync = this.db.prepare(`
-      DELETE FROM sync_queue 
-      WHERE created_at < datetime('now', '-7 days')
-    `);
-    cleanupSync.run();
-
-    // Remove old completed print jobs (older than 30 days)
-    const cleanupPrint = this.db.prepare(`
-      DELETE FROM print_jobs 
-      WHERE status = 'PRINTED' AND created_at < datetime('now', '-30 days')
-    `);
-    cleanupPrint.run();
-
-    log.info('🧹 Database cleanup completed');
-  }
-
-  public close(): void {
+  close(): void {
     if (this.db) {
       this.db.close();
-      log.info('🔒 Database connection closed');
+      log.info('Database connection closed');
     }
   }
 }
