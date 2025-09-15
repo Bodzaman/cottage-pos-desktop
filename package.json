@@ -48,8 +48,8 @@
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
     "directories": {
-      "output": "release",
-      "buildResources": "assets"
+      "output": "dist",
+      "app": "."
     },
     "files": [
       "dist/**/*",
@@ -65,8 +65,10 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "publisherName": "Cottage Tandoori",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
@@ -75,16 +77,21 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "allowElevation": true
     },
     "publish": [
       {
         "provider": "github",
         "owner": "Bodzaman",
         "repo": "cottage-pos-desktop",
-        "private": false
+        "private": false,
+        "token": null,
+        "publishAutoUpdate": true
       }
-    ]
+    ],
+    "copyright": "Copyright \u00a9 2025 Cottage Tandoori",
+    "description": "Professional POS system for Cottage Tandoori restaurant"
   },
   "repository": {
     "type": "git",
