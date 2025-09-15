@@ -1,100 +1,133 @@
 import { contextBridge, ipcRenderer } from 'electron';
-// Type definitions for better type safety
-interface MenuItemOrder {
+import log from 'electron-log';
+
+// Define interfaces for type safety
+interface POSOrder {
+  id: string;
+  items: POSOrderItem[];
+  total: number;
+  customer?: {
+    name?: string;
+    phone?: string;
+  };
+  orderType: 'dine-in' | 'takeaway' | 'delivery';
+  tableNumber?: number;
+  timestamp: string;
+}
+
+interface POSOrderItem {
   id: string;
   name: string;
-  price: number;
   quantity: number;
-  modifiers?: string[];
+  price: number;
+  variants?: string[];
+  special_instructions?: string;
 }
 
-interface PrintJobData {
-  type: 'receipt' | 'kitchen' | 'test';
-  content: string;
-  options?: Record<string, unknown>;
-}
-
-
-// Type definitions for the exposed API
-export interface ElectronAPI {
-  // System operations
-  openSettings: () => void;
-  showAbout: () => void;
-
-  // Printer operations
-  testPrint: () => Promise<boolean>;
-  printReceipt: (data: ReceiptData) => Promise<boolean>;
-
-  // Update operations
-  onUpdateAvailable: (callback: () => void) => void;
-  onUpdateDownloaded: (callback: () => void) => void;
-  restartAndUpdate: () => void;
-
-  // Offline operations
-  saveOfflineOrder: (order: OrderData) => Promise<void>;
-  getOfflineOrders: () => Promise<OrderData[]>;
-  syncOfflineOrders: () => Promise<void>;
-
-  // Connection status
-  onConnectionChange: (callback: (isOnline: boolean) => void) => void;
-}
-
-export interface ReceiptData {
-  orderNumber: string;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-  }>;
-  total: number;
-  timestamp: Date;
-}
-
-export interface OrderData {
+interface DatabaseRecord {
   id: string;
-  items: Array<MenuItemOrder>;
-  total: number;
-  timestamp: Date;
-  synced: boolean;
+  [key: string]: unknown;
 }
 
-// Secure API exposure
-const electronAPI: ElectronAPI = {
-  // System operations
-  openSettings: () => ipcRenderer.send('open-settings'),
-  showAbout: () => ipcRenderer.send('show-about'),
+interface PrinterStatus {
+  connected: boolean;
+  ready: boolean;
+}
 
-  // Printer operations
-  testPrint: () => ipcRenderer.invoke('test-print'),
-  printReceipt: (data: ReceiptData) => ipcRenderer.invoke('print-receipt', data),
-
-  // Update operations
-  onUpdateAvailable: (callback) => {
-    ipcRenderer.on('update-available', callback);
-  },
-  onUpdateDownloaded: (callback) => {
-    ipcRenderer.on('update-downloaded', callback);
-  },
-  restartAndUpdate: () => ipcRenderer.send('restart-and-update'),
-
+interface ElectronAPI {
+  // Database operations
+  database: {
+    query: (sql: string, params?: unknown[]) => Promise<DatabaseRecord[]>;
+    run: (sql: string, params?: unknown[]) => Promise<{ changes: number; lastInsertRowid: number }>;
+  };
+  
+  // Configuration
+  config: {
+    get: (key: string) => Promise<unknown>;
+    set: (key: string, value: unknown) => Promise<void>;
+  };
+  
+  // Printing
+  printer: {
+    printReceipt: (orderData: POSOrder) => Promise<boolean>;
+    printKitchenTicket: (orderData: POSOrder) => Promise<boolean>;
+    getStatus: () => Promise<PrinterStatus>;
+  };
+  
+  // Auto-start
+  autoStart: {
+    enable: () => Promise<boolean>;
+    disable: () => Promise<boolean>;
+    isEnabled: () => Promise<boolean>;
+  };
+  
+  // App utilities
+  app: {
+    getVersion: () => Promise<string>;
+    getPath: (name: 'home' | 'appData' | 'userData' | 'cache' | 'temp') => Promise<string>;
+  };
+  
   // Offline operations
-  saveOfflineOrder: (order: OrderData) => ipcRenderer.invoke('save-offline-order', order),
-  getOfflineOrders: () => ipcRenderer.invoke('get-offline-orders'),
-  syncOfflineOrders: () => ipcRenderer.invoke('sync-offline-orders'),
+  offline: {
+    addToQueue: (data: POSOrder) => Promise<string>;
+    getQueue: () => Promise<DatabaseRecord[]>;
+    processQueue: () => Promise<number>;
+  };
+}
 
-  // Connection status
-  onConnectionChange: (callback) => {
-    ipcRenderer.on('connection-change', (_, isOnline) => callback(isOnline));
+// Type declaration for global window object
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
+
+// API definition with proper typing
+const api: ElectronAPI = {
+  database: {
+    query: (sql: string, params: unknown[] = []) => ipcRenderer.invoke('db:query', sql, params),
+    run: (sql: string, params: unknown[] = []) => ipcRenderer.invoke('db:run', sql, params)
+  },
+  
+  config: {
+    get: (key: string) => ipcRenderer.invoke('config:get', key),
+    set: (key: string, value: unknown) => ipcRenderer.invoke('config:set', key, value)
+  },
+  
+  printer: {
+    printReceipt: (orderData: POSOrder) => ipcRenderer.invoke('printer:print-receipt', orderData),
+    printKitchenTicket: (orderData: POSOrder) => ipcRenderer.invoke('printer:print-kitchen-ticket', orderData),
+    getStatus: () => ipcRenderer.invoke('printer:get-status')
+  },
+  
+  autoStart: {
+    enable: () => ipcRenderer.invoke('autostart:enable'),
+    disable: () => ipcRenderer.invoke('autostart:disable'),
+    isEnabled: () => ipcRenderer.invoke('autostart:is-enabled')
+  },
+  
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:get-version'),
+    getPath: (name: 'home' | 'appData' | 'userData' | 'cache' | 'temp') => ipcRenderer.invoke('app:get-path', name)
+  },
+  
+  offline: {
+    addToQueue: (data: POSOrder) => ipcRenderer.invoke('offline:add-to-queue', data),
+    getQueue: () => ipcRenderer.invoke('offline:get-queue'),
+    processQueue: () => ipcRenderer.invoke('offline:process-queue')
   }
 };
 
-// Safely expose the API to the renderer process
-contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-
-// Security: Remove any Node.js globals that might have leaked
-delete (window as Record<string, unknown>).require;
-delete (window as Record<string, unknown>).exports;
-delete (window as any).module;
-
-// Log successful preload
-console.log('🔒 Preload script loaded securely with context isolation');
+// Expose the API to the renderer process
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electronAPI', api);
+    log.info('Electron API exposed to renderer process');
+  } catch (error) {
+    log.error('Failed to expose Electron API:', error);
+  }
+} else {
+  // Fallback for non-isolated context (not recommended)
+  (window as unknown as { electronAPI: ElectronAPI }).electronAPI = api;
+  log.warn('Context isolation is disabled - this is not recommended for security');
+}
