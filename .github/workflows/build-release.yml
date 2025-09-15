@@ -1,24 +1,23 @@
-name: Build & Release Cottage Tandoori POS
+name: Build and Release Windows App
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
 
 jobs:
   release:
     runs-on: windows-latest
-    timeout-minutes: 30
 
     permissions:
       contents: write
 
+    timeout-minutes: 45
+
     steps:
-      - name: Checkout repository
+      - name: Check out Git repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,15 +28,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Electron app for Windows
-        run: npm run build-win
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build application
+        run: npm run build --if-present
 
-      - name: Upload release assets
-        if: startsWith(github.ref, 'refs/tags/')
-        run: npm run release
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compile and Release Electron App
+        uses: x6Pnda/action-electron-compiler@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
+          package_manager: npm
+          args: --windows --x64
+          skip_build: false
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-installer
+          path: |
+            dist/*.exe
+            dist/*.nsis.7z
+
+      - name: Debug Build Output
+        if: always()
+        run: |
+          echo "Build completed. Listing dist directory:"
+          dir dist /s
+          echo "Checking for installer files:"
+          if exist "dist\*.exe" (
+            echo "✅ Windows installer found"
+            for %%f in (dist\*.exe) do echo "   - %%f"
+          ) else (
+            echo "❌ No installer files found"
+          )
