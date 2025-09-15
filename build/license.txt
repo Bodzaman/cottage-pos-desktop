@@ -1,0 +1,39 @@
+COTTAGE TANDOORI POS - SOFTWARE LICENSE AGREEMENT
+
+Copyright (c) 2024 Cottage Tandoori Restaurant. All rights reserved.
+
+This software is proprietary and confidential. By installing and using this software, you agree to the following terms:
+
+1. GRANT OF LICENSE
+   This software is licensed, not sold. You are granted a non-exclusive, non-transferable license to use this software solely for the operation of Cottage Tandoori Restaurant point-of-sale activities.
+
+2. RESTRICTIONS
+   You may not:
+   - Copy, modify, or distribute this software
+   - Reverse engineer, decompile, or disassemble this software
+   - Use this software for any purpose other than restaurant operations
+   - Remove or alter any proprietary notices
+
+3. SUPPORT AND UPDATES
+   Technical support and software updates are provided by the development team. Updates may be delivered automatically through the built-in update mechanism.
+
+4. DATA AND PRIVACY
+   This software processes restaurant order data and customer information. All data remains on your local system and is not transmitted to third parties except for payment processing and order synchronization.
+
+5. THERMAL PRINTING
+   This software includes thermal printer drivers and is optimized for Epson TM-T20III receipt printers. Proper printer configuration is required for full functionality.
+
+6. DISCLAIMER OF WARRANTY
+   This software is provided "as is" without warranty of any kind. The authors disclaim all warranties, express or implied, including but not limited to the warranties of merchantability and fitness for a particular purpose.
+
+7. LIMITATION OF LIABILITY
+   In no event shall the authors be liable for any damages arising from the use of this software.
+
+8. TERMINATION
+   This license is effective until terminated. Your rights under this license will terminate automatically if you fail to comply with any term hereof.
+
+By clicking "I Agree" or installing this software, you acknowledge that you have read and understood this agreement and agree to be bound by its terms.
+
+For technical support, contact: support@cottagetandoori.co.uk
+Version: 2.0.0
+Installation Date: [INSTALLATION_DATE]
