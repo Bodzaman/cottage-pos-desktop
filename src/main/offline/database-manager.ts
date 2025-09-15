@@ -1,5 +1,9 @@
 // import Database from 'better-sqlite3'; // Will be added when needed
 // Placeholder implementation for now
+
+// Temporary type definitions
+type DatabaseType = any;
+type StatementType = any;
 import { app } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
@@ -31,7 +35,7 @@ interface PrintJobRecord {
 }
 
 export class DatabaseManager {
-  private db!: Database.Database;
+  private db!: any // any // Database placeholderDatabase placeholder;
   private dbPath!: string;
 
   constructor() {
