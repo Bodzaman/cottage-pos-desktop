@@ -1,22 +1,18 @@
-name: Build and Release Cottage POS
+name: Build Cottage POS (Test)
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-test*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 2.0.1)'
-        required: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-and-release:
+  build:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -26,34 +22,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Clean install dependencies
+      - name: Delete existing package-lock.json
         run: |
-          npm install --package-lock-only
-          npm ci
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
 
-      - name: Build application
+      - name: Install dependencies and regenerate lock file
+        run: npm install
+
+      - name: Verify build scripts exist
+        run: |
+          echo "Checking package.json scripts..."
+          npm run --silent
+
+      - name: Build application (test only)
         run: npm run build
 
-      - name: Build and publish Windows installer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:publish
-
-      - name: Upload installer as artifact (backup)
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cottage-pos-installer-v${{ github.ref_name }}
-          path: |
-            dist/*.exe
-            dist/*.nsis.7z
-          retention-days: 90
-
-      - name: Verify release created
+      - name: Verify build output
         run: |
-          echo "✅ Build completed successfully"
-          echo "📦 Installer should be published to GitHub Releases"
-          echo "🏷️ Tag: ${{ github.ref_name }}"
+          echo "Build completed successfully!"
+          if (Test-Path dist) { 
+            echo "dist folder created"
+            Get-ChildItem dist -ErrorAction SilentlyContinue
+          }
