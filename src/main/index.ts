@@ -6,7 +6,7 @@ import { autoUpdater } from 'electron-updater';
 import { setupIpcHandlers } from './ipc/ipc-handlers';
 import { AutoStartManager } from './windows/auto-start-manager';
 // import icon from '../../resources/icon.png'; // Icon will be added later
-const icon = undefined; // Placeholder
+const icon = null; // Placeholder - will be added later
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -64,7 +64,7 @@ class ElectronApp {
       height: 800,
       show: false,
       autoHideMenuBar: true,
-      icon: nativeImage.createFromPath(icon),
+      icon || undefined: nativeImage.createFromPath(icon || undefined),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false,
