@@ -25,10 +25,10 @@ class CottagePOSApp {
   private tray: Tray | null = null;
   private isQuiting = false;
 
-  // Core managers
-  private dbManager: DatabaseManager;
-  private printerManager: ThermalPrinterManager;
-  private ipcHandlers: IPCHandlers;
+  // Core managers - initialized in constructor
+  private dbManager!: DatabaseManager;
+  private printerManager!: ThermalPrinterManager;
+  private ipcHandlers!: IPCHandlers;
 
   private readonly windowConfig: WindowConfig = {
     width: 1200,
@@ -36,6 +36,17 @@ class CottagePOSApp {
     minWidth: 1000,
     minHeight: 600
   };
+  constructor() {
+    this.initializeManagers();
+  }
+
+  private initializeManagers(): void {
+    // Initialize managers in proper order
+    this.dbManager = new DatabaseManager();
+    this.printerManager = new ThermalPrinterManager();
+    this.ipcHandlers = new IPCHandlers(this.dbManager, this.printerManager);
+  }
+
 
   constructor() {
     log.info('🚀 Cottage Tandoori POS - Application Starting');
@@ -70,7 +81,7 @@ class CottagePOSApp {
   private initializeApp(): void {
     // Security: Prevent new window creation
     app.on('web-contents-created', (_, contents) => {
-      contents.on('new-window', (event) => {
+      contents.on('new-window', (event: any) => {
         event.preventDefault();
       });
 
@@ -136,7 +147,7 @@ class CottagePOSApp {
         // Modern security settings
         nodeIntegration: false,           // ⛔ Disable Node.js in renderer
         contextIsolation: true,           // ✅ Isolate context
-        enableRemoteModule: false,        // ⛔ Disable remote module
+        // enableRemoteModule removed (deprecated in Electron 14+)
         sandbox: true,                    // ✅ Enable sandbox
         webSecurity: true,                // ✅ Keep web security
         allowRunningInsecureContent: false, // ⛔ Block insecure content
