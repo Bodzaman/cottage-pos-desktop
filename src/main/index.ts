@@ -25,7 +25,7 @@ class CottagePOSApp {
   private tray: Tray | null = null;
   private isQuiting = false;
 
-  // Core managers - initialized in constructor
+  // Core managers
   private dbManager!: DatabaseManager;
   private printerManager!: ThermalPrinterManager;
   private ipcHandlers!: IPCHandlers;
