@@ -1,28 +1,51 @@
-name: Build and Release Windows App
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v1.0.0
-  workflow_dispatch:  # Allows manual trigger
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
 
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'npm'
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
 
-      - name: Build/release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true  # Always create release when workflow runs
-          max_attempts: 3
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build Electron app
+      run: npm run build
+
+    - name: Package for Windows
+      run: npm run dist -- --windows --x64
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: dist/*.exe
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          dist/*.exe
+          dist/*.nsis.7z
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
