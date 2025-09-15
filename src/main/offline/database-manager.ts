@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+// import Database from 'better-sqlite3'; // Will be added when needed
+// Placeholder implementation for now
 import { app } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
