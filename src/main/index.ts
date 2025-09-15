@@ -5,7 +5,8 @@ import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import { setupIpcHandlers } from './ipc/ipc-handlers';
 import { AutoStartManager } from './windows/auto-start-manager';
-import icon from '../../resources/icon.png';
+// import icon from '../../resources/icon.png'; // Icon will be added later
+const icon = undefined; // Placeholder
 
 // Configure logging
 log.transports.file.level = 'info';
