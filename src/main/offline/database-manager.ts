@@ -55,8 +55,8 @@ export interface CategoryData {
 }
 
 export class DatabaseManager {
-  private db: Database.Database;
-  private dbPath: string;
+  private db!: Database.Database;
+  private dbPath!: string;
 
   constructor() {
     // Create database directory in user data
@@ -162,7 +162,7 @@ export class DatabaseManager {
     const orderStmt = this.db.prepare(`
       SELECT * FROM orders WHERE id = ?
     `);
-    const order = orderStmt.get(orderId) as any;
+    const order = orderStmt.get(orderId) as { id: number; status: string; customer_id?: number; items?: string; total?: number; created_at?: string; } | undefined;
 
     if (!order) return null;
 
