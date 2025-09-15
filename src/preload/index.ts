@@ -1,4 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
+// Type definitions for better type safety
+interface MenuItemOrder {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  modifiers?: string[];
+}
+
+interface PrintJobData {
+  type: 'receipt' | 'kitchen' | 'test';
+  content: string;
+  options?: Record<string, unknown>;
+}
+
 
 // Type definitions for the exposed API
 export interface ElectronAPI {
@@ -37,7 +52,7 @@ export interface ReceiptData {
 
 export interface OrderData {
   id: string;
-  items: Array<any>;
+  items: Array<MenuItemOrder>;
   total: number;
   timestamp: Date;
   synced: boolean;
@@ -77,8 +92,8 @@ const electronAPI: ElectronAPI = {
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 
 // Security: Remove any Node.js globals that might have leaked
-delete (window as any).require;
-delete (window as any).exports;
+delete (window as Record<string, unknown>).require;
+delete (window as Record<string, unknown>).exports;
 delete (window as any).module;
 
 // Log successful preload
