@@ -27,7 +27,10 @@
   "dependencies": {
     "electron-updater": "^6.1.7",
     "electron-log": "^5.0.1",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@electron-toolkit/preload": "^3.0.0",
+    "node-thermal-printer": "^4.4.2"
   },
   "devDependencies": {
     "electron": "^28.1.0",
