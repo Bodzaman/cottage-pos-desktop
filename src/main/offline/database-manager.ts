@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { join } from 'path';
-import Database from 'better-sqlite3';
+// Using require for better-sqlite3 to avoid TypeScript declaration issues
+const Database = require('better-sqlite3');
 
 export interface OfflineOrder {
   id: string;
@@ -18,7 +19,7 @@ export interface OfflineOrder {
 }
 
 export class DatabaseManager {
-  private db: Database.Database | null = null;
+  private db: any = null;
   private dbPath: string;
 
   constructor() {
@@ -28,6 +29,7 @@ export class DatabaseManager {
   public async initialize(): Promise<void> {
     try {
       this.db = new Database(this.dbPath);
+      this.db.pragma('journal_mode = WAL');
       await this.createTables();
       console.log('Database initialized successfully');
     } catch (error) {
