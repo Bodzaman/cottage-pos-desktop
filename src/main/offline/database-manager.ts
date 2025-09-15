@@ -1,272 +1,134 @@
-// import Database from 'better-sqlite3'; // Will be added when needed
-// Placeholder implementation for now
-
-// Temporary type definitions
-type DatabaseType = any;
-type StatementType = any;
 import { app } from 'electron';
 import { join } from 'path';
-import log from 'electron-log';
+import Database from 'better-sqlite3';
 
-interface DatabaseRecord {
+export interface OfflineOrder {
   id: string;
-  [key: string]: unknown;
-}
-
-interface ConfigRecord {
-  key: string;
-  value: string;
-}
-
-interface OfflineQueueRecord {
-  id: string;
-  data: string;
-  created_at: string;
-  processed: number;
-}
-
-interface PrintJobRecord {
-  id: string;
-  type: string;
-  data: string;
-  status: string;
-  created_at: string;
-  processed_at?: string;
+  tableId?: string;
+  items: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }>;
+  total: number;
+  timestamp: string;
+  orderType: 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
+  status: 'pending' | 'completed';
 }
 
 export class DatabaseManager {
-  private db!: any // any // Database placeholderDatabase placeholder;
-  private dbPath!: string;
+  private db: Database.Database | null = null;
+  private dbPath: string;
 
   constructor() {
-    this.initialize();
+    this.dbPath = join(app.getPath('userData'), 'cottage-pos.db');
   }
 
-  private initialize(): void {
+  public async initialize(): Promise<void> {
     try {
-      // Set database path in user data directory
-      this.dbPath = join(app.getPath('userData'), 'cottage-pos.db');
-      
-      // Initialize database connection
       this.db = new Database(this.dbPath);
-      this.db.pragma('journal_mode = WAL');
-      
-      // Create tables if they don't exist
-      this.createTables();
-      
-      log.info(`Database initialized at: ${this.dbPath}`);
+      await this.createTables();
+      console.log('Database initialized successfully');
     } catch (error) {
-      log.error('Database initialization error:', error);
+      console.error('Failed to initialize database:', error);
       throw error;
     }
   }
 
-  private createTables(): void {
-    // Configuration table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+  private async createTables(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
 
-    // Offline queue for syncing when online
+    // Create offline orders table
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS offline_queue (
+      CREATE TABLE IF NOT EXISTS offline_orders (
         id TEXT PRIMARY KEY,
-        data TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        processed INTEGER DEFAULT 0
-      )
-    `);
-
-    // Print jobs queue
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS print_jobs (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
-        data TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        processed_at DATETIME
-      )
-    `);
-
-    // Orders cache for offline operation
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS orders_cache (
-        id TEXT PRIMARY KEY,
-        order_data TEXT NOT NULL,
+        table_id TEXT,
+        items TEXT NOT NULL,
+        total REAL NOT NULL,
+        timestamp TEXT NOT NULL,
         order_type TEXT NOT NULL,
-        total_amount REAL NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        synced INTEGER DEFAULT 0
+        status TEXT NOT NULL DEFAULT 'pending'
       )
     `);
 
-    // Menu items cache
+    // Create print queue table
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS menu_cache (
+      CREATE TABLE IF NOT EXISTS print_queue (
         id TEXT PRIMARY KEY,
-        category TEXT NOT NULL,
-        name TEXT NOT NULL,
-        price REAL NOT NULL,
-        description TEXT,
-        available INTEGER DEFAULT 1,
-        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        order_id TEXT NOT NULL,
+        receipt_data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        printed BOOLEAN DEFAULT FALSE
       )
     `);
-
-    log.info('Database tables created/verified');
   }
 
-  async query(sql: string, params: unknown[] = []): Promise<DatabaseRecord[]> {
-    try {
-      const stmt = this.db.prepare(sql);
-      const results = stmt.all(...params) as DatabaseRecord[];
-      return results;
-    } catch (error) {
-      log.error('Database query error:', error);
-      throw error;
-    }
+  public async saveOfflineOrder(order: OfflineOrder): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare(`
+      INSERT INTO offline_orders (id, table_id, items, total, timestamp, order_type, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      order.id,
+      order.tableId || null,
+      JSON.stringify(order.items),
+      order.total,
+      order.timestamp,
+      order.orderType,
+      order.status
+    );
   }
 
-  async run(sql: string, params: unknown[] = []): Promise<{ changes: number; lastInsertRowid: number }> {
-    try {
-      const stmt = this.db.prepare(sql);
-      const result = stmt.run(...params);
-      return {
-        changes: result.changes,
-        lastInsertRowid: Number(result.lastInsertRowid)
-      };
-    } catch (error) {
-      log.error('Database run error:', error);
-      throw error;
-    }
+  public async getOfflineOrders(): Promise<OfflineOrder[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('SELECT * FROM offline_orders WHERE status = ?');
+    const rows = stmt.all('pending') as any[];
+
+    return rows.map(row => ({
+      id: row.id,
+      tableId: row.table_id,
+      items: JSON.parse(row.items),
+      total: row.total,
+      timestamp: row.timestamp,
+      orderType: row.order_type,
+      status: row.status
+    }));
   }
 
-  async getConfig(key: string): Promise<unknown> {
-    try {
-      const stmt = this.db.prepare('SELECT value FROM config WHERE key = ?');
-      const result = stmt.get(key) as ConfigRecord | undefined;
-      
-      if (result) {
-        try {
-          return JSON.parse(result.value);
-        } catch {
-          return result.value;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      log.error('Get config error:', error);
-      throw error;
-    }
+  public async markOrderCompleted(orderId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('UPDATE offline_orders SET status = ? WHERE id = ?');
+    stmt.run('completed', orderId);
   }
 
-  async setConfig(key: string, value: unknown): Promise<void> {
-    try {
-      const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO config (key, value, updated_at) 
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-      `);
-      
-      const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
-      stmt.run(key, serializedValue);
-    } catch (error) {
-      log.error('Set config error:', error);
-      throw error;
-    }
+  public async addToPrintQueue(orderId: string, receiptData: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare(`
+      INSERT INTO print_queue (id, order_id, receipt_data, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      `print_${Date.now()}`,
+      orderId,
+      receiptData,
+      new Date().toISOString()
+    );
   }
 
-  async addToOfflineQueue(data: unknown): Promise<string> {
-    try {
-      const id = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const stmt = this.db.prepare(`
-        INSERT INTO offline_queue (id, data) VALUES (?, ?)
-      `);
-      
-      stmt.run(id, JSON.stringify(data));
-      return id;
-    } catch (error) {
-      log.error('Add to offline queue error:', error);
-      throw error;
-    }
-  }
-
-  async getOfflineQueue(): Promise<DatabaseRecord[]> {
-    try {
-      const stmt = this.db.prepare('SELECT * FROM offline_queue WHERE processed = 0 ORDER BY created_at');
-      return stmt.all() as DatabaseRecord[];
-    } catch (error) {
-      log.error('Get offline queue error:', error);
-      return [];
-    }
-  }
-
-  async processOfflineQueue(): Promise<number> {
-    try {
-      // Mark all items as processed
-      const stmt = this.db.prepare('UPDATE offline_queue SET processed = 1 WHERE processed = 0');
-      const result = stmt.run();
-      
-      log.info(`Processed ${result.changes} offline queue items`);
-      return result.changes;
-    } catch (error) {
-      log.error('Process offline queue error:', error);
-      return 0;
-    }
-  }
-
-  async addPrintJob(type: string, data: unknown): Promise<string> {
-    try {
-      const id = `print_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const stmt = this.db.prepare(`
-        INSERT INTO print_jobs (id, type, data) VALUES (?, ?, ?)
-      `);
-      
-      stmt.run(id, type, JSON.stringify(data));
-      return id;
-    } catch (error) {
-      log.error('Add print job error:', error);
-      throw error;
-    }
-  }
-
-  async getPendingPrintJobs(): Promise<PrintJobRecord[]> {
-    try {
-      const stmt = this.db.prepare(`
-        SELECT * FROM print_jobs 
-        WHERE status = 'pending' 
-        ORDER BY created_at
-      `);
-      return stmt.all() as PrintJobRecord[];
-    } catch (error) {
-      log.error('Get pending print jobs error:', error);
-      return [];
-    }
-  }
-
-  async markPrintJobCompleted(id: string): Promise<void> {
-    try {
-      const stmt = this.db.prepare(`
-        UPDATE print_jobs 
-        SET status = 'completed', processed_at = CURRENT_TIMESTAMP 
-        WHERE id = ?
-      `);
-      stmt.run(id);
-    } catch (error) {
-      log.error('Mark print job completed error:', error);
-      throw error;
-    }
-  }
-
-  close(): void {
+  public async close(): Promise<void> {
     if (this.db) {
       this.db.close();
-      log.info('Database connection closed');
+      this.db = null;
     }
   }
 }
+
+export const databaseManager = new DatabaseManager();
