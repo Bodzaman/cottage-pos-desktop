@@ -86,8 +86,8 @@ class CottageTandooriPOS {
 
         // Load POSII URL
         const posiiUrl = this.isProduction 
-            ? 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/ui/POSII'
-            : 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/devx/ui/POSII';
+            ? 'https://exoticcreations.databutton.app/cottage-tandoori-restaurant/posii'
+            : 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/devx/ui/posii';
             
         this.mainWindow.loadURL(posiiUrl);
 
