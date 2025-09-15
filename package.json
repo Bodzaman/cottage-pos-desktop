@@ -1,8 +1,8 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.0.6",
-  "description": "Cottage Tandoori POS - Professional Desktop Application",
-  "main": "main.js",
+  "version": "1.0.7",
+  "description": "Cottage Tandoori POS - Modern TypeScript Desktop Application",
+  "main": "dist/main/index.js",
   "homepage": "https://github.com/Bodzaman/cottage-pos-desktop#readme",
   "repository": {
     "type": "git",
@@ -12,17 +12,25 @@
     "url": "https://github.com/Bodzaman/cottage-pos-desktop/issues"
   },
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --no-sandbox",
-    "build": "electron-builder",
-    "build-win": "electron-builder --win",
-    "dist": "electron-builder --publish=never",
-    "release": "electron-builder --publish=always",
-    "pack": "electron-builder --dir",
-    "postinstall": "electron-builder install-app-deps"
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron dist/main/index.js --no-sandbox",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "build:main": "tsc --project tsconfig.main.json",
+    "build:preload": "tsc --project tsconfig.preload.json", 
+    "build:renderer": "vite build",
+    "build:electron": "electron-builder",
+    "build:win": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --publish=never",
+    "release": "npm run build && electron-builder --publish=always",
+    "pack": "npm run build && electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit"
   },
   "keywords": [
     "electron",
+    "typescript",
     "pos",
     "thermal-printer",
     "restaurant",
@@ -30,7 +38,9 @@
     "desktop-app",
     "windows",
     "epson",
-    "receipt-printer"
+    "receipt-printer",
+    "offline-first",
+    "vite"
   ],
   "author": {
     "name": "Cottage Tandoori Restaurant",
@@ -44,31 +54,47 @@
   },
   "dependencies": {
     "electron-updater": "^6.1.0",
-    "electron-log": "^5.0.0"
+    "electron-log": "^5.0.0",
+    "better-sqlite3": "^9.0.0",
+    "node-thermal-printer": "^4.4.0"
   },
   "devDependencies": {
     "electron": "^27.0.0",
     "electron-builder": "^24.6.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.2.0",
+    "vite": "^4.5.0",
+    "electron-is-dev": "^2.0.0",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.2.0",
+    "rimraf": "^5.0.0",
+    "@types/node": "^20.8.0",
+    "@types/better-sqlite3": "^7.6.0"
   },
   "build": {
     "appId": "com.cottage.tandoori.pos",
     "productName": "Cottage Tandoori POS",
     "directories": {
-      "output": "dist"
+      "output": "dist/installer"
     },
     "files": [
+      "dist/main/**/*",
+      "dist/preload/**/*", 
+      "dist/renderer/**/*",
       "build/**/*",
       "node_modules/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "src/main/database/schema.sql",
+        "to": "database/schema.sql"
+      }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "build/icon.ico",
@@ -82,11 +108,12 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
       "displayLanguageSelector": false,
-      "installerLanguages": [
-        "en_US"
-      ],
-      "license": null,
-      "warningsAsErrors": false
+      "installerLanguages": ["en_US"],
+      "license": "LICENSE.txt",
+      "installerIcon": "build/installer.ico",
+      "uninstallerIcon": "build/installer.ico",
+      "warningsAsErrors": false,
+      "deleteAppDataOnUninstall": true
     },
     "publish": [
       {
