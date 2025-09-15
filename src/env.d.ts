@@ -1,9 +1,7 @@
 
-declare module '*.png?asset' {
-  const src: string
-  export default src
-}
+/// <reference types="vite/client" />
+
 declare module '*.png' {
-  const src: string
-  export default src
+  const value: any;
+  export default value;
 }
