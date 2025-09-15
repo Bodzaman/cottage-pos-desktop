@@ -31,7 +31,7 @@ function createMainWindow(): BrowserWindow {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      enableRemoteModule: false,
+      // enableRemoteModule: false, // Deprecated property removed
       preload: path.join(__dirname, '../preload/preload.js'),
       webSecurity: !isDev
     },
