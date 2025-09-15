@@ -1,0 +1,100 @@
+/* Cottage Tandoori POS - Main Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d1810 100%);
+    color: #ffffff;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+.pos-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.pos-header {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #d4941e;
+}
+
+.pos-header h1 {
+    color: #d4941e;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.pos-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator {
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.online {
+    color: #22c55e;
+}
+
+.pos-main {
+    flex: 1;
+    padding: 2rem;
+}
+
+.pos-content h2 {
+    color: #d4941e;
+    margin-bottom: 1rem;
+    font-size: 2rem;
+}
+
+.pos-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.stat-card {
+    background: rgba(212, 148, 30, 0.1);
+    border: 1px solid #d4941e;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    background: rgba(212, 148, 30, 0.2);
+    transform: translateY(-2px);
+}
+
+.stat-card h3 {
+    color: #d4941e;
+    margin-bottom: 1rem;
+}
+
+.stat-card p {
+    margin: 0.5rem 0;
+    color: #cccccc;
+}
+
+.pos-footer {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem 2rem;
+    text-align: center;
+    border-top: 1px solid #333;
+    color: #888;
+}
