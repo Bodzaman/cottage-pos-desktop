@@ -3,7 +3,7 @@ name: Build Cottage POS (Test)
 on:
   push:
     tags:
-      - 'v*-test*'
+      - 'v*'
   workflow_dispatch:
 
 permissions:
