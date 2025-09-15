@@ -26,8 +26,8 @@ export interface ReceiptData {
 }
 
 export class ThermalPrinterManager {
-  private printer: ThermalPrinter;
-  private dbManager: DatabaseManager;
+  private printer!: ThermalPrinter;
+  private dbManager!: DatabaseManager;
   private isInitialized = false;
 
   constructor(dbManager: DatabaseManager) {
