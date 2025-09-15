@@ -1,12 +1,13 @@
+import log from 'electron-log';
 // Cottage Tandoori POS - Renderer Main Entry Point
 import './styles/main.css';
 
 // Initialize the POS application
-console.log('🏢 Cottage Tandoori POS - Renderer Process Started');
+log.info('🏢 Cottage Tandoori POS - Renderer Process Started');
 
 // DOM Content Loaded Handler
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('📱 POS Interface Ready');
+    log.info('📱 POS Interface Ready');
 
     // Initialize the main POS interface
     initializePOSInterface();
@@ -69,13 +70,13 @@ function initializePOSInterface() {
 
 // Setup Event Handlers
 function setupPOSEventHandlers() {
-    console.log('🎯 POS Event Handlers Initialized');
+    log.info('🎯 POS Event Handlers Initialized');
 
     // Example: Add click handler for status indicator
     const statusIndicator = document.querySelector('.status-indicator');
     if (statusIndicator) {
         statusIndicator.addEventListener('click', () => {
-            console.log('📡 Connection Status Checked');
+            log.info('📡 Connection Status Checked');
         });
     }
 }
