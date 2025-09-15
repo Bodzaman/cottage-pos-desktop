@@ -6,8 +6,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 export class IPCHandlers {
-  private dbManager: DatabaseManager;
-  private printerManager: ThermalPrinterManager;
+  private dbManager!: DatabaseManager;
+  private printerManager!: ThermalPrinterManager;
 
   constructor(dbManager: DatabaseManager, printerManager: ThermalPrinterManager) {
     this.dbManager = dbManager;
