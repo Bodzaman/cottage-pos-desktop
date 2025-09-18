@@ -1181,4 +1181,3 @@ export class ThermalPrinterManager {
       return { connected: false, ready: false };
 }
 }
-}
