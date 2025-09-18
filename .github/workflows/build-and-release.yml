@@ -1,0 +1,49 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# COMPREHENSIVE PERMISSIONS - FIXES 403 FORBIDDEN ERRORS
+permissions:
+  contents: write          # Create releases and upload assets
+  discussions: write       # Manage discussions
+  releases: write         # Manage GitHub releases
+  pull-requests: write    # Handle pull requests
+  issues: write          # Manage issues
+  repository-projects: write  # Repository management
+  actions: write         # Actions management
+  checks: write          # Check runs
+  deployments: write     # Deployment management
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and publish to GitHub Releases
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cottage-pos-windows-installer
+          path: dist/*.exe
+          retention-days: 30
