@@ -1180,3 +1180,5 @@ export class ThermalPrinterManager {
       console.error('Get status error:', error);
       return { connected: false, ready: false };
 }
+}
+}
