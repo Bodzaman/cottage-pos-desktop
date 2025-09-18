@@ -297,6 +297,4 @@ export class AutoStartManager {
 
   public async isEnabled(): Promise<boolean> {
     return this.isAutoStartEnabled();
-  }
-}
 }
