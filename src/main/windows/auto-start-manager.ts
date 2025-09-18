@@ -299,4 +299,3 @@ export class AutoStartManager {
     return this.isAutoStartEnabled();
 }
 }
-}
