@@ -7,6 +7,60 @@ interface PrintJobResult {
   success: boolean
   message: string
   jobId?: string
+
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
 }
 
 export class ThermalPrinterManager {
@@ -22,7 +76,61 @@ export class ThermalPrinterManager {
       characterSet: 'UK'
     })
     this.initialize()
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
   }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
   private async initialize(): Promise<void> {
     try {
@@ -31,19 +139,343 @@ export class ThermalPrinterManager {
     } catch (error) {
       console.error('Failed to initialize printer connection:', error)
       this.isConnected = false
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
     }
   }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
   public async getPrinterStatus(): Promise<{ isConnected: boolean }> {
     try {
       this.isConnected = await this.printer.isPrinterConnected()
-      return { isConnected: this.isConnected }
+      return { isConnected: this.isConnected 
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
     } catch (error) {
       console.error('Error checking printer status:', error)
       this.isConnected = false
-      return { isConnected: false }
+      return { isConnected: false 
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
     }
   }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
   public async addPrintJob(receipt: Receipt, options: any): Promise<PrintJobResult> {
     const job: Omit<PrintJob, 'id'> = {
@@ -51,32 +483,464 @@ export class ThermalPrinterManager {
       status: PrintJobStatus.PENDING,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    }
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
     try {
-      const newJobId = await this.dbManager.addPrintJob(job)
-      this.processPrintQueue()
-      return { success: true, message: 'Job added to queue.', jobId: newJobId }
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
     } catch (error) {
-      const err = error as Error
-      return { success: false, message: `Failed to add job to DB: ${err.message}` }
+      console.error('Print receipt error:', error);
+      return false;
     }
   }
 
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+    try {
+      const newJobId = await this.dbManager.addPrintJob(job)
+      this.processPrintQueue()
+      return { success: true, message: 'Job added to queue.', jobId: newJobId 
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+    } catch (error) {
+      const err = error as Error
+      return { success: false, message: `Failed to add job to DB: ${err.message}` 
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+
   public addPrintJobToQueue(receipt: Receipt, options: any): Promise<PrintJobResult> {
       return this.addPrintJob(receipt, options)
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
   }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
   public async processPrintQueue(): Promise<void> {
     if (!this.isConnected) {
       console.log('Printer not connected. Skipping print queue processing.')
       return
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
     }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
     const pendingJobs = await this.dbManager.getPendingPrintJobs()
     if (!pendingJobs || typeof pendingJobs[Symbol.iterator] !== 'function') {
         console.error('getPendingPrintJobs did not return an iterable object.')
         return
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
     }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
 
     for (const job of pendingJobs) {
       try {
@@ -98,7 +962,223 @@ export class ThermalPrinterManager {
       } catch (error) {
         console.error(`Failed to print job ${job.id}:`, error)
         await this.dbManager.updatePrintJobStatus(job.id, PrintJobStatus.FAILED)
-      }
+      
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+    
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+  
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
+    }
+  }
+}
+
+  // IPC-compatible methods
+  public async printReceipt(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'receipt' });
+      return result.success;
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      return false;
+    }
+  }
+
+  public async printKitchenTicket(orderData: any): Promise<boolean> {
+    try {
+      const receipt = {
+        orderNumber: orderData.id,
+        items: orderData.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total: orderData.total
+      };
+
+      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
+      return result.success;
+    } catch (error) {
+      console.error('Print kitchen ticket error:', error);
+      return false;
+    }
+  }
+
+  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
+    try {
+      const status = await this.getPrinterStatus();
+      return { 
+        connected: status.isConnected, 
+        ready: status.isConnected 
+      };
+    } catch (error) {
+      console.error('Get status error:', error);
+      return { connected: false, ready: false };
     }
   }
 }
