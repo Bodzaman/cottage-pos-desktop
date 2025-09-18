@@ -9,7 +9,20 @@ export class AutoStartManager {
   constructor() {
     // Set auto-start based on user preference
     this.initializeAutoStart();
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   private initializeAutoStart(): void {
     try {
@@ -20,13 +33,52 @@ export class AutoStartManager {
         this.enableAutoStart();
       } else {
         this.disableAutoStart();
-      }
+      
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
       log.info(`⚙️ Auto-start initialized: ${autoStartEnabled ? 'Enabled' : 'Disabled'}`);
     } catch (error) {
       log.error('❌ Auto-start initialization failed:', error);
-    }
+    
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   public enableAutoStart(): boolean {
     try {
@@ -44,8 +96,34 @@ export class AutoStartManager {
     } catch (error) {
       log.error('❌ Failed to enable auto-start:', error);
       return false;
-    }
+    
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   public disableAutoStart(): boolean {
     try {
@@ -61,8 +139,34 @@ export class AutoStartManager {
     } catch (error) {
       log.error('❌ Failed to disable auto-start:', error);
       return false;
-    }
+    
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   public isAutoStartEnabled(): boolean {
     try {
@@ -71,8 +175,34 @@ export class AutoStartManager {
     } catch (error) {
       log.error('❌ Failed to check auto-start status:', error);
       return false;
-    }
+    
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   public toggleAutoStart(): boolean {
     const currentState = this.isAutoStartEnabled();
@@ -81,20 +211,72 @@ export class AutoStartManager {
       return this.disableAutoStart();
     } else {
       return this.enableAutoStart();
-    }
+    
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
+  }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   private getAutoStartSetting(): boolean {
     // In a real implementation, this would read from database or config
     // For now, default to enabled for restaurant POS
     return true;
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   private setAutoStartSetting(enabled: boolean): void {
     // In a real implementation, this would save to database or config
     // For now, we'll just log the setting
     log.info(`💾 Auto-start setting saved: ${enabled}`);
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 
   public getStartupInfo(): { autoStarted: boolean; minimized: boolean } {
     const args = process.argv;
@@ -103,5 +285,18 @@ export class AutoStartManager {
       autoStarted: args.includes('--auto-started'),
       minimized: args.includes('--minimized') || args.includes('--auto-started')
     };
+  
+  // IPC-compatible async methods
+  public async enable(): Promise<boolean> {
+    return this.enableAutoStart();
   }
+
+  public async disable(): Promise<boolean> {
+    return this.disableAutoStart();
+  }
+
+  public async isEnabled(): Promise<boolean> {
+    return this.isAutoStartEnabled();
+  }
+}
 }
