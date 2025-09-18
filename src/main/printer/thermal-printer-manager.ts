@@ -8,61 +8,6 @@ interface PrintJobResult {
   message: string
   jobId?: string
 
-  // IPC-compatible methods
-  public async printReceipt(orderData: any): Promise<boolean> {
-    try {
-      const receipt = {
-        orderNumber: orderData.id,
-        items: orderData.items.map((item: any) => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        total: orderData.total
-      };
-
-      const result = await this.addPrintJob(receipt, { type: 'receipt' });
-      return result.success;
-    } catch (error) {
-      console.error('Print receipt error:', error);
-      return false;
-    }
-  }
-
-  public async printKitchenTicket(orderData: any): Promise<boolean> {
-    try {
-      const receipt = {
-        orderNumber: orderData.id,
-        items: orderData.items.map((item: any) => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        total: orderData.total
-      };
-
-      const result = await this.addPrintJob(receipt, { type: 'kitchen' });
-      return result.success;
-    } catch (error) {
-      console.error('Print kitchen ticket error:', error);
-      return false;
-    }
-  }
-
-  public async getStatus(): Promise<{ connected: boolean; ready: boolean }> {
-    try {
-      const status = await this.getPrinterStatus();
-      return { 
-        connected: status.isConnected, 
-        ready: status.isConnected 
-      };
-    } catch (error) {
-      console.error('Get status error:', error);
-      return { connected: false, ready: false };
-    }
-  }
-}
-
 export class ThermalPrinterManager {
   private printer: ThermalPrinter
   private dbManager: DatabaseManager
