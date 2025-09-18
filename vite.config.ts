@@ -23,7 +23,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'src/renderer/index.html')
-      }
+      },
+      external: [
+        'electron',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime'
+      ]
     },
 
     // Optimize for Electron
