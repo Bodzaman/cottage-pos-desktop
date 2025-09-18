@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.0.0", 
+  "version": "1.0.0",
   "description": "Professional Desktop POS System for Cottage Tandoori Restaurant",
   "main": "dist/main/main.js",
   "homepage": "https://github.com/Bodzaman/cottage-pos-desktop",
@@ -27,7 +27,9 @@
   "dependencies": {
     "electron-updater": "^6.1.7",
     "electron-log": "^5.0.1",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "electron": "^28.1.0",
@@ -35,7 +37,10 @@
     "typescript": "^5.3.3",
     "concurrently": "^8.2.2",
     "wait-on": "^7.2.0",
-    "@types/node": "^20.10.5"
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1"
   },
   "build": {
     "appId": "com.cottagetandoori.pos",
@@ -53,7 +58,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
