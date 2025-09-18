@@ -21,7 +21,8 @@ export class ThermalPrinterManager {
       characterSet: 'UK'
     })
     this.initialize()
-  
+  }
+
   // IPC-compatible methods
   public async printReceipt(orderData: any): Promise<boolean> {
     try {
