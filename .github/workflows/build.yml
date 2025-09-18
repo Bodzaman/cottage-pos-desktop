@@ -28,7 +28,7 @@ jobs:
           if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
 
       - name: Install dependencies and regenerate lock file
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Verify build scripts exist
         run: |
