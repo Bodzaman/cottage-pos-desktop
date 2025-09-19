@@ -32,10 +32,10 @@ jobs:
       run: |
         if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
           echo "🏷️ Tag detected - building with publish"
-          yarn run electron-builder --windows --publish always
+          yarn run dist
         else
           echo "🌿 Branch build - build only, no publish"
-          yarn run electron-builder --windows --publish never
+          yarn run build
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
