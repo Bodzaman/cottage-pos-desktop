@@ -28,6 +28,7 @@ jobs:
       run: yarn install
 
     - name: Build/release Electron app
+      shell: bash
       run: |
         if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
           echo "🏷️ Tag detected - building with publish"
@@ -38,4 +39,3 @@ jobs:
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
