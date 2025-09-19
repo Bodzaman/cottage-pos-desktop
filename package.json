@@ -90,8 +90,7 @@
         "publishAutoUpdate": true
       }
     ],
-    "copyright": "Copyright \u00a9 2025 Cottage Tandoori",
-    "description": "Professional POS system for Cottage Tandoori restaurant"
+    "copyright": "Copyright \u00a9 2025 Cottage Tandoori"
   },
   "repository": {
     "type": "git",
