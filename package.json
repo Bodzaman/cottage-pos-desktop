@@ -90,7 +90,8 @@
         "publishAutoUpdate": true
       }
     ],
-    "copyright": "Copyright \u00a9 2025 Cottage Tandoori"
+    "copyright": "Copyright \u00a9 2025 Cottage Tandoori",
+    "icon": false
   },
   "repository": {
     "type": "git",
