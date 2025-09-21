@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Professional Desktop POS System for Cottage Tandoori Restaurant",
   "main": "dist/main/main.js",
   "homepage": "https://github.com/Bodzaman/cottage-pos-desktop",
