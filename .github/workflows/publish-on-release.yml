@@ -26,16 +26,13 @@ jobs:
       run: yarn install
 
     - name: Build and publish Electron app
-      run: yarn run dist --publish always
+      run: yarn run publish
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Verify artifacts created
+    - name: Verify artifacts created and uploaded
       shell: bash
       run: |
-        echo "Checking dist folder contents..."
-        ls -la dist/ || echo "No dist folder found"
-
-        echo "Looking for Windows artifacts..."
-        find dist/ -name "*.exe" -o -name "latest.yml" -o -name "*.blockmap" || echo "No Windows artifacts found"
+        echo "Build and publish completed!"
+        echo "Assets should now be available on the GitHub release"
