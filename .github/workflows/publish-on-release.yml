@@ -25,22 +25,46 @@ jobs:
     - name: Install dependencies
       run: yarn install
 
-    - name: Build and publish Electron app
-      run: yarn run publish
+    - name: Build Electron app (no publish)
+      run: yarn run dist
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
 
-    - name: Debug - Check if files were created
+    - name: Upload release assets
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
       run: |
-        echo "=== DIST FOLDER CONTENTS ==="
-        ls -la dist/ 2>/dev/null || echo "No dist folder"
+        echo "Uploading assets for release: $RELEASE_TAG"
 
-        echo "=== LOOKING FOR ARTIFACTS ==="
-        find . -name "*.exe" -o -name "latest.yml" -o -name "*.blockmap" 2>/dev/null || echo "No artifacts found"
+        # Find all artifacts
+        EXE_FILE=$(find dist/ -name "*.exe" | head -1)
+        YML_FILE=$(find dist/ -name "latest.yml" | head -1)
+        BLOCKMAP_FILE=$(find dist/ -name "*.blockmap" | head -1)
 
-        echo "=== GITHUB RELEASE INFO ==="
-        echo "Release tag: ${{ github.event.release.tag_name }}"
-        echo "Release name: ${{ github.event.release.name }}"
+        if [ -f "$EXE_FILE" ]; then
+          echo "Uploading: $EXE_FILE"
+          gh release upload "$RELEASE_TAG" "$EXE_FILE" --clobber
+        fi
+
+        if [ -f "$YML_FILE" ]; then
+          echo "Uploading: $YML_FILE"
+          gh release upload "$RELEASE_TAG" "$YML_FILE" --clobber
+        fi
+
+        if [ -f "$BLOCKMAP_FILE" ]; then
+          echo "Uploading: $BLOCKMAP_FILE"
+          gh release upload "$RELEASE_TAG" "$BLOCKMAP_FILE" --clobber
+        fi
+
+        echo "Upload complete!"
+
+    - name: Verify upload
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+      run: |
+        echo "Checking uploaded assets..."
+        gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
