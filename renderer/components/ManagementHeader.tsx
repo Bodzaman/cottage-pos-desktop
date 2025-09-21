@@ -1,7 +1,5 @@
 
 
-
-
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { globalColors } from '../utils/QSAIDesign';
@@ -67,8 +65,26 @@ const ManagementHeader: React.FC<Props> = ({
   const [selectedOrder, setSelectedOrder] = useState<OrderModel | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   
-  // Only show search on POS page
-  const showSearch = path === '/pos' || path === '/posii' || path === '/posdesktop' || path === '/pos-desktop' || path === '/';
+  // Always show search for POS environments (desktop and web)
+  const isPOSEnvironment = path.includes('pos') || path === '/' || 
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || 
+     window.navigator.userAgent.includes('Electron')));
+  const showSearch = isPOSEnvironment;
+  
+  // DEBUG: Add comprehensive logging for desktop app investigation
+  useEffect(() => {
+    console.log('🔍 ManagementHeader DEBUG INFO:');
+    console.log('Current path:', path);
+    console.log('Window location:', typeof window !== 'undefined' ? {
+      hostname: window.location.hostname,
+      pathname: window.location.pathname,
+      href: window.location.href
+    } : 'window undefined');
+    console.log('User agent:', typeof window !== 'undefined' ? window.navigator.userAgent : 'navigator undefined');
+    console.log('Electron detection:', typeof window !== 'undefined' ? window.navigator.userAgent.includes('Electron') : false);
+    console.log('isPOSEnvironment:', isPOSEnvironment);
+    console.log('showSearch:', showSearch);
+  }, [path, isPOSEnvironment, showSearch]);
   
   // Debounced search function
   const debouncedSearch = useCallback(
