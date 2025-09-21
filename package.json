@@ -17,12 +17,13 @@
     "build": "npm run build:vite && npm run build:electron",
     "build:vite": "vite build",
     "build:electron": "tsc -p tsconfig.main.json",
-    "dist": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win",
     "pack": "npm run build && electron-builder --dir",
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "publish": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.1.7",
