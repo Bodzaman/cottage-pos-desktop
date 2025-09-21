@@ -1,5 +1,3 @@
-
-
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { globalColors } from '../utils/QSAIDesign';
@@ -69,7 +67,10 @@ const ManagementHeader: React.FC<Props> = ({
   const isPOSEnvironment = path.includes('pos') || path === '/' || 
     (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || 
      window.navigator.userAgent.includes('Electron')));
-  const showSearch = isPOSEnvironment;
+  
+  // DESKTOP FIX: Always show search bar for maximum compatibility
+  // Desktop app routing may vary, so ensure search is always available
+  const showSearch = true; // Previously: isPOSEnvironment
   
   // DEBUG: Add comprehensive logging for desktop app investigation
   useEffect(() => {
