@@ -26,7 +26,7 @@ jobs:
       run: yarn install
 
     - name: Build and publish Electron app
-      run: yarn run dist
+      run: yarn run dist --publish always
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
