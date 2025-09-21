@@ -25,10 +25,62 @@ jobs:
     - name: Install dependencies
       run: yarn install
 
+    - name: Bump package.json version from release tag
+      shell: bash
+      run: |
+        # Extract version from release tag (remove 'v' prefix)
+        TAG_VERSION="${{ github.event.release.tag_name }}"
+        VERSION="${TAG_VERSION#v}"
+        echo "Release tag: $TAG_VERSION"
+        echo "Package version: $VERSION"
+
+        # Update package.json version
+        npm version $VERSION --no-git-tag-version
+        echo "Updated package.json to version $VERSION"
+
     - name: Build Electron app (no publish)
       run: yarn run dist
       env:
         CI: true
+
+    - name: Validate version consistency before upload
+      shell: bash
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+      run: |
+        VERSION="${RELEASE_TAG#v}"
+        echo "Validating version consistency for release $RELEASE_TAG..."
+
+        # Check package.json version
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        echo "Package.json version: $PACKAGE_VERSION"
+
+        # Check latest.yml version
+        if [ -f "dist/latest.yml" ]; then
+          YML_VERSION=$(grep -o 'version: [0-9]*\.[0-9]*\.[0-9]*' dist/latest.yml | cut -d' ' -f2)
+          echo "latest.yml version: $YML_VERSION"
+
+          if [ "$YML_VERSION" != "$VERSION" ]; then
+            echo "❌ ERROR: latest.yml version ($YML_VERSION) != release version ($VERSION)"
+            exit 1
+          fi
+        fi
+
+        if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+          echo "❌ ERROR: package.json version ($PACKAGE_VERSION) != release version ($VERSION)"
+          exit 1
+        fi
+
+        # Verify exe filename contains correct version
+        EXE_FILE=$(find dist/ -name "*-$VERSION-Setup.exe")
+        if [ -z "$EXE_FILE" ]; then
+          echo "❌ ERROR: No .exe file found with version $VERSION"
+          echo "Available files:"
+          find dist/ -name "*.exe"
+          exit 1
+        fi
+
+        echo "✅ All version checks passed!"
 
     - name: Upload release assets
       shell: bash
