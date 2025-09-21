@@ -1,6 +1,6 @@
 /**
  * Cottage Tandoori POS - Preload Script
- * Secure bridge between main and renderer processes
+ * Exposes secure IPC handlers to the renderer process
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
@@ -8,45 +8,39 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  /**
-   * App information
-   */
-  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  // App information
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
-  /**
-   * Window controls
-   */
-  minimize: () => ipcRenderer.invoke('window:minimize'),
-  maximize: () => ipcRenderer.invoke('window:maximize'),
-  close: () => ipcRenderer.invoke('window:close'),
+  // Update functions
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 
-  /**
-   * System information
-   */
-  getPlatform: () => process.platform,
-  getAppVersion: () => process.env.npm_package_version || '1.0.0',
+  // About dialog
+  showAbout: () => ipcRenderer.invoke('show-about'),
 
-  /**
-   * Printing support (for future thermal printer integration)
-   */
-  printReceipt: (data: any) => ipcRenderer.invoke('printer:receipt', data),
+  // Platform information
+  platform: process.platform,
 
-  /**
-   * File system access (if needed for offline data)
-   */
-  saveData: (filename: string, data: any) => ipcRenderer.invoke('fs:save', filename, data),
-  loadData: (filename: string) => ipcRenderer.invoke('fs:load', filename),
-
-  /**
-   * Update notifications
-   */
-  onUpdateAvailable: (callback: () => void) => {
-    ipcRenderer.on('update-available', callback);
-  },
-  onUpdateDownloaded: (callback: () => void) => {
-    ipcRenderer.on('update-downloaded', callback);
+  // Version information
+  versions: {
+    node: process.versions.node,
+    chrome: process.versions.chrome,
+    electron: process.versions.electron
   }
 });
 
-// Log initialization
-console.log('🔗 Cottage Tandoori POS preload script loaded');
+// Type definitions for TypeScript (if using TypeScript in renderer)
+declare global {
+  interface Window {
+    electronAPI: {
+      getAppVersion: () => Promise<string>;
+      checkForUpdates: () => Promise<void>;
+      showAbout: () => Promise<void>;
+      platform: string;
+      versions: {
+        node: string;
+        chrome: string;
+        electron: string;
+      };
+    };
+  }
+}
