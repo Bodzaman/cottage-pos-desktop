@@ -30,9 +30,17 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CI: true
 
-    - name: Verify artifacts created and uploaded
+    - name: Debug - Check if files were created
       shell: bash
       run: |
-        echo "Build and publish completed!"
-        echo "Assets should now be available on the GitHub release"
+        echo "=== DIST FOLDER CONTENTS ==="
+        ls -la dist/ 2>/dev/null || echo "No dist folder"
+
+        echo "=== LOOKING FOR ARTIFACTS ==="
+        find . -name "*.exe" -o -name "latest.yml" -o -name "*.blockmap" 2>/dev/null || echo "No artifacts found"
+
+        echo "=== GITHUB RELEASE INFO ==="
+        echo "Release tag: ${{ github.event.release.tag_name }}"
+        echo "Release name: ${{ github.event.release.name }}"
