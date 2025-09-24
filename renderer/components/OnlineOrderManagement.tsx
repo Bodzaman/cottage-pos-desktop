@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -219,11 +217,63 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
     try {
       switch (action) {
         case 'CONFIRM':
+          // ========================================================================
+          // 🆕 ONLINE ORDER ACCEPT: Create Kitchen Print Job
+          // ========================================================================
+          
+          console.log('📋 [OnlineOrderManagement] Order confirmed, triggering kitchen print for:', order.orderNumber);
+          
+          try {
+            // Get template assignment for the order type
+            const assignmentResponse = await brain.get_template_assignment({ order_mode: order.orderType });
+            const templateAssignment = await assignmentResponse.json();
+            
+            // Prepare kitchen receipt data
+            const kitchenReceipt = {
+              orderNumber: order.orderNumber,
+              orderType: order.orderType,
+              channel: 'ONLINE_ORDER',
+              items: order.items.map(item => ({
+                name: item.name || 'Unknown Item',
+                quantity: item.quantity || 1,
+                notes: item.notes || '',
+                modifiers: item.modifiers?.map(mod => mod.name) || []
+              })),
+              specialInstructions: order.specialInstructions || '',
+              allergenNotes: order.allergenNotes || '',
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              deliveryAddress: order.deliveryAddress || null,
+              timestamp: new Date().toISOString()
+            };
+            
+            // Create kitchen print job
+            const printJobResponse = await brain.create_print_job({
+              template_id: templateAssignment.kitchen_template_id,
+              receipt_type: 'kitchen',
+              order_data: kitchenReceipt,
+              priority: 'high',
+              metadata: {
+                order_mode: order.orderType,
+                order_source: 'online',
+                created_from: 'online_order_accept'
+              }
+            });
+            
+            const printJob = await printJobResponse.json();
+            console.log('✅ [OnlineOrderManagement] Kitchen print job created:', printJob.job_id);
+            
+          } catch (printError) {
+            console.error('❌ [OnlineOrderManagement] Failed to create kitchen print job:', printError);
+            // Don't fail the whole operation for print errors
+          }
+          
+          // Update order status
           await brain.update_order_status({
             orderId: order.id,
             status: 'CONFIRMED'
           });
-          toast.success(`Order ${order.orderNumber} confirmed`);
+          toast.success(`Order ${order.orderNumber} confirmed & sent to kitchen`);
           break;
           
         case 'START_PREPARATION':
@@ -243,11 +293,76 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           break;
           
         case 'MARK_COMPLETED':
+          // ========================================================================
+          // 🆕 ONLINE ORDER COMPLETE: Create Customer Receipt Print Job
+          // ========================================================================
+          
+          console.log('🧾 [OnlineOrderManagement] Order completed, triggering customer receipt for:', order.orderNumber);
+          
+          try {
+            // Get template assignment for the order type (convert format for API)
+            const apiOrderMode = order.orderType.replace(/-/g, '_'); // Convert DELIVERY/COLLECTION format
+            const assignmentResponse = await brain.get_template_assignment({ order_mode: apiOrderMode });
+            const templateAssignment = await assignmentResponse.json();
+            
+            // Calculate totals (basic calculation - should match order.total)
+            const subtotal = order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+            const vatAmount = subtotal * 0.2; // 20% VAT
+            const finalTotal = order.total || (subtotal + vatAmount);
+            
+            // Prepare customer receipt data
+            const customerReceipt = {
+              orderNumber: order.orderNumber,
+              orderType: order.orderType,
+              channel: 'ONLINE_ORDER',
+              items: order.items.map(item => ({
+                name: item.name || 'Unknown Item',
+                quantity: item.quantity || 1,
+                price: item.price || 0,
+                total: (item.price || 0) * (item.quantity || 1),
+                notes: item.notes || '',
+                modifiers: item.modifiers?.map(mod => ({ name: mod.name, price: mod.price || 0 })) || []
+              })),
+              subtotal: subtotal,
+              vat: vatAmount,
+              total: finalTotal,
+              paymentMethod: order.paymentStatus === 'PAID' ? 'Card' : 'Pending',
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              customerEmail: order.customerEmail || '',
+              deliveryAddress: order.orderType === 'DELIVERY' ? {
+                address: order.deliveryAddress || ''
+              } : null,
+              timestamp: new Date().toISOString()
+            };
+            
+            // Create customer receipt print job
+            const printJobResponse = await brain.create_print_job({
+              template_id: templateAssignment.customer_template_id,
+              receipt_type: 'customer',
+              order_data: customerReceipt,
+              priority: 'medium',
+              metadata: {
+                order_mode: order.orderType,
+                order_source: 'online',
+                created_from: 'online_order_complete'
+              }
+            });
+            
+            const printJob = await printJobResponse.json();
+            console.log('✅ [OnlineOrderManagement] Customer receipt print job created:', printJob.job_id);
+            
+          } catch (printError) {
+            console.error('❌ [OnlineOrderManagement] Failed to create customer receipt print job:', printError);
+            // Don't fail the whole operation for print errors
+          }
+          
+          // Update order status
           await brain.update_order_status({
             orderId: order.id,
             status: 'COMPLETED'
           });
-          toast.success(`Order ${order.orderNumber} completed`);
+          toast.success(`Order ${order.orderNumber} completed & receipt printed`);
           break;
           
         case 'CONTACT_CUSTOMER':
