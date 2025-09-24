@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { User, Users, MapPin, Phone, Edit3, Mail, FileText, Trash2 } from 'lucide-react';
 import { useCustomerDataStore } from 'utils/customerDataStore';
@@ -349,13 +350,22 @@ export const CustomerSummaryBadge: React.FC<CustomerSummaryBadgeProps> = ({
         <div className="flex-shrink-0 flex items-center gap-2">
           {/* Clear/Reset Button */}
           {onClear && (
-            <button
+            <div
               onClick={(e) => {
                 e.stopPropagation();
                 onClear();
               }}
-              className="opacity-60 hover:opacity-100 transition-all duration-300 p-1 rounded-md hover:bg-red-500/20"
+              className="opacity-60 hover:opacity-100 transition-all duration-300 p-1 rounded-md hover:bg-red-500/20 cursor-pointer"
               title="Clear customer details"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClear();
+                }
+              }}
             >
               <Trash2 
                 className="w-4 h-4" 
@@ -364,7 +374,7 @@ export const CustomerSummaryBadge: React.FC<CustomerSummaryBadgeProps> = ({
                   filter: 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.4))'
                 }} 
               />
-            </button>
+            </div>
           )}
           
           {/* Edit Button with white styling */}
