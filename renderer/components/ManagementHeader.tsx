@@ -72,21 +72,6 @@ const ManagementHeader: React.FC<Props> = ({
   // Desktop app routing may vary, so ensure search is always available
   const showSearch = true; // Previously: isPOSEnvironment
   
-  // DEBUG: Add comprehensive logging for desktop app investigation
-  useEffect(() => {
-    console.log('🔍 ManagementHeader DEBUG INFO:');
-    console.log('Current path:', path);
-    console.log('Window location:', typeof window !== 'undefined' ? {
-      hostname: window.location.hostname,
-      pathname: window.location.pathname,
-      href: window.location.href
-    } : 'window undefined');
-    console.log('User agent:', typeof window !== 'undefined' ? window.navigator.userAgent : 'navigator undefined');
-    console.log('Electron detection:', typeof window !== 'undefined' ? window.navigator.userAgent.includes('Electron') : false);
-    console.log('isPOSEnvironment:', isPOSEnvironment);
-    console.log('showSearch:', showSearch);
-  }, [path, isPOSEnvironment, showSearch]);
-  
   // Debounced search function
   const debouncedSearch = useCallback(
     (() => {
