@@ -1,6 +1,3 @@
-
-
-// React imports
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -12,16 +9,22 @@ import brain from 'brain';
 
 // Store imports
 import { useSimpleAuth } from '../utils/simple-auth-context';
-import { useRealtimeMenuStore, getMenuDataForPOS } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStore, loadPOSBundle, getMenuDataForPOS } from '../utils/realtimeMenuStore';
 import { useCustomerDataStore } from 'utils/customerDataStore';
-import { useVoiceOrderStore } from 'utils/voiceOrderStore';
-import { useTableOrdersStore } from 'utils/tableOrdersStore';
-import { useHeaderViewChange } from 'utils/headerViewChange';
+import { useVoiceOrderStore } from '../utils/voiceOrderStore';
+import { useTableOrdersStore } from '../utils/tableOrdersStore';
+import { useHeaderViewChange } from '../utils/headerViewChange';
+import { useSystemStatus } from 'utils/pollingService';
+
+// Enhanced image preloading imports
+import { useImagePreloader } from '../utils/useImagePreloader';
+import { POSSkeletonGrid } from 'components/POSSkeletonGrid';
 
 // Utility imports
 import { colors as designColors } from '../utils/designSystem';
 import { quickLog, createLogger } from 'utils/logger';
 import { useOnDemandPrinter } from 'utils/onDemandPrinterService';
+import posPerformance, { POSPerfMarks } from 'utils/posPerformance';
 
 // Component imports
 import ManagementHeader from '../components/ManagementHeader';
@@ -30,6 +33,7 @@ import { DineInTableSelector } from '../components/DineInTableSelector';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { POSMenuSelector } from '../components/POSMenuSelector';
 import { OrderSummaryPanel } from '../components/OrderSummaryPanel';
+import { POSOrderSummary } from '../components/POSOrderSummary';
 import { CustomerSummaryBadge } from '../components/CustomerSummaryBadge';
 import { CustomerDetailsModal } from 'components/CustomerDetailsModal';
 import { POSGuestCountModalClean } from 'components/POSGuestCountModalClean';
@@ -38,6 +42,7 @@ import ManagementPasswordDialog from '../components/ManagementPasswordDialog';
 import MenuManagementDialog from '../components/MenuManagementDialog';
 import AllOrdersModal from '../components/AllOrdersModal';
 import { CustomizeOrchestrator, CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
+import { POSFooter } from '../components/POSFooter';
 
 // View Components - Import from POSII for parity
 import { OnlineOrderManagement } from 'components/OnlineOrderManagement';
@@ -49,6 +54,10 @@ import { MenuCategory, MenuItem, OrderItem, ModifierSelection } from '../utils/m
 import { CustomerData } from '../utils/customerDataStore';
 import { printingService } from '../utils/printingService';
 import { checkHelperAppStatus, printBothViaHelperApp } from '../utils/helperAppDetection';
+import { TipSelection, PaymentResult } from '../utils/menuTypes';
+import { registerServiceWorker } from '../utils/serviceWorkerManager';
+import { outboxSyncManager } from '../utils/outboxSyncManager';
+import { bufferedPaymentManager } from '../utils/bufferedPaymentManager';
 
 // ============================================================================
 // TYPES
@@ -87,8 +96,7 @@ interface POSState {
   showOrderConfirmation: boolean;
   pendingOrderConfirmation: boolean;
   showGuestCountModal: boolean;
-  showDineInModal: boolean; // Add missing state
-  selectedTableNumber: number | null;
+  showDineInModal: boolean;
 }
 
 /**
@@ -139,6 +147,111 @@ export default function POSDesktop() {
     state.orders?.filter(order => order.status === 'NEW' || order.status === 'PENDING')?.length || 0
   );
   
+  // ============================================================================
+  // ENHANCED IMAGE PRELOADING & BUNDLE STRATEGY
+  // ============================================================================
+  const [bundleLoaded, setBundleLoaded] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  
+  // Enhanced image preloading integration
+  const { 
+    isImageReady, 
+    getImageStatus, 
+    initializePreloading, 
+    stats,
+    isInitializing 
+  } = useImagePreloader();
+  
+  // Component initialization with enhanced bundle strategy
+  useEffect(() => {
+    const initializePOSDesktop = async () => {
+      console.log('🚀 [POSDesktop] Starting enhanced initialization with image preloading...');
+      
+      try {
+        // Phase 1: Load bundle (this triggers the enhanced bundle API)
+        console.log('📦 [POSDesktop] Loading enhanced POS bundle...');
+        const bundleStartTime = performance.now();
+        
+        await loadPOSBundle();
+        
+        const bundleLoadTime = performance.now() - bundleStartTime;
+        console.log(`✅ [POSDesktop] Enhanced bundle loaded in ${bundleLoadTime.toFixed(2)}ms`);
+        
+        setBundleLoaded(true);
+        
+        // Phase 2: Start priority-based image preloading
+        console.log('🖼️ [POSDesktop] Starting priority-based image preloading...');
+        const imageStartTime = performance.now();
+        
+        // Get current menu items for preloading from bundle
+        const currentMenuItems = realtimeMenuStore.filteredMenuItems.slice(0, 10); // First 10 visible items
+        
+        if (currentMenuItems.length > 0) {
+          // Convert to POSBundleMenuItem format for preloading
+          const bundleItems = currentMenuItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+            price: item.price || 0,
+            category_id: item.category_id,
+            display_order: item.display_order || 0,
+            active: item.active !== false,
+            image_thumb_url: item.image_url,
+            image_priority: 'critical', // Set priority for first batch
+            preload_order: item.display_order || 0
+          }));
+          
+          console.log(`🎯 [POSDesktop] Preloading ${bundleItems.length} priority images...`);
+          
+          // Start preloading with correct function
+          await initializePreloading(bundleItems as any);
+          
+          const imageLoadTime = performance.now() - imageStartTime;
+          console.log(`🖼️ [POSDesktop] Image preloading completed in ${imageLoadTime.toFixed(2)}ms`);
+          console.log(`📊 [POSDesktop] Preload stats:`, stats);
+        }
+        
+        // Phase 3: Complete initialization with skeleton transition delay
+        setTimeout(() => {
+          setInitialLoad(false); // ✅ Allow skeleton rendering before hiding
+          console.log('✅ [POSDesktop] Enhanced initialization complete');
+        }, 500); // Brief delay to ensure skeletons are visible during startup
+        
+      } catch (error) {
+        console.error('❌ [POSDesktop] Enhanced initialization failed:', error);
+        setBundleLoaded(true); // Fallback to show content
+        setInitialLoad(false);
+      }
+    };
+    
+    initializePOSDesktop();
+  }, []); // Keep empty dependency array - the initialization should only run once
+  
+  // NEW: Initialize offline services
+  useEffect(() => {
+    const initializeOfflineServices = async () => {
+      try {
+        // Register service worker for offline support
+        const swRegistered = await registerServiceWorker();
+        if (swRegistered) {
+          console.log('✅ [POSDesktop] Service worker registered successfully');
+        }
+        
+        // Initialize outbox sync manager
+        await outboxSyncManager.initialize();
+        console.log('✅ [POSDesktop] Outbox sync manager initialized');
+        
+        // Initialize payment manager (you'd pass your Stripe key here)
+        await bufferedPaymentManager.initialize();
+        console.log('✅ [POSDesktop] Buffered payment manager initialized');
+        
+      } catch (error) {
+        console.error('❌ [POSDesktop] Failed to initialize offline services:', error);
+      }
+    };
+    
+    initializeOfflineServices();
+  }, []);
+
   // ============================================================================
   // HEADER VIEW CHANGE LISTENER  
   // ============================================================================
@@ -228,7 +341,6 @@ export default function POSDesktop() {
     pendingOrderConfirmation: false,
     showGuestCountModal: false,
     showDineInModal: false, // Initialize dine-in modal state
-    selectedTableNumber: null,
   });
   
   // Helper function to update state
@@ -301,8 +413,7 @@ export default function POSDesktop() {
         // Check if we should trigger Order Confirmation Modal
         if (state.pendingOrderConfirmation) {
           console.log('✅ Continuing Process Order flow - opening Order Confirmation Modal');
-          updateState({ pendingOrderConfirmation: false });
-          // Note: Order confirmation modal would be handled here if needed
+          updateState({ pendingOrderConfirmation: false, showOrderConfirmation: true });
         }
       } else {
         // Fresh table selection - ready for new ordering
@@ -524,64 +635,168 @@ export default function POSDesktop() {
       return;
     }
 
-    // Calculate total
+    // ============================================================================
+    // STEP 1: CUSTOMER DATA VALIDATION
+    // ============================================================================
+    if (!customerDataStore.hasRequiredCustomerData(state.orderType)) {
+      console.log(`🔍 [POSDesktop] Missing customer data for ${state.orderType} order`);
+      
+      if (state.orderType === 'DINE-IN') {
+        // For DINE-IN: Need table selection
+        if (!state.selectedTableNumber) {
+          console.log('🔍 [POSDesktop] Opening table selection modal for DINE-IN order');
+          updateState({ 
+            pendingOrderConfirmation: true, 
+            showGuestCountModal: true,
+            selectedTableNumber: 1 // Default to table 1, will be updated in modal
+          });
+          toast.info('Table selection required', {
+            description: 'Please select a table to continue with this order'
+          });
+          return; // Stop here - will continue after table is selected
+        }
+      } else {
+        // For DELIVERY/COLLECTION/WAITING: Need customer details
+        console.log(`🔍 [POSDesktop] Opening customer modal for ${state.orderType} order`);
+        updateState({ showCustomerModal: true, pendingOrderConfirmation: true });
+        toast.info('Customer details required', {
+          description: 'Please provide customer information to continue'
+        });
+        return; // Stop here - will continue after customer data is provided
+      }
+    }
+
+    // ============================================================================
+    // STEP 2: BUSINESS RULES VALIDATION
+    // ============================================================================
     const calculatedTotal = state.orderItems.reduce((sum, item) => {
-      const itemTotal = item.price * item.quantity;
-      const modifiersTotal = (item.customizations || []).reduce((modSum, cust) => 
-        modSum + ((cust.price || 0) * item.quantity), 0);
-      return sum + itemTotal + modifiersTotal;
+      const itemPrice = item.variant?.price || item.price;
+      return sum + (itemPrice * item.quantity);
     }, 0);
 
-    try {
-      console.log(`📋 [POSDesktop] Processing ${state.orderType} order - Total: £${calculatedTotal.toFixed(2)}`);
-      
-      const orderItems = state.orderItems.map(item => ({
-        item_id: item.menu_item_id || item.id || `item_${Date.now()}`,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        variant_name: item.variantName,
-        modifiers: item.customizations?.map(cust => ({
-          name: cust.name,
-          price: cust.price || 0
-        })) || [],
-        notes: item.notes
-      }));
-
-      const orderId = `${state.orderType}-${Date.now()}`;
-      const now = new Date();
-      
-      const orderModel = {
-        order_id: orderId,
-        order_type: state.orderType,
-        order_source: "POS-DESKTOP",
-        customer_name: state.customerData?.firstName && state.customerData?.lastName 
-          ? `${state.customerData.firstName} ${state.customerData.lastName}` 
-          : state.customerData?.firstName || state.customerData?.lastName || "Walk-in Customer",
-        customer_phone: state.customerData?.phone || null,
-        table_number: state.orderType === 'DINE-IN' ? state.selectedTableNumber : null,
-        guest_count: state.orderType === 'DINE-IN' ? state.guestCount : null,
-        created_at: now,
-        completed_at: now,
-        items: orderItems,
-        subtotal: calculatedTotal,
-        total: calculatedTotal,
-        status: "COMPLETED"
-      };
-
-      const storeResponse = await brain.create_pos_order(orderModel);
-      const storeResult = await storeResponse.json();
-      
-      if (!storeResult.success) {
-        toast.error('Failed to save order', {
-          description: storeResult.message || 'Unable to store order in database'
+    // Validate minimum order for DELIVERY
+    if (state.orderType === 'DELIVERY') {
+      const minimumOrder = 15; // Should come from settings
+      if (calculatedTotal < minimumOrder) {
+        toast.error('Minimum order not met', {
+          description: `Delivery orders require a minimum of £${minimumOrder.toFixed(2)}. Current total: £${calculatedTotal.toFixed(2)}`
         });
         return;
       }
+    }
+
+    // All validations passed - open Order Confirmation Modal
+    console.log('✅ All validations passed, opening Order Confirmation Modal');
+    updateState({ showOrderConfirmation: true });
+  }, [state]);
+
+  // ============================================================================
+  // PAYMENT COMPLETION HANDLER - Table closure and receipt printing
+  // ============================================================================
+  const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
+    console.log('💳 [POSDesktop] Payment completed successfully:', { tipSelection, paymentResult });
+    
+    try {
+      // ========================================================================
+      // STEP 1: CALCULATE FINAL TOTALS WITH TIP
+      // ========================================================================
+      const subtotal = state.orderItems.reduce((sum, item) => {
+        const itemPrice = item.variant?.price || item.price;
+        return sum + (itemPrice * item.quantity);
+      }, 0);
       
-      setState(prev => ({
-        ...prev,
+      const vatAmount = subtotal * 0.20; // 20% VAT
+      const totalWithVat = subtotal + vatAmount;
+      const finalTotal = totalWithVat + tipSelection.amount;
+      
+      console.log('💰 [POSDesktop] Final payment totals:', {
+        subtotal: subtotal.toFixed(2),
+        vat: vatAmount.toFixed(2),
+        tip: tipSelection.amount.toFixed(2),
+        finalTotal: finalTotal.toFixed(2)
+      });
+      
+      // ========================================================================
+      // STEP 2: PERSIST PAYMENT TO DATABASE
+      // ========================================================================
+      const paymentData = {
+        order_type: state.orderType,
+        table_number: state.selectedTableNumber,
+        customer_data: state.customerData,
+        items: state.orderItems,
+        payment_method: paymentResult?.method || 'CASH',
+        subtotal,
+        vat_amount: vatAmount,
+        tip_amount: tipSelection.amount,
+        total_amount: finalTotal,
+        stripe_payment_intent_id: paymentResult?.reference || null
+      };
+      
+      console.log('💾 [POSDesktop] Persisting payment data...');
+      const paymentResponse = await brain.process_payment2(paymentData);
+      console.log('✅ [POSDesktop] Payment persisted:', paymentResponse);
+      
+      // ========================================================================
+      // STEP 3: PRINT CUSTOMER RECEIPT
+      // ========================================================================
+      console.log('🧾 [POSDesktop] Printing customer receipt...');
+      
+      const receiptData = {
+        order_number: `${state.orderType.charAt(0)}${Date.now().toString().slice(-6)}`,
+        order_type: state.orderType,
+        table_number: state.selectedTableNumber,
+        customer_name: `${state.customerData.firstName} ${state.customerData.lastName}`.trim() || 'Walk-in Customer',
+        items: state.orderItems.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.variant?.price || item.price,
+          total: (item.variant?.price || item.price) * item.quantity
+        })),
+        subtotal,
+        vat_amount: vatAmount,
+        tip_amount: tipSelection.amount,
+        total_amount: finalTotal,
+        payment_method: paymentResult?.method || 'CASH',
+        timestamp: new Date().toISOString()
+      };
+      
+      try {
+        const printResponse = await brain.create_print_job({
+          type: 'customer_receipt',
+          data: receiptData,
+          priority: 'normal'
+        });
+        console.log('✅ [POSDesktop] Receipt print job created:', printResponse);
+        toast.success('Receipt printed successfully');
+      } catch (printError) {
+        console.warn('⚠️ [POSDesktop] Receipt printing failed, but payment completed:', printError);
+        toast.warning('Payment completed but receipt printing failed');
+      }
+      
+      // ========================================================================
+      // STEP 4: CLOSE TABLE/TAB AND RESET STATE
+      // ========================================================================
+      if (state.orderType === 'DINE-IN' && state.selectedTableNumber) {
+        console.log(`🍽️ [POSDesktop] Closing table ${state.selectedTableNumber}...`);
+        
+        try {
+          await brain.update_pos_table_status({
+            tableNumber: state.selectedTableNumber,
+            status: 'available'
+          });
+          console.log(`✅ [POSDesktop] Table ${state.selectedTableNumber} closed successfully`);
+        } catch (tableError) {
+          console.warn('⚠️ [POSDesktop] Failed to update table status:', tableError);
+        }
+      }
+      
+      // Reset order state
+      console.log('🔄 [POSDesktop] Resetting order state after successful payment...');
+      updateState({
         orderItems: [],
+        selectedTableNumber: null,
+        guestCount: 1,
+        showOrderConfirmation: false,
         customerData: {
           firstName: '',
           lastName: '',
@@ -589,33 +804,30 @@ export default function POSDesktop() {
           email: '',
           notes: '',
           tableNumber: '',
-          guestCount: 1,
+          guestCount: 2,
           address: '',
           street: '',
           city: '',
           postcode: '',
           deliveryNotes: ''
-        },
-        selectedTableNumber: null,
-        guestCount: 1
-      }));
-
-      toast.success(`Order completed successfully!`, {
-        description: `Order ${orderId} • Total: £${calculatedTotal.toFixed(2)}`
+        }
       });
-
+      
+      // Success notification
+      toast.success(`Payment of £${finalTotal.toFixed(2)} completed successfully!`);
+      
     } catch (error) {
-      console.error(`❌ [POSDesktop] Failed to process order:`, error);
-      toast.error('Failed to process order');
+      console.error('❌ [POSDesktop] Payment completion failed:', error);
+      toast.error('Failed to complete payment process');
     }
-  }, [state]);
+  }, [state, brain, updateState]);
 
   // ============================================================================
   // THERMAL PRINTING HANDLERS WITH OFFLINE QUEUING
   // ============================================================================
 
   const handleSendToKitchen = async () => {
-    if (!currentOrder || currentOrder.length === 0) {
+    if (!state.orderItems || state.orderItems.length === 0) {
       toast.error('No items to send to kitchen');
       return;
     }
@@ -624,29 +836,82 @@ export default function POSDesktop() {
     
     try {
       // ========================================================================
+      // 🆕 GET TEMPLATE ASSIGNMENT FOR CURRENT ORDER MODE
+      // ========================================================================
+      
+      console.log('📋 [POSDesktop] Fetching template assignment for order mode:', state.orderType);
+      let templateAssignment;
+      
+      try {
+        // Get template assignment for the order type (convert format for API)
+        const apiOrderMode = state.orderType.replace(/-/g, '_'); // Convert DINE-IN → DINE_IN
+        const assignmentResponse = await brain.get_template_assignment({ order_mode: apiOrderMode });
+        templateAssignment = await assignmentResponse.json();
+        console.log('✅ [POSDesktop] Template assignment loaded:', templateAssignment);
+      } catch (error) {
+        console.warn('⚠️ [POSDesktop] Failed to load template assignment, using defaults:', error);
+        // Fallback to default templates
+        templateAssignment = {
+          kitchen_template_id: state.orderType === 'DELIVERY' ? 'delivery_takeaway' : 'classic_restaurant',
+          customer_template_id: state.orderType === 'DELIVERY' ? 'delivery_takeaway' : 'classic_restaurant'
+        };
+      }
+      
+      // ========================================================================
       // PREPARE KITCHEN TICKET DATA 
       // ========================================================================
       
       const kitchenReceipt = {
-        orderNumber: `T${state.currentTableNumber}`,
-        orderType: state.currentOrderMode,
-        items: currentOrder.map(item => ({
+        orderNumber: `T${state.selectedTableNumber}`,
+        orderType: state.orderType,
+        items: state.orderItems.map(item => ({
           name: item.name,
           quantity: item.quantity,
           notes: item.notes || '',
           modifiers: item.modifiers?.map(mod => mod.name) || []
         })),
-        table: `${state.currentTableNumber}`,
+        table: `${state.selectedTableNumber}`,
         specialInstructions: '',
-        customerName: state.currentCustomer?.name || 'Walk-in Customer',
+        customerName: state.customerData?.firstName || 'Walk-in Customer',
         timestamp: new Date().toISOString()
       };
 
       // ========================================================================
-      // DIRECT HELPER APP PRINTING - Frontend-to-Local Architecture  
+      // 🆕 CREATE PRINT JOB USING TEMPLATE ASSIGNMENT
       // ========================================================================
       
-      console.log('🖨️ [POSDesktop] Starting print process with helper app detection...');
+      console.log('🖨️ [POSDesktop] Creating kitchen print job with template:', templateAssignment.kitchen_template_id);
+      
+      try {
+        const printJobResponse = await brain.create_print_job({
+          template_id: templateAssignment.kitchen_template_id,
+          receipt_type: 'kitchen',
+          order_data: kitchenReceipt,
+          priority: 'high',
+          metadata: {
+            order_mode: state.orderType,
+            table_number: state.selectedTableNumber,
+            created_from: 'pos_desktop_kitchen'
+          }
+        });
+        
+        const printJob = await printJobResponse.json();
+        console.log('✅ [POSDesktop] Kitchen print job created:', printJob.job_id);
+        
+        toast.success(`Kitchen ticket sent to printer (${printJob.job_id})`, {
+          description: `Table ${state.selectedTableNumber} • ${state.orderItems.length} items`
+        });
+        
+      } catch (printError) {
+        console.error('❌ [POSDesktop] Failed to create kitchen print job:', printError);
+        toast.error('Failed to send kitchen ticket to printer');
+      }
+
+      // ========================================================================
+      // DIRECT HELPER APP PRINTING - Frontend-to-Local Architecture (Fallback)
+      // ========================================================================
+      
+      console.log('🖨️ [POSDesktop] Starting fallback print process with helper app detection...');
       
       // Step 1: Check if helper app is available
       const helperStatus = await checkHelperAppStatus();
@@ -736,8 +1001,8 @@ export default function POSDesktop() {
             priority: 'high',
             order_data: kitchenReceipt,
             metadata: {
-              table_number: state.currentTableNumber,
-              order_mode: state.currentOrderMode,
+              table_number: state.selectedTableNumber,
+              order_mode: state.orderType,
               created_from: 'pos_desktop',
               retry_count: 0
             }
@@ -748,7 +1013,7 @@ export default function POSDesktop() {
           
           if (queueResult.success) {
             // Mark items as queued for kitchen
-            const updatedOrder = currentOrder.map(item => ({
+            const updatedOrder = state.orderItems.map(item => ({
               ...item,
               sentToKitchen: true,
               kitchenQueued: true,
@@ -756,7 +1021,7 @@ export default function POSDesktop() {
               queueJobId: queueResult.job_id
             }));
             
-            updateOrderData(state.currentTableNumber, updatedOrder);
+            updateOrderData(state.selectedTableNumber, updatedOrder);
             
             updateState({
               kitchenQueued: true,
@@ -764,7 +1029,7 @@ export default function POSDesktop() {
               queuedJobsCount: (state.queuedJobsCount || 0) + 1
             });
 
-            toast.warning(`Kitchen ticket queued for offline printing - Table ${state.currentTableNumber}`, {
+            toast.warning(`Kitchen ticket queued for offline printing - Table ${state.selectedTableNumber}`, {
               description: 'Will print automatically when printer comes online'
             });
             
@@ -785,20 +1050,20 @@ export default function POSDesktop() {
       
       if (hasPhysicalPrinter) {
         // Mark items as sent to kitchen
-        const updatedOrder = currentOrder.map(item => ({
+        const updatedOrder = state.orderItems.map(item => ({
           ...item,
           sentToKitchen: true,
           kitchenPrintedAt: new Date()
         }));
         
-        updateOrderData(state.currentTableNumber, updatedOrder);
+        updateOrderData(state.selectedTableNumber, updatedOrder);
         
         updateState({
           kitchenPrinted: true,
           lastKitchenPrintedAt: new Date()
         });
 
-        toast.success(`Kitchen ticket printed successfully - Table ${state.currentTableNumber}`, {
+        toast.success(`Kitchen ticket printed successfully - Table ${state.selectedTableNumber}`, {
           description: `Printed via ${printResult.method.replace('_', ' ')}`
         });
         
@@ -814,7 +1079,7 @@ export default function POSDesktop() {
   };
 
   const handlePrintBill = async () => {
-    if (!currentOrder || currentOrder.length === 0) {
+    if (!state.orderItems || state.orderItems.length === 0) {
       toast.error('No items to print bill for');
       return;
     }
@@ -826,7 +1091,7 @@ export default function POSDesktop() {
       // CALCULATE ORDER TOTALS
       // ========================================================================
       
-      const subtotal = currentOrder.reduce((sum, item) => {
+      const subtotal = state.orderItems.reduce((sum, item) => {
         const itemPrice = item.variant?.price || item.price;
         return sum + (itemPrice * item.quantity);
       }, 0);
@@ -840,10 +1105,10 @@ export default function POSDesktop() {
       // ========================================================================
       
       const customerReceipt = {
-        orderNumber: `T${state.currentTableNumber}`,
-        orderMode: state.currentOrderMode,
-        tableNumber: state.currentTableNumber,
-        items: currentOrder.map(item => ({
+        orderNumber: `T${state.selectedTableNumber}`,
+        orderMode: state.orderType,
+        tableNumber: state.selectedTableNumber,
+        items: state.orderItems.map(item => ({
           name: item.name,
           quantity: item.quantity,
           variant: item.variant?.name || 'Standard',
@@ -899,8 +1164,8 @@ export default function POSDesktop() {
             priority: 'medium',
             order_data: customerReceipt,
             metadata: {
-              table_number: state.currentTableNumber,
-              order_mode: state.currentOrderMode,
+              table_number: state.selectedTableNumber,
+              order_mode: state.orderType,
               total_amount: total,
               created_from: 'pos_desktop',
               retry_count: 0
@@ -948,8 +1213,133 @@ export default function POSDesktop() {
 
   const handleCompleteOrder = useCallback(async () => {
     console.log('Complete order');
-    toast.success('Order completed');
-  }, []);
+    
+    // Validate we have items to complete
+    if (!state.orderItems || state.orderItems.length === 0) {
+      toast.error('No items to complete');
+      return;
+    }
+
+    console.log('🏁 [POSDesktop] Starting order completion with customer receipt...');
+    
+    try {
+      // ========================================================================
+      // 🆕 GET TEMPLATE ASSIGNMENT FOR CURRENT ORDER MODE
+      // ========================================================================
+      
+      console.log('📋 [POSDesktop] Fetching template assignment for order mode:', state.orderType);
+      let templateAssignment;
+      
+      try {
+        // Get template assignment for the order type (convert format for API)
+        const apiOrderMode = state.orderType.replace(/-/g, '_'); // Convert DINE-IN → DINE_IN
+        const assignmentResponse = await brain.get_template_assignment({ order_mode: apiOrderMode });
+        templateAssignment = await assignmentResponse.json();
+        console.log('✅ [POSDesktop] Template assignment loaded for completion:', templateAssignment);
+      } catch (error) {
+        console.warn('⚠️ [POSDesktop] Failed to load template assignment, using defaults:', error);
+        // Fallback to default templates
+        templateAssignment = {
+          kitchen_template_id: state.orderType === 'DELIVERY' ? 'delivery_takeaway' : 'classic_restaurant',
+          customer_template_id: state.orderType === 'DELIVERY' ? 'delivery_takeaway' : 'classic_restaurant'
+        };
+      }
+      
+      // ========================================================================
+      // PREPARE CUSTOMER RECEIPT DATA
+      // ========================================================================
+      
+      const orderTotal = state.orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const vatAmount = orderTotal * 0.2; // 20% VAT
+      const finalTotal = orderTotal + vatAmount;
+      
+      const customerReceipt = {
+        orderNumber: `${state.orderType === 'DINE-IN' ? 'T' : 'O'}${state.selectedTableNumber || Date.now()}`,
+        orderType: state.orderType,
+        channel: 'POS_DESKTOP',
+        items: state.orderItems.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+          notes: item.notes || '',
+          modifiers: item.modifiers?.map(mod => ({ name: mod.name, price: mod.price || 0 })) || []
+        })),
+        subtotal: orderTotal,
+        vat: vatAmount,
+        total: finalTotal,
+        paymentMethod: 'Cash', // Default for POS
+        customerName: state.customerData?.firstName && state.customerData?.lastName 
+          ? `${state.customerData.firstName} ${state.customerData.lastName}` 
+          : 'Walk-in Customer',
+        customerPhone: state.customerData?.phone || '',
+        deliveryAddress: state.orderType === 'DELIVERY' ? {
+          address: state.customerData?.address || '',
+          street: state.customerData?.street || '',
+          city: state.customerData?.city || '',
+          postcode: state.customerData?.postcode || ''
+        } : null,
+        table: state.orderType === 'DINE-IN' ? `${state.selectedTableNumber}` : null,
+        timestamp: new Date().toISOString()
+      };
+      
+      // ========================================================================
+      // 🆕 CREATE CUSTOMER RECEIPT PRINT JOB
+      // ========================================================================
+      
+      console.log('🧾 [POSDesktop] Creating customer receipt print job with template:', templateAssignment.customer_template_id);
+      
+      try {
+        const printJobResponse = await brain.create_print_job({
+          template_id: templateAssignment.customer_template_id,
+          receipt_type: 'customer',
+          order_data: customerReceipt,
+          priority: 'medium',
+          metadata: {
+            order_mode: state.orderType,
+            table_number: state.selectedTableNumber,
+            created_from: 'pos_desktop_customer',
+            completion_type: 'order_complete'
+          }
+        });
+        
+        const printJob = await printJobResponse.json();
+        console.log('✅ [POSDesktop] Customer receipt print job created:', printJob.job_id);
+        
+        toast.success(`Order completed! Customer receipt sent to printer (${printJob.job_id})`, {
+          description: `${state.orderType} • £${finalTotal.toFixed(2)} • ${state.orderItems.length} items`
+        });
+        
+        // Clear the order after successful completion
+        updateState({
+          orderItems: [],
+          selectedTableNumber: null,
+          customerData: {
+            firstName: '',
+            lastName: '',
+            phone: '',
+            email: '',
+            notes: '',
+            tableNumber: '',
+            guestCount: 0,
+            address: '',
+            street: '',
+            city: '',
+            postcode: '',
+            deliveryNotes: ''
+          }
+        });
+        
+      } catch (printError) {
+        console.error('❌ [POSDesktop] Failed to create customer receipt print job:', printError);
+        toast.error('Order completed but failed to print customer receipt');
+      }
+      
+    } catch (error) {
+      console.error('❌ [POSDesktop] Order completion failed:', error);
+      toast.error('Failed to complete order');
+    }
+  }, [state, brain, updateState]);
 
   const handleSplitBill = useCallback(async () => {
     console.log('Split bill');
@@ -1042,35 +1432,209 @@ export default function POSDesktop() {
     }
   };
 
-  // ============================================================================
-  // INITIALIZATION & EFFECTS
-  // ============================================================================
+  // Initialize menu store with fast POS bundle loading
   useEffect(() => {
-    const initializeMenuStore = async () => {
+    // React StrictMode guard - prevents double initialization
+    let isActive = true;
+    let cleanupFunctions: (() => void)[] = [];
+    
+    // Use initialization guard to prevent multiple concurrent starts
+    posPerformance.startInitialization('pos_desktop', async () => {
+      // Check if effect is still active (not unmounted)
+      if (!isActive) {
+        return;
+      }
+      
       try {
-        await realtimeMenuStore.initialize();
+        // Mark startup beginning
+        posPerformance.mark(POSPerfMarks.STARTUP);
+        posPerformance.mark(POSPerfMarks.BUNDLE_LOAD);
         
-        const menuData = getMenuDataForPOS();
-        const starterPatterns = ['Starters', 'Appetizers', 'Appetizer', 'Hot Appetizers'];
-        const starterCategory = menuData.categories?.find(cat => 
-          !cat.parent_category_id && 
-          starterPatterns.some(pattern => 
-            cat.name.toLowerCase().includes(pattern.toLowerCase()) ||
-            pattern.toLowerCase().includes(cat.name.toLowerCase())
-          )
-        );
+        // Only log in development
+        const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+        if (isDevelopment) {
+          console.log('🚀 [POSDesktop] Starting fast initialization with POS bundle...');
+        }
         
-        if (starterCategory) {
-          realtimeMenuStore.setSelectedMenuCategory(starterCategory.id);
+        // Try fast bundle loading first
+        const bundleSuccess = await loadPOSBundle();
+        
+        // Check if effect is still active after async operation
+        if (!isActive) {
+          return;
+        }
+        
+        posPerformance.measure(POSPerfMarks.BUNDLE_LOAD, { success: bundleSuccess });
+        
+        if (bundleSuccess) {
+          if (isDevelopment) {
+            console.log('✅ [POSDesktop] Fast bundle loaded successfully');
+          }
+          
+          // Set default category from bundle data
+          const menuData = getMenuDataForPOS();
+          const starterPatterns = ['Starters', 'Appetizers', 'Appetizer', 'Hot Appetizers'];
+          const starterCategory = menuData.categories?.find(cat => 
+            !cat.parent_category_id &&
+            starterPatterns.some(pattern =>
+              cat.name.toLowerCase().includes(pattern.toLowerCase())
+            )
+          );
+          
+          if (starterCategory && isActive) {
+            if (isDevelopment) {
+              console.log(`🎯 [POSDesktop] Setting default category to: ${starterCategory.name}`);
+            }
+            realtimeMenuStore.setSelectedMenuCategory(starterCategory.id);
+          }
+          
+          // Mark first interactive
+          posPerformance.mark(POSPerfMarks.FIRST_INTERACTIVE);
+          
+        } else {
+          // Fallback to full initialization if bundle fails
+          if (isDevelopment) {
+            console.log('⚠️ [POSDesktop] Bundle loading failed, falling back to full initialization');
+          }
+          
+          if (isActive) {
+            await realtimeMenuStore.initialize();
+          }
+          
+          // Check again after async operation
+          if (!isActive) {
+            return;
+          }
+          
+          const menuData = getMenuDataForPOS();
+          const starterPatterns = ['Starters', 'Appetizers', 'Appetizer', 'Hot Appetizers'];
+          const starterCategory = menuData.categories?.find(cat => 
+            !cat.parent_category_id &&
+            starterPatterns.some(pattern =>
+              cat.name.toLowerCase().includes(pattern.toLowerCase())
+            )
+          );
+          
+          if (starterCategory && isActive) {
+            if (isDevelopment) {
+              console.log(`🎯 [POSDesktop] Setting default category to: ${starterCategory.name}`);
+            }
+            realtimeMenuStore.setSelectedMenuCategory(starterCategory.id);
+          }
+        }
+        
+        if (isActive) {
+          posPerformance.measure(POSPerfMarks.STARTUP);
+        }
+        
+        // Log performance summary only in development
+        if (isDevelopment && isActive) {
+          setTimeout(() => {
+            if (isActive) {
+              const summary = posPerformance.getSummary();
+              console.log('📊 [POSDesktop] Performance Summary:', summary);
+            }
+          }, 100);
         }
         
       } catch (error) {
-        console.error('POSDesktop: Failed to initialize menu store:', error);
-        toast.error('Failed to load menu data');
+        const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+        if (isDevelopment && isActive) {
+          console.error('❌ [POSDesktop] Error during fast initialization:', error);
+        }
+        if (isActive) {
+          posPerformance.record('startup_error', 1, { error: error.message });
+        }
+        throw error; // Re-throw so guard can handle it
       }
-    };
+    }).catch((error) => {
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      if (isDevelopment && isActive) {
+        console.error('❌ [POSDesktop] Initialization guard failed:', error);
+      }
+    });
     
-    initializeMenuStore();
+    // Cleanup function for React StrictMode and component unmounting
+    return () => {
+      isActive = false;
+      
+      // Run any registered cleanup functions
+      cleanupFunctions.forEach(cleanup => {
+        try {
+          cleanup();
+        } catch (error) {
+          // Silently handle cleanup errors
+        }
+      });
+      
+      // Reset initialization state to allow fresh start on remount
+      posPerformance.resetInitialization('pos_desktop');
+    };
+  }, []);
+
+  // Start real-time subscriptions after bundle loading and UI rendering is complete
+  useEffect(() => {
+    // React StrictMode guard - prevents double initialization
+    let isActive = true;
+    
+    // Delay subscription startup to allow bundle loading and UI rendering to complete
+    const subscriptionDelay = setTimeout(() => {
+      if (!isActive) return;
+      
+      // Use initialization guard to prevent multiple concurrent starts
+      posPerformance.startInitialization('pos_desktop_subscriptions', async () => {
+        // Check if effect is still active (not unmounted)
+        if (!isActive) {
+          return;
+        }
+        
+        try {
+          const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+          if (isDevelopment) {
+            console.log('🚀 [POSDesktop] Starting real-time subscriptions after bundle completion...');
+          }
+          
+          // Start real-time subscriptions for menu data
+          realtimeMenuStore.startRealtimeSubscriptions();
+          
+          // Check if effect is still active after startup
+          if (!isActive) {
+            return;
+          }
+          
+          // Mark subscriptions started
+          posPerformance.mark(POSPerfMarks.FIRST_INTERACTIVE);
+          
+          // Log completion only in development
+          if (isDevelopment && isActive) {
+            console.log('✅ [POSDesktop] Real-time subscriptions started successfully');
+          }
+          
+        } catch (error) {
+          const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+          if (isDevelopment && isActive) {
+            console.error('❌ [POSDesktop] Error starting subscriptions:', error);
+          }
+          if (isActive) {
+            posPerformance.record('subscriptions_error', 1, { error: error.message });
+          }
+        }
+      }).catch((error) => {
+        const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+        if (isDevelopment && isActive) {
+          console.error('❌ [POSDesktop] Subscriptions guard failed:', error);
+        }
+      });
+    }, 500); // 500ms delay to ensure bundle loading and UI rendering is complete
+    
+    // Cleanup function for React StrictMode and component unmounting
+    return () => {
+      isActive = false;
+      clearTimeout(subscriptionDelay);
+      
+      // Reset initialization state to allow fresh start on remount
+      posPerformance.resetInitialization('pos_desktop_subscriptions');
+    };
   }, []);
 
   // ============================================================================
@@ -1232,6 +1796,9 @@ export default function POSDesktop() {
             orderMode={state.orderType}
             onCustomizeItem={handleCustomizeItemFromMenu}
             className="h-full"
+            // ✅ NEW: Enhanced bundle strategy props
+            showSkeletons={initialLoad || isInitializing}
+            preloadedImages={{ isImageReady, getImageStatus }}
           />
         </div>
         
@@ -1278,6 +1845,15 @@ export default function POSDesktop() {
             isOrderReady={isOrderReady}
             onSchedulingChange={handleSchedulingChange}
             schedulingData={null}
+            
+            // ✅ NEW: Direct props control for Order Confirmation Modal
+            showOrderConfirmation={state.showOrderConfirmation}
+            onCloseOrderConfirmation={() => updateState({ showOrderConfirmation: false })}
+            onShowOrderConfirmation={() => updateState({ showOrderConfirmation: true })}
+            
+            // ✅ NEW: Payment completion handler
+            onPaymentComplete={handlePaymentSuccess}
+            
             className="h-full"
           />
         </div>
@@ -1322,6 +1898,35 @@ export default function POSDesktop() {
             tableNumber={state.selectedTableNumber}
           />
         )}
+        
+        {/* Customer Details Modal */}
+        {state.showCustomerModal && (
+          <CustomerDetailsModal
+            isOpen={state.showCustomerModal}
+            onClose={() => updateState({ showCustomerModal: false })}
+            onSave={handleCustomerSave}
+            orderType={state.orderType as "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING"}
+            orderValue={calculateOrderTotal()}
+            initialData={{
+              firstName: state.customerData?.firstName || '',
+              lastName: state.customerData?.lastName || '',
+              phone: state.customerData?.phone || '',
+              email: state.customerData?.email || '',
+              notes: state.customerData?.notes || '',
+              address: state.customerData?.address || '',
+              street: state.customerData?.street || '',
+              city: state.customerData?.city || '',
+              postcode: state.customerData?.postcode || '',
+              deliveryNotes: state.customerData?.deliveryNotes || ''
+            }}
+          />
+        )}
+        
+        {/* Professional Footer */}
+        <POSFooter 
+          currentOrderType={state.orderType}
+          className=""
+        />
       </div>
     </CustomizeOrchestratorProvider>
   );
