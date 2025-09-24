@@ -33,7 +33,7 @@ import POSUnifiedPaymentModal from './POSUnifiedPaymentModal';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
-import { usePOSSettings } from '../utils/posSettingsStore';
+import { usePOSSettingsWithAutoFetch } from '../utils/posSettingsStore';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
 import brain from 'brain';
@@ -147,7 +147,7 @@ export function OrderSummaryPanel({
   const logger = createLogger('OrderSummaryPanel');
 
   // ✅ Get POS settings from store
-  const { settings: posSettings } = usePOSSettings();
+  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
   
   // UI State Management
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
