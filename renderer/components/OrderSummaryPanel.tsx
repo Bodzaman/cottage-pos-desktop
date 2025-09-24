@@ -1,6 +1,3 @@
-
-
-
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -66,9 +63,25 @@ interface Props {
   onTableSelectionClick?: () => void;
   onCustomizeItem?: (index: number, item: OrderItem) => void;
   
+  // Payment Modal props
+  showPaymentModal?: boolean;
+  onClosePaymentModal?: () => void;
+  showStripePayment?: boolean;
+  onCloseStripePayment?: () => void;
+  onConfirmPayment?: (result: any) => void;
+  onCompleteStripePayment?: (result: any) => void;
+  onPrintReceipt?: () => void;
+  onEditOrder?: () => void;
+  onSaveAndPrint?: () => void;
+  onPaymentSuccess?: (result: any) => void;
+  isStandalone?: boolean;
+  hideTableNumber?: boolean;
+  hideCustomerBadge?: boolean;
+  
   // ✅ NEW: Direct props control for Order Confirmation Modal
   showOrderConfirmation?: boolean;
   onCloseOrderConfirmation?: () => void;
+  onShowOrderConfirmation?: () => void;
   
   // ✅ NEW: Table Selection Modal props
   showTableSelection?: boolean;
@@ -96,11 +109,20 @@ export function OrderSummaryPanel({
   customerAddress,
   customerStreet,
   customerPostcode,
-  onAddToOrder,
-  onRemoveFromOrder,
+  customerData,
+  onRemoveItem,
   onUpdateQuantity,
+  onClearOrder,
   onProcessPayment,
   onSendToKitchen,
+  onPrintBill,
+  onSaveUpdate,
+  onTableSelect,
+  onCustomerDetailsClick,
+  onTableSelectionClick,
+  onCustomizeItem,
+  
+  // Payment Modal props
   showPaymentModal = false,
   onClosePaymentModal,
   showStripePayment = false,
@@ -114,15 +136,12 @@ export function OrderSummaryPanel({
   isStandalone = false,
   hideTableNumber = false,
   hideCustomerBadge = false,
-  // ✅ NEW: Order Confirmation Modal props
+  
   showOrderConfirmation = false,
   onCloseOrderConfirmation,
-  // ✅ NEW: Table Selection Modal props  
+  onShowOrderConfirmation,
   showTableSelection = false,
   onCloseTableSelection,
-  onCustomizeItem,
-  customerData,
-  // ✅ Missing className prop
   className = ''
 }: Props) {
   const logger = createLogger('OrderSummaryPanel');
@@ -133,19 +152,6 @@ export function OrderSummaryPanel({
   // UI State Management
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ action: () => void; label: string } | null>(null);
-  
-  // ✅ Order Confirmation Modal state
-  const [internalShowOrderConfirmation, setInternalShowOrderConfirmation] = useState(false);
-  
-  // ✅ Sync parent showOrderConfirmation prop with internal state
-  useEffect(() => {
-    if (showOrderConfirmation !== internalShowOrderConfirmation) {
-      setInternalShowOrderConfirmation(showOrderConfirmation);
-    }
-  }, [showOrderConfirmation, internalShowOrderConfirmation]);
-  
-  // ✅ REMOVED: Complex useEffect dependency chain - now using direct props
-  // const [wasWaitingForTableSetup, setWasWaitingForTableSetup] = useState(false);
   
   // Payment modal and Stripe payment states (still needed)
   const [internalShowStripePayment, setInternalShowStripePayment] = useState<boolean>(false);
@@ -174,7 +180,6 @@ export function OrderSummaryPanel({
 
   // Handle Order Confirmation Modal close - notify parent and update internal state
   const handleOrderConfirmationClose = () => {
-    setInternalShowOrderConfirmation(false);
     if (onCloseOrderConfirmation) {
       onCloseOrderConfirmation();
     }
@@ -236,7 +241,9 @@ export function OrderSummaryPanel({
 
     // All validations passed - open Order Confirmation Modal
     console.log('✅ All validations passed, opening Order Confirmation Modal');
-    setInternalShowOrderConfirmation(true);
+    if (onShowOrderConfirmation) {
+      onShowOrderConfirmation();
+    }
   };
 
   // Table selection handler
@@ -902,7 +909,7 @@ export function OrderSummaryPanel({
 
       {/* Order Confirmation Modal with Context-Aware CTAs */}
       <OrderConfirmationModal
-        isOpen={internalShowOrderConfirmation}  // ✅ Use internal state instead of prop
+        isOpen={showOrderConfirmation}  // ✅ Use internal state instead of prop
         onClose={handleOrderConfirmationClose}
         orderItems={orderItems}
         orderType={orderType}
