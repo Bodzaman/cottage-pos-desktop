@@ -545,9 +545,50 @@ export default function POSDesktop() {
   // ============================================================================
   const handleAddToOrder = useCallback((orderItem: OrderItem) => {
     setState(prev => {
-      const newItems = [...prev.orderItems, orderItem];
-      toast.success(`Added ${orderItem.name} to order`);
-      return { ...prev, orderItems: newItems };
+      const currentItems = prev.orderItems;
+      
+      // Check for duplicate item (same menu item + variant + modifiers)
+      const duplicateIndex = currentItems.findIndex(existingItem => {
+        const sameMenuItem = existingItem.menu_item_id === orderItem.menu_item_id;
+        const sameVariant = existingItem.variant_id === orderItem.variant_id;
+        const sameNotes = existingItem.notes === orderItem.notes;
+        
+        // Compare modifiers arrays (if both have modifiers)
+        const sameModifiers = (() => {
+          const existingMods = existingItem.modifiers || [];
+          const newMods = orderItem.modifiers || [];
+          
+          if (existingMods.length !== newMods.length) return false;
+          
+          // Sort and compare modifier arrays
+          const sortedExisting = existingMods.sort((a, b) => a.modifier_id.localeCompare(b.modifier_id));
+          const sortedNew = newMods.sort((a, b) => a.modifier_id.localeCompare(b.modifier_id));
+          
+          return sortedExisting.every((mod, index) => {
+            const newMod = sortedNew[index];
+            return mod.modifier_id === newMod.modifier_id && 
+                   mod.option_id === newMod.option_id;
+          });
+        })();
+        
+        return sameMenuItem && sameVariant && sameNotes && sameModifiers;
+      });
+      
+      if (duplicateIndex >= 0) {
+        // Increment quantity of existing item
+        const updatedItems = currentItems.map((item, index) => 
+          index === duplicateIndex 
+            ? { ...item, quantity: item.quantity + orderItem.quantity }
+            : item
+        );
+        toast.success(`Increased quantity of ${orderItem.name} (now ${currentItems[duplicateIndex].quantity + orderItem.quantity})`);
+        return { ...prev, orderItems: updatedItems };
+      } else {
+        // Add as new item
+        const newItems = [...currentItems, orderItem];
+        toast.success(`Added ${orderItem.name} to order`);
+        return { ...prev, orderItems: newItems };
+      }
     });
   }, []);
   
