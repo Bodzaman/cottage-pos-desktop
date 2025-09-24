@@ -737,14 +737,29 @@ export default function POSDesktop() {
       console.log('✅ [POSDesktop] Payment persisted:', paymentResponse);
       
       // ========================================================================
-      // STEP 3: PRINT CUSTOMER RECEIPT
+      // STEP 3: PRINT CUSTOMER RECEIPT WITH TEMPLATE SUPPORT
       // ========================================================================
-      console.log('🧾 [POSDesktop] Printing customer receipt...');
+      console.log('🧾 [POSDesktop] Printing customer receipt with template support...');
+      
+      // Get template assignment for the order type
+      let templateAssignment;
+      try {
+        const apiOrderMode = state.orderType.replace(/-/g, '_'); // Convert DINE-IN → DINE_IN
+        const assignmentResponse = await brain.get_template_assignment({ order_mode: apiOrderMode });
+        templateAssignment = await assignmentResponse.json();
+        console.log('✅ [POSDesktop] Template assignment loaded:', templateAssignment);
+      } catch (error) {
+        console.warn('⚠️ [POSDesktop] Failed to load template assignment, using defaults:', error);
+        templateAssignment = {
+          customer_template_id: state.orderType === 'DELIVERY' ? 'delivery_takeaway' : 'classic_restaurant'
+        };
+      }
       
       const receiptData = {
         order_number: `${state.orderType.charAt(0)}${Date.now().toString().slice(-6)}`,
         order_type: state.orderType,
         table_number: state.selectedTableNumber,
+        guest_count: state.guestCount, // ✅ FIXED: Add missing guest count
         customer_name: `${state.customerData.firstName} ${state.customerData.lastName}`.trim() || 'Walk-in Customer',
         items: state.orderItems.map(item => ({
           name: item.name,
@@ -762,11 +777,14 @@ export default function POSDesktop() {
       
       try {
         const printResponse = await brain.create_print_job({
-          type: 'customer_receipt',
-          data: receiptData,
+          template_id: templateAssignment.customer_template_id, // ✅ FIXED: Use saved template
+          receipt_type: 'customer',
+          order_data: receiptData, // ✅ FIXED: Use order_data instead of data
           priority: 'normal'
         });
-        console.log('✅ [POSDesktop] Receipt print job created:', printResponse);
+        
+        const printJob = await printResponse.json();
+        console.log('✅ [POSDesktop] Receipt print job created with template:', printJob.job_id);
         toast.success('Receipt printed successfully');
       } catch (printError) {
         console.warn('⚠️ [POSDesktop] Receipt printing failed, but payment completed:', printError);
@@ -1280,6 +1298,7 @@ export default function POSDesktop() {
           postcode: state.customerData?.postcode || ''
         } : null,
         table: state.orderType === 'DINE-IN' ? `${state.selectedTableNumber}` : null,
+        guest_count: state.guestCount, // ✅ FIXED: Add missing guest count for template compatibility
         timestamp: new Date().toISOString()
       };
       
