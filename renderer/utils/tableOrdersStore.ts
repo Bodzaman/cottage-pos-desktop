@@ -114,6 +114,11 @@ interface TableOrdersState {
   updateCustomerTabItems: (tabId: string, items: OrderItem[]) => Promise<boolean>;
   completeCustomerTab: (tabId: string) => Promise<boolean>;
   
+  // NEW: Advanced customer tab operations (split/merge/move)
+  splitCustomerTab: (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => Promise<{ success: boolean; originalTab?: CustomerTab; newTab?: CustomerTab; message: string }>;
+  mergeCustomerTabs: (sourceTabId: string, targetTabId: string) => Promise<{ success: boolean; targetTab?: CustomerTab; message: string }>;
+  moveItemsBetweenTabs: (sourceTabId: string, targetTabId: string, itemIndices: number[]) => Promise<{ success: boolean; sourceTab?: CustomerTab; targetTab?: CustomerTab; message: string }>;
+  
   // Utilities (PRESERVED and ENHANCED)
   hasExistingOrders: (tableNumber: number) => boolean;
   getTableStatus: (tableNumber: number) => 'Available' | 'Seated';
@@ -654,6 +659,199 @@ export const useTableOrdersStore = create<TableOrdersState>()(subscribeWithSelec
     // ENHANCED: Rename customer tab
     renameCustomerTab: async (tabId: string, newName: string) => {
       return get().updateCustomerTab(tabId, { tab_name: newName });
+    },
+
+    // NEW: Split customer tab
+    splitCustomerTab: async (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => {
+      try {
+        const response = await brain.split_tab({
+          source_tab_id: sourceTabId,
+          new_tab_name: newTabName,
+          item_indices: itemIndices,
+          guest_id: guestId
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.original_tab && data.new_tab) {
+            // Update state with both tabs
+            const tableNumber = data.original_tab.table_number;
+            
+            set(state => {
+              const existingTabs = state.customerTabs[tableNumber] || [];
+              const updatedTabs = existingTabs.map(tab => 
+                tab.id === sourceTabId ? data.original_tab : tab
+              );
+              
+              // Add the new tab
+              updatedTabs.push(data.new_tab);
+              
+              return {
+                customerTabs: {
+                  ...state.customerTabs,
+                  [tableNumber]: updatedTabs
+                },
+                optimisticCustomerTabs: {
+                  ...state.optimisticCustomerTabs,
+                  [tableNumber]: updatedTabs
+                }
+              };
+            });
+            
+            toast.success(data.message);
+            return {
+              success: true,
+              originalTab: data.original_tab,
+              newTab: data.new_tab,
+              message: data.message
+            };
+          }
+        }
+        
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to split tab');
+        return {
+          success: false,
+          message: errorData.message || 'Failed to split tab'
+        };
+        
+      } catch (error) {
+        console.error('Error splitting tab:', error);
+        toast.error('Failed to split tab');
+        return {
+          success: false,
+          message: 'Failed to split tab'
+        };
+      }
+    },
+
+    // NEW: Merge customer tabs
+    mergeCustomerTabs: async (sourceTabId: string, targetTabId: string) => {
+      try {
+        const response = await brain.merge_tabs({
+          source_tab_id: sourceTabId,
+          target_tab_id: targetTabId
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.target_tab) {
+            // Update state - remove source tab, update target tab
+            const tableNumber = data.target_tab.table_number;
+            
+            set(state => {
+              const existingTabs = state.customerTabs[tableNumber] || [];
+              const updatedTabs = existingTabs
+                .filter(tab => tab.id !== sourceTabId) // Remove source tab
+                .map(tab => tab.id === targetTabId ? data.target_tab : tab); // Update target tab
+                
+              // Update active tab if source was active
+              const newActiveTab = state.activeCustomerTab[tableNumber] === sourceTabId 
+                ? targetTabId 
+                : state.activeCustomerTab[tableNumber];
+              
+              return {
+                customerTabs: {
+                  ...state.customerTabs,
+                  [tableNumber]: updatedTabs
+                },
+                optimisticCustomerTabs: {
+                  ...state.optimisticCustomerTabs,
+                  [tableNumber]: updatedTabs
+                },
+                activeCustomerTab: {
+                  ...state.activeCustomerTab,
+                  [tableNumber]: newActiveTab
+                }
+              };
+            });
+            
+            toast.success(data.message);
+            return {
+              success: true,
+              targetTab: data.target_tab,
+              message: data.message
+            };
+          }
+        }
+        
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to merge tabs');
+        return {
+          success: false,
+          message: errorData.message || 'Failed to merge tabs'
+        };
+        
+      } catch (error) {
+        console.error('Error merging tabs:', error);
+        toast.error('Failed to merge tabs');
+        return {
+          success: false,
+          message: 'Failed to merge tabs'
+        };
+      }
+    },
+
+    // NEW: Move items between customer tabs
+    moveItemsBetweenTabs: async (sourceTabId: string, targetTabId: string, itemIndices: number[]) => {
+      try {
+        const response = await brain.move_items_between_tabs({
+          source_tab_id: sourceTabId,
+          target_tab_id: targetTabId,
+          item_indices: itemIndices
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.source_tab && data.target_tab) {
+            // Update state with both updated tabs
+            const tableNumber = data.source_tab.table_number;
+            
+            set(state => {
+              const existingTabs = state.customerTabs[tableNumber] || [];
+              const updatedTabs = existingTabs.map(tab => {
+                if (tab.id === sourceTabId) return data.source_tab;
+                if (tab.id === targetTabId) return data.target_tab;
+                return tab;
+              });
+              
+              return {
+                customerTabs: {
+                  ...state.customerTabs,
+                  [tableNumber]: updatedTabs
+                },
+                optimisticCustomerTabs: {
+                  ...state.optimisticCustomerTabs,
+                  [tableNumber]: updatedTabs
+                }
+              };
+            });
+            
+            toast.success(data.message);
+            return {
+              success: true,
+              sourceTab: data.source_tab,
+              targetTab: data.target_tab,
+              message: data.message
+            };
+          }
+        }
+        
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to move items');
+        return {
+          success: false,
+          message: errorData.message || 'Failed to move items'
+        };
+        
+      } catch (error) {
+        console.error('Error moving items between tabs:', error);
+        toast.error('Failed to move items between tabs');
+        return {
+          success: false,
+          message: 'Failed to move items between tabs'
+        };
+      }
     },
 
     // NEW: Delete customer tab
