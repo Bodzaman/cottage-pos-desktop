@@ -1,8 +1,13 @@
-
-
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { X, Plus, Users, User, Edit2, Save, Trash2 } from 'lucide-react';
 import { OrderItem, MenuItem, Category } from 'types';
@@ -57,7 +62,8 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTableTab, setSelectedTableTab] = useState<number>(tableNumber);
-  const [pendingItems, setPendingItems] = useState<OrderItem[]>([]);
+  // ✅ STAGING WORKFLOW: Items added to staging first, then explicitly saved to database
+  const [stagingItems, setStagingItems] = useState<OrderItem[]>([]);
   const [showBillReview, setShowBillReview] = useState(false);
   
   // NEW: Customer tab UI state
@@ -74,6 +80,9 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   // NEW: State for unsaved changes warning
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   
+  // ✅ STAGING WORKFLOW: Warning system for unsaved staging items
+  const hasUnsavedItems = stagingItems.length > 0;
+  
   // Get existing table order items
   const existingTableOrder = persistedTableOrders[selectedTableTab];
   const existingItems = existingTableOrder?.order_items || [];
@@ -86,10 +95,10 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   const getDisplayItems = () => {
     if (currentActiveCustomerTab) {
       // Show active customer tab items + pending
-      return [...(currentActiveCustomerTab.order_items || []), ...pendingItems];
+      return [...(currentActiveCustomerTab.order_items || []), ...stagingItems];
     } else {
       // Show table-level items + pending (existing behavior)
-      return [...existingItems, ...pendingItems];
+      return [...existingItems, ...stagingItems];
     }
   };
   
@@ -114,7 +123,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   useEffect(() => {
     if (isOpen) {
       setSelectedTableTab(tableNumber);
-      setPendingItems([]);
+      setStagingItems([]);
       setSelectedCategory(null); // Default to "All Items" for quick browsing
       
       // NEW: Reset customer tab UI state
@@ -137,18 +146,26 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     }
   }, [isOpen, tableNumber, forceRefresh, loadCustomerTabsForTable]); // Remove linkedTables from dependencies to prevent loop
   
-  // NEW: Handle table tab switching - load customer tabs and clear pending items
+  // NEW: Handle table tab switching - load customer tabs
   const handleTableTabSwitch = (table: number) => {
+    // ✅ STAGING WORKFLOW: Warn before switching if unsaved items
+    if (hasUnsavedItems) {
+      toast.warning('You have unsaved items in staging!', {
+        description: 'Save or send to kitchen before switching tables',
+        duration: 4000
+      });
+      return; // Don't allow table switching with unsaved items
+    }
+    
     setSelectedTableTab(table);
-    setPendingItems([]); // Clear pending when switching tables
+    setStagingItems([]); // Clear staging when switching tables
     loadCustomerTabsForTable(table); // Ensure customer tabs are loaded
   };
   
-  // NEW: Customer tab management functions - simplified for component interface
+  // Customer tab management functions
   const handleCreateCustomerTab = async (tabName: string) => {
     const tabId = await createCustomerTab(selectedTableTab, tabName);
     if (tabId) {
-      // Auto-select the new tab
       setActiveCustomerTab(selectedTableTab, tabId);
       toast.success(`Customer tab "${tabName}" created`);
     } else {
@@ -176,54 +193,75 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   
   const handleCustomerTabSelect = (customerTab: CustomerTab | null) => {
     setActiveCustomerTab(selectedTableTab, customerTab?.id || null);
-    setPendingItems([]); // Clear pending when switching customer tabs
   };
   
   // Handle adding menu item to order
-  const handleAddToOrder = (menuItem: MenuItem) => {
-    // ✅ FIXED: Create OrderItem matching backend API structure (AppApisTableOrdersOrderItem)
-    const orderItem: OrderItem = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ✅ Unique order item ID
-      menu_item_id: menuItem.id, // ✅ FIXED: Added required menu_item_id field
-      variant_id: null, // ✅ Default to null (can be set for variants later)
-      name: menuItem.name,
-      quantity: 1,
-      price: menuItem.price,
-      notes: null, // ✅ Default to null
-      protein_type: null, // ✅ Default to null
-      image_url: menuItem.image_url || null // ✅ Use menu item image if available
-    };
+  const handleAddToOrder = (orderItem: OrderItem) => {
+    // ✅ STAGING WORKFLOW: OrderItem already properly formatted by POSMenuCard
+    console.log('🟡 DineInOrderModal handleAddToOrder received:', orderItem);
     
-    // Check if item already exists in pending items
-    const existingIndex = pendingItems.findIndex(item => 
-      item.id === orderItem.id && 
-      JSON.stringify(item.customizations) === JSON.stringify(orderItem.customizations)
+    // ✅ STAGING WORKFLOW: Check if item already exists in staging (by menu_item_id)
+    const existingIndex = stagingItems.findIndex(item => 
+      item.menu_item_id === orderItem.menu_item_id && 
+      item.notes === orderItem.notes &&
+      item.protein_type === orderItem.protein_type
     );
     
     if (existingIndex >= 0) {
-      // Update quantity of existing item
-      const updatedItems = [...pendingItems];
+      // ✅ STAGING WORKFLOW: Update quantity of existing staging item
+      const updatedItems = [...stagingItems];
       updatedItems[existingIndex].quantity += 1;
-      setPendingItems(updatedItems);
+      setStagingItems(updatedItems);
+      toast.success(`Updated ${orderItem.name} quantity in staging`, {
+        description: `Now ${updatedItems[existingIndex].quantity} items`
+      });
+      console.log('🟡 Updated staging item quantity:', updatedItems[existingIndex]);
     } else {
-      // Add new item
-      setPendingItems(prev => [...prev, orderItem]);
+      // ✅ STAGING WORKFLOW: Add new item to staging with proper ID structure
+      const stagingOrderItem: OrderItem = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ✅ Unique staging ID
+        menu_item_id: orderItem.menu_item_id, // ✅ FIXED: Preserve correct UUID from POSMenuCard
+        variant_id: orderItem.variant_id,
+        name: orderItem.name,
+        quantity: 1,
+        price: orderItem.price,
+        notes: null,
+        protein_type: orderItem.protein_type,
+        image_url: orderItem.image_url
+      };
+      
+      setStagingItems(prev => [...prev, stagingOrderItem]);
+      toast.success(`Added ${orderItem.name} to staging`, {
+        description: 'Use "Save Order" or "Send to Kitchen" to persist'
+      });
+      console.log('🟡 Added new item to staging:', stagingOrderItem);
     }
-    
-    toast.success(`Added ${menuItem.name} to order`);
   };
   
-  // Handle quantity updates (works for both existing and pending items)
+  // ✅ STAGING WORKFLOW: Modal close with unsaved items warning
+  const handleModalClose = () => {
+    if (hasUnsavedItems) {
+      setShowUnsavedWarning(true);
+    } else {
+      onClose();
+    }
+  };
+  
+  // ✅ STAGING WORKFLOW: Force close without saving (for warning dialog)
+  const handleForceClose = () => {
+    setStagingItems([]); // Clear staging items
+    setShowUnsavedWarning(false);
+    onClose();
+  };
+  
+  // Handle quantity updates (works for both existing and staging items)
   const handleUpdateQuantity = (index: number, quantity: number) => {
     if (index < existingItems.length) {
-      // Updating existing item - implement real update logic
+      // Updating existing database item
       const item = existingItems[index];
-      const updatedItems = [...existingItems];
-      updatedItems[index] = { ...item, quantity };
       
-      // Update immediately in both contexts
       if (currentActiveCustomerTab) {
-        // Update customer tab
+        // Update customer tab item
         removeItemFromCustomerTab(currentActiveCustomerTab.id!, index).then(() => {
           const newItem = { ...item, quantity };
           addItemsToCustomerTab(currentActiveCustomerTab.id!, [newItem]).then(() => {
@@ -231,7 +269,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
           });
         });
       } else {
-        // Update main table order
+        // Update main table order item
         const tableOrder = persistedTableOrders[selectedTableTab];
         if (tableOrder) {
           const newItems = [...tableOrder.order_items];
@@ -242,18 +280,19 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         }
       }
     } else {
-      // Updating pending item
-      const pendingIndex = index - existingItems.length;
-      const updatedPending = [...pendingItems];
-      updatedPending[pendingIndex].quantity = quantity;
-      setPendingItems(updatedPending);
+      // ✅ STAGING WORKFLOW: Updating staging item - immediate local update
+      const stagingIndex = index - existingItems.length;
+      const updatedStaging = [...stagingItems];
+      updatedStaging[stagingIndex].quantity = quantity;
+      setStagingItems(updatedStaging);
+      console.log('🟡 Updated staging item quantity:', updatedStaging[stagingIndex]);
     }
   };
   
-  // Handle item removal (works for both existing and pending items)
+  // Handle item removal (works for both existing and staging items)
   const handleRemoveItem = (index: number) => {
     if (index < existingItems.length) {
-      // Removing existing item - show confirmation dialog
+      // Removing existing database item - show confirmation
       const item = existingItems[index];
       setConfirmationDialog({
         isOpen: true,
@@ -261,19 +300,20 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         itemName: item.name || 'Unknown item'
       });
     } else {
-      // Removing pending item - no confirmation needed
-      const pendingIndex = index - existingItems.length;
-      const updatedPending = [...pendingItems];
-      updatedPending.splice(pendingIndex, 1);
-      setPendingItems(updatedPending);
+      // ✅ STAGING WORKFLOW: Removing staging item - no confirmation needed
+      const stagingIndex = index - existingItems.length;
+      const updatedStaging = [...stagingItems];
+      updatedStaging.splice(stagingIndex, 1);
+      setStagingItems(updatedStaging);
+      toast.success('Item removed from staging');
+      console.log('🟡 Removed staging item:', stagingIndex);
     }
   };
   
-  // NEW: Handle confirmed deletion of existing items
+  // Handle confirmed deletion of existing database items
   const handleConfirmDeletion = async () => {
     const { itemIndex, itemName } = confirmationDialog;
     
-    // Guard: Ensure we have a valid table number
     if (!selectedTableTab || selectedTableTab <= 0) {
       toast.error('Invalid table number - cannot remove item');
       setConfirmationDialog({ isOpen: false, itemIndex: -1, itemName: '' });
@@ -284,19 +324,15 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
       let success = false;
       
       if (currentActiveCustomerTab) {
-        // Delete from customer tab
         success = await removeItemFromCustomerTab(currentActiveCustomerTab.id!, itemIndex);
         if (success) {
           toast.success(`Removed ${itemName} from ${currentActiveCustomerTab.tab_name}`);
-          // Refresh customer tabs to show changes
           await loadCustomerTabsForTable(selectedTableTab);
         }
       } else {
-        // Delete from main table order
         success = await removeItemFromTable(selectedTableTab, itemIndex);
         if (success) {
           toast.success(`Removed ${itemName} from Table ${selectedTableTab}`);
-          // Refresh table orders to show changes
           await forceRefresh();
         }
       }
@@ -308,29 +344,24 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
       console.error('Error removing item:', error);
       toast.error(`Failed to remove ${itemName}`);
     } finally {
-      // Close confirmation dialog
       setConfirmationDialog({ isOpen: false, itemIndex: -1, itemName: '' });
     }
   };
   
-  // NEW: Handle cancellation of deletion
+  // Handle cancellation of deletion
   const handleCancelDeletion = () => {
     setConfirmationDialog({ isOpen: false, itemIndex: -1, itemName: '' });
-  }
+  };
   
   // NEW: Handle cancel with unsaved changes warning
   const handleCancel = () => {
-    // Check if there are unsaved items (pendingItems)
-    if (pendingItems.length > 0) {
-      setShowUnsavedWarning(true);
-    } else {
-      onClose();
-    }
+    // ✅ DATABASE-FIRST: No pending items to check, just close modal
+    onClose();
   };
   
   // NEW: Confirm cancellation with unsaved changes
   const handleConfirmCancel = () => {
-    setPendingItems([]);
+    setStagingItems([]);
     setShowUnsavedWarning(false);
     onClose();
   };
@@ -347,7 +378,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   
   // Save order (add pending items to persistent storage) - FIXED: Don't close modal
   const handleSave = async () => {
-    if (pendingItems.length === 0) {
+    if (stagingItems.length === 0) {
       toast.info('No new items to save');
       return;
     }
@@ -355,19 +386,19 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     try {
       if (currentActiveCustomerTab) {
         // NEW: Save to customer tab
-        await addItemsToCustomerTab(currentActiveCustomerTab.id!, pendingItems);
-        toast.success(`Added ${pendingItems.length} items to ${currentActiveCustomerTab.tab_name}`);
+        await addItemsToCustomerTab(currentActiveCustomerTab.id!, stagingItems);
+        toast.success(`Added ${stagingItems.length} items to ${currentActiveCustomerTab.tab_name}`);
         // ✅ REFRESH customer tabs to show new items
         await loadCustomerTabsForTable(selectedTableTab);
       } else {
         // Existing: Save to table-level orders
-        await addItemsToTable(selectedTableTab, pendingItems);
-        toast.success(`Added ${pendingItems.length} items to Table ${selectedTableTab}`);
+        await addItemsToTable(selectedTableTab, stagingItems);
+        toast.success(`Added ${stagingItems.length} items to Table ${selectedTableTab}`);
         // ✅ REFRESH table orders to show new items
         await forceRefresh();
       }
       
-      setPendingItems([]); // Clear pending items after saving
+      setStagingItems([]); // Clear pending items after saving
       // ✅ FIXED: Don't close modal on "Add to Order" - keep it open for more items
       // onClose(); // REMOVED - modal stays open
     } catch (error) {
@@ -376,35 +407,37 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     }
   };
   
-  // Send to kitchen (save + print kitchen ticket) - FIXED: Keep modal open after kitchen
+  // ✅ STAGING WORKFLOW: Send to Kitchen - commits staging items to database + kitchen status
   const handleSendToKitchen = async () => {
-    if (pendingItems.length === 0) {
-      toast.info('No new items to send to kitchen');
+    if (stagingItems.length === 0) {
+      toast.info('No new items in staging to send to kitchen');
       return;
     }
-    
+
     try {
       if (currentActiveCustomerTab) {
-        // NEW: Send customer tab items to kitchen
-        await addItemsToCustomerTab(currentActiveCustomerTab.id!, pendingItems);
-        toast.success(`Sent ${pendingItems.length} items from ${currentActiveCustomerTab.tab_name} to kitchen`);
-        // ✅ REFRESH customer tabs to show new items
+        // Send staging items to customer tab + kitchen
+        console.log('🍳 Sending staging items to kitchen via customer tab:', stagingItems);
+        await addItemsToCustomerTab(currentActiveCustomerTab.id!, stagingItems);
+        toast.success(`🍳 Sent ${stagingItems.length} items from ${currentActiveCustomerTab.tab_name} to kitchen`);
+        // Refresh customer tabs to show new items
         await loadCustomerTabsForTable(selectedTableTab);
       } else {
-        // Existing: Send table-level items to kitchen
-        await addItemsToTable(selectedTableTab, pendingItems);
-        toast.success(`Sent ${pendingItems.length} items to kitchen`);
-        // ✅ REFRESH table orders to show new items
+        // Send staging items to table-level orders + kitchen
+        console.log('🍳 Sending staging items to kitchen via table:', stagingItems);
+        await addItemsToTable(selectedTableTab, stagingItems);
+        toast.success(`🍳 Sent ${stagingItems.length} items to kitchen`);
+        // Refresh table orders to show new items
         await forceRefresh();
       }
+
+      // Clear staging after successful send
+      setStagingItems([]);
+      console.log('🧹 Staging cleared after successful kitchen send');
       
-      setPendingItems([]);
-      // ✅ FIXED: Don't close modal after sending to kitchen - keep it open for more orders
-      // onClose(); // REMOVED - modal stays open
-      // Add printer integration here for kitchen ticket
     } catch (error) {
-      console.error('Error sending to kitchen:', error);
-      toast.error('Failed to send to kitchen');
+      console.error('❌ Failed to send staging items to kitchen:', error);
+      toast.error('Failed to send items to kitchen');
     }
   };
   
@@ -482,42 +515,44 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
             borderBottom: `2px solid ${QSAITheme.purple.primary}`
           }}
         >
-          <DialogHeader 
-            className="border-b pb-4 flex-shrink-0"
-            style={{ borderColor: QSAITheme.border.medium }}
-          >
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-semibold" style={{ color: QSAITheme.text.primary }}>
-                Dine-In Order Management - Table {selectedTableTab}
-              </DialogTitle>
-              
-              {/* NEW: Cancel Button */}
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                className="text-gray-300 hover:text-white hover:bg-gray-800"
-                style={{
-                  borderColor: QSAITheme.purple.primary + '40',
-                  color: QSAITheme.text.secondary
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-            
-            {/* Linked Tables Section */}
-            {renderLinkedTableTabs()}
-
-            {/* NEW: Customer Tabs Section - Compact Layout */}
-            <div className="mt-4">
-              <CustomerTabsCompact 
-                tableNumber={selectedTableTab}
-                onCustomerTabCreate={handleCreateCustomerTab}
-                onCustomerTabRename={handleRenameCustomerTab}
-                onCustomerTabClose={handleCloseCustomerTab}
-              />
-            </div>
+          {/* Required Dialog accessibility components */}
+          <DialogHeader className="sr-only">
+            <DialogTitle>Table Order Management</DialogTitle>
+            <DialogDescription>
+              Manage orders for Table {selectedTableTab} - add items, create customer tabs, and process orders
+            </DialogDescription>
           </DialogHeader>
+          
+          {/* Modal Header with improved close handling */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+            <div className="flex items-center gap-3">
+              <span className="text-xl font-bold text-white">Table Order</span>
+              {hasUnsavedItems && (
+                <Badge variant="secondary" className="bg-yellow-600 text-white">
+                  {stagingItems.length} unsaved
+                </Badge>
+              )}
+            </div>
+            <Button 
+              onClick={handleModalClose}
+              variant="ghost" 
+              size="sm" 
+              className="text-gray-400 hover:text-white"
+              title={hasUnsavedItems ? 'Unsaved items - click to see warning' : 'Close'}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          {/* Customer Tabs Section */}
+          <div className="px-4 py-2">
+            <CustomerTabsCompact
+              tableNumber={selectedTableTab}
+              onCustomerTabCreate={createCustomerTab}
+              onCustomerTabRename={renameCustomerTab}
+              onCustomerTabClose={closeCustomerTab}
+            />
+          </div>
           
           {/* 3-Panel Layout: Categories | Menu Items | Order Summary */}
           <div className="flex-1 grid grid-cols-[200px_1fr_300px] gap-4 min-h-0 overflow-hidden">
@@ -591,7 +626,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         onConfirm={handleConfirmCancel}
         onCancel={handleCancelWarning}
         title="Unsaved Changes"
-        description={`You have ${pendingItems.length} unsaved item${pendingItems.length === 1 ? '' : 's'} in your cart. If you cancel now, these items will be lost. Are you sure you want to proceed?`}
+        description={`You have ${stagingItems.length} unsaved item${stagingItems.length === 1 ? '' : 's'} in your cart. If you cancel now, these items will be lost. Are you sure you want to proceed?`}
         confirmText="Yes, Cancel"
         cancelText="Keep Editing"
         isDestructive={true}
