@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, ArrowLeft, Menu, X, Settings, Cog, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,14 +20,6 @@ export function QuickNavigation({ className = '' }: QuickNavigationProps) {
   const [showQuickTools, setShowQuickTools] = useState(false);
   const { getAvailableRoutes, navigateWithHistory, goBack, canGoBack, currentPage } = useNavigation();
   const { user, isAdmin } = useSimpleAuth();
-
-  // DEBUG: Add debugging for settings visibility investigation
-  useEffect(() => {
-    console.log('🔍 QuickNavigation DEBUG INFO:');
-    console.log('User:', user);
-    console.log('isAdmin:', isAdmin);
-    console.log('Settings will show:', isAdmin);
-  }, [user, isAdmin]);
 
   // Add event listeners for modal triggers from QuickToolsModal
   React.useEffect(() => {
