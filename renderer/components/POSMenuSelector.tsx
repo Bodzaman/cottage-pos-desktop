@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Search, RefreshCw, List, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Category, MenuItem, OrderItem } from 'utils/menuTypes';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { CategorySidebar } from 'components/CategorySidebar';
 import { POSMenuCard } from 'components/POSMenuCard';
+import { POSMenuCardSkeleton } from 'components/POSMenuCardSkeleton';
 import { toast } from 'sonner';
 
 interface Props {
@@ -18,6 +18,12 @@ interface Props {
   overrideMenuItems?: MenuItem[];
   orderMode?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
   onCustomizeItem?: (item: OrderItem) => void;
+  // ✅ NEW: Enhanced bundle strategy props
+  showSkeletons?: boolean;
+  preloadedImages?: {
+    isImageReady: (url: string) => boolean;
+    getImageStatus: (url: string) => any;
+  };
 }
 
 export function POSMenuSelector({ 
@@ -26,7 +32,10 @@ export function POSMenuSelector({
   className, 
   overrideMenuItems, 
   orderMode = "COLLECTION", 
-  onCustomizeItem 
+  onCustomizeItem,
+  // ✅ NEW: Enhanced bundle strategy props
+  showSkeletons = false,
+  preloadedImages
 }: Props) {
   const {
     categories,
@@ -46,6 +55,18 @@ export function POSMenuSelector({
     return (saved as 'card' | 'list') || 'card';
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // ✅ NEW: Enhanced bundle strategy - determine what to show
+  const shouldShowSkeletons = showSkeletons; // Show skeletons during initial load phase
+  const hasRealData = filteredMenuItems.length > 0;
+  
+  console.log('🚀 [POSMenuSelector] Render state:', {
+    showSkeletons,
+    shouldShowSkeletons,
+    hasRealData,
+    menuItemsCount: filteredMenuItems.length,
+    isLoading
+  });
   
   // Save view mode preference
   const handleViewModeChange = (mode: 'card' | 'list') => {
@@ -178,20 +199,31 @@ export function POSMenuSelector({
             ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-1" 
             : "space-y-2 p-1"
           }>
-            {filteredMenuItems.map((item) => (
-              <POSMenuCard
-                key={item.id}
-                item={item}
-                onAddToOrder={handleCardItemSelect}
-                orderType={orderMode}
-                viewMode={viewMode}
-                onCustomizeItem={onCustomizeItem}
-              />
-            ))}
+            {/* ✅ NEW: Conditional rendering based on skeleton state */}
+            {shouldShowSkeletons ? (
+              // Show skeleton cards during initial load
+              Array.from({ length: 8 }, (_, index) => (
+                <POSMenuCardSkeleton key={`skeleton-${index}`} viewMode={viewMode} />
+              ))
+            ) : (
+              // Show real menu items
+              filteredMenuItems.map((item) => (
+                <POSMenuCard
+                  key={item.id}
+                  item={item}
+                  onAddToOrder={handleCardItemSelect}
+                  orderType={orderMode}
+                  viewMode={viewMode}
+                  onCustomizeItem={onCustomizeItem}
+                  // ✅ NEW: Pass preloaded image functions
+                  preloadedImages={preloadedImages}
+                />
+              ))
+            )}
           </div>
 
-          {/* No Results Message */}
-          {filteredMenuItems.length === 0 && !isLoading && (
+          {/* No Results Message - only show when not loading skeletons */}
+          {!shouldShowSkeletons && filteredMenuItems.length === 0 && !isLoading && (
             <div className="text-center py-8">
               <div className="w-12 h-12 text-gray-400 mx-auto mb-4">🍽️</div>
               <p className="text-gray-400">
