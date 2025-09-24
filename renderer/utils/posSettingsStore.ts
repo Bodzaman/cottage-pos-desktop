@@ -40,8 +40,8 @@ interface POSSettingsStore {
 // Default settings to match backend defaults
 const defaultPOSSettings: POSSettings = {
   service_charge: {
-    enabled: true,
-    percentage: 12.5
+    enabled: false,
+    percentage: 10.0
   },
   delivery_charge: {
     enabled: true,
