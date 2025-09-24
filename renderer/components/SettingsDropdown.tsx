@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ChevronDown, Settings, ShoppingCart, Clock, CreditCard, Bot, Cog, Power, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,17 +9,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useNavigation } from './NavigationProvider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
+import { useRestaurantSettings } from '../utils/useRestaurantSettings';
+import ManagementPasswordDialog from './ManagementPasswordDialog';
+import PaymentReconciliationPanel from './PaymentReconciliationPanel';
+import { RefundManagementPanel } from './RefundManagementPanel';
+import { VoiceOrderNotificationPanel } from './VoiceOrderNotificationPanel';
+import { VoiceOrderTestPanel } from './VoiceOrderTestPanel';
+import RestaurantSettingsManager from './RestaurantSettingsManager';
+import { isManagementAuthenticated } from '../utils/management-auth';
 
 interface SettingsSection {
   id: string;
   title: string;
   description: string;
   icon: React.ReactNode;
-  path: string;
-  category: 'inline' | 'navigation';
+  requiresAuth: boolean;
+  category: 'inline' | 'modal';
 }
 
 interface SettingsDropdownProps {
@@ -28,78 +36,159 @@ interface SettingsDropdownProps {
 }
 
 export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
-  const { navigateWithHistory } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showManagementModal, setShowManagementModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('business-profile');
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
-  // Quick control states for Online Orders
-  const [onlineOrderingEnabled, setOnlineOrderingEnabled] = useState(true);
-  const [autoApproveOrders, setAutoApproveOrders] = useState(true);
+  // Restaurant settings hook for Online Orders toggles
+  const { settings, saveSettings, isLoading } = useRestaurantSettings();
+  const [onlineOrderingEnabled, setOnlineOrderingEnabled] = useState(
+    settings?.general?.onlineOrderingEnabled ?? true
+  );
+  const [autoApproveOrders, setAutoApproveOrders] = useState(
+    settings?.general?.autoApproveOrders ?? true
+  );
 
-  // Define the 6 settings sections as specified in requirements
+  // Define the 6 settings sections as in-place actions
   const settingsSections: SettingsSection[] = [
     {
       id: 'online-orders',
       title: 'Online Orders',
       description: 'Website orders, delivery settings, payment options',
       icon: <ShoppingCart className="h-4 w-4" />,
-      path: '/online-order-settings',
-      category: 'navigation'
+      requiresAuth: true,
+      category: 'modal'
     },
     {
       id: 'restaurant-info',
       title: 'Restaurant Info',
       description: 'Hours, contact details, business information',
       icon: <Clock className="h-4 w-4" />,
-      path: '/admin-settings?tab=restaurant-info',
-      category: 'navigation'
+      requiresAuth: true,
+      category: 'modal'
     },
     {
       id: 'payment-delivery',
       title: 'Payment & Delivery',
       description: 'Stripe setup, delivery zones, fees',
       icon: <CreditCard className="h-4 w-4" />,
-      path: '/admin-settings?tab=payment-delivery',
-      category: 'navigation'
+      requiresAuth: true,
+      category: 'modal'
     },
     {
       id: 'pos-settings',
       title: 'POS Settings',
       description: 'Point of sale configuration, table setup',
       icon: <Cog className="h-4 w-4" />,
-      path: '/admin-settings?tab=pos-settings',
-      category: 'navigation'
+      requiresAuth: true,
+      category: 'modal'
     },
     {
       id: 'ai-staff-settings',
       title: 'AI Staff Settings',
       description: 'AI assistant configuration and management',
       icon: <Bot className="h-4 w-4" />,
-      path: '/ai-staff-management-hub',
-      category: 'navigation'
-    },
-    {
-      id: 'system-settings',
-      title: 'System Settings',
-      description: 'General app configuration and preferences',
-      icon: <Cog className="h-4 w-4" />,
-      path: '/admin-settings?tab=system-settings',
-      category: 'navigation'
+      requiresAuth: true,
+      category: 'modal'
     }
   ];
 
+  // Handle authentication flow
+  const handleAuthenticatedAction = (action: () => void) => {
+    if (isManagementAuthenticated()) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowPasswordDialog(true);
+    }
+  };
+
+  const handlePasswordAuthenticated = () => {
+    setShowPasswordDialog(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  // Section click handlers
   const handleSectionClick = (section: SettingsSection) => {
-    navigateWithHistory(section.path);
     setIsOpen(false);
+    
+    if (section.requiresAuth) {
+      handleAuthenticatedAction(() => {
+        setActiveTab(getTabForSection(section.id));
+        setShowManagementModal(true);
+      });
+    } else {
+      setActiveTab(getTabForSection(section.id));
+      setShowManagementModal(true);
+    }
+  };
+
+  const getTabForSection = (sectionId: string): string => {
+    switch (sectionId) {
+      case 'online-orders': return 'online-orders';
+      case 'restaurant-info': return 'business-profile';
+      case 'payment-delivery': return 'payments-delivery';
+      case 'pos-settings': return 'pos-settings';
+      case 'ai-staff-settings': return 'ai-staff';
+      default: return 'business-profile';
+    }
   };
   
-  const handleOnlineOrderingToggle = (enabled: boolean) => {
-    setOnlineOrderingEnabled(enabled);
-    toast.success(enabled ? 'Online ordering enabled' : 'Online ordering disabled');
+  // Online Orders toggle handlers
+  const handleOnlineOrderingToggle = async (enabled: boolean) => {
+    try {
+      setOnlineOrderingEnabled(enabled);
+      
+      // Update settings using the hook
+      const updatedSettings = {
+        ...settings,
+        general: {
+          ...settings?.general,
+          onlineOrderingEnabled: enabled
+        }
+      };
+      
+      await saveSettings(updatedSettings);
+      toast.success(enabled ? 'Online ordering enabled' : 'Online ordering disabled');
+    } catch (error) {
+      console.error('Failed to update online ordering setting:', error);
+      setOnlineOrderingEnabled(!enabled); // Revert on error
+      toast.error('Failed to update setting');
+    }
   };
   
-  const handleAutoApproveToggle = (enabled: boolean) => {
-    setAutoApproveOrders(enabled);
-    toast.success(enabled ? 'Auto-approve enabled' : 'Auto-approve disabled');
+  const handleAutoApproveToggle = async (enabled: boolean) => {
+    try {
+      setAutoApproveOrders(enabled);
+      
+      // Update settings using the hook
+      const updatedSettings = {
+        ...settings,
+        general: {
+          ...settings?.general,
+          autoApproveOrders: enabled
+        }
+      };
+      
+      await saveSettings(updatedSettings);
+      toast.success(enabled ? 'Auto-approve enabled' : 'Auto-approve disabled');
+    } catch (error) {
+      console.error('Failed to update auto-approve setting:', error);
+      setAutoApproveOrders(!enabled); // Revert on error
+      toast.error('Failed to update setting');
+    }
+  };
+
+  const handleConfigureDetails = () => {
+    handleAuthenticatedAction(() => {
+      setActiveTab('online-orders');
+      setShowManagementModal(true);
+    });
   };
 
   return (
@@ -140,7 +229,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
               className="text-xs mt-1"
               style={{ color: globalColors.text.secondary }}
             >
-              Organize and manage your restaurant settings
+              Configure your restaurant settings
             </p>
           </div>
           
@@ -183,6 +272,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
                             checked={onlineOrderingEnabled}
                             onCheckedChange={handleOnlineOrderingToggle}
                             className="scale-75"
+                            disabled={isLoading}
                           />
                         </div>
                         
@@ -195,6 +285,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
                             checked={autoApproveOrders}
                             onCheckedChange={handleAutoApproveToggle}
                             className="scale-75"
+                            disabled={isLoading}
                           />
                         </div>
                         
@@ -202,7 +293,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
                           variant="outline"
                           size="sm"
                           className="w-full text-xs h-7 mt-2"
-                          onClick={() => handleSectionClick(section)}
+                          onClick={handleConfigureDetails}
                           style={{
                             borderColor: globalColors.purple.primary,
                             color: globalColors.purple.primary,
@@ -255,6 +346,81 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Management Password Dialog */}
+      <ManagementPasswordDialog
+        isOpen={showPasswordDialog}
+        onClose={() => {
+          setShowPasswordDialog(false);
+          setPendingAction(null);
+        }}
+        onAuthenticated={handlePasswordAuthenticated}
+      />
+
+      {/* Management Modal with Tabs */}
+      <Dialog open={showManagementModal} onOpenChange={setShowManagementModal}>
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-hidden"
+          style={{
+            backgroundColor: globalColors.background.secondary,
+            borderColor: globalColors.border.light
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: globalColors.text.primary }}>
+              Restaurant Management
+            </DialogTitle>
+          </DialogHeader>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="business-profile">Business</TabsTrigger>
+              <TabsTrigger value="online-orders">Online Orders</TabsTrigger>
+              <TabsTrigger value="payments-delivery">Payments</TabsTrigger>
+              <TabsTrigger value="pos-settings">POS</TabsTrigger>
+              <TabsTrigger value="ai-staff">AI Staff</TabsTrigger>
+            </TabsList>
+            
+            <div className="mt-4 max-h-[60vh] overflow-y-auto">
+              <TabsContent value="business-profile" className="space-y-4">
+                <RestaurantSettingsManager />
+              </TabsContent>
+              
+              <TabsContent value="online-orders" className="space-y-4">
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>Online Orders Configuration</h3>
+                  {/* Online orders settings would go here */}
+                  <p style={{ color: globalColors.text.secondary }}>Configure website ordering, delivery zones, and payment options.</p>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="payments-delivery" className="space-y-4">
+                <div className="grid gap-6">
+                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>Payment & Delivery Management</h3>
+                  <PaymentReconciliationPanel />
+                  <RefundManagementPanel />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="pos-settings" className="space-y-4">
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>POS Configuration</h3>
+                  {/* POS settings would go here */}
+                  <p style={{ color: globalColors.text.secondary }}>Configure point of sale settings, table management, and receipt templates.</p>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="ai-staff" className="space-y-4">
+                <div className="grid gap-6">
+                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>AI Staff Management</h3>
+                  <VoiceOrderNotificationPanel compact={true} />
+                  <VoiceOrderTestPanel />
+                </div>
+              </TabsContent>
+            </div>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
