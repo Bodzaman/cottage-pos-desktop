@@ -1,5 +1,6 @@
 
 
+
 /**
  * Real-time Menu Store - Unified source of truth for menu data
  * 
@@ -72,6 +73,10 @@ interface MenuStoreState {
   unsubscribeFromChanges: () => void;
   triggerCorpusSync: () => Promise<void>;
   forceFullRefresh: () => Promise<void>; // Add force refresh method
+  
+  // NEW: Bundle-specific initialization without real-time subscriptions
+  initializeDataOnly: () => Promise<void>;
+  startRealtimeSubscriptions: () => void;
   
   // Filtering actions
   setSelectedParentCategory: (categoryId: string | null) => void;
@@ -175,6 +180,12 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Actions
   initialize: async () => {
+    // Prevent concurrent menu store initializations
+    if (isMenuStoreInitializing) {
+      console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
+      return;
+    }
+    
     const state = get();
     
     if (state.isLoading) {
@@ -182,6 +193,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       return;
     }
     
+    isMenuStoreInitializing = true;
     set({ isLoading: true, error: null });
     
     // Create abort controller for this initialization
@@ -238,6 +250,9 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       
       // Show user-friendly error
       toast.error('Failed to connect to menu data. Using cached data.');
+    } finally {
+      // Always reset the global flag
+      isMenuStoreInitializing = false;
     }
   },
   
@@ -588,23 +603,82 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Menu corpus synced successfully');
-        toast.success('Menu updated - AI voice system synchronized');
+        console.log('✅ Menu corpus sync completed successfully');
+        // Refresh the data after corpus sync
+        await get().refreshData();
       } else {
-        console.warn('⚠️ Menu corpus sync failed:', result.message);
-        toast.warning('Menu saved but AI sync may need manual refresh');
+        console.error('❌ Menu corpus sync failed:', result.message);
       }
       
     } catch (error) {
       if (abortController.signal.aborted) {
-        console.log('🚫 Corpus sync timed out');
-        toast.warning('Menu saved - AI sync taking longer than expected');
+        console.log('🚫 Corpus sync was aborted');
         return;
       }
       
-      console.error('❌ Error triggering corpus sync:', error);
-      toast.warning('Menu saved but AI system may need manual refresh');
+      console.error('❌ Error during corpus sync:', error);
+      set({ error: 'Failed to sync menu corpus' });
     }
+  },
+  
+  // NEW: Initialize data only without real-time subscriptions
+  initializeDataOnly: async () => {
+    // Prevent concurrent menu store initializations
+    if (isMenuStoreInitializing) {
+      console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
+      return;
+    }
+    
+    const state = get();
+    
+    if (state.isLoading) {
+      console.log('Menu store already initializing, skipping...');
+      return;
+    }
+    
+    isMenuStoreInitializing = true;
+    set({ isLoading: true, error: null });
+    
+    try {
+      console.log('🔄 [Bundle Init] Loading menu data without real-time subscriptions...');
+      
+      // Ensure Supabase is configured with correct credentials first
+      const configSuccess = await ensureSupabaseConfigured();
+      if (!configSuccess) {
+        console.warn('⚠️ Failed to ensure Supabase configuration, proceeding with fallback');
+      }
+      
+      // Load initial data only
+      await state.refreshData();
+      
+      set({ 
+        isLoading: false, 
+        isConnected: false, // Mark as not connected since no subscriptions yet
+        lastUpdate: Date.now()
+      });
+      
+      console.log('✅ [Bundle Init] Menu data loaded successfully (subscriptions pending)');
+      
+    } catch (error) {
+      console.error('❌ Error initializing menu data:', error);
+      set({ 
+        isLoading: false, 
+        error: error instanceof Error ? error.message : 'Failed to initialize menu data',
+        isConnected: false
+      });
+    } finally {
+      // Always reset the global flag
+      isMenuStoreInitializing = false;
+    }
+  },
+  
+  // NEW: Start real-time subscriptions separately
+  startRealtimeSubscriptions: () => {
+    const state = get();
+    console.log('🚀 [Bundle Init] Starting real-time subscriptions after bundle completion...');
+    
+    // Start real-time subscriptions
+    state.subscribeToChanges();
   },
   
   // Force full refresh method
@@ -801,8 +875,15 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     get().updateFilteredItems();
   },
   
-  setMenuItems: (menuItems: MenuItem[]) => {
-    set({ menuItems });
+  setMenuItems: (items: MenuItem[]) => {
+    // Clear skeleton state from all items when setting full data
+    const cleanItems = items.map(item => {
+      const cleanItem = { ...item };
+      delete (cleanItem as any)._isSkeletonState;
+      return cleanItem;
+    });
+    
+    set({ menuItems: cleanItems });
     get().updateDerivedData();
     get().updateFilteredItems();
   },
@@ -1026,6 +1107,160 @@ export const getMenuDataForPOS = () => {
     lastUpdate: store.lastUpdate,
     error: store.error
   };
+}
+
+// Global flag to prevent concurrent bundle loads
+let isBundleLoading = false;
+// Global flag to prevent concurrent menu store initializations
+let isMenuStoreInitializing = false;
+
+// NEW: Fast POS bundle loader for initial startup
+export const loadPOSBundle = async () => {
+  // Prevent concurrent bundle loads
+  if (isBundleLoading) {
+    console.log('⏭️ [POS Bundle] Bundle already loading, skipping duplicate request...');
+    return false;
+  }
+  
+  const store = useRealtimeMenuStore.getState();
+  console.log('🚀 [POS Bundle] Loading lightweight bundle for fast startup...');
+  
+  isBundleLoading = true;
+  
+  try {
+    store.setLoading(true);
+    
+    // Import brain dynamically to avoid circular imports
+    const brain = (await import('brain')).default;
+    const response = await brain.get_pos_bundle();
+    const bundleData = await response.json();
+    
+    if (bundleData.success) {
+      console.log(`🚀 [POS Bundle] Loaded ${bundleData.total_categories} categories, ${bundleData.total_items} items (~${bundleData.bundle_size_kb}KB)`);
+      
+      // Set bundle data immediately for fast rendering
+      store.setCategories(bundleData.categories);
+      
+      // Convert bundle items to menu items format with skeleton state
+      const bundleMenuItems = bundleData.items.map((item: any) => ({
+        ...item,
+        variants: [], // Will be loaded on-demand
+        menu_item_description: null, // Will be loaded on-demand
+        dietary_tags: null, // Will be loaded on-demand
+        // Mark as skeleton state to prevent image loading
+        _isSkeletonState: true,
+        // Keep basic fields for display
+        display_image_url: null // Don't show any image during skeleton state
+      }));
+      
+      store.setMenuItems(bundleMenuItems);
+      store.setLoading(false);
+      store.setError(null);
+      
+      // Mark as bundle-loaded for faster subsequent access
+      store.lastUpdate = Date.now();
+      
+      // Start background loading of full data immediately (parallel to bundle completion)
+      console.log('🔄 [POS Bundle] Starting parallel background full data load...');
+      // Don't wait - start background loading immediately for faster overall performance
+      Promise.resolve().then(() => {
+        store.initializeDataOnly(); // This will load full data and replace skeleton items
+      });
+      
+      return true;
+    } else {
+      throw new Error(bundleData.message || 'Failed to load POS bundle');
+    }
+  } catch (error) {
+    console.error('❌ [POS Bundle] Failed to load bundle:', error);
+    store.setError(error as Error);
+    store.setLoading(false);
+    return false;
+  } finally {
+    // Always reset the loading flag, even if there's an error
+    isBundleLoading = false;
+  }
+};
+
+// NEW: Load full item details on-demand
+export const loadItemDetails = async (itemId: string) => {
+  console.log(`🔍 [POS Bundle] Loading full details for item ${itemId}...`);
+  
+  try {
+    const brain = (await import('brain')).default;
+    const response = await brain.item_details(itemId);
+    const detailsData = await response.json();
+    
+    if (detailsData.success) {
+      const store = useRealtimeMenuStore.getState();
+      const currentItems = store.menuItems;
+      
+      // Update the specific item with full details
+      const updatedItems = currentItems.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...detailsData.data.item,
+            variants: detailsData.data.variants || []
+          };
+        }
+        return item;
+      });
+      
+      store.setMenuItems(updatedItems);
+      
+      // Also update variants store
+      if (detailsData.data.variants) {
+        store.setItemVariants(detailsData.data.variants);
+      }
+      
+      return detailsData.data;
+    }
+  } catch (error) {
+    console.error(`❌ [POS Bundle] Failed to load item details for ${itemId}:`, error);
+    return null;
+  }
+};
+
+// NEW: Load full category items when category is opened
+export const loadCategoryItems = async (categoryId: string) => {
+  console.log(`🔍 [POS Bundle] Loading full items for category ${categoryId}...`);
+  
+  try {
+    const brain = (await import('brain')).default;
+    const response = await brain.category_items(categoryId);
+    const categoryData = await response.json();
+    
+    if (categoryData.success) {
+      const store = useRealtimeMenuStore.getState();
+      const currentItems = store.menuItems;
+      
+      // Update items in this category with full data
+      const enrichedItems = categoryData.data.items;
+      const updatedItems = currentItems.map(item => {
+        const enrichedItem = enrichedItems.find((ei: any) => ei.id === item.id);
+        return enrichedItem || item;
+      });
+      
+      store.setMenuItems(updatedItems);
+      
+      // Extract and store variants
+      const allVariants: any[] = [];
+      enrichedItems.forEach((item: any) => {
+        if (item.variants) {
+          allVariants.push(...item.variants);
+        }
+      });
+      
+      if (allVariants.length > 0) {
+        store.setItemVariants(allVariants);
+      }
+      
+      return categoryData.data;
+    }
+  } catch (error) {
+    console.error(`❌ [POS Bundle] Failed to load category items for ${categoryId}:`, error);
+    return null;
+  }
 };
 
 // Cleanup function for app unmount
