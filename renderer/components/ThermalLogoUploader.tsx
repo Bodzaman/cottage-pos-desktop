@@ -106,18 +106,20 @@ export default function ThermalLogoUploader({
         { type: 'image/png' }
       );
 
-      // Upload to media assets
-      const response = await brain.upload_media_asset({
+      // Create upload data object (brain client handles FormData conversion)
+      const uploadData = {
         file: processedFile,
-        friendly_name: `Thermal Logo - ${originalFile.name}`,
+        category: 'logos',
+        subcategory: 'thermal',
         description: `Thermal-optimized logo processed for ${paperWidth}mm receipt paper`,
-        tags: `logo,thermal,receipt,${logoSize},${processingMode}`,
-        usage: 'logo'
-      });
-
+        tags: JSON.stringify(['logo', 'thermal', 'receipt', logoSize, processingMode])
+      };
+      
+      const response = await brain.upload_general_file(uploadData);
       const data = await response.json();
-      if (data.success && data.asset) {
-        onLogoUploaded(data.asset.id, data.asset.url);
+      
+      if (data.success && data.asset_id && data.url) {
+        onLogoUploaded(data.asset_id, data.url);
         toast.success('Logo uploaded successfully!');
         
         // Reset state
