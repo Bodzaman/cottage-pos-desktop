@@ -1,6 +1,3 @@
-
-
-
 /**
  * Real-time Menu Store - Unified source of truth for menu data
  * 
@@ -16,6 +13,8 @@ import { OrderItem } from './menuTypes';
 import { TableData } from './tableTypes';
 import { toast } from 'sonner';
 import brain from 'brain';
+import { aiContextManager, invalidateMenuContext } from './aiContextManager';
+import { FIXED_SECTIONS, mapCategoryToSection } from './sectionMapping';
 
 // FlexibleBillingModal types
 export interface BillingOption {
@@ -38,7 +37,7 @@ interface MenuStoreState {
   // Data state
   categories: Category[];
   menuItems: MenuItem[];
-  setMeals: SetMeal[]; // Add Set Meals to store
+  setMeals: SetMeal[];
   proteinTypes: ProteinType[];
   customizations: CustomizationBase[];
   itemVariants: ItemVariant[];
@@ -64,6 +63,10 @@ interface MenuStoreState {
   // FlexibleBillingModal state
   flexibleBillingModal: FlexibleBillingModalState;
   
+  // AI Context state
+  aiContextLastUpdate: number;
+  aiContextStatus: 'idle' | 'loading' | 'ready' | 'error';
+  
   // Actions
   initialize: () => Promise<void>;
   refreshData: () => Promise<void>;
@@ -77,6 +80,12 @@ interface MenuStoreState {
   // NEW: Bundle-specific initialization without real-time subscriptions
   initializeDataOnly: () => Promise<void>;
   startRealtimeSubscriptions: () => void;
+  
+  // AI Context actions
+  refreshAIContext: () => Promise<void>;
+  getAIMenuContext: (options?: any) => Promise<any>;
+  validateAIMenuItem: (query: string, categoryFilter?: string) => Promise<any>;
+  invalidateAIContext: () => void;
   
   // Filtering actions
   setSelectedParentCategory: (categoryId: string | null) => void;
@@ -103,7 +112,11 @@ interface MenuStoreState {
   setConnected: (connected: boolean) => void;
 
   // Helper functions
-  convertSetMealsToMenuItems: () => MenuItem[]; // Convert Set Meals to MenuItem format
+  convertSetMealsToMenuItems: () => MenuItem[];
+  
+  // NEW: Customization helper methods
+  getWebsiteCustomizations: () => CustomizationBase[];
+  getCustomizationsByGroup: () => Record<string, CustomizationBase[]>;
 }
 
 // Subscription management state
@@ -121,12 +134,13 @@ const subscriptionState: SubscriptionState = {
 
 // Helper function to safely cleanup subscriptions
 function cleanupSubscriptions() {
-  console.log('🧹 Cleaning up real-time subscriptions...');
+  const isDev = import.meta.env?.DEV;
+  if (isDev) console.log('🧹 Cleaning up real-time subscriptions...');
   
   subscriptionState.subscriptions.forEach((subscription, channelName) => {
     try {
       supabase.removeChannel(subscription);
-      console.log(`✅ Cleaned up subscription: ${channelName}`);
+      if (isDev) console.log(`✅ Cleaned up subscription: ${channelName}`);
     } catch (error) {
       console.warn(`⚠️ Error cleaning up subscription ${channelName}:`, error);
     }
@@ -180,16 +194,17 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Actions
   initialize: async () => {
+    const isDev = import.meta.env?.DEV;
     // Prevent concurrent menu store initializations
     if (isMenuStoreInitializing) {
-      console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
+      if (isDev) console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
       return;
     }
     
     const state = get();
     
     if (state.isLoading) {
-      console.log('Menu store already initializing, skipping...');
+      if (isDev) console.log('Menu store already initializing, skipping...');
       return;
     }
     
@@ -200,18 +215,18 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     const abortController = new AbortController();
     
     try {
-      console.log('Initializing real-time menu store...');
+      if (isDev) console.log('Initializing real-time menu store...');
       
       // Ensure Supabase is configured with correct credentials first
-      console.log('🔧 Ensuring Supabase configuration is correct...');
+      if (isDev) console.log('🔧 Ensuring Supabase configuration is correct...');
       const configSuccess = await ensureSupabaseConfigured();
-      if (!configSuccess) {
+      if (!configSuccess && isDev) {
         console.warn('⚠️ Failed to ensure Supabase configuration, proceeding with fallback');
       }
       
       // Check if initialization was aborted
       if (abortController.signal.aborted) {
-        console.log('🚫 Menu store initialization aborted');
+        if (isDev) console.log('🚫 Menu store initialization aborted');
         return;
       }
       
@@ -220,7 +235,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       
       // Check again after async operation
       if (abortController.signal.aborted) {
-        console.log('🚫 Menu store initialization aborted after data refresh');
+        if (isDev) console.log('🚫 Menu store initialization aborted after data refresh');
         return;
       }
       
@@ -233,11 +248,11 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
         lastUpdate: Date.now()
       });
       
-      console.log('✅ Real-time menu store initialized successfully');
+      if (isDev) console.log('✅ Real-time menu store initialized successfully');
       
     } catch (error) {
       if (abortController.signal.aborted) {
-        console.log('🚫 Menu store initialization was aborted');
+        if (isDev) console.log('🚫 Menu store initialization was aborted');
         return;
       }
       
@@ -257,95 +272,64 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   },
   
   refreshData: async () => {
+    const isDev = import.meta.env?.DEV;
+    const abortController = new AbortController();
+    
     try {
       set({ isLoading: true, error: null });
       
-      console.log('🔄 [RealtimeMenuStore] Refreshing menu data with hierarchical ordering...');
+      if (isDev) console.log('🔄 [RealtimeMenuStore] Refreshing menu data...');
       
-      // Use the new hierarchical ordering API instead of manual queries
+      // ✅ CRITICAL FIX: Use brain API that handles image conversion properly
       const response = await brain.get_menu_with_ordering();
       const result = await response.json();
       
       if (result.success && result.data) {
         const menuData = result.data;
-        console.log('✅ [RealtimeMenuStore] Menu data fetched with ordering:', {
-          categories: menuData.categories?.length || 0,
-          items: menuData.items?.length || 0
+        const { categories, items } = menuData;
+        
+        // Map categories - ✅ FIX: Use parent_category_id directly from DB instead of mapping parent_id
+        const mappedCategories = (categories || []).map((item: any) => ({
+          ...item,
+          // ✅ CRITICAL FIX: Don't overwrite parent_category_id with parent_id!
+          // The database already has parent_category_id set correctly (e.g., "section-starters")
+          // parent_id is a legacy field that may be null or UUID references
+          parent_category_id: item.parent_category_id || item.parent_id, // Prefer parent_category_id
+          active: item.is_active
+        }));
+        
+        // Set categories and items with proper image_url from API
+        get().setCategories(mappedCategories);
+        get().setMenuItems(items || []);
+        
+        if (isDev) console.log('✅ [RealtimeMenuStore] Menu data set via API:', {
+          categories: mappedCategories.length,
+          items: items?.length || 0
         });
         
-        // Process flat array structure from API
-        const allCategories: Category[] = [];
-        const allMenuItems: MenuItem[] = [];
+        // ✅ FIX: Fetch Set Meals BEFORE updating filtered items
+        await get().fetchSetMeals();
+      
+        // Still fetch protein types, customizations, and variants separately
+        await get().fetchSupplementaryData();
         
-        // Process categories - they come as a flat array
-        if (menuData.categories && Array.isArray(menuData.categories)) {
-          menuData.categories.forEach((category: any) => {
-            allCategories.push({
-              id: category.id,
-              name: category.name,
-              description: category.description || '',
-              display_order: category.display_order || 0,
-              print_order: category.print_order || 0,
-              print_to_kitchen: category.print_to_kitchen || true,
-              image_url: category.image_url,
-              parent_category_id: category.parent_category_id || category.parent_id,
-              active: category.active !== undefined ? category.active : category.is_active
-            });
-          });
-        }
-        
-        // Process menu items - they come as a flat array
-        if (menuData.items && Array.isArray(menuData.items)) {
-          menuData.items.forEach((item: any) => {
-            allMenuItems.push({
-              ...item,
-              active: item.active !== undefined ? item.active : item.is_active,
-              display_order: item.display_order || item.menu_order || 0
-            });
-          });
-        }
-        
-        // 🔍 DEBUG: Log first few items to check image_url
-        console.log('🔍 [RealtimeMenuStore] First 3 processed menu items:');
-        allMenuItems.slice(0, 3).forEach((item, index) => {
-          console.log(`  ${index + 1}. ${item.name}:`);
-          console.log(`     - image_url: ${item.image_url || 'NULL'}`);
-          console.log(`     - has image_url property: ${item.hasOwnProperty('image_url')}`);
+        // ✅ OPTIMIZATION: Call updateFilteredItems ONCE at the end
+        get().updateFilteredItems();
+      
+        set({ isLoading: false, isConnected: true });
+      
+        const { categories: finalCategories, menuItems: finalMenuItems, setMeals } = get();
+        if (isDev) console.log('✅ [RealtimeMenuStore] Menu data refreshed with ordering:', {
+          categories: finalCategories.length,
+          menuItems: finalMenuItems.length,
+          setMeals: setMeals.length,
+          parentCategories: finalCategories.filter(cat => !cat.parent_category_id && cat.active).length
         });
-        
-        // Update store with processed data
-        get().setCategories(allCategories);
-        get().setMenuItems(allMenuItems);
-        
-        console.log('✅ [RealtimeMenuStore] Data processed successfully:', {
-          totalCategories: allCategories.length,
-          totalItems: allMenuItems.length
-        });
-        
       } else {
         console.error('❌ Failed to fetch menu with ordering:', result.message);
         // Fallback to old method if new API fails
         await get().fallbackRefreshData();
       }
-      
-      // Still fetch protein types, customizations, and variants separately
-      await get().fetchSupplementaryData();
-      
-      // Fetch Set Meals
-      await get().fetchSetMeals();
-      
-      // Update derived data
-      get().updateDerivedData();
-      
-      set({ isLoading: false, isConnected: true });
-      
-      const { categories, menuItems, setMeals } = get();
-      console.log('✅ [RealtimeMenuStore] Menu data refreshed with ordering:', {
-        categories: categories.length,
-        menuItems: menuItems.length,
-        setMeals: setMeals.length,
-        parentCategories: categories.filter(cat => !cat.parent_category_id && cat.active).length
-      });
     } catch (error) {
       console.error('❌ Error refreshing menu data:', error);
       set({ 
@@ -356,7 +340,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       
       // Try fallback method
       try {
-        console.log('🔄 Attempting fallback refresh...');
+        if (isDev) console.log('🔄 Attempting fallback refresh...');
         await get().fallbackRefreshData();
         set({ isConnected: true });
       } catch (fallbackError) {
@@ -368,15 +352,16 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Fallback method using direct database queries
   fallbackRefreshData: async () => {
-    console.log('🔄 [RealtimeMenuStore] Using fallback data refresh method...');
+    const isDev = import.meta.env?.DEV;
+    if (isDev) console.log('🔄 [RealtimeMenuStore] Using fallback data refresh method...');
     
     // Ensure Supabase client is properly configured first
     await ensureSupabaseConfigured();
     
     // Fetch all data in parallel with proper error handling
     const dataPromises = [
-      supabase.from('menu_categories').select('*').order('menu_order'),
-      supabase.from('menu_items').select('*').eq('active', true).order('menu_order'),
+      supabase.from('menu_categories').select('*').order('display_print_order'),
+      supabase.from('menu_items').select('*').eq('is_active', true).order('display_print_order'),
       supabase.from('menu_protein_types').select('*').order('name'),
       supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
       supabase.from('item_variants').select(`
@@ -392,7 +377,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     
     // Process categories
     if (categoriesResult.status === 'fulfilled' && !categoriesResult.value.error) {
-      console.log('✅ [RealtimeMenuStore] Categories fetched:', categoriesResult.value.data?.length || 0);
+      if (isDev) console.log('✅ [RealtimeMenuStore] Categories fetched:', categoriesResult.value.data?.length || 0);
       if (categoriesResult.value.data) {
         const mappedCategories = categoriesResult.value.data.map((item: any) => ({
           ...item,
@@ -407,7 +392,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     
     // Process menu items  
     if (itemsResult.status === 'fulfilled' && !itemsResult.value.error) {
-      console.log('✅ [RealtimeMenuStore] Menu items fetched:', itemsResult.value.data?.length || 0);
+      if (isDev) console.log('✅ [RealtimeMenuStore] Menu items fetched:', itemsResult.value.data?.length || 0);
       if (itemsResult.value.data) {
         get().setMenuItems(itemsResult.value.data);
       }
@@ -437,56 +422,93 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Fetch supplementary data separately
   fetchSupplementaryData: async () => {
+    const isDev = import.meta.env?.DEV;
     try {
-      const dataPromises = [
-        supabase.from('menu_protein_types').select('*').order('name'),
-        supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
-        supabase.from('item_variants').select(`
-          *,
-          menu_protein_types:protein_type_id(id, name)
-        `).order('menu_item_id')
-      ];
+      // ✅ CRITICAL FIX: Use brain API instead of direct Supabase calls to ensure image_url conversion
+      if (isDev) console.log('🔄 [RealtimeMenuStore] Fetching supplementary data via API...');
       
-      const results = await Promise.allSettled(dataPromises);
-      const [proteinResult, customizationResult, variantsResult] = results;
+      // Use the main API that handles image conversion properly  
+      const response = await brain.get_menu_with_ordering();
+      const result = await response.json();
       
-      // Process protein types
-      if (proteinResult.status === 'fulfilled' && !proteinResult.value.error && proteinResult.value.data) {
-        console.log('✅ [RealtimeMenuStore] Protein types loaded:', proteinResult.value.data.length);
-        get().setProteinTypes(proteinResult.value.data);
+      if (result.success && result.data) {
+        const menuData = result.data;
+        console.log('✅ [RealtimeMenuStore] Supplementary data fetched via API:', {
+          categories: menuData.categories?.length || 0,
+          items: menuData.items?.length || 0
+        });
+        
+        // Process the data that already has proper image_url conversion
+        if (menuData.categories) {
+          const mappedCategories = menuData.categories.map((item: any) => ({
+            ...item,
+            // ✅ FIX: Use parent_category_id from API (which has "section-xxx" format), only fallback to parent_id if null
+            parent_category_id: item.parent_category_id || item.parent_id,
+            active: item.is_active
+          }));
+          get().setCategories(mappedCategories);
+        }
+        
+        if (menuData.items) {
+          get().setMenuItems(menuData.items);
+        }
+        
+        // ✅ NEW: Also fetch additional data that might not be in the main API
+        const dataPromises = [
+          supabase.from('menu_protein_types').select('*').order('name'),
+          supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
+          supabase.from('item_variants').select(`
+            *,
+            menu_protein_types:protein_type_id(id, name)
+          `).order('menu_item_id')
+        ];
+        
+        const results = await Promise.allSettled(dataPromises);
+        const [proteinResult, customizationResult, variantsResult] = results;
+        
+        // Process protein types
+        if (proteinResult.status === 'fulfilled' && !proteinResult.value.error && proteinResult.value.data) {
+          console.log('✅ [RealtimeMenuStore] Protein types loaded:', proteinResult.value.data.length);
+          get().setProteinTypes(proteinResult.value.data);
+        } else {
+          console.error('❌ [RealtimeMenuStore] Failed to load protein types:', proteinResult);
+        }
+        
+        // Process customizations
+        if (customizationResult.status === 'fulfilled' && !customizationResult.value.error && customizationResult.value.data) {
+          get().setCustomizations(customizationResult.value.data);
+        }
+        
+        // Process variants
+        if (variantsResult.status === 'fulfilled' && !variantsResult.value.error && variantsResult.value.data) {
+          const enhancedVariants = variantsResult.value.data.map(variant => ({
+            ...variant,
+            protein_type_name: variant.menu_protein_types?.name || null
+          }));
+          get().setItemVariants(enhancedVariants);
+        }
+        
       } else {
-        console.error('❌ [RealtimeMenuStore] Failed to load protein types:', proteinResult);
+        console.error('❌ [RealtimeMenuStore] API failed for supplementary data:', result);
       }
       
-      // Process customizations
-      if (customizationResult.status === 'fulfilled' && !customizationResult.value.error && customizationResult.value.data) {
-        get().setCustomizations(customizationResult.value.data);
-      }
-      
-      // Process variants
-      if (variantsResult.status === 'fulfilled' && !variantsResult.value.error && variantsResult.value.data) {
-        const enhancedVariants = variantsResult.value.data.map(variant => ({
-          ...variant,
-          protein_type_name: variant.menu_protein_types?.name || null
-        }));
-        get().setItemVariants(enhancedVariants);
-      }
     } catch (error) {
       console.error('❌ Error fetching supplementary data:', error);
     }
   },
   
   subscribeToChanges: () => {
+    const isDev = import.meta.env?.DEV;
     // Prevent multiple subscription attempts
     if (subscriptionState.isSubscribing) {
-      console.log('⏳ Subscription setup already in progress, skipping...');
+      if (isDev) console.log('⏳ Subscription setup already in progress, skipping...');
       return;
     }
     
     subscriptionState.isSubscribing = true;
     
     try {
-      console.log('🔔 Setting up real-time subscriptions...');
+      if (isDev) console.log('🔔 Setting up real-time subscriptions...');
       
       // Cleanup existing subscriptions first
       cleanupSubscriptions();
@@ -503,7 +525,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
           table: 'menu_categories'
         }, (payload) => {
           if (!subscriptionState.abortController?.signal.aborted) {
-            console.log('📁 Categories changed:', payload.eventType);
+            if (isDev) console.log('📁 Categories changed:', payload.eventType);
             handleCategoriesChange(payload);
           }
         })
@@ -520,7 +542,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
           table: 'menu_items'
         }, (payload) => {
           if (!subscriptionState.abortController?.signal.aborted) {
-            console.log('🍽️ Menu items changed:', payload.eventType);
+            if (isDev) console.log('🍽️ Menu items changed:', payload.eventType);
             handleMenuItemsChange(payload);
           }
         })
@@ -537,7 +559,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
           table: 'menu_customizations'
         }, (payload) => {
           if (!subscriptionState.abortController?.signal.aborted) {
-            console.log('⚙️ Customizations changed:', payload.eventType);
+            if (isDev) console.log('⚙️ Customizations changed:', payload.eventType);
             handleCustomizationsChange(payload);
           }
         })
@@ -554,7 +576,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
           table: 'menu_item_variants'
         }, (payload) => {
           if (!subscriptionState.abortController?.signal.aborted) {
-            console.log('🔄 Variants changed:', payload.eventType);
+            if (isDev) console.log('🔄 Variants changed:', payload.eventType);
             handleVariantsChange(payload);
           }
         })
@@ -565,7 +587,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       set({ isConnected: true });
       subscriptionState.isSubscribing = false;
       
-      console.log('✅ Real-time subscriptions established successfully');
+      if (isDev) console.log('✅ Real-time subscriptions established successfully');
       
     } catch (error) {
       console.error('❌ Error setting up subscriptions:', error);
@@ -623,33 +645,47 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // NEW: Initialize data only without real-time subscriptions
   initializeDataOnly: async () => {
+    const isDev = import.meta.env?.DEV;
     // Prevent concurrent menu store initializations
     if (isMenuStoreInitializing) {
-      console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
+      if (isDev) console.log('⏭️ [Menu Store] Already initializing, skipping duplicate request...');
       return;
     }
     
     const state = get();
     
     if (state.isLoading) {
-      console.log('Menu store already initializing, skipping...');
+      if (isDev) console.log('Menu store already initializing, skipping...');
       return;
+    }
+    
+    // ✅ NEW: Check if bundle data is fresh (loaded within last 30 seconds)
+    const timeSinceBundleLoad = Date.now() - bundleLoadTime;
+    const isBundleFresh = timeSinceBundleLoad < 30000; // 30 seconds
+    
+    if (isBundleFresh && isDev) {
+      console.log(`✨ [Bundle Init] Bundle is fresh (${(timeSinceBundleLoad / 1000).toFixed(1)}s old), skipping duplicate data fetch`);
     }
     
     isMenuStoreInitializing = true;
     set({ isLoading: true, error: null });
     
     try {
-      console.log('🔄 [Bundle Init] Loading menu data without real-time subscriptions...');
+      if (isDev) console.log('🔄 [Bundle Init] Loading menu data without real-time subscriptions...');
       
       // Ensure Supabase is configured with correct credentials first
       const configSuccess = await ensureSupabaseConfigured();
-      if (!configSuccess) {
+      if (!configSuccess && isDev) {
         console.warn('⚠️ Failed to ensure Supabase configuration, proceeding with fallback');
       }
       
-      // Load initial data only
-      await state.refreshData();
+      // ✅ NEW: Only refresh data if bundle is NOT fresh
+      if (!isBundleFresh) {
+        if (isDev) console.log('🔄 [Bundle Init] Bundle is stale, fetching fresh data...');
+        await state.refreshData();
+      } else {
+        if (isDev) console.log('⏭️ [Bundle Init] Using fresh bundle data, skipping refresh');
+      }
       
       set({ 
         isLoading: false, 
@@ -657,7 +693,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
         lastUpdate: Date.now()
       });
       
-      console.log('✅ [Bundle Init] Menu data loaded successfully (subscriptions pending)');
+      if (isDev) console.log('✅ [Bundle Init] Menu data loaded successfully (subscriptions pending)');
       
     } catch (error) {
       console.error('❌ Error initializing menu data:', error);
@@ -674,8 +710,9 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // NEW: Start real-time subscriptions separately
   startRealtimeSubscriptions: () => {
+    const isDev = import.meta.env?.DEV;
     const state = get();
-    console.log('🚀 [Bundle Init] Starting real-time subscriptions after bundle completion...');
+    if (isDev) console.log('🚀 [Bundle Init] Starting real-time subscriptions after bundle completion...');
     
     // Start real-time subscriptions
     state.subscribeToChanges();
@@ -683,7 +720,8 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Force full refresh method
   forceFullRefresh: async () => {
-    console.log('🔄 [RealtimeMenuStore] Force full refresh requested...');
+    const isDev = import.meta.env?.DEV;
+    if (isDev) console.log('🔄 [RealtimeMenuStore] Force full refresh requested...');
     
     // Reset state
     set({
@@ -705,7 +743,98 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     // Refresh combined data
     get().updateDerivedData();
     
-    console.log('✅ [RealtimeMenuStore] Force full refresh completed');
+    if (isDev) console.log('✅ [RealtimeMenuStore] Force full refresh completed');
+  },
+  
+  // AI Context actions
+  refreshAIContext: async () => {
+    const isDev = import.meta.env?.DEV;
+    const abortController = new AbortController();
+    
+    try {
+      if (isDev) console.log('🔄 Refreshing AI context...');
+      
+      // Create a timeout for the context refresh
+      const timeoutId = setTimeout(() => {
+        abortController.abort();
+      }, 10000); // 10 second timeout
+      
+      const response = await brain.refresh_ai_context();
+      
+      clearTimeout(timeoutId);
+      
+      if (abortController.signal.aborted) {
+        if (isDev) console.log('🚫 AI context refresh aborted due to timeout');
+        return;
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        if (isDev) console.log('✅ AI context refreshed successfully');
+        // Update context status in store
+        set({ aiContextLastUpdate: Date.now(), aiContextStatus: 'ready' });
+      } else {
+        console.error('❌ AI context refresh failed:', result.message);
+        set({ aiContextStatus: 'error' });
+      }
+      
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        if (isDev) console.log('🚫 AI context refresh was aborted');
+        return;
+      }
+      
+      console.error('❌ Error refreshing AI context:', error);
+      set({ aiContextStatus: 'error' });
+    }
+  },
+  
+  getAIMenuContext: async (options?: any) => {
+    const isDev = import.meta.env?.DEV;
+    try {
+      if (isDev) console.log('🔍 Fetching AI menu context...');
+      const response = await brain.get_ai_menu_context(options);
+      const result = await response.json();
+      
+      if (result.success) {
+        if (isDev) console.log('✅ AI context fetched successfully');
+        return result.data;
+      } else {
+        console.warn('⚠️ AI context fetch failed:', result.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching AI context:', error);
+      return null;
+    }
+  },
+  
+  validateAIMenuItem: async (query: string, categoryFilter?: string) => {
+    const isDev = import.meta.env?.DEV;
+    try {
+      if (isDev) console.log('🔍 Validating AI menu item:', query);
+      const response = await brain.validate_ai_menu_item(query, categoryFilter);
+      const result = await response.json();
+      
+      if (result.success) {
+        if (isDev) console.log('✅ AI validation successful');
+        return result.data;
+      } else {
+        console.warn('⚠️ AI validation failed:', result.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error validating AI menu item:', error);
+      return null;
+    }
+  },
+  
+  invalidateAIContext: () => {
+    const isDev = import.meta.env?.DEV;
+    if (isDev) console.log('🗑️ Invalidating AI context...');
+    invalidateMenuContext();
+    set({ aiContextStatus: 'idle' });
   },
   
   // Filtering methods
@@ -716,6 +845,15 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   setSelectedMenuCategory: (categoryId: string | null) => {
     const { categories } = get();
+    const isDev = import.meta.env?.DEV;
+    
+    if (isDev) {
+      console.log('🎯 [setSelectedMenuCategory] Called with:', categoryId);
+      if (categoryId) {
+        const category = categories.find(c => c.id === categoryId);
+        console.log('🎯 [setSelectedMenuCategory] Category details:', category);
+      }
+    }
     
     set({ selectedMenuCategory: categoryId });
     get().updateFilteredItems();
@@ -727,102 +865,138 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   },
   
   updateFilteredItems: () => {
-    const { menuItems, categories, selectedParentCategory, selectedMenuCategory, searchQuery } = get();
+    const isDev = import.meta.env?.DEV;
+    const { menuItems, categories, selectedParentCategory, selectedMenuCategory, searchQuery, setMeals } = get();
     
-    // Get regular menu items
-    let filtered = menuItems.filter(item => item.active);
-    
-    // Get Set Meals converted to MenuItem format
-    const setMealMenuItems = get().convertSetMealsToMenuItems();
-    
-    // Combine regular menu items with Set Meals
-    const allMenuItems = [...filtered, ...setMealMenuItems];
-    
-    // Apply search filter to combined items
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = allMenuItems.filter(item => 
-        item.name.toLowerCase().includes(query) ||
-        (item.menu_item_description?.toLowerCase() || '').includes(query)
-      );
-    }
-    // Apply category filtering
-    else {
-      filtered = allMenuItems;
-      
-      // Find SET MEALS category dynamically
-      const setMealsCategory = categories.find(cat => cat.name === 'SET MEALS');
-      
-      // Check if the selected category is SET MEALS
-      if (setMealsCategory && (selectedParentCategory === setMealsCategory.id || selectedMenuCategory === setMealsCategory.id)) {
-        // Filter for SET MEALS category - show only set meal items
-        filtered = filtered.filter(item => {
-          const isSetMeal = (item as any).item_type === 'set_meal';
-          return isSetMeal || (item.category_id === setMealsCategory.id && (item as any).is_set_meal === true);
-        });
-      }
-      // Handle fixed parent category selection
-      else if (selectedParentCategory && 
-               ['starters', 'main-course', 'side-dishes', 'accompaniments', 'desserts-coffee', 'drinks-wine'].includes(selectedParentCategory)) {
+    if (isDev) console.log('🔍 [updateFilteredItems] Called with:', {
+      selectedParentCategory,
+      selectedMenuCategory,
+      searchQuery,
+      totalMenuItems: menuItems.length,
+      totalSetMeals: setMeals.length
+    });
+
+    let filtered = [...menuItems];
+
+    // ✅ FIX: When no category is selected (null), show ALL items - don't filter!
+    if (!selectedMenuCategory || selectedMenuCategory === 'all') {
+      if (isDev) console.log('✅ [updateFilteredItems] No category filter - showing all items:', filtered.length);
+      // Skip category filtering - show all items
+    } else {
+      // 1. Filter by parent category first (legacy support)
+      if (selectedParentCategory && selectedParentCategory !== 'all') {
+        const childCategoryIds = categories
+          .filter(cat => cat.parent_category_id === selectedParentCategory && cat.active)
+          .map(cat => cat.id);
         
-        const fixedCategories = [
-          { id: 'starters', label: 'STARTERS', mappedNames: ['Starters', 'Appetizers', 'Appetizer', 'Hot Appetizers'] },
-          { id: 'main-course', label: 'MAIN COURSE', mappedNames: ['Main Course', 'Mains', 'Main Courses', 'Tandoori Main Course', 'Tandoori Specialities', 'Chicken Dishes', 'Lamb Dishes', 'Seafood', 'Vegetarian Mains'] },
-          { id: 'side-dishes', label: 'SIDE DISHES', mappedNames: ['Side Dishes', 'Sides', 'Rice', 'Bread', 'Naan', 'Rice Dishes'] },
-          { id: 'accompaniments', label: 'ACCOMPANIMENTS', mappedNames: ['Accompaniments', 'Sauces', 'Condiments', 'Chutneys'] },
-          { id: 'desserts-coffee', label: 'DESSERTS & COFFEE', mappedNames: ['Desserts & Coffee', 'Coffee & Desserts', 'Desserts', 'Sweet', 'Coffee', 'Ice Cream'] },
-          { id: 'drinks-wine', label: 'DRINKS & WINE', mappedNames: ['Drinks & Wine', 'Drinks', 'Beverages', 'Wine', 'Alcohol', 'Soft Drinks'] }
-        ];
-        
-        const currentFixedCategory = fixedCategories.find(cat => cat.id === selectedParentCategory);
-        if (currentFixedCategory) {
-          // Get all categories that match this fixed parent
-          const matchingCategoryIds = categories
-            .filter(dbCategory => 
-              currentFixedCategory.mappedNames.some(mappedName => 
-                dbCategory.name.toLowerCase().includes(mappedName.toLowerCase()) ||
-                mappedName.toLowerCase().includes(dbCategory.name.toLowerCase())
-              ) && dbCategory.active
-            )
-            .map(cat => cat.id);
-          
-          // If a specific subcategory is selected, filter by that
-          if (selectedMenuCategory) {
-            filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
-          } else {
-            // Show all items from matching categories
-            filtered = filtered.filter(item => matchingCategoryIds.includes(item.category_id));
-          }
+        if (childCategoryIds.length > 0) {
+          filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
         }
       }
-      // Handle specific subcategory selection (fallback for direct category selection)
-      else if (selectedMenuCategory) {
-        // Check if selectedMenuCategory is a parent category
+
+      // 2. Filter by specific menu category (child category)
+      if (isDev) {
+        console.log('🎯 [Filter Debug] selectedMenuCategory:', selectedMenuCategory);
+        console.log('🎯 [Filter Debug] First 3 menu items:', menuItems.slice(0, 3).map(i => ({ 
+          name: i.name, 
+          category_id: i.category_id 
+        })));
+        console.log('🎯 [Filter Debug] Categories:', categories.map(c => ({
+          id: c.id,
+          name: c.name,
+          parent_category_id: c.parent_category_id
+        })));
+      }
+      
+      // ✅ NEW: Handle section-based filtering (synthetic parent categories)
+      if (selectedMenuCategory.startsWith('section-')) {
+        if (isDev) console.log('📂 [Filter Debug] Detected SECTION selection:', selectedMenuCategory);
+        
+        // This is a section - get all real categories that are children of this section
+        const childCategoryIds = categories
+          .filter(cat => cat.parent_category_id === selectedMenuCategory && cat.active)
+          .map(cat => cat.id);
+        
+        if (isDev) console.log('📂 [Filter Debug] Child category IDs under section:', childCategoryIds);
+        
+        // Filter items by child category IDs
+        filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
+        
+        if (isDev) console.log('📂 [Filter Debug] Filtered items count:', filtered.length);
+      } else {
+        if (isDev) console.log('📄 [Filter Debug] Detected REAL CATEGORY selection:', selectedMenuCategory);
+        
+        // This is a regular category - check if it's a parent with children
         const selectedCategory = categories.find(cat => cat.id === selectedMenuCategory);
         
-        if (selectedCategory && selectedCategory.parent_category_id === null) {
-          // This is a parent category - find all child categories
+        if (isDev) console.log('📄 [Filter Debug] Found category:', selectedCategory);
+        
+        if (selectedCategory && selectedCategory.parent_category_id && 
+            selectedCategory.parent_category_id.startsWith('section-')) {
+          // This is a real category under a section - just filter by this category
+          if (isDev) console.log('✅ [Filter Debug] Real category under section - filtering by category_id:', selectedMenuCategory);
+          
+          // **DEBUG: Log items before filtering**
+          if (isDev) console.log('✅ [Filter Debug] Items BEFORE filter:', filtered.map(i => ({ 
+            name: i.name, 
+            category_id: i.category_id,
+            matches: i.category_id === selectedMenuCategory
+          })));
+          
+          if (isDev) console.log('✅ [Filter Debug] Comparison check:', {
+            selectedMenuCategory,
+            selectedMenuCategoryType: typeof selectedMenuCategory,
+            firstItemCategoryId: filtered[0]?.category_id,
+            firstItemCategoryIdType: typeof filtered[0]?.category_id,
+            strictMatch: filtered[0]?.category_id === selectedMenuCategory,
+            looseMatch: filtered[0]?.category_id == selectedMenuCategory
+          });
+          
+          filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
+          
+          if (isDev) console.log('✅ [Filter Debug] Filtered items count:', filtered.length);
+          if (isDev) console.log('✅ [Filter Debug] Sample filtered items:', filtered.slice(0, 3).map(i => ({ name: i.name, category_id: i.category_id })));
+        } else if (selectedCategory && !selectedCategory.parent_category_id) {
+          // Legacy parent category - find all child categories
           const childCategoryIds = categories
             .filter(cat => cat.parent_category_id === selectedMenuCategory && cat.active)
             .map(cat => cat.id);
           
-          // Filter by child category IDs
-          filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
+          if (childCategoryIds.length > 0) {
+            // Filter by child category IDs
+            filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
+          } else {
+            // No children, filter by this category directly
+            filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
+          }
         } else {
-          // This is a regular category - filter normally
+          // Regular category - filter normally
           filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
         }
       }
     }
+
+    // 3. Apply search filter
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(query) ||
+        (item.menu_item_description?.toLowerCase() || '').includes(query)
+      );
+    }
+
+    // 4. Combine with Set Meals converted to MenuItem format
+    const setMealItems = get().convertSetMealsToMenuItems();
+    const combinedItems = [...filtered, ...setMealItems];
     
-    // Sort filtered items by menu_order
-    const sortedFiltered = filtered.sort((a, b) => {
-      const aOrder = a.display_order || 999;
-      const bOrder = b.display_order || 999;
-      return aOrder - bOrder;
+    if (isDev) console.log('✅ [updateFilteredItems] Result:', {
+      regularItems: filtered.length,
+      setMealItems: setMealItems.length,
+      combinedTotal: combinedItems.length,
+      selectedCategory: selectedMenuCategory
     });
-    
-    set({ filteredMenuItems: sortedFiltered });
+
+    set({ filteredMenuItems: combinedItems });
   },
   
   // FlexibleBillingModal actions
@@ -870,9 +1044,70 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   
   // Internal state updates
   setCategories: (categories: Category[]) => {
-    set({ categories });
-    get().updateDerivedData();
-    get().updateFilteredItems();
+    const isDev = import.meta.env?.DEV;
+    
+    // Transform incoming categories to include the 7 fixed section parents
+    const activeCategories = categories.filter(cat => cat.active);
+    
+    // Create synthetic parent categories for the 7 sections
+    const sectionParents: Category[] = FIXED_SECTIONS.map((section) => ({
+      id: `section-${section.id}`,
+      name: section.name,
+      description: section.displayName,
+      display_order: section.order,
+      print_order: section.order,
+      print_to_kitchen: true,
+      image_url: null,
+      parent_category_id: null, // These are top-level
+      active: true,
+      code_prefix: section.codePrefix
+    }));
+    
+    // Map real database categories as children under the appropriate section
+    const childCategories: Category[] = activeCategories.map(cat => {
+      // ✅ FIX: Preserve parent_category_id if it's already a valid section reference
+      // Only fallback to mapCategoryToSection if parent_category_id is missing or invalid
+      let finalParentId: string;
+      
+      if (cat.parent_category_id && cat.parent_category_id.startsWith('section-')) {
+        // Already has a valid section parent - preserve it!
+        finalParentId = cat.parent_category_id;
+        if (isDev) console.log(`✅ [setCategories] Preserving section for "${cat.name}": ${finalParentId}`);
+      } else {
+        // No valid section parent - guess based on name/code_prefix
+        const sectionId = mapCategoryToSection(cat);
+        finalParentId = `section-${sectionId}`;
+        if (isDev) console.log(`🔍 [setCategories] Mapping "${cat.name}" to guessed section: ${finalParentId}`);
+      }
+      
+      return {
+        ...cat,
+        parent_category_id: finalParentId
+      };
+    });
+    
+    // Combine section parents with child categories
+    const transformedCategories = [...sectionParents, ...childCategories];
+    
+    // Build hierarchical structure
+    const parentCategories = transformedCategories.filter(cat => !cat.parent_category_id);
+    const subcategories: Record<string, Category[]> = {};
+    
+    parentCategories.forEach(parent => {
+      subcategories[parent.id] = transformedCategories
+        .filter(cat => cat.parent_category_id === parent.id)
+        .sort((a, b) => a.display_order - b.display_order);
+    });
+    
+    set({ 
+      categories: transformedCategories,
+      parentCategories,
+      childCategories: transformedCategories.filter(cat => cat.parent_category_id),
+      subcategories
+    });
+    
+    // ✅ OPTIMIZATION: Remove updateFilteredItems() call - will be called once at end of bundle load
+    // get().updateFilteredItems();
   },
   
   setMenuItems: (items: MenuItem[]) => {
@@ -885,7 +1120,8 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
     
     set({ menuItems: cleanItems });
     get().updateDerivedData();
-    get().updateFilteredItems();
+    // ✅ OPTIMIZATION: Remove updateFilteredItems() call - updateDerivedData already calls it
+    // get().updateFilteredItems();
   },
   
   setProteinTypes: (proteinTypes: ProteinType[]) => {
@@ -925,10 +1161,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       subcategories: {}
     });
     
-    // Update filtered items after derived data changes
-    get().updateFilteredItems();
-    
-    // Update filtered items after derived data changes
+    // ✅ OPTIMIZATION: Keep this call but make sure it's only called once per data refresh cycle
     get().updateFilteredItems();
   },
   
@@ -939,19 +1172,20 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
   // Set Meals methods
   setSetMeals: (setMeals: SetMeal[]) => {
     set({ setMeals });
-    // Update filtered items to include Set Meals converted to MenuItems
-    get().updateFilteredItems();
+    // ✅ OPTIMIZATION: Remove updateFilteredItems() call - will be called once at end of bundle load
+    // get().updateFilteredItems();
   },
 
   fetchSetMeals: async () => {
+    const isDev = import.meta.env?.DEV;
     try {
-      console.log('🔄 [RealtimeMenuStore] Fetching Set Meals...');
+      if (isDev) console.log('🔄 [RealtimeMenuStore] Fetching Set Meals...');
       const response = await brain.list_set_meals({ active_only: true });
       const setMeals = response.json ? await response.json() : response;
       
       if (Array.isArray(setMeals)) {
         get().setSetMeals(setMeals);
-        console.log('✅ [RealtimeMenuStore] Set Meals fetched:', { count: setMeals.length });
+        if (isDev) console.log('✅ [RealtimeMenuStore] Set Meals fetched:', { count: setMeals.length });
       } else {
         console.warn('⚠️ [RealtimeMenuStore] Set Meals response is not an array:', setMeals);
         get().setSetMeals([]);
@@ -997,19 +1231,65 @@ export const useRealtimeMenuStore = create<MenuStoreState>((set, get) => ({
       } as MenuItem & { price?: number; set_meal_data?: any; item_type?: string }));
     
     return setMealMenuItems;
+  },
+
+  getWebsiteCustomizations: () => {
+    const { customizations } = get();
+    return customizations.filter(customization => 
+      customization.is_active && customization.show_on_website
+    );
+  },
+
+  getCustomizationsByGroup: () => {
+    const { customizations } = get();
+    const customizationsByGroup: Record<string, CustomizationBase[]> = {};
+    
+    customizations.forEach(customization => {
+      if (customization.is_active && customization.show_on_website) {
+        const group = customization.customization_group || 'Other';
+        if (!customizationsByGroup[group]) {
+          customizationsByGroup[group] = [];
+        }
+        customizationsByGroup[group].push(customization);
+      }
+    });
+    
+    return customizationsByGroup;
   }
 }));
 
 // Real-time event handlers
 function handleCategoriesChange(payload: any) {
   const store = useRealtimeMenuStore.getState();
+  const isDev = import.meta.env?.DEV;
+  
+  if (isDev) console.log('📁 [Real-time] Categories change detected:', {
+    eventType: payload.eventType,
+    category: payload.new || payload.old,
+    parent_category_id: (payload.new || payload.old)?.parent_category_id
+  });
   
   if (payload.eventType === 'INSERT') {
-    const newCategory = payload.new as Category;
+    const newCategory = {
+      ...payload.new,
+      // ✅ FIX: Use parent_category_id from DB ("section-xxx" format), only fallback to parent_id if null
+      parent_category_id: payload.new.parent_category_id || payload.new.parent_id,
+      active: payload.new.is_active ?? payload.new.active
+    } as Category;
+    
+    if (isDev) console.log('➕ [Real-time] Adding new category:', newCategory);
     store.setCategories([...store.categories, newCategory]);
     toast.success(`Category "${newCategory.name}" added`);
   } else if (payload.eventType === 'UPDATE') {
-    const updatedCategory = payload.new as Category;
+    const updatedCategory = {
+      ...payload.new,
+      // ✅ FIX: Use parent_category_id from DB ("section-xxx" format), only fallback to parent_id if null
+      parent_category_id: payload.new.parent_category_id || payload.new.parent_id,
+      active: payload.new.is_active ?? payload.new.active
+    } as Category;
+    
+    if (isDev) console.log('🔄 [Real-time] Updating category:', updatedCategory);
+    
     const categories = store.categories.map(cat => 
       cat.id === updatedCategory.id ? updatedCategory : cat
     );
@@ -1113,6 +1393,10 @@ export const getMenuDataForPOS = () => {
 let isBundleLoading = false;
 // Global flag to prevent concurrent menu store initializations
 let isMenuStoreInitializing = false;
+// NEW: Track when bundle was last loaded to prevent duplicate fetches
+let bundleLoadTime = 0;
+// NEW: Track if real-time subscriptions have been started
+let realtimeSubscriptionsStarted = false;
 
 // NEW: Fast POS bundle loader for initial startup
 export const loadPOSBundle = async () => {
@@ -1136,7 +1420,8 @@ export const loadPOSBundle = async () => {
     const bundleData = await response.json();
     
     if (bundleData.success) {
-      console.log(`🚀 [POS Bundle] Loaded ${bundleData.total_categories} categories, ${bundleData.total_items} items (~${bundleData.bundle_size_kb}KB)`);
+      const isDev = import.meta.env?.DEV;
+      if (isDev) console.log(`🚀 [POS Bundle] Loaded ${bundleData.data.categories.length} categories, ${bundleData.data.items.length} items (~${(bundleData.bundle_size_kb / 1024).toFixed(2)}KB)`);
       
       // Set bundle data immediately for fast rendering
       store.setCategories(bundleData.categories);
@@ -1147,10 +1432,10 @@ export const loadPOSBundle = async () => {
         variants: [], // Will be loaded on-demand
         menu_item_description: null, // Will be loaded on-demand
         dietary_tags: null, // Will be loaded on-demand
-        // Mark as skeleton state to prevent image loading
+        // Mark as skeleton state to prevent full data loading until needed
         _isSkeletonState: true,
-        // Keep basic fields for display
-        display_image_url: null // Don't show any image during skeleton state
+        // ✅ FIXED: Preserve image_url from bundle instead of setting to null
+        // image_url is already provided by the bundle endpoint
       }));
       
       store.setMenuItems(bundleMenuItems);
@@ -1159,13 +1444,11 @@ export const loadPOSBundle = async () => {
       
       // Mark as bundle-loaded for faster subsequent access
       store.lastUpdate = Date.now();
+      bundleLoadTime = Date.now(); // Track bundle load time globally
       
-      // Start background loading of full data immediately (parallel to bundle completion)
-      console.log('🔄 [POS Bundle] Starting parallel background full data load...');
-      // Don't wait - start background loading immediately for faster overall performance
-      Promise.resolve().then(() => {
-        store.initializeDataOnly(); // This will load full data and replace skeleton items
-      });
+      // ✅ REMOVED: Don't start background data loading or subscriptions automatically
+      // Let user interaction trigger subscriptions for faster perceived performance
+      if (isDev) console.log('⏭️ [POS Bundle] Bundle loaded. Real-time subscriptions will start on first interaction or after 15s.');
       
       return true;
     } else {
@@ -1260,6 +1543,17 @@ export const loadCategoryItems = async (categoryId: string) => {
   } catch (error) {
     console.error(`❌ [POS Bundle] Failed to load category items for ${categoryId}:`, error);
     return null;
+  }
+};
+
+// NEW: Start real-time subscriptions with lazy loading support
+export const startRealtimeSubscriptionsIfNeeded = () => {
+  const store = useRealtimeMenuStore.getState();
+  const isDev = import.meta.env?.DEV;
+  
+  if (!realtimeSubscriptionsStarted) {
+    if (isDev) console.log('🚀 [Realtime] Starting subscriptions on user interaction...');
+    store.subscribeToChanges();
   }
 };
 
