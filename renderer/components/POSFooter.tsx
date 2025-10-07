@@ -16,7 +16,7 @@ interface POSFooterProps {
 }
 
 /**
- * Professional footer for POSII with complete operational status dashboard
+ * Professional footer for POSDesktop with complete operational status dashboard
  * Four-section layout: System Status | Operational Status | Branding | Date & Time
  */
 export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSFooterProps) {
