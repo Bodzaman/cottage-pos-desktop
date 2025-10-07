@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -23,6 +24,9 @@ interface CustomerDetailsModalProps {
   orderValue?: number; // Order total for delivery validation
   onOrderTypeSwitch?: (newOrderType: 'COLLECTION') => void; // Add callback for order type switching
   onManagerOverride?: () => void; // Add callback for manager override
+  // NEW: Promise-based manager approval and granted flag from parent
+  requestManagerApproval?: () => Promise<boolean>;
+  managerOverrideGranted?: boolean;
 }
 
 interface CustomerData {
@@ -53,7 +57,9 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   initialData = {},
   orderValue,
   onOrderTypeSwitch,
-  onManagerOverride
+  onManagerOverride,
+  requestManagerApproval,
+  managerOverrideGranted
 }) => {
   const [customerData, setCustomerData] = useState<CustomerData>({
     firstName: '',
@@ -114,23 +120,36 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
       try {
         const fullAddress = `${customerData.street}, ${customerData.city || ''}, ${customerData.postcode}`.replace(/, ,/g, ',').trim();
         
-        const validationResponse = await brain.validate_delivery_address({
-          address: fullAddress,
+        // Use the standardized postcode validation endpoint
+        const validationResponse = await brain.validate_delivery_postcode({
           postcode: customerData.postcode || '',
-          order_total: orderValue
+          order_value: orderValue
         });
         
         const validationData = await validationResponse.json();
         
         if (!validationData.valid) {
-          // Show validation errors to staff
-          const errorMessage = validationData.errors?.join('\n') || 'Delivery validation failed';
-          alert(`Delivery validation failed:\n\n${errorMessage}\n\nPlease correct the issues before proceeding.`);
-          return;
+          // If a manager override has already been granted, allow proceed
+          if (managerOverrideGranted) {
+            toast.info('🔐 Manager override applied');
+          } else if (requestManagerApproval) {
+            // Ask for manager approval now
+            const approved = await requestManagerApproval();
+            if (!approved) {
+              const errorMessage = validationData.errors?.join('\n') || 'Delivery validation failed';
+              alert(`Delivery validation failed:\n\n${errorMessage}\n\nManager approval required to proceed.`);
+              return;
+            }
+            toast.success('Manager override granted. Proceeding with delivery.');
+          } else {
+            const errorMessage = validationData.errors?.join('\n') || 'Delivery validation failed';
+            alert(`Delivery validation failed:\n\n${errorMessage}\n\nPlease correct the issues before proceeding.`);
+            return;
+          }
+        } else {
+          // Success - delivery address is valid
+          toast.success(`Delivery validated successfully${validationData.distance_miles ? ` • ${validationData.distance_miles.toFixed(1)} miles` : ''}`);
         }
-        
-        // Success - delivery address is valid
-        toast.success(`Delivery validated successfully. Distance: ${validationData.distance_miles?.toFixed(1)} miles`);
         
       } catch (error) {
         console.error('Delivery validation error:', error);
