@@ -38,6 +38,9 @@ import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
 import brain from 'brain';
 import { createLogger } from 'utils/logger';
+import { colors as designColors } from '@/utils/designSystem';
+import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { StaffCustomizationModal, SelectedCustomization } from './StaffCustomizationModal';
 
 interface Props {
   orderItems: OrderItem[];
@@ -149,6 +152,14 @@ export function OrderSummaryPanel({
   // ✅ Get POS settings from store
   const { settings: posSettings } = usePOSSettingsWithAutoFetch();
   
+  // ✅ Get menu items from store for customization modal
+  const { menuItems, itemVariants } = useRealtimeMenuStore();
+  
+  // ✅ NEW: State for StaffCustomizationModal
+  const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  const [customizingOrderItem, setCustomizingOrderItem] = useState<OrderItem | null>(null);
+  const [customizingItemIndex, setCustomizingItemIndex] = useState<number>(-1);
+  
   // UI State Management
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ action: () => void; label: string } | null>(null);
@@ -169,8 +180,43 @@ export function OrderSummaryPanel({
   // Get customer data from store
   const { customerData: storeCustomerData } = useCustomerDataStore();
   
-  // Use CustomizeOrchestrator instead of calling onCustomizeItem directly
-  const { customize } = useCustomizeOrchestrator();
+  // ✅ NEW: Handler to open StaffCustomizationModal for editing order items
+  const handleOpenCustomization = (index: number, item: OrderItem) => {
+    setCustomizingOrderItem(item);
+    setCustomizingItemIndex(index);
+    setIsCustomizationModalOpen(true);
+  };
+  
+  // ✅ NEW: Handler to save customized item from StaffCustomizationModal
+  const handleCustomizationConfirm = (menuItem: MenuItem, quantity: number, variant?: any, customizations?: SelectedCustomization[], notes?: string) => {
+    if (customizingItemIndex === -1 || !customizingOrderItem) return;
+    
+    // Build updated OrderItem
+    const updatedItem: OrderItem = {
+      ...customizingOrderItem,
+      quantity: quantity,
+      notes: notes || '',
+      customizations: customizations?.map(c => ({
+        id: c.id,
+        customization_id: c.id,
+        name: c.name,
+        price_adjustment: c.price,
+        group: c.group
+      })) || customizingOrderItem.customizations || []
+    };
+    
+    // Call parent callback if it exists
+    if (onCustomizeItem) {
+      onCustomizeItem(customizingItemIndex, updatedItem);
+    }
+    
+    // Close modal
+    setIsCustomizationModalOpen(false);
+    setCustomizingOrderItem(null);
+    setCustomizingItemIndex(-1);
+    
+    toast.success('Item updated successfully');
+  };
   
   // Helper function to show confirmation modal
   const handleShowConfirmation = (action: () => void, label: string) => {
@@ -256,7 +302,7 @@ export function OrderSummaryPanel({
     if (onCloseTableSelection) {
       onCloseTableSelection();
     }
-    // Let POSII handle the guest count flow - don't auto-open Order Confirmation
+    // Let POSDesktop handle the guest count flow - don't auto-open Order Confirmation
   };
 
   // Order Confirmation Modal handlers
@@ -485,8 +531,8 @@ export function OrderSummaryPanel({
 
   // Calculate totals - including customizations
   const subtotal = orderItems.reduce((sum, item) => {
-    // Base item price
-    let itemTotal = item.price * item.quantity;
+    // Base item price with null guard
+    let itemTotal = (item.price || 0) * item.quantity;
     
     // Add customization costs
     if (item.customizations && item.customizations.length > 0) {
@@ -590,17 +636,39 @@ export function OrderSummaryPanel({
     >
       {/* Header */}
       <div 
-        className="p-4 border-b flex items-center justify-between"
+        className="p-4 border-b" 
         style={{ borderColor: QSAITheme.border.medium }}
       >
-        <h3 className="font-semibold text-sm" style={{ color: QSAITheme.text.primary }}>
-          Order Summary
-          {orderType === "DINE-IN" && tableNumber && (
-            <span className="ml-2 text-xs opacity-75">Table {tableNumber}{guestCount ? ` • ${guestCount} guests` : ''}</span>
-          )}
-        </h3>
-        <div className="text-xs" style={{ color: QSAITheme.text.muted }}>
-          {orderItems.length} item{orderItems.length !== 1 ? 's' : ''}
+        <div className="space-y-2">
+          <h3 className="font-semibold text-sm" style={{
+            backgroundImage: `linear-gradient(135deg, white 30%, ${designColors.brand.purple} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            display: 'inline-block'
+          }}>
+            Order Summary
+          </h3>
+          
+          {/* Gradient underline */}
+          <div 
+            className="w-24 h-1 rounded-full"
+            style={{
+              background: `linear-gradient(90deg, transparent, ${designColors.brand.purple}, transparent)`
+            }}
+          />
+          
+          {/* Order context */}
+          <div className="flex items-center justify-between mt-2">
+            {orderType === "DINE-IN" && tableNumber && (
+              <span className="text-xs opacity-75" style={{ color: QSAITheme.text.secondary }}>
+                Table {tableNumber}{guestCount ? ` • ${guestCount} guests` : ''}
+              </span>
+            )}
+            <div className="text-xs" style={{ color: QSAITheme.text.muted }}>
+              {orderItems.length} item{orderItems.length !== 1 ? 's' : ''}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -625,15 +693,37 @@ export function OrderSummaryPanel({
               <div className="flex items-start space-x-3">
                 {/* Larger thumbnail image */}
                 <div className="flex-shrink-0">
-                  <img
-                    src={item.image_url || '/api/placeholder/64/64'}
-                    alt={item.name}
-                    className="w-16 h-16 rounded-lg object-cover border"
-                    style={{ borderColor: QSAITheme.border.medium }}
-                    onError={(e) => {
-                      e.currentTarget.src = '/api/placeholder/64/64';
-                    }}
-                  />
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-16 h-16 rounded-lg object-cover border"
+                      style={{ borderColor: QSAITheme.border.medium }}
+                      onError={(e) => {
+                        // On error, replace with fallback div
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const itemName = item.name || 'Item';
+                          parent.innerHTML = `
+                            <div class="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
+                              style="background: linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%); border-color: ${QSAITheme.border.medium};">
+                              ${itemName.charAt(0).toUpperCase()}
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
+                      style={{ 
+                        background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
+                        borderColor: QSAITheme.border.medium
+                      }}
+                    >
+                      {(item.name || 'Item').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Item details */}
@@ -751,9 +841,9 @@ export function OrderSummaryPanel({
               </div>
               
               {/* Bottom section: Quantity controls, Customize button, Price */}
-              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+              <div className="flex items-center justify-between gap-3 pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
                 {/* Quantity controls */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
@@ -790,18 +880,9 @@ export function OrderSummaryPanel({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    customize({
-                      source: item,
-                      context: 'order_summary',
-                      onSave: (updatedItem) => {
-                        // If onCustomizeItem callback exists, use it; otherwise handle locally
-                        if (onCustomizeItem) {
-                          onCustomizeItem(index, updatedItem);
-                        }
-                      }
-                    });
+                    handleOpenCustomization(index, item);
                   }}
-                  className="text-xs px-3 py-1 h-7"
+                  className="text-xs px-3 py-1 h-7 flex-shrink-0"
                   style={{
                     borderColor: QSAITheme.purple.primary,
                     color: 'white',
@@ -813,8 +894,8 @@ export function OrderSummaryPanel({
                 </Button>
                 
                 {/* Price */}
-                <div className="text-sm font-semibold" style={{ color: QSAITheme.text.primary }}>
-                  £{(item.price * item.quantity).toFixed(2)}
+                <div className="text-sm font-semibold ml-auto flex-shrink-0" style={{ color: QSAITheme.text.primary }}>
+                  £{((item.price || 0) * item.quantity).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -928,6 +1009,38 @@ export function OrderSummaryPanel({
         onConfirm={handleOrderConfirmation}
         actionLabel={'Process Order'}
       />
+
+      {/* ✅ NEW: Staff Customization Modal for editing order items */}
+      {isCustomizationModalOpen && customizingOrderItem && (() => {
+        // Find the matching MenuItem from the store
+        const menuItem = menuItems.find(mi => mi.id === customizingOrderItem.menu_item_id);
+        
+        // Find the matching variant if one exists
+        const variant = customizingOrderItem.variant_id 
+          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id)
+          : null;
+        
+        if (!menuItem) {
+          console.warn('MenuItem not found for OrderItem:', customizingOrderItem);
+          return null;
+        }
+        
+        return (
+          <StaffCustomizationModal
+            item={menuItem}
+            variant={variant}
+            isOpen={isCustomizationModalOpen}
+            onClose={() => {
+              setIsCustomizationModalOpen(false);
+              setCustomizingOrderItem(null);
+              setCustomizingItemIndex(-1);
+            }}
+            onConfirm={handleCustomizationConfirm}
+            orderType={orderType}
+            initialQuantity={customizingOrderItem.quantity}
+          />
+        );
+      })()}
     </div>
   );
 }
