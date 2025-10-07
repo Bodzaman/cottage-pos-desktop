@@ -1,7 +1,6 @@
 
 
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +35,7 @@ interface DineInTableSelectorProps {
   selectedTable: number | null;
   onTableSelect: (tableNumber: number, tableStatus?: string) => void;
   className?: string;
-  // Local table orders state from POSII to show seated status
+  // Local table orders state from POSDesktop to show seated status
   tableOrders?: Record<number, any[]>;
 }
 
