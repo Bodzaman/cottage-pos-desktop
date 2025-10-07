@@ -1,5 +1,6 @@
 
 
+
 /**
  * Standardized menu data model types for use across all components
  * in both the public website menu and POS system
@@ -100,7 +101,7 @@ export interface MenuItem {
   name: string;
   kitchen_display_name?: string | null; // Optional optimized name for thermal receipt printing
   // Unified description field from database migration
-  menu_item_description: string | null;
+  description: string | null;
   image_url: string | null;
   spice_indicators: string | null;
   category_id: string;
