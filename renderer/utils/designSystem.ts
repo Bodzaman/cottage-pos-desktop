@@ -1,5 +1,6 @@
 
 
+
 /**
  * Updated Design System Configuration
  * Modern silver/platinum luxury theme for premium restaurant aesthetic
@@ -9,9 +10,9 @@
 const colors = {
   // Primary accent colors
   brand: {
-    purple: '#7C5DFA',      // Purple - primary actions
-    purpleDark: '#6B4DEA',   // Darker purple for hover states
-    purpleLight: '#9277FF',  // Lighter purple for highlights
+    purple: '#5B3CC4',      // Purple - primary actions (DARKER)
+    purpleDark: '#4A2FB3',   // Darker purple for hover states (DARKER)
+    purpleLight: '#6B4DE0',  // Lighter purple for highlights (DARKER)
     silver: '#C0C0C0',      // Silver - secondary accent (replaces gold)
     silverDark: '#A8A8A8',   // Darker silver for hover states
     platinum: '#E5E5E5',     // Platinum - highlight accent
@@ -21,9 +22,9 @@ const colors = {
     // Legacy accent colors (keeping for backward compatibility but all map to silver now)
     gold: '#C0C0C0',         // Now maps to silver
     golddark: '#A8A8A8',     // Now maps to silverDark
-    burgundy: '#7C5DFA',     // Now maps to purple
-    burgundydark: '#6B4DEA',  // Now maps to purpleDark
-    burgundylight: '#9277FF', // Now maps to purpleLight
+    burgundy: '#5B3CC4',     // Now maps to darker purple
+    burgundydark: '#4A2FB3',  // Now maps to darker purpleDark
+    burgundylight: '#6B4DE0', // Now maps to darker purpleLight
     blue: '#4285F4',
     blueLight: '#70A1FF',
   },
