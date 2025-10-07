@@ -223,7 +223,7 @@ export async function testHelperAppPrint(): Promise<PrintResponse> {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        content: 'COTTAGE TANDOORI\nTest Print from POSII\nHelper App Integration Test'
+        content: 'COTTAGE TANDOORI\nTest Print from POSDesktop\nHelper App Integration Test'
       })
     });
     
