@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Edit, Shield, Eye, Save, RotateCcw, XCircle, CheckCircle2, Plus, Minus, Key, AlertCircle } from 'lucide-react';
@@ -10,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Category, MenuItem, ItemVariant, ProteinType, SetMeal } from '../utils/menuTypes';
-import { useMenuData } from '../utils/menuCache';
+import { useCompleteMenuData, menuKeys } from '../utils/menuQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { colors } from '../utils/designSystem';
 import { styles, globalColors, effects } from '../utils/QSAIDesign';
@@ -35,13 +33,21 @@ interface EnhancedMenuItem extends MenuItem {
 }
 
 const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onClose }) => {
-  // Customer menu state (based on AdminMenu patterns)
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<EnhancedMenuItem[]>([]);
-  const [proteinTypes, setProteinTypes] = useState<ProteinType[]>([]);
+  // React Query hooks - only fetch when dialog is open
+  const queryClient = useQueryClient();
+  const { 
+    data: menuData, 
+    isLoading: loading 
+  } = useCompleteMenuData({ enabled: isOpen });
+  
+  // Extract data from React Query result
+  const categories = menuData?.categories || [];
+  const menuItems = menuData?.menuItems || [];
+  const proteinTypes = menuData?.proteinTypes || [];
+  
+  // Keep non-React Query state
   const [setMeals, setSetMeals] = useState<SetMeal[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [loading, setLoading] = useState<boolean>(true);
   const [loadingSetMeals, setLoadingSetMeals] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterOptions>({
     spiceLevel: null,
@@ -70,8 +76,25 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
     'Nut-free'
   ];
 
-  // Use the menu data cache hook (same as menu system)
-  const { fetchCompleteMenuData, invalidateCache } = useMenuData();
+  // Load set meals when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      loadSetMeals();
+      // Set initial active category if categories exist
+      if (categories.length > 0) {
+        setActiveCategory('all');
+      }
+    }
+  }, [isOpen, categories.length]);
+  
+  // Handle close modal
+  const handleClose = () => {
+    setIsEditMode(false);
+    setIsAuthenticated(false);
+    setEditingItemId(null);
+    setEditFormData({});
+    onClose();
+  };
   
   // Load set meals
   const loadSetMeals = async () => {
@@ -89,57 +112,6 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       setLoadingSetMeals(false);
     }
   };
-  
-  // Handle close modal
-  const handleClose = () => {
-    setIsEditMode(false);
-    setIsAuthenticated(false);
-    setEditingItemId(null);
-    setEditFormData({});
-    onClose();
-  };
-  
-  // Fetch menu data on modal open (using AdminMenu patterns)
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // FORCE cache invalidation to ensure rich content loads
-        invalidateCache();
-        localStorage.setItem('menuLastRefresh', Date.now().toString());
-        
-        // Fetch data using the cache utility (same as AdminMenu)
-        const { categories: categoriesData, menuItems: itemsWithVariants, proteinTypes: proteinTypesData } = 
-          await fetchCompleteMenuData();
-        
-        // Set state with fetched data
-        setCategories(categoriesData);
-        setMenuItems(itemsWithVariants);
-        setProteinTypes(proteinTypesData);
-        
-        // Load set meals as well (optional - don't block on failure)
-        try {
-          await loadSetMeals();
-        } catch (error) {
-          console.warn('Set meals loading failed (non-critical):', error);
-        }
-        
-        // Set initial active category if categories exist
-        if (categoriesData && categoriesData.length > 0) {
-          setActiveCategory('all');
-        }
-      } catch (error) {
-        console.error('Error fetching menu data:', error);
-        toast.error('Failed to load menu data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [isOpen]);
   
   // Handle password authentication
   const handlePasswordSubmit = async () => {
@@ -271,7 +243,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
         setEditFormData({});
         
         // Invalidate cache to ensure fresh data on next load
-        invalidateCache();
+        await queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
       } else {
         const errorData = await response.json().catch(() => null);
         const errorMessage = errorData?.error || errorData?.message || 'Failed to update item';
@@ -337,7 +309,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
         );
         
         // Invalidate cache to ensure fresh data on next load
-        invalidateCache();
+        await queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
       } else {
         const errorData = await response.json().catch(() => null);
         const errorMessage = errorData?.error || errorData?.message || 'Failed to update availability';
@@ -352,52 +324,23 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
   };
   
   // Handle duplicate item
-  const handleDuplicateItem = async (item: EnhancedMenuItem) => {
+  const handleDuplicateItem = async (itemId: string) => {
     try {
+      const item = menuItems.find(i => i.id === itemId);
+      if (!item) return;
+      
       const duplicateName = `${item.name} (Copy)`;
       
-      // Check if this name already exists
-      const existingItem = menuItems.find(i => i.name === duplicateName);
-      if (existingItem) {
-        toast.error('An item with this name already exists');
-        return;
-      }
-      
-      // Create duplicate
-      const duplicateData = {
+      const response = await brain.create_menu_item({
+        ...item,
         name: duplicateName,
-        menu_item_description: item.menu_item_description,
-        long_description: item.long_description,
-        category_id: item.category_id,
-        image_url: item.image_url,
-        default_spice_level: item.default_spice_level,
-        dietary_tags: item.dietary_tags,
-        featured: false, // Don't duplicate featured status
-        display_order: item.display_order + 1,
-        active: true, // Start as active
-        variants: item.variants?.map(variant => ({
-          protein_type_id: variant.protein_type_id,
-          name: variant.name,
-          price: variant.price,
-          price_dine_in: variant.price_dine_in,
-          price_delivery: variant.price_delivery,
-          is_default: variant.is_default,
-          description_override: variant.description_override,
-          spice_level_override: variant.spice_level_override,
-          dietary_tags_override: variant.dietary_tags_override,
-          available_for_delivery: variant.available_for_delivery,
-          available_for_takeaway: variant.available_for_takeaway
-        })) || []
-      };
-      
-      const response = await brain.create_menu_item(duplicateData);
+        id: undefined  // Remove ID to create new item
+      });
       
       if (response.ok) {
         toast.success(`Created duplicate: ${duplicateName}`);
-        // Refresh data
-        invalidateCache();
-        const { menuItems: updatedItems } = await fetchCompleteMenuData();
-        setMenuItems(updatedItems);
+        // Refresh data - use React Query invalidation
+        await queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
       } else {
         throw new Error('Failed to create duplicate');
       }
@@ -888,7 +831,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleDuplicateItem(item)}
+                    onClick={() => handleDuplicateItem(item.id)}
                     className="text-xs font-medium"
                     style={{
                       background: `${colors.brand.gold}20`,
