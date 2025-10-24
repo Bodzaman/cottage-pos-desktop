@@ -1,12 +1,14 @@
 
 
+// ... existing code ...
 
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
 import brain from 'brain';
-import { API_URL } from 'app';
-import { OrderItem } from 'types';
+import { PersistentTableOrder, TableOrderItem } from './tableOrderTypes';
+import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
+
+const isDev = import.meta.env?.DEV;
 
 // ============================================================================
 // ENHANCED TABLE ORDER TYPES
@@ -16,11 +18,25 @@ interface TableOrder {
   id?: string;
   table_number: number;
   order_items: OrderItem[];
-  status: 'Available' | 'Seated';
+  status: 'AVAILABLE' | 'SEATED';
   guest_count?: number;
   linked_tables: number[];
   created_at?: string;
   updated_at?: string;
+}
+
+// Frontend representation for UI display
+interface PersistentTableOrder {
+  id?: string;
+  tableId: number;
+  tableName: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: 'active' | 'completed' | 'cancelled';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ENHANCED: Customer Tab types with better type safety
@@ -39,7 +55,7 @@ interface CustomerTab {
 interface TableWithTabs {
   tableNumber: number;
   guestCount: number;
-  status: 'Available' | 'Seated';
+  status: 'AVAILABLE' | 'SEATED';
   customerTabs: CustomerTab[]; // Individual customer tabs within table
   linkedTables: number[]; // EXISTING: Preserve linked table functionality
 }
@@ -67,17 +83,24 @@ interface ErrorState {
 }
 
 interface TableOrdersState {
-  // Enhanced state management
-  tableOrders: Record<number, OrderItem[]>; // Local state for fast UI updates
-  persistedTableOrders: Record<number, TableOrder>; // Synced with Supabase
+  // Core state - Session storage (ephemeral, current working session)
+  tableOrders: Record<number, OrderItem[]>;
+  
+  // Persistent state - Supabase storage (survives refreshes, durable)
+  persistedTableOrders: Record<number, TableOrder>;
+  
+  // UI state
+  isLoading: boolean;
+
+  // Initialization flag (prevents double-init)
+  isInitialized: boolean;
   
   // ENHANCED: Customer tabs state management with optimistic updates
-  customerTabs: Record<number, CustomerTab[]>; // Customer tabs per table number
-  activeCustomerTab: Record<number, string | null>; // Currently selected tab ID per table
-  optimisticCustomerTabs: Record<number, CustomerTab[]>; // NEW: Optimistic state for immediate UI updates
+  customerTabs: Record<number, CustomerTab[]>;
+  activeCustomerTab: Record<number, string | null>;
+  optimisticCustomerTabs: Record<number, CustomerTab[]>;
   
   // NEW: Performance and caching
-  isLoading: boolean;
   lastSync: number;
   syncInProgress: boolean;
   
@@ -121,7 +144,7 @@ interface TableOrdersState {
   
   // Utilities (PRESERVED and ENHANCED)
   hasExistingOrders: (tableNumber: number) => boolean;
-  getTableStatus: (tableNumber: number) => 'Available' | 'Seated';
+  getTableStatus: (tableNumber: number) => 'AVAILABLE' | 'SEATED';
   getTableOrders: (tableNumber: number) => OrderItem[];
   
   // ENHANCED: Customer tab utilities
@@ -150,870 +173,1045 @@ interface TableOrdersState {
 // ENHANCED ZUSTAND STORE WITH OPTIMISTIC UPDATES
 // ============================================================================
 
-export const useTableOrdersStore = create<TableOrdersState>()(subscribeWithSelector(
-  (set, get) => ({
-    // Enhanced initial state
-    tableOrders: {},
-    persistedTableOrders: {},
-    
-    // ENHANCED: Customer tabs with optimistic support
-    customerTabs: {},
-    activeCustomerTab: {},
-    optimisticCustomerTabs: {}, // NEW: For immediate UI updates
-    
-    isLoading: false,
-    lastSync: 0,
-    syncInProgress: false,
-    
-    // NEW: Error handling state
-    errors: {
-      tableErrors: {},
-      customerTabErrors: {},
-      globalError: null
-    },
-    
-    // NEW: Store configuration
-    options: {
-      enableOptimisticUpdates: true,
-      debounceMs: 300,
-      maxRetries: 3,
-      syncInterval: 30000 // 30 seconds
-    },
-    
-    // Initialize schema
-    initializeSchema: async () => {
-      try {
-        set({ isLoading: true });
-        const response = await brain.setup_restaurant_schema();
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Schema setup result:', data);
-          await get().loadTableOrders();
-        }
-      } catch (error) {
-        console.error('Schema initialization failed:', error);
-        set(state => ({
-          errors: {
-            ...state.errors,
-            globalError: 'Failed to initialize database schema'
-          }
-        }));
-      } finally {
-        set({ isLoading: false });
+export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
+  // Enhanced initial state
+  tableOrders: {},
+  persistedTableOrders: {},
+  
+  // ENHANCED: Customer tabs with optimistic support
+  customerTabs: {},
+  activeCustomerTab: {},
+  optimisticCustomerTabs: {}, // NEW: For immediate UI updates
+  
+  isLoading: false,
+  isInitialized: false,
+  lastSync: 0,
+  syncInProgress: false,
+  
+  // NEW: Error handling state
+  errors: {
+    tableErrors: {},
+    customerTabErrors: {},
+    globalError: null
+  },
+  
+  // NEW: Store configuration
+  options: {
+    enableOptimisticUpdates: true,
+    debounceMs: 300,
+    maxRetries: 3,
+    syncInterval: 30000 // 30 seconds
+  },
+  
+  // Initialize schema
+  initializeSchema: async () => {
+    try {
+      set({ isLoading: true });
+      const response = await brain.setup_restaurant_schema();
+      if (response.ok) {
+        const data = await response.json();
+        if (isDev) console.log('Schema setup result:', JSON.stringify(data, null, 2));
+        await get().loadTableOrders();
       }
-    },
-
-    // ENHANCED: Customer tabs schema initialization
-    initializeCustomerTabsSchema: async () => {
-      try {
-        console.log('🔧 Initializing customer tabs schema...');
-        const response = await brain.setup_customer_tabs_schema();
-        if (response.ok) {
-          console.log('✅ Customer tabs schema initialized successfully');
-        } else {
-          throw new Error('Failed to initialize customer tabs schema');
+    } catch (error) {
+      console.error('Schema initialization failed:', error);
+      set(state => ({
+        errors: {
+          ...state.errors,
+          globalError: 'Failed to initialize database schema'
         }
-      } catch (error) {
-        console.warn('⚠️ Customer tabs schema setup issue:', error);
-        set(state => ({
-          errors: {
-            ...state.errors,
-            globalError: 'Customer tabs schema setup failed'
-          }
-        }));
-      }
-    },
+      }));
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
-    // Load table orders
-    loadTableOrders: async () => {
-      try {
-        set({ isLoading: true });
-        const response = await brain.list_table_orders();
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.table_orders)) {
-            const tableOrdersMap: Record<number, OrderItem[]> = {};
-            const persistedOrdersMap: Record<number, TableOrder> = {};
-            
-            data.table_orders.forEach((order: TableOrder) => {
-              const tableNumber = order.table_number;
-              tableOrdersMap[tableNumber] = order.order_items || [];
-              persistedOrdersMap[tableNumber] = order;
+  // ENHANCED: Customer tabs schema initialization
+  initializeCustomerTabsSchema: async () => {
+    try {
+      if (isDev) console.log('🔧 Initializing customer tabs schema...');
+      const response = await brain.setup_customer_tabs_schema();
+      if (response.ok) {
+        if (isDev) console.log('✅ Customer tabs schema initialized successfully');
+      } else {
+        throw new Error('Failed to initialize customer tabs schema');
+      }
+    } catch (error) {
+      console.warn('⚠️ Customer tabs schema setup issue:', error);
+      set(state => ({
+        errors: {
+          ...state.errors,
+          globalError: 'Customer tabs schema setup failed'
+        }
+      }));
+    }
+  },
+
+  // Load table orders
+  loadTableOrders: async () => {
+    // React StrictMode guard - prevent double initialization
+    const state = get();
+    if (state.isInitialized) {
+      if (isDev) {
+        console.log('⚠️ [tableOrdersStore] Already initialized, skipping loadTableOrders');
+        console.log('📊 [tableOrdersStore] Current state:', {
+          persistedCount: Object.keys(state.persistedTableOrders).length,
+          tableOrders: Object.keys(state.tableOrders).length
+        });
+      }
+      return;
+    }
+
+    if (isDev) console.log('🔄 [tableOrdersStore] Starting loadTableOrders...');
+    set({ isLoading: true, error: null });
+
+    try {
+      if (isDev) console.log('📡 [tableOrdersStore] Fetching table orders from API...');
+      const response = await brain.list_table_orders({});
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [tableOrdersStore] API error:', response.status, errorText);
+        throw new Error(`Failed to load table orders: ${response.status}`);
+      }
+
+      const data = (await response.json()) as { table_orders: TableOrderResponse[] };
+      if (isDev) {
+        console.log('✅ [tableOrdersStore] Received API response:', {
+          count: data.table_orders?.length || 0,
+          orders: data.table_orders?.map(o => ({ 
+            id: o.id, 
+            table_number: o.table_number, 
+            status: o.status 
+          })) || []
+        });
+      }
+
+      const persistedOrders: Record<number, PersistentTableOrder> = {};
+
+      if (data.table_orders && data.table_orders.length > 0) {
+        if (isDev) console.log('🔄 [tableOrdersStore] Processing orders...');
+        data.table_orders.forEach((order) => {
+          const items = order.items || [];
+          if (isDev) {
+            console.log(`📝 [tableOrdersStore] Processing order ${order.id} for table ${order.table_number}:`, {
+              itemsCount: items.length,
+              status: order.status,
+              items: items.map(i => ({ name: i.item_name, quantity: i.quantity }))
             });
-            
-            set({ 
-              tableOrders: tableOrdersMap, 
-              persistedTableOrders: persistedOrdersMap,
-              lastSync: Date.now()
-            });
           }
-        }
-      } catch (error) {
-        console.error('Failed to load table orders:', error);
-        set(state => ({
-          errors: {
-            ...state.errors,
-            globalError: 'Failed to load table orders'
-          }
-        }));
-      } finally {
-        set({ isLoading: false });
-      }
-    },
 
-    // ENHANCED: Load customer tabs for specific table with optimistic support
-    loadCustomerTabsForTable: async (tableNumber: number) => {
-      try {
-        const response = await brain.list_customer_tabs_for_table({ tableNumber });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.customer_tabs)) {
-            set(state => ({
-              customerTabs: {
-                ...state.customerTabs,
-                [tableNumber]: data.customer_tabs
-              },
-              // Sync optimistic state with server state
-              optimisticCustomerTabs: {
-                ...state.optimisticCustomerTabs,
-                [tableNumber]: data.customer_tabs
-              }
-            }));
+          persistedOrders[order.table_number] = {
+            id: order.id,
+            tableId: order.table_number,
+            tableName: order.table_name || `Table ${order.table_number}`,
+            items: items.map(item => ({
+              id: item.id?.toString() || crypto.randomUUID(),
+              name: item.item_name,
+              quantity: item.quantity,
+              basePrice: item.base_price,
+              total: item.total_price,
+              category: item.category || '',
+              modifiers: item.modifiers || [],
+              kitchenInstructions: item.kitchen_instructions || '',
+            })),
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            status: order.status as 'active' | 'completed' | 'cancelled',
+            createdAt: new Date(order.created_at),
+            updatedAt: new Date(order.updated_at),
+          };
+        });
+        
+        if (isDev) {
+          console.log('✅ [tableOrdersStore] All orders processed:', {
+            totalTables: Object.keys(persistedOrders).length,
+            tables: Object.keys(persistedOrders)
+          });
+        }
+      } else {
+        if (isDev) console.log('ℹ️ [tableOrdersStore] No active table orders found');
+      }
+
+      if (isDev) console.log('💾 [tableOrdersStore] Setting store state with processed orders');
+      set({
+        persistedTableOrders: persistedOrders,
+        tableOrders: { ...persistedOrders },
+        isLoading: false,
+        isInitialized: true,
+      });
+      
+      const finalState = get();
+      if (isDev) {
+        console.log('✅ [tableOrdersStore] Store state updated:', {
+          isInitialized: finalState.isInitialized,
+          persistedCount: Object.keys(finalState.persistedTableOrders).length,
+          tableOrdersCount: Object.keys(finalState.tableOrders).length,
+          tables: Object.keys(finalState.tableOrders)
+        });
+      }
+    } catch (error) {
+      console.error('❌ [tableOrdersStore] Error in loadTableOrders:', error);
+      set({ error: (error as Error).message, isLoading: false, isInitialized: true });
+    }
+  },
+
+  // ENHANCED: Load customer tabs for specific table with optimistic support
+  loadCustomerTabsForTable: async (tableNumber: number) => {
+    try {
+      const response = await brain.list_customer_tabs_for_table({ tableNumber });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.customer_tabs)) {
+          set(state => ({
+            customerTabs: {
+              ...state.customerTabs,
+              [tableNumber]: data.customer_tabs
+            },
+            optimisticCustomerTabs: {
+              ...state.optimisticCustomerTabs,
+              [tableNumber]: data.customer_tabs
+            }
+          }));
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to load customer tabs for table ${tableNumber}:`, error);
+      set(state => ({
+        errors: {
+          ...state.errors,
+          tableErrors: {
+            ...state.errors.tableErrors,
+            [tableNumber]: 'Failed to load customer tabs'
           }
         }
-      } catch (error) {
-        console.error(`Failed to load customer tabs for table ${tableNumber}:`, error);
+      }));
+    }
+  },
+
+  // ENHANCED: Create customer tab with optimistic updates
+  createCustomerTab: async (tableNumber: number, tabName: string, guestId?: string) => {
+    const { options } = get();
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Optimistic update
+    if (options.enableOptimisticUpdates) {
+      const optimisticTab: CustomerTab = {
+        id: tempId,
+        table_number: tableNumber,
+        tab_name: tabName,
+        order_items: [],
+        status: 'active',
+        guest_id: guestId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      set(state => ({
+        optimisticCustomerTabs: {
+          ...state.optimisticCustomerTabs,
+          [tableNumber]: [
+            ...(state.optimisticCustomerTabs[tableNumber] || []),
+            optimisticTab
+          ]
+        }
+      }));
+    }
+
+    try {
+      const response = await brain.create_customer_tab({
+        table_number: tableNumber,
+        tab_name: tabName,
+        guest_id: guestId
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.customer_tab) {
+          const realTab = data.customer_tab;
+          
+          set(state => ({
+            customerTabs: {
+              ...state.customerTabs,
+              [tableNumber]: [
+                ...(state.customerTabs[tableNumber] || []),
+                realTab
+              ]
+            },
+            optimisticCustomerTabs: {
+              ...state.optimisticCustomerTabs,
+              [tableNumber]: state.optimisticCustomerTabs[tableNumber]?.map(tab => 
+                tab.id === tempId ? realTab : tab
+              ) || [realTab]
+            }
+          }));
+          
+          toast.success(`Customer tab "${tabName}" created successfully`);
+          return realTab.id;
+        }
+      }
+      throw new Error('Failed to create customer tab');
+    } catch (error) {
+      console.error('Error creating customer tab:', error);
+      
+      // Rollback optimistic update
+      if (options.enableOptimisticUpdates) {
         set(state => ({
+          optimisticCustomerTabs: {
+            ...state.optimisticCustomerTabs,
+            [tableNumber]: state.optimisticCustomerTabs[tableNumber]?.filter(tab => tab.id !== tempId) || []
+          },
           errors: {
             ...state.errors,
             tableErrors: {
               ...state.errors.tableErrors,
-              [tableNumber]: 'Failed to load customer tabs'
+              [tableNumber]: 'Failed to create customer tab'
             }
           }
         }));
       }
-    },
-
-    // ENHANCED: Create customer tab with optimistic updates
-    createCustomerTab: async (tableNumber: number, tabName: string, guestId?: string) => {
-      const { options } = get();
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // Optimistic update
+      toast.error('Failed to create customer tab');
+      return null;
+    }
+  },
+
+  // ENHANCED: Update customer tab with optimistic updates
+  updateCustomerTab: async (tabId: string, updates: { tab_name?: string; order_items?: OrderItem[]; status?: string }) => {
+    const { options, customerTabs } = get();
+    let tableNumber: number | null = null;
+    let originalTab: CustomerTab | null = null;
+    
+    // Find the tab and table number
+    for (const [tNum, tabs] of Object.entries(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        tableNumber = parseInt(tNum);
+        originalTab = tab;
+        break;
+      }
+    }
+    
+    if (!tableNumber || !originalTab) {
+      toast.error('Customer tab not found');
+      return false;
+    }
+
+    // Optimistic update
+    if (options.enableOptimisticUpdates) {
+      const updatedTab = {
+        ...originalTab,
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+      
+      set(state => ({
+        optimisticCustomerTabs: {
+          ...state.optimisticCustomerTabs,
+          [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
+            tab.id === tabId ? updatedTab : tab
+          ) || []
+        }
+      }));
+    }
+
+    try {
+      const response = await brain.update_customer_tab({ tab_id: tabId }, updates);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.customer_tab) {
+          // Update real state
+          set(state => ({
+            customerTabs: {
+              ...state.customerTabs,
+              [tableNumber!]: state.customerTabs[tableNumber!]?.map(tab => 
+                tab.id === tabId ? data.customer_tab : tab
+              ) || []
+            }
+          }));
+          
+          return true;
+        }
+      }
+      throw new Error('Failed to update customer tab');
+    } catch (error) {
+      console.error('Error updating customer tab:', error);
+      
+      // Rollback optimistic update
       if (options.enableOptimisticUpdates) {
-        const optimisticTab: CustomerTab = {
-          id: tempId,
-          table_number: tableNumber,
-          tab_name: tabName,
-          order_items: [],
-          status: 'active',
-          guest_id: guestId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
         set(state => ({
           optimisticCustomerTabs: {
             ...state.optimisticCustomerTabs,
-            [tableNumber]: [
-              ...(state.optimisticCustomerTabs[tableNumber] || []),
-              optimisticTab
-            ]
+            [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
+              tab.id === tabId ? originalTab! : tab
+            ) || []
+          },
+          errors: {
+            ...state.errors,
+            customerTabErrors: {
+              ...state.errors.customerTabErrors,
+              [tabId]: 'Failed to update customer tab'
+            }
           }
         }));
       }
+      
+      toast.error('Failed to update customer tab');
+      return false;
+    }
+  },
 
-      try {
-        const response = await brain.create_customer_tab({
-          table_number: tableNumber,
-          tab_name: tabName,
-          guest_id: guestId
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.customer_tab) {
-            const realTab = data.customer_tab;
-            
-            set(state => ({
+  // ENHANCED: Add items to customer tab with optimistic updates
+  addItemsToCustomerTab: async (tabId: string, items: OrderItem[]) => {
+    const { options, customerTabs } = get();
+    let tableNumber: number | null = null;
+    let originalTab: CustomerTab | null = null;
+    
+    // Find the tab and table number
+    for (const [tNum, tabs] of Object.entries(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        tableNumber = parseInt(tNum);
+        originalTab = tab;
+        break;
+      }
+    }
+    
+    if (!tableNumber || !originalTab) {
+      toast.error('Customer tab not found');
+      return false;
+    }
+
+    // Optimistic update
+    if (options.enableOptimisticUpdates) {
+      const updatedTab = {
+        ...originalTab,
+        order_items: [...originalTab.order_items, ...items],
+        updated_at: new Date().toISOString()
+      };
+      
+      set(state => ({
+        optimisticCustomerTabs: {
+          ...state.optimisticCustomerTabs,
+          [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
+            tab.id === tabId ? updatedTab : tab
+          ) || []
+        }
+      }));
+    }
+
+    try {
+      const response = await brain.add_items_to_customer_tab({ tab_id: tabId }, { items });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.customer_tab) {
+          // Update real state
+          set(state => ({
+            customerTabs: {
+              ...state.customerTabs,
+              [tableNumber!]: state.customerTabs[tableNumber!]?.map(tab => 
+                tab.id === tabId ? data.customer_tab : tab
+              ) || []
+            }
+          }));
+          
+          toast.success(`Added ${items.length} items to customer tab`);
+          return true;
+        }
+      }
+      throw new Error('Failed to add items to customer tab');
+    } catch (error) {
+      console.error('Error adding items to customer tab:', error);
+      
+      // Rollback optimistic update
+      if (options.enableOptimisticUpdates) {
+        set(state => ({
+          optimisticCustomerTabs: {
+            ...state.optimisticCustomerTabs,
+            [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
+              tab.id === tabId ? originalTab! : tab
+            ) || []
+          },
+          errors: {
+            ...state.errors,
+            customerTabErrors: {
+              ...state.errors.customerTabErrors,
+              [tabId]: 'Failed to add items to customer tab'
+            }
+          }
+        }));
+      }
+      
+      toast.error('Failed to add items to customer tab');
+      return false;
+    }
+  },
+
+  // ENHANCED: Close customer tab
+  closeCustomerTab: async (tabId: string) => {
+    const { options, customerTabs, activeCustomerTab } = get();
+    let tableNumber: number | null = null;
+    let originalTab: CustomerTab | null = null;
+    
+    // Find the tab and table number
+    for (const [tNum, tabs] of Object.entries(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        tableNumber = parseInt(tNum);
+        originalTab = tab;
+        break;
+      }
+    }
+    
+    if (!tableNumber || !originalTab) {
+      toast.error('Customer tab not found');
+      return false;
+    }
+
+    // Optimistic update
+    if (options.enableOptimisticUpdates) {
+      set(state => {
+        const updatedTabs = state.optimisticCustomerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
+        const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
+          ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
+          : state.activeCustomerTab[tableNumber!];
+          
+        return {
+          optimisticCustomerTabs: {
+            ...state.optimisticCustomerTabs,
+            [tableNumber!]: updatedTabs
+          },
+          activeCustomerTab: {
+            ...state.activeCustomerTab,
+            [tableNumber!]: newActiveTab
+          }
+        };
+      });
+    }
+
+    try {
+      const response = await brain.close_customer_tab({ tabId: tabId });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Update real state
+          set(state => {
+            const updatedTabs = state.customerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
+            const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
+              ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
+              : state.activeCustomerTab[tableNumber!];
+              
+            return {
               customerTabs: {
                 ...state.customerTabs,
-                [tableNumber]: [
-                  ...(state.customerTabs[tableNumber] || []),
-                  realTab
-                ]
+                [tableNumber!]: updatedTabs
+              },
+              activeCustomerTab: {
+                ...state.activeCustomerTab,
+                [tableNumber!]: newActiveTab
+              }
+            };
+          });
+          
+          toast.success('Customer tab closed successfully');
+          return true;
+        }
+      }
+      throw new Error('Failed to close customer tab');
+    } catch (error) {
+      console.error('Error closing customer tab:', error);
+      
+      // Rollback optimistic update
+      if (options.enableOptimisticUpdates) {
+        set(state => ({
+          optimisticCustomerTabs: {
+            ...state.optimisticCustomerTabs,
+            [tableNumber!]: [...(state.optimisticCustomerTabs[tableNumber!] || []), originalTab!]
+          },
+          activeCustomerTab: {
+            ...state.activeCustomerTab,
+            [tableNumber!]: activeCustomerTab[tableNumber!]
+          },
+          errors: {
+            ...state.errors,
+            customerTabErrors: {
+              ...state.errors.customerTabErrors,
+              [tabId]: 'Failed to close customer tab'
+            }
+          }
+        }));
+      }
+      
+      toast.error('Failed to close customer tab');
+      return false;
+    }
+  },
+
+  // ENHANCED: Rename customer tab
+  renameCustomerTab: async (tabId: string, newName: string) => {
+    return get().updateCustomerTab(tabId, { tab_name: newName });
+  },
+
+  // NEW: Split customer tab
+  splitCustomerTab: async (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => {
+    try {
+      const response = await brain.split_tab({
+        source_tab_id: sourceTabId,
+        new_tab_name: newTabName,
+        item_indices: itemIndices,
+        guest_id: guestId
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.original_tab && data.new_tab) {
+          // Update state with both tabs
+          const tableNumber = data.original_tab.table_number;
+          
+          set(state => {
+            const existingTabs = state.customerTabs[tableNumber] || [];
+            const updatedTabs = existingTabs.map(tab => 
+              tab.id === sourceTabId ? data.original_tab : tab
+            );
+            
+            // Add the new tab
+            updatedTabs.push(data.new_tab);
+            
+            return {
+              customerTabs: {
+                ...state.customerTabs,
+                [tableNumber]: updatedTabs
               },
               optimisticCustomerTabs: {
                 ...state.optimisticCustomerTabs,
-                [tableNumber]: state.optimisticCustomerTabs[tableNumber]?.map(tab => 
-                  tab.id === tempId ? realTab : tab
-                ) || [realTab]
+                [tableNumber]: updatedTabs
               }
-            }));
+            };
+          });
+          
+          toast.success(data.message);
+          return {
+            success: true,
+            originalTab: data.original_tab,
+            newTab: data.new_tab,
+            message: data.message
+          };
+        }
+      }
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to split tab');
+      return {
+        success: false,
+        message: errorData.message || 'Failed to split tab'
+      };
+      
+    } catch (error) {
+      console.error('Error splitting tab:', error);
+      toast.error('Failed to split tab');
+      return {
+        success: false,
+        message: 'Failed to split tab'
+      };
+    }
+  },
+
+  // NEW: Merge customer tabs
+  mergeCustomerTabs: async (sourceTabId: string, targetTabId: string) => {
+    try {
+      const response = await brain.merge_tabs({
+        source_tab_id: sourceTabId,
+        target_tab_id: targetTabId
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.target_tab) {
+          // Update state - remove source tab, update target tab
+          const tableNumber = data.target_tab.table_number;
+          
+          set(state => {
+            const existingTabs = state.customerTabs[tableNumber] || [];
+            const updatedTabs = existingTabs
+              .filter(tab => tab.id !== sourceTabId) // Remove source tab
+              .map(tab => tab.id === targetTabId ? data.target_tab : tab); // Update target tab
             
-            toast.success(`Customer tab "${tabName}" created successfully`);
-            return realTab.id;
-          }
-        }
-        throw new Error('Failed to create customer tab');
-      } catch (error) {
-        console.error('Error creating customer tab:', error);
-        
-        // Rollback optimistic update
-        if (options.enableOptimisticUpdates) {
-          set(state => ({
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber]: state.optimisticCustomerTabs[tableNumber]?.filter(tab => tab.id !== tempId) || []
-            },
-            errors: {
-              ...state.errors,
-              tableErrors: {
-                ...state.errors.tableErrors,
-                [tableNumber]: 'Failed to create customer tab'
+            // Update active tab if source was active
+            const newActiveTab = state.activeCustomerTab[tableNumber] === sourceTabId 
+              ? targetTabId 
+              : state.activeCustomerTab[tableNumber];
+            
+            return {
+              customerTabs: {
+                ...state.customerTabs,
+                [tableNumber]: updatedTabs
+              },
+              optimisticCustomerTabs: {
+                ...state.optimisticCustomerTabs,
+                [tableNumber]: updatedTabs
+              },
+              activeCustomerTab: {
+                ...state.activeCustomerTab,
+                [tableNumber]: newActiveTab
               }
-            }
-          }));
-        }
-        
-        toast.error('Failed to create customer tab');
-        return null;
-      }
-    },
-
-    // ENHANCED: Update customer tab with optimistic updates
-    updateCustomerTab: async (tabId: string, updates: { tab_name?: string; order_items?: OrderItem[]; status?: string }) => {
-      const { options, customerTabs } = get();
-      let tableNumber: number | null = null;
-      let originalTab: CustomerTab | null = null;
-      
-      // Find the tab and table number
-      for (const [tNum, tabs] of Object.entries(customerTabs)) {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab) {
-          tableNumber = parseInt(tNum);
-          originalTab = tab;
-          break;
+            };
+          });
+          
+          toast.success(data.message);
+          return {
+            success: true,
+            targetTab: data.target_tab,
+            message: data.message
+          };
         }
       }
       
-      if (!tableNumber || !originalTab) {
-        toast.error('Customer tab not found');
-        return false;
-      }
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to merge tabs');
+      return {
+        success: false,
+        message: errorData.message || 'Failed to merge tabs'
+      };
+      
+    } catch (error) {
+      console.error('Error merging tabs:', error);
+      toast.error('Failed to merge tabs');
+      return {
+        success: false,
+        message: 'Failed to merge tabs'
+      };
+    }
+  },
 
-      // Optimistic update
-      if (options.enableOptimisticUpdates) {
-        const updatedTab = {
-          ...originalTab,
-          ...updates,
-          updated_at: new Date().toISOString()
+  // NEW: Move items between customer tabs
+  moveItemsBetweenTabs: async (sourceTabId: string, targetTabId: string, itemIndices: number[]) => {
+    try {
+      const response = await brain.move_items_between_tabs({
+        source_tab_id: sourceTabId,
+        target_tab_id: targetTabId,
+        item_indices: itemIndices
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.source_tab && data.target_tab) {
+          // Update state with both updated tabs
+          const tableNumber = data.source_tab.table_number;
+          
+          set(state => {
+            const existingTabs = state.customerTabs[tableNumber] || [];
+            const updatedTabs = existingTabs.map(tab => {
+              if (tab.id === sourceTabId) return data.source_tab;
+              if (tab.id === targetTabId) return data.target_tab;
+              return tab;
+            });
+            
+            return {
+              customerTabs: {
+                ...state.customerTabs,
+                [tableNumber]: updatedTabs
+              },
+              optimisticCustomerTabs: {
+                ...state.optimisticCustomerTabs,
+                [tableNumber]: updatedTabs
+              }
+            };
+          });
+          
+          toast.success(data.message);
+          return {
+            success: true,
+            sourceTab: data.source_tab,
+            targetTab: data.target_tab,
+            message: data.message
+          };
+        }
+      }
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to move items');
+      return {
+        success: false,
+        message: errorData.message || 'Failed to move items'
+      };
+      
+    } catch (error) {
+      console.error('Error moving items between tabs:', error);
+      toast.error('Failed to move items between tabs');
+      return {
+        success: false,
+        message: 'Failed to move items between tabs'
+      };
+    }
+  },
+
+  // NEW: Delete customer tab
+  deleteCustomerTab: async (tabId: string) => {
+    const { options, customerTabs, activeCustomerTab } = get();
+    let tableNumber: number | null = null;
+    let originalTab: CustomerTab | null = null;
+    
+    // Find the tab and table number
+    for (const [tNum, tabs] of Object.entries(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        tableNumber = parseInt(tNum);
+        originalTab = tab;
+        break;
+      }
+    }
+    
+    if (!tableNumber || !originalTab) {
+      toast.error('Customer tab not found');
+      return false;
+    }
+
+    // Optimistic update
+    if (options.enableOptimisticUpdates) {
+      set(state => {
+        const updatedTabs = state.optimisticCustomerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
+        const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
+          ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
+          : state.activeCustomerTab[tableNumber!];
+          
+        return {
+          optimisticCustomerTabs: {
+            ...state.optimisticCustomerTabs,
+            [tableNumber!]: updatedTabs
+          },
+          activeCustomerTab: {
+            ...state.activeCustomerTab,
+            [tableNumber!]: newActiveTab
+          }
         };
-        
+      });
+    }
+
+    try {
+      const response = await brain.delete_customer_tab({ tab_id: tabId });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Update real state
+          set(state => {
+            const updatedTabs = state.customerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
+            const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
+              ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
+              : state.activeCustomerTab[tableNumber!];
+              
+            return {
+              customerTabs: {
+                ...state.customerTabs,
+                [tableNumber!]: updatedTabs
+              },
+              activeCustomerTab: {
+                ...state.activeCustomerTab,
+                [tableNumber!]: newActiveTab
+              }
+            };
+          });
+          
+          toast.success('Customer tab deleted successfully');
+          return true;
+        }
+      }
+      throw new Error('Failed to delete customer tab');
+    } catch (error) {
+      console.error('Error deleting customer tab:', error);
+      
+      // Rollback optimistic update
+      if (options.enableOptimisticUpdates) {
         set(state => ({
           optimisticCustomerTabs: {
             ...state.optimisticCustomerTabs,
-            [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
-              tab.id === tabId ? updatedTab : tab
-            ) || []
+            [tableNumber!]: [...(state.optimisticCustomerTabs[tableNumber!] || []), originalTab!]
+          },
+          activeCustomerTab: {
+            ...state.activeCustomerTab,
+            [tableNumber!]: activeCustomerTab[tableNumber!]
+          },
+          errors: {
+            ...state.errors,
+            customerTabErrors: {
+              ...state.errors.customerTabErrors,
+              [tabId]: 'Failed to delete customer tab'
+            }
           }
         }));
       }
-
-      try {
-        const response = await brain.update_customer_tab({ tab_id: tabId }, updates);
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.customer_tab) {
-            // Update real state
-            set(state => ({
-              customerTabs: {
-                ...state.customerTabs,
-                [tableNumber!]: state.customerTabs[tableNumber!]?.map(tab => 
-                  tab.id === tabId ? data.customer_tab : tab
-                ) || []
-              }
-            }));
-            
-            return true;
-          }
-        }
-        throw new Error('Failed to update customer tab');
-      } catch (error) {
-        console.error('Error updating customer tab:', error);
-        
-        // Rollback optimistic update
-        if (options.enableOptimisticUpdates) {
-          set(state => ({
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
-                tab.id === tabId ? originalTab! : tab
-              ) || []
-            },
-            errors: {
-              ...state.errors,
-              customerTabErrors: {
-                ...state.errors.customerTabErrors,
-                [tabId]: 'Failed to update customer tab'
-              }
-            }
-          }));
-        }
-        
-        toast.error('Failed to update customer tab');
-        return false;
-      }
-    },
-
-    // ENHANCED: Add items to customer tab with optimistic updates
-    addItemsToCustomerTab: async (tabId: string, items: OrderItem[]) => {
-      const { options, customerTabs } = get();
-      let tableNumber: number | null = null;
-      let originalTab: CustomerTab | null = null;
       
-      // Find the tab and table number
-      for (const [tNum, tabs] of Object.entries(customerTabs)) {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab) {
-          tableNumber = parseInt(tNum);
-          originalTab = tab;
-          break;
-        }
-      }
-      
-      if (!tableNumber || !originalTab) {
-        toast.error('Customer tab not found');
-        return false;
-      }
+      toast.error('Failed to delete customer tab');
+      return false;
+    }
+  },
 
-      // Optimistic update
-      if (options.enableOptimisticUpdates) {
-        const updatedTab = {
-          ...originalTab,
-          order_items: [...originalTab.order_items, ...items],
-          updated_at: new Date().toISOString()
-        };
+  // NEW: Remove item from customer tab
+  removeItemFromCustomerTab: async (tabId: string, itemIndex: number) => {
+    const { options, customerTabs } = get();
+    let tableNumber: number | null = null;
+    let originalTab: CustomerTab | null = null;
+    
+    // Find the tab and table number
+    for (const [tNum, tabs] of Object.entries(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        tableNumber = parseInt(tNum);
+        originalTab = tab;
+        break;
+      }
+    }
+    
+    if (!tableNumber || !originalTab || itemIndex >= originalTab.order_items.length) {
+      toast.error('Customer tab or item not found');
+      return false;
+    }
+
+    const updatedItems = [...originalTab.order_items];
+    updatedItems.splice(itemIndex, 1);
+    
+    return get().updateCustomerTab(tabId, { order_items: updatedItems });
+  },
+
+  // NEW: Update customer tab items
+  updateCustomerTabItems: async (tabId: string, items: OrderItem[]) => {
+    return get().updateCustomerTab(tabId, { order_items: items });
+  },
+
+  // NEW: Complete customer tab
+  completeCustomerTab: async (tabId: string) => {
+    return get().updateCustomerTab(tabId, { status: 'paid' });
+  },
+
+  // NEW: Set active customer tab for a table
+  setActiveCustomerTab: (tableNumber: number, tabId: string | null) => {
+    set(state => ({
+      activeCustomerTab: {
+        ...state.activeCustomerTab,
+        [tableNumber]: tabId
+      }
+    }));
+  },
+  
+  // Create new table order (seat guests)
+  createTableOrder: async (tableNumber: number, guestCount: number, linkedTables = []) => {
+    try {
+      const response = await brain.create_table_order({
+        table_number: tableNumber,
+        guest_count: guestCount,
+        linked_tables: linkedTables
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success && data.table_order) {
+        const tableOrder = data.table_order;
         
-        set(state => ({
-          optimisticCustomerTabs: {
-            ...state.optimisticCustomerTabs,
-            [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
-              tab.id === tabId ? updatedTab : tab
-            ) || []
+        set((state) => ({
+          persistedTableOrders: {
+            ...state.persistedTableOrders,
+            [tableNumber]: tableOrder
+          },
+          tableOrders: {
+            ...state.tableOrders,
+            [tableNumber]: []
           }
         }));
-      }
-
-      try {
-        const response = await brain.add_items_to_customer_tab({ tab_id: tabId }, { items });
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.customer_tab) {
-            // Update real state
-            set(state => ({
-              customerTabs: {
-                ...state.customerTabs,
-                [tableNumber!]: state.customerTabs[tableNumber!]?.map(tab => 
-                  tab.id === tabId ? data.customer_tab : tab
-                ) || []
-              }
-            }));
-            
-            toast.success(`Added ${items.length} items to customer tab`);
-            return true;
-          }
-        }
-        throw new Error('Failed to add items to customer tab');
-      } catch (error) {
-        console.error('Error adding items to customer tab:', error);
-        
-        // Rollback optimistic update
-        if (options.enableOptimisticUpdates) {
-          set(state => ({
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: state.optimisticCustomerTabs[tableNumber!]?.map(tab => 
-                tab.id === tabId ? originalTab! : tab
-              ) || []
-            },
-            errors: {
-              ...state.errors,
-              customerTabErrors: {
-                ...state.errors.customerTabErrors,
-                [tabId]: 'Failed to add items to customer tab'
-              }
-            }
-          }));
-        }
-        
-        toast.error('Failed to add items to customer tab');
+        return true;
+      } else {
+        toast.error(data.message || 'Failed to create table order');
         return false;
       }
-    },
-
-    // ENHANCED: Close customer tab
-    closeCustomerTab: async (tabId: string) => {
-      const { options, customerTabs, activeCustomerTab } = get();
-      let tableNumber: number | null = null;
-      let originalTab: CustomerTab | null = null;
       
-      // Find the tab and table number
-      for (const [tNum, tabs] of Object.entries(customerTabs)) {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab) {
-          tableNumber = parseInt(tNum);
-          originalTab = tab;
-          break;
-        }
-      }
-      
-      if (!tableNumber || !originalTab) {
-        toast.error('Customer tab not found');
-        return false;
-      }
-
-      // Optimistic update
-      if (options.enableOptimisticUpdates) {
-        set(state => {
-          const updatedTabs = state.optimisticCustomerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
-          const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
-            ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
-            : state.activeCustomerTab[tableNumber!];
-            
-          return {
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: updatedTabs
-            },
-            activeCustomerTab: {
-              ...state.activeCustomerTab,
-              [tableNumber!]: newActiveTab
-            }
-          };
-        });
-      }
-
-      try {
-        const response = await brain.close_customer_tab({ tabId: tabId });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            // Update real state
-            set(state => {
-              const updatedTabs = state.customerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
-              const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
-                ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
-                : state.activeCustomerTab[tableNumber!];
-                
-              return {
-                customerTabs: {
-                  ...state.customerTabs,
-                  [tableNumber!]: updatedTabs
-                },
-                activeCustomerTab: {
-                  ...state.activeCustomerTab,
-                  [tableNumber!]: newActiveTab
-                }
-              };
-            });
-            
-            toast.success('Customer tab closed successfully');
-            return true;
-          }
-        }
-        throw new Error('Failed to close customer tab');
-      } catch (error) {
-        console.error('Error closing customer tab:', error);
-        
-        // Rollback optimistic update
-        if (options.enableOptimisticUpdates) {
-          set(state => ({
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: [...(state.optimisticCustomerTabs[tableNumber!] || []), originalTab!]
-            },
-            activeCustomerTab: {
-              ...state.activeCustomerTab,
-              [tableNumber!]: activeCustomerTab[tableNumber!]
-            },
-            errors: {
-              ...state.errors,
-              customerTabErrors: {
-                ...state.errors.customerTabErrors,
-                [tabId]: 'Failed to close customer tab'
-              }
-            }
-          }));
-        }
-        
-        toast.error('Failed to close customer tab');
-        return false;
-      }
-    },
-
-    // ENHANCED: Rename customer tab
-    renameCustomerTab: async (tabId: string, newName: string) => {
-      return get().updateCustomerTab(tabId, { tab_name: newName });
-    },
-
-    // NEW: Split customer tab
-    splitCustomerTab: async (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => {
-      try {
-        const response = await brain.split_tab({
-          source_tab_id: sourceTabId,
-          new_tab_name: newTabName,
-          item_indices: itemIndices,
-          guest_id: guestId
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.original_tab && data.new_tab) {
-            // Update state with both tabs
-            const tableNumber = data.original_tab.table_number;
-            
-            set(state => {
-              const existingTabs = state.customerTabs[tableNumber] || [];
-              const updatedTabs = existingTabs.map(tab => 
-                tab.id === sourceTabId ? data.original_tab : tab
-              );
-              
-              // Add the new tab
-              updatedTabs.push(data.new_tab);
-              
-              return {
-                customerTabs: {
-                  ...state.customerTabs,
-                  [tableNumber]: updatedTabs
-                },
-                optimisticCustomerTabs: {
-                  ...state.optimisticCustomerTabs,
-                  [tableNumber]: updatedTabs
-                }
-              };
-            });
-            
-            toast.success(data.message);
-            return {
-              success: true,
-              originalTab: data.original_tab,
-              newTab: data.new_tab,
-              message: data.message
-            };
-          }
-        }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to split tab');
-        return {
-          success: false,
-          message: errorData.message || 'Failed to split tab'
-        };
-        
-      } catch (error) {
-        console.error('Error splitting tab:', error);
-        toast.error('Failed to split tab');
-        return {
-          success: false,
-          message: 'Failed to split tab'
-        };
-      }
-    },
-
-    // NEW: Merge customer tabs
-    mergeCustomerTabs: async (sourceTabId: string, targetTabId: string) => {
-      try {
-        const response = await brain.merge_tabs({
-          source_tab_id: sourceTabId,
-          target_tab_id: targetTabId
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.target_tab) {
-            // Update state - remove source tab, update target tab
-            const tableNumber = data.target_tab.table_number;
-            
-            set(state => {
-              const existingTabs = state.customerTabs[tableNumber] || [];
-              const updatedTabs = existingTabs
-                .filter(tab => tab.id !== sourceTabId) // Remove source tab
-                .map(tab => tab.id === targetTabId ? data.target_tab : tab); // Update target tab
-                
-              // Update active tab if source was active
-              const newActiveTab = state.activeCustomerTab[tableNumber] === sourceTabId 
-                ? targetTabId 
-                : state.activeCustomerTab[tableNumber];
-              
-              return {
-                customerTabs: {
-                  ...state.customerTabs,
-                  [tableNumber]: updatedTabs
-                },
-                optimisticCustomerTabs: {
-                  ...state.optimisticCustomerTabs,
-                  [tableNumber]: updatedTabs
-                },
-                activeCustomerTab: {
-                  ...state.activeCustomerTab,
-                  [tableNumber]: newActiveTab
-                }
-              };
-            });
-            
-            toast.success(data.message);
-            return {
-              success: true,
-              targetTab: data.target_tab,
-              message: data.message
-            };
-          }
-        }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to merge tabs');
-        return {
-          success: false,
-          message: errorData.message || 'Failed to merge tabs'
-        };
-        
-      } catch (error) {
-        console.error('Error merging tabs:', error);
-        toast.error('Failed to merge tabs');
-        return {
-          success: false,
-          message: 'Failed to merge tabs'
-        };
-      }
-    },
-
-    // NEW: Move items between customer tabs
-    moveItemsBetweenTabs: async (sourceTabId: string, targetTabId: string, itemIndices: number[]) => {
-      try {
-        const response = await brain.move_items_between_tabs({
-          source_tab_id: sourceTabId,
-          target_tab_id: targetTabId,
-          item_indices: itemIndices
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.source_tab && data.target_tab) {
-            // Update state with both updated tabs
-            const tableNumber = data.source_tab.table_number;
-            
-            set(state => {
-              const existingTabs = state.customerTabs[tableNumber] || [];
-              const updatedTabs = existingTabs.map(tab => {
-                if (tab.id === sourceTabId) return data.source_tab;
-                if (tab.id === targetTabId) return data.target_tab;
-                return tab;
-              });
-              
-              return {
-                customerTabs: {
-                  ...state.customerTabs,
-                  [tableNumber]: updatedTabs
-                },
-                optimisticCustomerTabs: {
-                  ...state.optimisticCustomerTabs,
-                  [tableNumber]: updatedTabs
-                }
-              };
-            });
-            
-            toast.success(data.message);
-            return {
-              success: true,
-              sourceTab: data.source_tab,
-              targetTab: data.target_tab,
-              message: data.message
-            };
-          }
-        }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to move items');
-        return {
-          success: false,
-          message: errorData.message || 'Failed to move items'
-        };
-        
-      } catch (error) {
-        console.error('Error moving items between tabs:', error);
-        toast.error('Failed to move items between tabs');
-        return {
-          success: false,
-          message: 'Failed to move items between tabs'
-        };
-      }
-    },
-
-    // NEW: Delete customer tab
-    deleteCustomerTab: async (tabId: string) => {
-      const { options, customerTabs, activeCustomerTab } = get();
-      let tableNumber: number | null = null;
-      let originalTab: CustomerTab | null = null;
-      
-      // Find the tab and table number
-      for (const [tNum, tabs] of Object.entries(customerTabs)) {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab) {
-          tableNumber = parseInt(tNum);
-          originalTab = tab;
-          break;
-        }
-      }
-      
-      if (!tableNumber || !originalTab) {
-        toast.error('Customer tab not found');
-        return false;
-      }
-
-      // Optimistic update
-      if (options.enableOptimisticUpdates) {
-        set(state => {
-          const updatedTabs = state.optimisticCustomerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
-          const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
-            ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
-            : state.activeCustomerTab[tableNumber!];
-            
-          return {
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: updatedTabs
-            },
-            activeCustomerTab: {
-              ...state.activeCustomerTab,
-              [tableNumber!]: newActiveTab
-            }
-          };
-        });
-      }
-
-      try {
-        const response = await brain.delete_customer_tab({ tab_id: tabId });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            // Update real state
-            set(state => {
-              const updatedTabs = state.customerTabs[tableNumber!]?.filter(tab => tab.id !== tabId) || [];
-              const newActiveTab = state.activeCustomerTab[tableNumber!] === tabId
-                ? (updatedTabs.length > 0 ? updatedTabs[0].id : null)
-                : state.activeCustomerTab[tableNumber!];
-                
-              return {
-                customerTabs: {
-                  ...state.customerTabs,
-                  [tableNumber!]: updatedTabs
-                },
-                activeCustomerTab: {
-                  ...state.activeCustomerTab,
-                  [tableNumber!]: newActiveTab
-                }
-              };
-            });
-            
-            toast.success('Customer tab deleted successfully');
-            return true;
-          }
-        }
-        throw new Error('Failed to delete customer tab');
-      } catch (error) {
-        console.error('Error deleting customer tab:', error);
-        
-        // Rollback optimistic update
-        if (options.enableOptimisticUpdates) {
-          set(state => ({
-            optimisticCustomerTabs: {
-              ...state.optimisticCustomerTabs,
-              [tableNumber!]: [...(state.optimisticCustomerTabs[tableNumber!] || []), originalTab!]
-            },
-            activeCustomerTab: {
-              ...state.activeCustomerTab,
-              [tableNumber!]: activeCustomerTab[tableNumber!]
-            },
-            errors: {
-              ...state.errors,
-              customerTabErrors: {
-                ...state.errors.customerTabErrors,
-                [tabId]: 'Failed to delete customer tab'
-              }
-            }
-          }));
-        }
-        
-        toast.error('Failed to delete customer tab');
-        return false;
-      }
-    },
-
-    // NEW: Remove item from customer tab
-    removeItemFromCustomerTab: async (tabId: string, itemIndex: number) => {
-      const { options, customerTabs } = get();
-      let tableNumber: number | null = null;
-      let originalTab: CustomerTab | null = null;
-      
-      // Find the tab and table number
-      for (const [tNum, tabs] of Object.entries(customerTabs)) {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab) {
-          tableNumber = parseInt(tNum);
-          originalTab = tab;
-          break;
-        }
-      }
-      
-      if (!tableNumber || !originalTab || itemIndex >= originalTab.order_items.length) {
-        toast.error('Customer tab or item not found');
-        return false;
-      }
-
-      const updatedItems = [...originalTab.order_items];
-      updatedItems.splice(itemIndex, 1);
-      
-      return get().updateCustomerTab(tabId, { order_items: updatedItems });
-    },
-
-    // NEW: Update customer tab items
-    updateCustomerTabItems: async (tabId: string, items: OrderItem[]) => {
-      return get().updateCustomerTab(tabId, { order_items: items });
-    },
-
-    // NEW: Complete customer tab
-    completeCustomerTab: async (tabId: string) => {
-      return get().updateCustomerTab(tabId, { status: 'paid' });
-    },
-
-    // NEW: Set active customer tab for a table
-    setActiveCustomerTab: (tableNumber: number, tabId: string | null) => {
-      set(state => ({
-        activeCustomerTab: {
-          ...state.activeCustomerTab,
-          [tableNumber]: tabId
+    } catch (error) {
+      console.error('Failed to create table order:', error);
+      toast.error('Failed to seat guests at table');
+      return false;
+    }
+  },
+  
+  // Update table order items
+  updateTableOrder: async (tableNumber: number, items: OrderItem[]) => {
+    try {
+      // Update local state immediately for fast UI
+      set((state) => ({
+        tableOrders: {
+          ...state.tableOrders,
+          [tableNumber]: items
         }
       }));
-    },
-    
-    // Create new table order (seat guests)
-    createTableOrder: async (tableNumber: number, guestCount: number, linkedTables = []) => {
-      try {
-        const response = await brain.create_table_order({
-          table_number: tableNumber,
-          guest_count: guestCount,
-          linked_tables: linkedTables
-        });
-        
+      
+      const response = await brain.update_table_order({ tableNumber }, {
+        order_items: items
+      });
+      
+      if (response.ok) {
         const data = await response.json();
         
-        if (response.ok && data.success && data.table_order) {
+        if (data.success && data.table_order) {
+          set((state) => ({
+            persistedTableOrders: {
+              ...state.persistedTableOrders,
+              [tableNumber]: data.table_order
+            }
+          }));
+          
+          return true;
+        }
+      }
+      
+      // Revert local state on failure
+      const state = get();
+      const persistedOrder = state.persistedTableOrders[tableNumber];
+      if (persistedOrder) {
+        set((state) => ({
+          tableOrders: {
+            ...state.tableOrders,
+            [tableNumber]: persistedOrder.order_items
+          }
+        }));
+      }
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to update table order');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to update table order:', error);
+      toast.error('Failed to update table order');
+      return false;
+    }
+  },
+  
+  // Add items to existing table order
+  addItemsToTable: async (tableNumber: number, items: OrderItem[]) => {
+    try {
+      // ✅ FIXED: Transform OrderItem to match backend API structure (AppApisTableOrdersOrderItem)
+      const backendItems = items.map(item => ({
+        id: item.id,
+        menu_item_id: item.menu_item_id || item.id, // ✅ FIXED: Ensure menu_item_id exists
+        variant_id: item.variant_id || null,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        variant_name: item.variantName || null,
+        notes: item.notes || null,
+        protein_type: item.protein_type || null,
+        image_url: item.image_url || null
+      }));
+      
+      // ✅ FIXED: Pass tableNumber as object parameter matching AddItemsToTableParams
+      const response = await brain.add_items_to_table({ tableNumber }, backendItems);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.table_order) {
           const tableOrder = data.table_order;
           
           set((state) => ({
@@ -1023,529 +1221,424 @@ export const useTableOrdersStore = create<TableOrdersState>()(subscribeWithSelec
             },
             tableOrders: {
               ...state.tableOrders,
-              [tableNumber]: []
+              [tableNumber]: tableOrder.order_items
             }
           }));
           
           return true;
-        } else {
-          toast.error(data.message || 'Failed to create table order');
-          return false;
         }
-        
-      } catch (error) {
-        console.error('Failed to create table order:', error);
-        toast.error('Failed to seat guests at table');
+      }
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to add items to table');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to add items to table:', error);
+      toast.error('Failed to add items to table');
+      return false;
+    }
+  },
+
+  // Remove specific item from table order by index
+  removeItemFromTable: async (tableNumber: number, itemIndex: number) => {
+    try {
+      const state = get();
+      const tableOrder = state.persistedTableOrders[tableNumber];
+      
+      if (!tableOrder || !tableOrder.order_items) {
+        toast.error('No order found for this table');
         return false;
       }
-    },
-    
-    // Update table order items
-    updateTableOrder: async (tableNumber: number, items: OrderItem[]) => {
-      try {
-        // Update local state immediately for fast UI
-        set((state) => ({
-          tableOrders: {
-            ...state.tableOrders,
-            [tableNumber]: items
-          }
-        }));
-        
-        const response = await brain.update_table_order({ tableNumber }, {
-          order_items: items
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.success && data.table_order) {
-            set((state) => ({
-              persistedTableOrders: {
-                ...state.persistedTableOrders,
-                [tableNumber]: data.table_order
-              }
-            }));
-            
-            return true;
-          }
+      
+      // Create updated items array without the item at specified index
+      const updatedItems = tableOrder.order_items.filter((_, index) => index !== itemIndex);
+      
+      // Update local state immediately for fast UI
+      set((state) => ({
+        tableOrders: {
+          ...state.tableOrders,
+          [tableNumber]: updatedItems
         }
+      }));
+      
+      // Update in Supabase
+      const response = await brain.update_table_order({ tableNumber }, {
+        order_items: updatedItems
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
         
-        // Revert local state on failure
-        const state = get();
-        const persistedOrder = state.persistedTableOrders[tableNumber];
-        if (persistedOrder) {
+        if (data.success && data.table_order) {
           set((state) => ({
-            tableOrders: {
-              ...state.tableOrders,
-              [tableNumber]: persistedOrder.order_items
+            persistedTableOrders: {
+              ...state.persistedTableOrders,
+              [tableNumber]: data.table_order
             }
           }));
-        }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to update table order');
-        return false;
-        
-      } catch (error) {
-        console.error('Failed to update table order:', error);
-        toast.error('Failed to update table order');
-        return false;
-      }
-    },
-    
-    // Add items to existing table order
-    addItemsToTable: async (tableNumber: number, items: OrderItem[]) => {
-      try {
-        // ✅ FIXED: Transform OrderItem to match backend API structure (AppApisTableOrdersOrderItem)
-        const backendItems = items.map(item => ({
-          id: item.id,
-          menu_item_id: item.menu_item_id || item.id, // ✅ FIXED: Ensure menu_item_id exists
-          variant_id: item.variant_id || null,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          variant_name: item.variantName || null,
-          notes: item.notes || null,
-          protein_type: item.protein_type || null,
-          image_url: item.image_url || null
-        }));
-        
-        // ✅ FIXED: Pass tableNumber as object parameter matching AddItemsToTableParams
-        const response = await brain.add_items_to_table({ tableNumber }, backendItems);
-        
-        if (response.ok) {
-          const data = await response.json();
           
-          if (data.success && data.table_order) {
-            const tableOrder = data.table_order;
-            
-            set((state) => ({
-              persistedTableOrders: {
-                ...state.persistedTableOrders,
-                [tableNumber]: tableOrder
-              },
-              tableOrders: {
-                ...state.tableOrders,
-                [tableNumber]: tableOrder.order_items
-              }
-            }));
-            
-            return true;
-          }
+          return true;
         }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to add items to table');
-        return false;
-        
-      } catch (error) {
-        console.error('Failed to add items to table:', error);
-        toast.error('Failed to add items to table');
-        return false;
       }
-    },
-
-    // Remove specific item from table order by index
-    removeItemFromTable: async (tableNumber: number, itemIndex: number) => {
-      try {
-        const state = get();
-        const tableOrder = state.persistedTableOrders[tableNumber];
-        
-        if (!tableOrder || !tableOrder.order_items) {
-          toast.error('No order found for this table');
-          return false;
+      
+      // Revert local state on failure
+      set((state) => ({
+        tableOrders: {
+          ...state.tableOrders,
+          [tableNumber]: tableOrder.order_items
         }
+      }));
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to remove item from table');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to remove item from table:', error);
+      toast.error('Failed to remove item from table');
+      return false;
+    }
+  },
+  
+  // Complete table order (final bill paid)
+  completeTableOrder: async (tableNumber: number) => {
+    try {
+      const response = await brain.complete_table_order({ tableNumber });
+      
+      if (response.ok) {
+        const data = await response.json();
         
-        // Create updated items array without the item at specified index
-        const updatedItems = tableOrder.order_items.filter((_, index) => index !== itemIndex);
-        
-        // Update local state immediately for fast UI
-        set((state) => ({
-          tableOrders: {
-            ...state.tableOrders,
-            [tableNumber]: updatedItems
-          }
-        }));
-        
-        // Update in Supabase
-        const response = await brain.update_table_order({ tableNumber }, {
-          order_items: updatedItems
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.success && data.table_order) {
-            set((state) => ({
-              persistedTableOrders: {
-                ...state.persistedTableOrders,
-                [tableNumber]: data.table_order
-              }
-            }));
+        if (data.success) {
+          set((state) => {
+            const newTableOrders = { ...state.tableOrders };
+            const newPersistedOrders = { ...state.persistedTableOrders };
             
-            return true;
-          }
-        }
-        
-        // Revert local state on failure
-        set((state) => ({
-          tableOrders: {
-            ...state.tableOrders,
-            [tableNumber]: tableOrder.order_items
-          }
-        }));
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to remove item from table');
-        return false;
-        
-      } catch (error) {
-        console.error('Failed to remove item from table:', error);
-        toast.error('Failed to remove item from table');
-        return false;
-      }
-    },
-    
-    // Complete table order (final bill paid)
-    completeTableOrder: async (tableNumber: number) => {
-      try {
-        const response = await brain.complete_table_order({ tableNumber });
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.success) {
-            set((state) => {
-              const newTableOrders = { ...state.tableOrders };
-              const newPersistedOrders = { ...state.persistedTableOrders };
-              
-              delete newTableOrders[tableNumber];
-              delete newPersistedOrders[tableNumber];
-              
-              return {
-                tableOrders: newTableOrders,
-                persistedTableOrders: newPersistedOrders
-              };
-            });
+            delete newTableOrders[tableNumber];
+            delete newPersistedOrders[tableNumber];
             
-            return true;
-          }
-        }
-        
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to complete table order');
-        return false;
-        
-      } catch (error) {
-        console.error('Failed to complete table order:', error);
-        toast.error('Failed to complete table order');
-        return false;
-      }
-    },
-
-    // Reset table to available (for final bill completion)
-    resetTableToAvailable: async (tableNumber: number) => {
-      try {
-        const response = await brain.reset_table_to_available({ tableNumber });
-        if (response.ok) {
-          // Remove from local state
-          const { persistedTableOrders } = get();
-          const updatedOrders = { ...persistedTableOrders };
-          delete updatedOrders[tableNumber];
-          
-          set({
-            persistedTableOrders: updatedOrders,
-            lastSync: Date.now()
+            return {
+              tableOrders: newTableOrders,
+              persistedTableOrders: newPersistedOrders
+            };
           });
           
           return true;
         }
-        return false;
-      } catch (error) {
-        console.error('Error resetting table to available:', error);
-        return false;
       }
-    },
+      
+      const errorData = await response.json();
+      toast.error(errorData.message || 'Failed to complete table order');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to complete table order:', error);
+      toast.error('Failed to complete table order');
+      return false;
+    }
+  },
 
-    // Force refresh data from server (useful for syncing after external changes)
-    forceRefresh: async () => {
-      console.log('🔄 Force refreshing table orders from database...');
-      await get().loadTableOrders();
-    },
+  // Reset table to available (for final bill completion)
+  resetTableToAvailable: async (tableNumber: number) => {
+    try {
+      const response = await brain.reset_table_to_available({ tableNumber });
+      if (response.ok) {
+        // Remove from local state
+        const { persistedTableOrders } = get();
+        const updatedOrders = { ...persistedTableOrders };
+        delete updatedOrders[tableNumber];
+        
+        set({
+          persistedTableOrders: updatedOrders,
+          lastSync: Date.now()
+        });
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error resetting table to available:', error);
+      return false;
+    }
+  },
+
+  // Force refresh data from server (useful for syncing after external changes)
+  forceRefresh: async () => {
+    if (isDev) console.log('🔄 Force refreshing table orders from database...');
+    set({ isInitialized: false });
+    await get().loadTableOrders();
+  },
+  
+  // Utility functions
+  hasExistingOrders: (tableNumber: number) => {
+    const { persistedTableOrders, customerTabs } = get();
+    // Check if table is seated (has persistent status) OR has current session orders OR has active customer tabs
+    const tableStatus = persistedTableOrders[tableNumber]?.status;
+    const hasCurrentOrders = get().tableOrders[tableNumber]?.length > 0;
+    const hasActiveCustomerTabs = customerTabs[tableNumber]?.length > 0;
+    return tableStatus === 'SEATED' || hasCurrentOrders || hasActiveCustomerTabs;
+  },
+
+  getTableStatus: (tableNumber: number) => {
+    const { persistedTableOrders } = get();
+    return persistedTableOrders[tableNumber]?.status || 'AVAILABLE';
+  },
+
+  getTableOrders: (tableNumber: number) => {
+    const { tableOrders } = get();
+    return tableOrders[tableNumber] || [];
+  },
+
+  // ENHANCED: Customer tab utilities with optimistic state preference
+  getCustomerTabsForTable: (tableNumber: number) => {
+    const { optimisticCustomerTabs, customerTabs, options } = get();
     
-    // Utility functions
-    hasExistingOrders: (tableNumber: number) => {
-      const { persistedTableOrders, customerTabs } = get();
-      // Check if table is seated (has persistent status) OR has current session orders OR has active customer tabs
-      const tableStatus = persistedTableOrders[tableNumber]?.status;
-      const hasCurrentOrders = get().tableOrders[tableNumber]?.length > 0;
-      const hasActiveCustomerTabs = customerTabs[tableNumber]?.length > 0;
-      return tableStatus === 'Seated' || hasCurrentOrders || hasActiveCustomerTabs;
-    },
+    // Use optimistic state if available and optimistic updates are enabled
+    if (options.enableOptimisticUpdates && optimisticCustomerTabs[tableNumber]) {
+      return optimisticCustomerTabs[tableNumber];
+    }
+    
+    return customerTabs[tableNumber] || [];
+  },
 
-    getTableStatus: (tableNumber: number) => {
-      const { persistedTableOrders } = get();
-      return persistedTableOrders[tableNumber]?.status || 'Available';
-    },
+  getActiveCustomerTab: (tableNumber: number) => {
+    const { activeCustomerTab } = get();
+    const activeTabId = activeCustomerTab[tableNumber];
+    
+    if (!activeTabId) return null;
+    
+    const tabs = get().getCustomerTabsForTable(tableNumber);
+    return tabs.find(tab => tab.id === activeTabId) || null;
+  },
 
-    getTableOrders: (tableNumber: number) => {
-      const { tableOrders } = get();
-      return tableOrders[tableNumber] || [];
-    },
-
-    // ENHANCED: Customer tab utilities with optimistic state preference
-    getCustomerTabsForTable: (tableNumber: number) => {
-      const { optimisticCustomerTabs, customerTabs, options } = get();
-      
-      // Use optimistic state if available and optimistic updates are enabled
-      if (options.enableOptimisticUpdates && optimisticCustomerTabs[tableNumber]) {
-        return optimisticCustomerTabs[tableNumber];
-      }
-      
-      return customerTabs[tableNumber] || [];
-    },
-
-    getActiveCustomerTab: (tableNumber: number) => {
-      const { activeCustomerTab } = get();
-      const activeTabId = activeCustomerTab[tableNumber];
-      
-      if (!activeTabId) return null;
-      
-      const tabs = get().getCustomerTabsForTable(tableNumber);
-      return tabs.find(tab => tab.id === activeTabId) || null;
-    },
-
-    getCustomerTabById: (tabId: string) => {
-      const { optimisticCustomerTabs, customerTabs, options } = get();
-      
-      // Search in optimistic state first if enabled
-      if (options.enableOptimisticUpdates) {
-        for (const tabs of Object.values(optimisticCustomerTabs)) {
-          const tab = tabs.find(t => t.id === tabId);
-          if (tab) return tab;
-        }
-      }
-      
-      // Fallback to regular state
-      for (const tabs of Object.values(customerTabs)) {
+  getCustomerTabById: (tabId: string) => {
+    const { optimisticCustomerTabs, customerTabs, options } = get();
+    
+    // Search in optimistic state first if enabled
+    if (options.enableOptimisticUpdates) {
+      for (const tabs of Object.values(optimisticCustomerTabs)) {
         const tab = tabs.find(t => t.id === tabId);
         if (tab) return tab;
       }
-      
+    }
+    
+    // Fallback to regular state
+    for (const tabs of Object.values(customerTabs)) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) return tab;
+    }
+    
+    return null;
+  },
+
+  hasActiveCustomerTabs: (tableNumber: number) => {
+    const tabs = get().getCustomerTabsForTable(tableNumber);
+    return tabs.some(tab => tab.status === 'active');
+  },
+
+  // NEW: Advanced utilities for linked tables with customer tabs
+  getLinkedTableCustomerTabs: (tableNumbers: number[]) => {
+    const result: Record<number, CustomerTab[]> = {};
+    
+    for (const tableNumber of tableNumbers) {
+      result[tableNumber] = get().getCustomerTabsForTable(tableNumber);
+    }
+    
+    return result;
+  },
+
+  getLinkedTableGroup: (tableNumber: number) => {
+    const { persistedTableOrders } = get();
+    const tableOrder = persistedTableOrders[tableNumber];
+    
+    if (!tableOrder || !tableOrder.linked_tables || tableOrder.linked_tables.length === 0) {
       return null;
-    },
-
-    hasActiveCustomerTabs: (tableNumber: number) => {
-      const tabs = get().getCustomerTabsForTable(tableNumber);
-      return tabs.some(tab => tab.status === 'active');
-    },
-
-    // NEW: Advanced utilities for linked tables with customer tabs
-    getLinkedTableCustomerTabs: (tableNumbers: number[]) => {
-      const result: Record<number, CustomerTab[]> = {};
-      
-      for (const tableNumber of tableNumbers) {
-        result[tableNumber] = get().getCustomerTabsForTable(tableNumber);
+    }
+    
+    const allTableNumbers = [tableNumber, ...tableOrder.linked_tables];
+    const tables: TableWithTabs[] = [];
+    let totalGuestCount = 0;
+    
+    for (const tNum of allTableNumbers) {
+      const order = persistedTableOrders[tNum];
+      if (order) {
+        tables.push({
+          tableNumber: tNum,
+          guestCount: order.guest_count || 0,
+          status: order.status,
+          customerTabs: get().getCustomerTabsForTable(tNum),
+          linkedTables: order.linked_tables || []
+        });
+        totalGuestCount += order.guest_count || 0;
       }
-      
-      return result;
-    },
+    }
+    
+    return {
+      tables,
+      primaryTable: tableNumber,
+      guestCount: totalGuestCount
+    };
+  },
 
-    getLinkedTableGroup: (tableNumber: number) => {
-      const { persistedTableOrders } = get();
-      const tableOrder = persistedTableOrders[tableNumber];
-      
-      if (!tableOrder || !tableOrder.linked_tables || tableOrder.linked_tables.length === 0) {
-        return null;
+  getTotalOrdersForLinkedTables: (tableNumbers: number[]) => {
+    const { tableOrders } = get();
+    const allOrders: OrderItem[] = [];
+    
+    for (const tableNumber of tableNumbers) {
+      const orders = tableOrders[tableNumber] || [];
+      allOrders.push(...orders);
+    }
+    
+    // Also include customer tab orders
+    for (const tableNumber of tableNumbers) {
+      const customerTabs = get().getCustomerTabsForTable(tableNumber);
+      for (const tab of customerTabs) {
+        allOrders.push(...tab.order_items);
       }
-      
-      const allTableNumbers = [tableNumber, ...tableOrder.linked_tables];
-      const tables: TableWithTabs[] = [];
-      let totalGuestCount = 0;
-      
-      for (const tNum of allTableNumbers) {
-        const order = persistedTableOrders[tNum];
-        if (order) {
-          tables.push({
-            tableNumber: tNum,
-            guestCount: order.guest_count || 0,
-            status: order.status,
-            customerTabs: get().getCustomerTabsForTable(tNum),
-            linkedTables: order.linked_tables || []
-          });
-          totalGuestCount += order.guest_count || 0;
+    }
+    
+    return allOrders;
+  },
+
+  // NEW: Performance and error handling utilities
+  clearErrors: () => {
+    set(state => ({
+      errors: {
+        tableErrors: {},
+        customerTabErrors: {},
+        globalError: null
+      }
+    }));
+  },
+
+  clearTableError: (tableNumber: number) => {
+    set(state => ({
+      errors: {
+        ...state.errors,
+        tableErrors: {
+          ...state.errors.tableErrors,
+          [tableNumber]: undefined
         }
       }
-      
-      return {
-        tables,
-        primaryTable: tableNumber,
-        guestCount: totalGuestCount
-      };
-    },
+    }));
+  },
 
-    getTotalOrdersForLinkedTables: (tableNumbers: number[]) => {
-      const { tableOrders } = get();
-      const allOrders: OrderItem[] = [];
-      
-      for (const tableNumber of tableNumbers) {
-        const orders = tableOrders[tableNumber] || [];
-        allOrders.push(...orders);
-      }
-      
-      // Also include customer tab orders
-      for (const tableNumber of tableNumbers) {
-        const customerTabs = get().getCustomerTabsForTable(tableNumber);
-        for (const tab of customerTabs) {
-          allOrders.push(...tab.order_items);
+  clearCustomerTabError: (tabId: string) => {
+    set(state => ({
+      errors: {
+        ...state.errors,
+        customerTabErrors: {
+          ...state.errors.customerTabErrors,
+          [tabId]: undefined
         }
       }
-      
-      return allOrders;
-    },
+    }));
+  },
 
-    // NEW: Performance and error handling utilities
-    clearErrors: () => {
-      set(state => ({
-        errors: {
-          tableErrors: {},
-          customerTabErrors: {},
-          globalError: null
+  retryFailedOperation: async (operationType: string, ...args: any[]) => {
+    const { options } = get();
+    
+    for (let attempt = 1; attempt <= options.maxRetries; attempt++) {
+      try {
+        switch (operationType) {
+          case 'createCustomerTab':
+            return await get().createCustomerTab(args[0], args[1], args[2]);
+          case 'updateCustomerTab':
+            return await get().updateCustomerTab(args[0], args[1]);
+          case 'addItemsToCustomerTab':
+            return await get().addItemsToCustomerTab(args[0], args[1]);
+          case 'closeCustomerTab':
+            return await get().closeCustomerTab(args[0]);
+          case 'deleteCustomerTab':
+            return await get().deleteCustomerTab(args[0]);
+          default:
+            throw new Error(`Unknown operation type: ${operationType}`);
         }
-      }));
-    },
+      } catch (error) {
+        console.warn(`Retry attempt ${attempt}/${options.maxRetries} failed for ${operationType}:`, error);
+        
+        if (attempt === options.maxRetries) {
+          toast.error(`Failed to ${operationType} after ${options.maxRetries} attempts`);
+          return false;
+        }
+        
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+    
+    return false;
+  },
 
-    clearTableError: (tableNumber: number) => {
+  // NEW: State synchronization utilities
+  syncCustomerTabsFromServer: async (tableNumber: number) => {
+    try {
+      set(state => ({ syncInProgress: true }));
+      
+      const response = await brain.list_customer_tabs_for_table({ tableNumber });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.customer_tabs)) {
+          set(state => ({
+            customerTabs: {
+              ...state.customerTabs,
+              [tableNumber]: data.customer_tabs
+            },
+            optimisticCustomerTabs: {
+              ...state.optimisticCustomerTabs,
+              [tableNumber]: data.customer_tabs
+            }
+          }));
+          if (isDev) console.log(`✅ Synced ${data.customer_tabs.length} customer tabs for table ${tableNumber}`);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to sync customer tabs for table ${tableNumber}:`, error);
       set(state => ({
         errors: {
           ...state.errors,
           tableErrors: {
             ...state.errors.tableErrors,
-            [tableNumber]: undefined
+            [tableNumber]: 'Failed to sync customer tabs from server'
           }
         }
       }));
-    },
+    } finally {
+      set(state => ({ syncInProgress: false }));
+    }
+  },
 
-    clearCustomerTabError: (tabId: string) => {
-      set(state => ({
-        errors: {
-          ...state.errors,
-          customerTabErrors: {
-            ...state.errors.customerTabErrors,
-            [tabId]: undefined
-          }
-        }
-      }));
-    },
-
-    retryFailedOperation: async (operationType: string, ...args: any[]) => {
-      const { options } = get();
+  validateCustomerTabState: (tableNumber: number) => {
+    const { customerTabs, optimisticCustomerTabs, activeCustomerTab } = get();
+    
+    const realTabs = customerTabs[tableNumber] || [];
+    const optimisticTabs = optimisticCustomerTabs[tableNumber] || [];
+    const activeTabId = activeCustomerTab[tableNumber];
+    
+    // Check if active tab exists
+    if (activeTabId) {
+      const tabExists = optimisticTabs.some(tab => tab.id === activeTabId) || 
+                       realTabs.some(tab => tab.id === activeTabId);
       
-      for (let attempt = 1; attempt <= options.maxRetries; attempt++) {
-        try {
-          switch (operationType) {
-            case 'createCustomerTab':
-              return await get().createCustomerTab(args[0], args[1], args[2]);
-            case 'updateCustomerTab':
-              return await get().updateCustomerTab(args[0], args[1]);
-            case 'addItemsToCustomerTab':
-              return await get().addItemsToCustomerTab(args[0], args[1]);
-            case 'closeCustomerTab':
-              return await get().closeCustomerTab(args[0]);
-            case 'deleteCustomerTab':
-              return await get().deleteCustomerTab(args[0]);
-            default:
-              throw new Error(`Unknown operation type: ${operationType}`);
-          }
-        } catch (error) {
-          console.warn(`Retry attempt ${attempt}/${options.maxRetries} failed for ${operationType}:`, error);
-          
-          if (attempt === options.maxRetries) {
-            toast.error(`Failed to ${operationType} after ${options.maxRetries} attempts`);
-            return false;
-          }
-          
-          // Exponential backoff
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
-      }
-      
-      return false;
-    },
-
-    // NEW: State synchronization utilities
-    syncCustomerTabsFromServer: async (tableNumber: number) => {
-      try {
-        set(state => ({ syncInProgress: true }));
-        
-        const response = await brain.list_customer_tabs_for_table({ tableNumber });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.customer_tabs)) {
-            set(state => ({
-              customerTabs: {
-                ...state.customerTabs,
-                [tableNumber]: data.customer_tabs
-              },
-              optimisticCustomerTabs: {
-                ...state.optimisticCustomerTabs,
-                [tableNumber]: data.customer_tabs
-              },
-              lastSync: Date.now()
-            }));
-            
-            console.log(`✅ Synced ${data.customer_tabs.length} customer tabs for table ${tableNumber}`);
-          }
-        }
-      } catch (error) {
-        console.error(`Failed to sync customer tabs for table ${tableNumber}:`, error);
-        set(state => ({
-          errors: {
-            ...state.errors,
-            tableErrors: {
-              ...state.errors.tableErrors,
-              [tableNumber]: 'Failed to sync customer tabs from server'
-            }
-          }
-        }));
-      } finally {
-        set(state => ({ syncInProgress: false }));
-      }
-    },
-
-    validateCustomerTabState: (tableNumber: number) => {
-      const { customerTabs, optimisticCustomerTabs, activeCustomerTab } = get();
-      
-      const realTabs = customerTabs[tableNumber] || [];
-      const optimisticTabs = optimisticCustomerTabs[tableNumber] || [];
-      const activeTabId = activeCustomerTab[tableNumber];
-      
-      // Check if active tab exists
-      if (activeTabId) {
-        const tabExists = optimisticTabs.some(tab => tab.id === activeTabId) || 
-                         realTabs.some(tab => tab.id === activeTabId);
-        
-        if (!tabExists) {
-          console.warn(`Active customer tab ${activeTabId} not found for table ${tableNumber}`);
-          // Auto-correct by setting first available tab as active
-          const availableTabs = optimisticTabs.length > 0 ? optimisticTabs : realTabs;
-          const newActiveTab = availableTabs.length > 0 ? availableTabs[0].id : null;
-          get().setActiveCustomerTab(tableNumber, newActiveTab);
-          return false;
-        }
-      }
-      
-      // Check for inconsistencies between optimistic and real state
-      if (optimisticTabs.length !== realTabs.length) {
-        console.warn(`State inconsistency detected for table ${tableNumber}: optimistic=${optimisticTabs.length}, real=${realTabs.length}`);
+      if (!tabExists) {
+        console.warn(`Active customer tab ${activeTabId} not found for table ${tableNumber}`);
+        // Auto-correct by setting first available tab as active
+        const availableTabs = optimisticTabs.length > 0 ? optimisticTabs : realTabs;
+        const newActiveTab = availableTabs.length > 0 ? availableTabs[0].id : null;
+        get().setActiveCustomerTab(tableNumber, newActiveTab);
         return false;
       }
-      
-      return true;
     }
-  })
-));
+    
+    // Check for inconsistencies between optimistic and real state
+    if (optimisticTabs.length !== realTabs.length) {
+      console.warn(`State inconsistency detected for table ${tableNumber}: optimistic=${optimisticTabs.length}, real=${realTabs.length}`);
+      return false;
+    }
+    
+    return true;
+  }
+}));
 
 // ============================================================================
 // ENHANCED STORE INSTANCE WITH PERFORMANCE MONITORING
