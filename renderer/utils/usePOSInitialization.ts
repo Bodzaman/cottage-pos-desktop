@@ -86,6 +86,11 @@ export function usePOSInitialization({ onViewChange }: UsePOSInitializationProps
           store.setCustomizations(cachedMenuData.customizations);
           store.setItemVariants(cachedMenuData.itemVariants); // This will call computeLookups()
           store.setSetMeals(cachedMenuData.setMeals);
+          
+          // ✅ CRITICAL: Update filtered items after loading from cache
+          // Without this, filteredMenuItems stays empty and POSMenuSelector shows no items
+          store.updateFilteredItems();
+          
           store.isLoading = false;
           store.isConnected = true;
           store.lastUpdate = Date.now();
