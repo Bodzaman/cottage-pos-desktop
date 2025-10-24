@@ -8,6 +8,8 @@ import brain from 'brain';
 import { OrderItem } from './menuTypes';
 import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager';
 
+const isDev = import.meta.env?.DEV;
+
 // Sync operation types
 export type SyncOperationType = 
   | 'CREATE_ORDER'
@@ -85,7 +87,7 @@ class OutboxSyncManager {
       }
 
       this.isInitialized = true;
-      console.log('✅ [OutboxSync] Initialized successfully');
+      if (isDev) console.log('✅ [OutboxSync] Initialized successfully');
 
     } catch (error) {
       console.error('❌ [OutboxSync] Initialization failed:', error);
@@ -138,7 +140,7 @@ class OutboxSyncManager {
       retry_count: 0
     });
 
-    console.log(`📤 [OutboxSync] Queued order creation: ${orderId}`);
+    if (isDev) console.log(`📤 [OutboxSync] Queued order creation: ${orderId}`);
     this.notifyStatusCallbacks();
 
     // Try immediate sync if online
@@ -167,7 +169,7 @@ class OutboxSyncManager {
       retry_count: 0
     });
 
-    console.log(`📤 [OutboxSync] Queued order status update: ${orderId} -> ${status}`);
+    if (isDev) console.log(`📤 [OutboxSync] Queued order status update: ${orderId} -> ${status}`);
     this.notifyStatusCallbacks();
 
     if (!getOfflineStatus()) {
@@ -192,7 +194,7 @@ class OutboxSyncManager {
       retry_count: 0
     });
 
-    console.log(`📤 [OutboxSync] Queued payment creation: ${orderId}`);
+    if (isDev) console.log(`📤 [OutboxSync] Queued payment creation: ${orderId}`);
     this.notifyStatusCallbacks();
 
     if (!getOfflineStatus()) {
@@ -244,11 +246,11 @@ class OutboxSyncManager {
       const pendingOps = await offlineStorage.getPendingSyncOperations();
       
       if (pendingOps.length === 0) {
-        console.log('ℹ️ [OutboxSync] No pending operations to sync');
+        if (isDev) console.log('ℹ️ [OutboxSync] No pending operations to sync');
         return;
       }
 
-      console.log(`🔄 [OutboxSync] Starting sync of ${pendingOps.length} operations`);
+      if (isDev) console.log(`🔄 [OutboxSync] Starting sync of ${pendingOps.length} operations`);
 
       // Process operations in priority order
       const sortedOps = pendingOps.sort((a, b) => {
@@ -296,7 +298,7 @@ class OutboxSyncManager {
     this.activeSyncs.add(operation.id);
 
     try {
-      console.log(`🔄 [OutboxSync] Processing ${operation.type}: ${operation.id}`);
+      if (isDev) console.log(`🔄 [OutboxSync] Processing ${operation.type}: ${operation.id}`);
 
       await offlineStorage.updateSyncOperation(operation.id, {
         status: 'PROCESSING',
@@ -309,7 +311,7 @@ class OutboxSyncManager {
         await offlineStorage.updateSyncOperation(operation.id, {
           status: 'COMPLETED'
         });
-        console.log(`✅ [OutboxSync] Completed ${operation.type}: ${operation.id}`);
+        if (isDev) console.log(`✅ [OutboxSync] Completed ${operation.type}: ${operation.id}`);
       } else {
         const newRetryCount = operation.retry_count + 1;
         const shouldRetry = result.shouldRetry && newRetryCount < 5;
@@ -328,7 +330,7 @@ class OutboxSyncManager {
             this.triggerSync();
           }, retryDelay);
 
-          console.log(`⏳ [OutboxSync] Retrying ${operation.type} in ${retryDelay}ms: ${operation.id}`);
+          if (isDev) console.log(`⏳ [OutboxSync] Retrying ${operation.type} in ${retryDelay}ms: ${operation.id}`);
         } else {
           await offlineStorage.updateSyncOperation(operation.id, {
             status: 'FAILED',
