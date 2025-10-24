@@ -1,32 +1,62 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // External library imports
 import { toast } from 'sonner';
+import { shallow } from 'zustand/shallow';
 
 // Databutton imports
 import brain from 'brain';
 
 // Store imports
 import { useSimpleAuth } from '../utils/simple-auth-context';
-import { useRealtimeMenuStore, getMenuDataForPOS, startRealtimeSubscriptionsIfNeeded } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStore, getMenuDataForPOS, startRealtimeSubscriptionsIfNeeded, cleanupRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { useCustomerDataStore } from '../utils/customerDataStore';
-import { useVoiceOrderStore } from '../utils/voiceOrderStore';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { useSystemStatus } from 'utils/pollingService';
+import { usePOSAuth } from 'utils/usePOSAuth';
+import { ResponsivePOSShell } from 'components/ResponsivePOSShell';
+
+// NEW: Import focused POS stores
+import { usePOSOrderStore } from 'utils/posOrderStore';
+import { usePOSCustomerStore } from 'utils/posCustomerStore';
+import { usePOSUIStore } from 'utils/posUIStore';
 
 // Enhanced image preloading imports
 import { useImagePreloader } from '../utils/useImagePreloader';
 import { POSSkeletonGrid } from 'components/POSSkeletonGrid';
+import { CategorySidebarSkeleton } from 'components/CategorySidebarSkeleton';
+import { OrderSummarySkeleton } from 'components/OrderSummarySkeleton';
+import { POSZoneErrorBoundary } from 'components/POSZoneErrorBoundary';
 
 // Utility imports
 import { colors as designColors } from '../utils/designSystem';
+import { QSAITheme } from '../utils/QSAIDesign';
 import { quickLog, createLogger } from 'utils/logger';
 import { useOnDemandPrinter } from 'utils/onDemandPrinterService';
 import posPerf, { POSPerfMarks } from 'utils/posPerformance';
 
 // Component imports
-import ManagementHeader from '../components/ManagementHeader';
+import { ManagementHeader } from '../components/ManagementHeader';
 import { POSNavigation } from '../components/POSNavigation';
 import { DineInTableSelector } from '../components/DineInTableSelector';
 import { CategorySidebar } from '../components/CategorySidebar';
@@ -41,11 +71,14 @@ import ManagementPasswordDialog from 'components/ManagementPasswordDialog';
 import MenuManagementDialog from '../components/MenuManagementDialog';
 import AllOrdersModal from '../components/AllOrdersModal';
 import { CustomizeOrchestrator, CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
-import { POSFooter } from '../components/POSFooter';
+import { POSFooter } from 'components/POSFooter';
+import { AdminSidePanel } from 'components/AdminSidePanel';
+import { AvatarDropdown } from 'components/AvatarDropdown';
+import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
+import { PaymentFlowResult } from 'utils/paymentFlowTypes';
 
 // View Components - Import from POSDesktop for parity
 import { OnlineOrderManagement } from 'components/OnlineOrderManagement';
-import { AIOrdersPanel } from 'components/AIOrdersPanel';
 import { ReservationsPlaceholder } from 'components/ReservationsPlaceholder';
 
 // Utility imports
@@ -62,48 +95,221 @@ import { useOrderProcessing } from 'utils/useOrderProcessing';
 import { usePrintingOperations } from 'utils/usePrintingOperations';
 import { usePOSInitialization } from 'utils/usePOSInitialization';
 
+import { OfflineFirst } from '../utils/offlineFirstManager';
+import { generateSessionId, type PersistedSession } from '../utils/sessionPersistence';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface POSState {
-  // View Management
-  activeView: string;
-  previousView: string;
+// REMOVED: No longer needed - state now managed by focused stores
+// interface POSState {
+//   // View Management
+//   activeView: string;
+//   previousView: string;
   
-  // Order Management
-  orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
-  selectedTableNumber: number | null;
-  guestCount: number;
-  orderItems: OrderItem[];
-}
+//   // Order Management
+//   orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
+//   selectedTableNumber: number | null;
+//   guestCount: number;
+//   orderItems: OrderItem[];
+  
+//   // Customer Information
+//   customerData: {
+//     firstName: string;
+//     lastName: string;
+//     phone: string;
+//     email: string;
+//     notes: string;
+//     tableNumber: string;
+//     guestCount: number;
+//     address: string;
+//     street: string;
+//     city: string;
+//     postcode: string;
+//     deliveryNotes: string;
+//   };
+  
+//   // UI State
+//   showCustomerModal: boolean;
+//   showVariantSelector: boolean;
+//   pendingOrderConfirmation: boolean;
+//   showGuestCountModal: boolean;
+//   showDineInModal: boolean;
+//   showPaymentFlow: boolean; // NEW: Single payment flow state
+//   showSessionRestoreDialog: boolean;
+// }
 
 /**
  * POSDesktop - Professional Point of Sale interface
  * Clean, production-ready implementation for restaurant operations
+ * 
+ * PROTECTED ROUTE: Requires authentication via /pos-login
  */
 export default function POSDesktop() {
   // ✅ Development check for console log guards
   const isDev = import.meta.env.DEV;
   
   // ============================================================================
-  // AUTHENTICATION & USER MANAGEMENT
+  // ALL HOOKS (must be called in same order every render)
   // ============================================================================
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, signOut, isAdmin, isCustomer } = useSimpleAuth();
   
-  const isAuthenticated = !!user;
-  const isStaff = isAdmin;
-  const hasPermission = isAdmin;
+  const navigate = useNavigate();
+  
+  const location = useLocation();
+  
+  // Note: POSDesktop uses POS-specific auth (usePOSAuth), not simple auth
+  // We keep this hook call to maintain hook count consistency, but don't use its values
+  useSimpleAuth();
+  
+  const { 
+    isAuthenticated, 
+    isLoading: authLoading, 
+    email, 
+    userId,
+    role,
+    profileImageUrl,
+    logout 
+  } = usePOSAuth();
 
+  const hasRedirectedRef = useRef(false);
+  
+  const lastRedirectTimeRef = useRef(0);
+  
+  const REDIRECT_COOLDOWN = 1000;
+  
   // ============================================================================
-  // MANAGER OVERRIDE DIALOG STATE (NEW)
+  // MANAGER OVERRIDE DIALOG STATE
   // ============================================================================
   const [isManagementDialogOpen, setIsManagementDialogOpen] = useState(false);
   const managerApprovalResolverRef = useRef<((approved: boolean) => void) | null>(null);
   const [managerOverrideGranted, setManagerOverrideGranted] = useState(false);
+  
+  // ============================================================================
+  // ADMIN PANEL STATE
+  // ============================================================================
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  
+  // ============================================================================
+  // STORE INTEGRATIONS
+  // ============================================================================
+  // 🚀 SELECTIVE SUBSCRIPTIONS: Subscribe to specific fields only to prevent unnecessary re-renders
+  const categories = useRealtimeMenuStore(state => state.categories, shallow);
+  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
+  const isLoading = useRealtimeMenuStore(state => state.isLoading);
+  const menuLoading = isLoading; // Alias for backward compatibility
+  const isConnected = useRealtimeMenuStore(state => state.isConnected);
+  const itemVariants = useRealtimeMenuStore(state => state.itemVariants, shallow);
+  const proteinTypes = useRealtimeMenuStore(state => state.proteinTypes, shallow);
+  const customizations = useRealtimeMenuStore(state => state.customizations, shallow);
+  const searchQuery = useRealtimeMenuStore(state => state.searchQuery);
+  const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
+  const selectedCategory = useRealtimeMenuStore(state => state.selectedMenuCategory);
+  
+  const customerDataStore = useCustomerDataStore();
+  const tableOrdersStore = useTableOrdersStore();
+  
+  // NEW: Focused POS stores replace single POSState
+  const orderStore = usePOSOrderStore();
+  const customerStore = usePOSCustomerStore();
+  const uiStore = usePOSUIStore();
+  
+  // Table orders from persistent store
+  const { 
+    tableOrders: persistentTableOrders, 
+    hasExistingOrders, 
+    getTableStatus, 
+    getTableOrders,
+    createTableOrder,
+    updateTableOrder,
+    addItemsToTable,
+    completeTableOrder
+  } = tableOrdersStore;
+  
+  // ============================================================================
+  // MAIN STATE MANAGEMENT (moved up before conditional logic)
+  // ============================================================================
+  
+  // REMOVED: Replaced by focused stores
+  // const [state, setState] = useState<POSState>({
+  //   // View Management
+  //   activeView: "pos",
+  //   previousView: "",
+    
+  //   // Order Management
+  //   orderType: "DINE-IN",
+  //   selectedTableNumber: null as number | null,
+  //   guestCount: 1,
+  //   orderItems: [] as OrderItem[],
+    
+  //   // Customer Information
+  //   customerData: {
+  //     firstName: '',
+  //     lastName: '',
+  //     phone: '',
+  //     email: '',
+  //     notes: '',
+  //     tableNumber: '',
+  //     guestCount: 1,
+  //     address: '',
+  //     street: '',
+  //     city: '',
+  //     postcode: '',
+  //     deliveryNotes: ''
+  //   },
+    
+  //   // UI State
+  //   showCustomerModal: false,
+  //   showVariantSelector: false,
+  //   pendingOrderConfirmation: false,
+  //   showGuestCountModal: false,
+  //   showDineInModal: false,
+  //   showPaymentFlow: false, // NEW: Single payment flow state
+  //   showSessionRestoreDialog: false,
+  // });
+  
+  // Helper function to update state
+  // const updateState = useCallback((updates: Partial<POSState>) => {
+  //   setState(prev => ({ ...prev, ...updates }));
+  // }, []);
 
+  // Calculate order total from items
+  const orderTotal = useMemo(() => 
+    orderStore.orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+    [orderStore.orderItems]
+  );
+  
+  // ============================================================================
+  // CUSTOM HOOKS FOR LOGIC EXTRACTION
+  // ============================================================================
+  const initialization = usePOSInitialization({
+    onViewChange: (view) => {
+      if (view === 'pos') {
+        uiStore.setActiveView('pos');
+      } else if (view === 'reservations') {
+        uiStore.setActiveView('reservations');
+      }
+    }
+  });
+
+  // ============================================================================
+  // ALL CALLBACKS AND HANDLERS (moved up before conditional logic)
+  // ============================================================================
+  
+  // LOGOUT HANDLER
+  const handleLogout = useCallback(async () => {
+    await logout();
+    toast.success('Logged out successfully');
+    navigate('/pos-login', { replace: true });
+  }, [logout, navigate]);
+  
+  // COMPUTED VALUES
+  const getDisplayOrderItems = useCallback(() => {
+    return orderStore.orderItems;
+  }, [orderStore.orderItems]);
+  
   // Promise-based approver that children can call to request manager auth
   const requestManagerApproval = useCallback((): Promise<boolean> => {
     setIsManagementDialogOpen(true);
@@ -119,6 +325,10 @@ export default function POSDesktop() {
       managerApprovalResolverRef.current = null;
     }
     setIsManagementDialogOpen(false);
+    
+    // Open admin panel after successful authentication
+    setShowAdminPanel(true);
+    
     toast.success('Management access granted');
   }, []);
 
@@ -130,237 +340,81 @@ export default function POSDesktop() {
     setIsManagementDialogOpen(false);
   }, []);
   
-  // ============================================================================
-  // STORE INTEGRATIONS
-  // ============================================================================
-  const realtimeMenuStore = useRealtimeMenuStore();
-  const customerDataStore = useCustomerDataStore();
-  const voiceOrderStore = useVoiceOrderStore();
-  const tableOrdersStore = useTableOrdersStore();
-  
-  // Force immediate store refresh on mount to load latest variant names
-  useEffect(() => {
-    console.log('🔄 POSDesktop: Forcing menu store refresh to load updated variant names...');
-    realtimeMenuStore.forceFullRefresh().then(() => {
-      console.log('✅ POSDesktop: Menu store refreshed with latest variant data');
-    }).catch(err => {
-      console.error('❌ POSDesktop: Failed to refresh menu store:', err);
-    });
-  }, []);
-
-  // ============================================================================
-  // NEW: CUSTOM HOOKS FOR LOGIC EXTRACTION
-  // ============================================================================
-  const initialization = usePOSInitialization({
-    onViewChange: (view) => {
-      if (view === 'pos') {
-        setState(prev => ({ ...prev, activeView: 'pos', previousView: prev.activeView }));
-      } else if (view === 'reservations') {
-        setState(prev => ({ ...prev, activeView: 'reservations', previousView: prev.activeView }));
-      }
-    }
-  });
-
-  // Extract data from stores
-  const { searchQuery, setSearchQuery } = realtimeMenuStore;
-  const categories = realtimeMenuStore.categories;
-  const selectedCategory = realtimeMenuStore.selectedMenuCategory;
-  const menuItems = realtimeMenuStore.menuItems;
-  const menuLoading = realtimeMenuStore.isLoading;
-  
-  // Table orders from persistent store
-  const { 
-    tableOrders: persistentTableOrders, 
-    hasExistingOrders, 
-    getTableStatus, 
-    getTableOrders,
-    createTableOrder,
-    updateTableOrder,
-    addItemsToTable,
-    completeTableOrder
-  } = tableOrdersStore;
-  
-  // Voice orders count
-  const newOrdersCount = useVoiceOrderStore(state => 
-    state.orders?.filter(order => order.status === 'NEW' || order.status === 'PENDING')?.length || 0
-  );
-  
-  // ============================================================================
-  // HEADER HANDLERS
-  // ============================================================================
-  const handleAdminAuthenticated = () => {
-    // Could add admin overlay functionality here if needed
-  };
-  
-  const handleOrderTypeChange = useCallback((orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "AI_ORDERS" | "ONLINE_ORDERS") => {
-    // Update state for all order types (remove early return)
-    updateState({ orderType });
+  const handleOrderTypeChange = useCallback((orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS") => {
+    orderStore.setOrderType(orderType);
     
-    // Switch views for special order types (like POSDesktop)
-    if (orderType === 'AI_ORDERS') {
-      updateState({ activeView: 'ai-orders' });
-    } else if (orderType === 'ONLINE_ORDERS') {
-      updateState({ activeView: 'online-orders' });
+    if (orderType === 'ONLINE_ORDERS') {
+      uiStore.setActiveView('online-orders');
     } else {
-      // For standard order types, return to main POS view
-      updateState({ activeView: 'pos' });
+      uiStore.setActiveView('pos');
     }
     
     toast.success(`Order type changed to ${orderType}`);
   }, []);
-
-  // ============================================================================
-  // MAIN STATE MANAGEMENT
-  // ============================================================================
-  const [state, setState] = useState<POSState>({
-    // View Management
-    activeView: "pos", // Changed from "TAKE ORDER" to "pos" to match POSViewType
-    previousView: "",
-    
-    // Order Management
-    orderType: "DINE-IN",
-    selectedTableNumber: null as number | null,
-    guestCount: 1,
-    orderItems: [] as OrderItem[],
-    
-    // Customer Information
-    customerData: {
-      firstName: '',
-      lastName: '',
-      phone: '',
-      email: '',
-      notes: '',
-      tableNumber: '',
-      guestCount: 1,
-      address: '',
-      street: '',
-      city: '',
-      postcode: '',
-      deliveryNotes: ''
-    },
-    
-    // UI State
-    showCustomerModal: false,
-    showVariantSelector: false,
-    showOrderConfirmation: false,
-    pendingOrderConfirmation: false,
-    showGuestCountModal: false,
-    showDineInModal: false, // Initialize dine-in modal state
-  });
   
-  // Helper function to update state
-  const updateState = useCallback((updates: Partial<POSState>) => {
-    setState(prev => ({ ...prev, ...updates }));
-  }, []);
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
-  const getDisplayOrderItems = useCallback(() => {
-    return state.orderItems;
-  }, [state.orderItems]);
-
-  // ============================================================================
   // TABLE MANAGEMENT HANDLERS
-  // ============================================================================
-  // Table management - Enhanced for dine-in workflow
-  const handleTableSelect = (tableNumber: number, tableStatus?: string) => {
-    console.log(`🍽️ [POSDesktop] handleTableSelect called: Table ${tableNumber}, Status: ${tableStatus}`);
+  const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
+    if (isDev) console.log(`🍽️ [POSDesktop] handleTableSelect called: Table ${tableNumber}, Status: ${tableStatus}`);
     
     if (tableStatus && tableStatus !== 'AVAILABLE') {
-      // Table is seated/occupied - open dine-in modal
-      console.log(`🍽️ [POSDesktop] Table ${tableNumber} is ${tableStatus} - opening dine-in modal`);
-      updateState({
-        selectedTableNumber: tableNumber,
-        showDineInModal: true
-      });
+      if (isDev) console.log(`🍽️ [POSDesktop] Table ${tableNumber} is ${tableStatus} - opening dine-in modal`);
+      orderStore.setSelectedTableNumber(tableNumber);
+      uiStore.setModal('showDineInModal', true);
     } else {
-      // Table is available - open guest count modal
-      console.log(`🍽️ [POSDesktop] Table ${tableNumber} selected (AVAILABLE) - opening guest count modal`);
-      updateState({
-        selectedTableNumber: tableNumber,
-        showGuestCountModal: true
-      });
+      if (isDev) console.log(`🍽️ [POSDesktop] Table ${tableNumber} selected (AVAILABLE) - opening guest count modal`);
+      orderStore.setSelectedTableNumber(tableNumber);
+      uiStore.setModal('showGuestCountModal', true);
     }
     
     const updatedCustomerData = {
       ...customerDataStore.customerData,
       tableNumber: tableNumber.toString(),
-      guestCount: state.guestCount || 1
+      guestCount: orderStore.guestCount || 1
     };
 
-    updateState({ customerData: updatedCustomerData });
-  };
+    customerStore.updateCustomer(updatedCustomerData);
+  }, []);
   
-  // Guest count save handler - matches POSDesktop functionality
   const handleGuestCountSave = useCallback(async (guestCount: number, action: 'normal' | 'link' | 'continue_anyway', linkedTables?: number[]) => {
-    const tableNumber = state.selectedTableNumber;
+    const tableNumber = orderStore.selectedTableNumber;
     if (!tableNumber) return;
     
-    // Check if we have existing order items (coming from Order Summary Process Order flow)
-    const hasExistingOrder = state.orderItems.length > 0;
+    const hasExistingOrder = orderStore.orderItems.length > 0;
     
-    // Create table order in persistent storage
     const success = await createTableOrder(tableNumber, guestCount, linkedTables || []);
     
     if (success) {
-      updateState({
-        guestCount,
-        showGuestCountModal: false,
-        // Preserve order items if they exist, otherwise start fresh
-        orderItems: hasExistingOrder ? state.orderItems : []
-      });
+      orderStore.setGuestCount(guestCount);
+      uiStore.setModal('showGuestCountModal', false);
+      // Keep existing order items if any
       
       if (hasExistingOrder) {
-        // Coming from Order Summary Process Order - show success
         toast.success(`Table ${tableNumber} seated with ${guestCount} guests - confirming order`);
         
-        // Check if we should trigger Order Confirmation Modal
-        if (state.pendingOrderConfirmation) {
-          console.log('✅ Continuing Process Order flow - opening Order Confirmation Modal');
-          updateState({ pendingOrderConfirmation: false, showOrderConfirmation: true });
+        if (uiStore.pendingOrderConfirmation) {
+          if (isDev) console.log('✅ Continuing Process Order flow - opening Payment Flow Orchestrator');
+          uiStore.setPendingOrderConfirmation(false);
+          uiStore.setModal('showPaymentFlow', true);
         }
       } else {
-        // Fresh table selection - ready for new ordering
         toast.success(`Table ${tableNumber} seated with ${guestCount} guests - ready for ordering`);
       }
     }
-  }, [state.selectedTableNumber, state.orderItems, state.pendingOrderConfirmation, createTableOrder, updateState]);
-
-  // ============================================================================
+  }, [createTableOrder]);
+  
   // CUSTOMER DATA MANAGEMENT
-  // ============================================================================
   const handleCustomerDetailsClick = useCallback(() => {
-    updateState({ showCustomerModal: true });
-  }, [updateState]);
+    uiStore.setModal('showCustomerModal', true);
+  }, []);
   
   const handleClearCustomerDetails = useCallback(() => {
     customerDataStore.clearCustomerData();
-    updateState({
-      customerData: {
-        firstName: '',
-        lastName: '',
-        phone: '',
-        email: '',
-        notes: '',
-        tableNumber: '',
-        guestCount: 2,
-        address: '',
-        street: '',
-        city: '',
-        postcode: '',
-        deliveryNotes: ''
-      }
-    });
-  }, [customerDataStore, updateState]);
+    customerStore.clearCustomer();
+  }, []);
 
-  // ============================================================================
-  // CUSTOMER MODAL HANDLERS (PARITY WITH POSDesktop)
-  // ============================================================================
-  
   // Calculate order total for validation
   const calculateOrderTotal = useCallback((): number => {
-    return state.orderItems.reduce((total, item) => {
+    return orderStore.orderItems.reduce((total, item) => {
       let itemTotal = item.price * item.quantity;
       
       // Add modifier prices if present
@@ -372,124 +426,92 @@ export default function POSDesktop() {
       
       return total + itemTotal;
     }, 0);
-  }, [state.orderItems]);
+  }, []);
 
   // Handle customer data save from modal
   const handleCustomerSave = useCallback((customerData: any) => {
-    console.log('💾 [POSDesktop] Saving customer data:', customerData);
+    if (isDev) console.log('💾 [POSDesktop] Saving customer data:', customerData);
     
-    // Update POSDesktop state
-    updateState({
-      customerData: {
-        firstName: customerData.firstName || '',
-        lastName: customerData.lastName || '',
-        phone: customerData.phone || '',
-        email: customerData.email || '',
-        notes: customerData.notes || '',
-        tableNumber: customerData.tableNumber || '',
-        guestCount: customerData.guestCount || 2,
-        address: customerData.address || '',
-        street: customerData.street || '',
-        city: customerData.city || '',
-        postcode: customerData.postcode || '',
-        deliveryNotes: customerData.deliveryNotes || ''
-      },
-      showCustomerModal: false
-    });
+    // Update focused customer store
+    customerStore.updateCustomer(customerData);
     
-    // Store in global customer data store for order processing
-    customerDataStore.setCustomerData({
-      firstName: customerData.firstName || '',
-      lastName: customerData.lastName || '',
-      phone: customerData.phone || '',
-      email: customerData.email || '',
-      notes: customerData.notes || '',
-      deliveryNotes: customerData.deliveryNotes || ''
-    });
+    // Update customer data store (legacy compatibility)
+    customerDataStore.setCustomerData(customerData);
     
     toast.success('Customer details saved');
-  }, [customerDataStore, updateState]);
+  }, []);
 
-  // ============================================================================
   // CUSTOM HOOKS - Core Business Logic
-  // ============================================================================
   
-  // Order Management Hook - ✅ Correct parameters
+  // ✅ FIXED: Stabilize setter function with useCallback to prevent infinite re-renders
+  const setOrderItems = useCallback((items: OrderItem[] | ((prev: OrderItem[]) => OrderItem[])) => {
+    orderStore.setOrderItems(typeof items === 'function' ? items(orderStore.orderItems) : items);
+  }, []);
+  
+  // Order Management Hook - ✅ Now receives stable function reference
   const orderManagement = useOrderManagement(
-    state.orderItems,
-    (items) => {
-      setState(prev => ({
-        ...prev,
-        orderItems: typeof items === 'function' ? items(prev.orderItems) : items
-      }));
-    }
+    orderStore.orderItems,
+    setOrderItems
   );
   
   // Customer Flow Hook - ✅ Fixed: Pass all 5 required parameters
   const customerFlow = useCustomerFlow(
-    state.orderType,
-    state.customerData,
-    (data) => updateState({ customerData: data }),
-    state.selectedTableNumber,
-    state.guestCount
+    orderStore.orderType,
+    customerStore.customerData,
+    (data) => customerStore.updateCustomer(data),
+    orderStore.selectedTableNumber,
+    orderStore.guestCount
   );
   
   // Order Processing Hook - ✅ Fixed: Pass all 6 required parameters
   const orderProcessing = useOrderProcessing(
-    state.orderType,
-    state.orderItems,
-    state.customerData,
-    state.selectedTableNumber,
-    state.guestCount
-  );
-  
-  // Printing Operations Hook - ✅ Fixed: Pass all 5 required parameters
-  const printing = usePrintingOperations(
-    state.orderType,
-    state.orderItems,
-    state.customerData,
-    state.selectedTableNumber,
-    state.guestCount
+    orderStore.orderType,
+    orderStore.orderItems,
+    customerStore.customerData,
+    orderStore.selectedTableNumber,
+    orderStore.guestCount
   );
 
-  // ============================================================================
+  // Printing Operations Hook
+  const printing = usePrintingOperations(
+    orderStore.orderType,
+    orderStore.orderItems,
+    customerStore.customerData,
+    orderStore.selectedTableNumber,
+    orderStore.guestCount
+  );
+
   // DELEGATED HANDLERS - Use hooks instead of inline logic
-  // ============================================================================
   
   const handleAddToOrder = orderManagement.handleAddToOrder;
   const handleRemoveItem = orderManagement.handleRemoveItem;
   const handleUpdateQuantity = orderManagement.handleUpdateQuantity;
   const handleClearOrder = useCallback(() => {
     orderManagement.handleClearOrder();
-    updateState({
-      selectedTableNumber: null,
-      guestCount: 1
-    });
-  }, [orderManagement, updateState]);
+    orderStore.clearOrder();
+  }, []);
   const handleIncrementItem = orderManagement.handleIncrementItem;
   const handleDecrementItem = orderManagement.handleDecrementItem;
   const handleUpdateNotes = orderManagement.handleUpdateNotes;
   const handleCustomizeItem = orderManagement.handleCustomizeItem;
   const handleCustomizeItemFromMenu = useCallback((item: OrderItem) => {
-    console.log('Customize item from menu:', item);
+    if (isDev) console.log('Customize item from menu:', item);
   }, []);
-  
+
   // Customer flow handlers
   const saveCustomerDetails = customerFlow.saveCustomerDetails;
   const closeCustomerModal = useCallback(() => {
     customerFlow.closeCustomerModal();
-    updateState({ showCustomerModal: false });
+    uiStore.setModal('showCustomerModal', false);
     setManagerOverrideGranted(false);
-  }, [customerFlow, updateState]);
+  }, []);
   
   const handleOrderTypeSwitch = useCallback((newOrderType: 'COLLECTION') => {
-    updateState({ 
-      orderType: newOrderType,
-      showCustomerModal: false
-    });
+    orderStore.setOrderType(newOrderType);
+    uiStore.setModal('showCustomerModal', false);
     setManagerOverrideGranted(false);
     toast.success(`🔄 Order type switched to ${newOrderType}`);
-  }, [updateState]);
+  }, []);
   
   const handleManagerOverride = useCallback(() => {
     setIsManagementDialogOpen(true);
@@ -498,31 +520,112 @@ export default function POSDesktop() {
   const validateCustomerData = customerFlow.validateCustomerData;
 
   // ============================================================================
-  // ORDER PROCESSING HANDLERS - Delegated to useOrderProcessing hook
+  // SESSION PERSISTENCE & RESTORATION (must be before payment handlers)
   // ============================================================================
-  const handleProcessOrder = useCallback(async () => {
-    await orderProcessing.processOrder(
-      () => updateState({ 
-        pendingOrderConfirmation: true, 
-        showGuestCountModal: true,
-        selectedTableNumber: 1
-      }),
-      () => updateState({ showCustomerModal: true, pendingOrderConfirmation: true }),
-      () => updateState({ showOrderConfirmation: true })
-    );
-  }, [orderProcessing, updateState]);
+  
+  // State for pending session restoration
+  const [pendingSession, setPendingSession] = useState<PersistedSession | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  
+  // Load saved session on mount
+  useEffect(() => {
+    const loadSavedSession = async () => {
+      // Prevent duplicate calls
+      if (isLoadingSession) {
+        if (isDev) console.log('⏭️ [POSDesktop] Session load already in progress, skipping');
+        return;
+      }
+      
+      setIsLoadingSession(true);
+      
+      try {
+        const savedSession = await OfflineFirst.loadSession();
+        
+        if (savedSession && savedSession.orderItems.length > 0) {
+          if (isDev) console.log('📦 [POSDesktop] Found saved session:', savedSession);
+          setPendingSession(savedSession);
+          uiStore.setModal('showSessionRestoreDialog', true);
+        } else {
+          if (isDev) console.log('✅ [POSDesktop] No saved session found, starting fresh');
+        }
+      } catch (error) {
+        console.error('❌ [POSDesktop] Failed to load saved session:', error);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+    
+    loadSavedSession();
+  }, []); // Empty deps = run once on mount
+  
+  // Clear current session from IndexedDB
+  const clearCurrentSession = useCallback(async () => {
+    try {
+      if (pendingSession?.sessionId) {
+        await OfflineFirst.clearSession(pendingSession.sessionId);
+        setPendingSession(null);
+        if (isDev) console.log('🗑️ [POSDesktop] Session cleared successfully');
+      }
+    } catch (error) {
+      console.error('❌ [POSDesktop] Failed to clear session:', error);
+    }
+  }, [pendingSession?.sessionId]);
+  
+  // Handle session discard (user chooses to start fresh)
+  const handleSessionDiscard = useCallback(async () => {
+    if (isDev) console.log('🗑️ [POSDesktop] User discarded saved session');
+    
+    try {
+      if (pendingSession?.sessionId) {
+        await OfflineFirst.clearSession(pendingSession.sessionId);
+      }
+      setPendingSession(null);
+      uiStore.setModal('showSessionRestoreDialog', false);
+      toast.success('✅ Starting fresh order');
+    } catch (error) {
+      console.error('❌ [POSDesktop] Failed to discard session:', error);
+      toast.error('Failed to clear saved session');
+    }
+  }, [pendingSession]);
+  
+  // Handle session restore (user chooses to restore saved order)
+  const handleSessionRestore = useCallback(async () => {
+    if (!pendingSession) {
+      if (isDev) console.warn('⚠️ [POSDesktop] No pending session to restore');
+      return;
+    }
+    
+    if (isDev) console.log('✅ [POSDesktop] Restoring saved session:', pendingSession);
+    
+    try {
+      // Restore order state from saved session
+      orderStore.setOrderItems(pendingSession.orderItems);
+      orderStore.setOrderType(pendingSession.orderType);
+      customerStore.updateCustomer(pendingSession.customerData);
+      orderStore.setSelectedTableNumber(pendingSession.selectedTableNumber);
+      orderStore.setGuestCount(pendingSession.guestCount);
+      uiStore.closeModal('showSessionRestoreDialog');
+      
+      toast.success(`✅ Restored order with ${pendingSession.orderItems.length} items`);
+    } catch (error) {
+      console.error('❌ [POSDesktop] Failed to restore session:', error);
+      toast.error('Failed to restore saved order');
+    }
+  }, [pendingSession]);
 
   // ============================================================================
   // PAYMENT COMPLETION HANDLER - Delegated to hooks
   // ============================================================================
+
+  // PAYMENT COMPLETION HANDLER - Delegated to hooks
   const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
-    console.log('💳 [POSDesktop] Payment completed successfully:', { tipSelection, paymentResult });
+    if (isDev) console.log('💳 [POSDesktop] Payment completed successfully:', { tipSelection, paymentResult });
     
     try {
       // Calculate final totals
-      const subtotal = state.orderItems.reduce((sum, item) => {
+      const subtotal = orderStore.orderItems.reduce((total, item) => {
         const itemPrice = item.variant?.price || item.price;
-        return sum + (itemPrice * item.quantity);
+        return total + (itemPrice * item.quantity);
       }, 0);
       
       const vatAmount = subtotal * 0.20;
@@ -531,28 +634,23 @@ export default function POSDesktop() {
       
       // Persist payment using hook
       const paymentData = {
-        order_type: state.orderType,
-        table_number: state.selectedTableNumber,
-        customer_data: state.customerData,
-        items: state.orderItems,
         payment_method: paymentResult?.method || 'CASH',
         subtotal,
         vat_amount: vatAmount,
         tip_amount: tipSelection.amount,
-        total_amount: finalTotal,
-        stripe_payment_intent_id: paymentResult?.reference || null
+        total_amount: finalTotal
       };
       
       await orderProcessing.persistPayment(paymentData);
       
       // Print customer receipt using hook
       const receiptData = {
-        order_number: `${state.orderType.charAt(0)}${Date.now().toString().slice(-6)}`,
-        order_type: state.orderType,
-        table_number: state.selectedTableNumber,
-        guest_count: state.guestCount,
-        customer_name: `${state.customerData.firstName} ${state.customerData.lastName}`.trim() || 'Walk-in Customer',
-        items: state.orderItems.map(item => ({
+        order_number: `${orderStore.orderType.charAt(0)}${Date.now().toString().slice(-6)}`,
+        order_type: orderStore.orderType,
+        table_number: orderStore.selectedTableNumber,
+        guest_count: orderStore.guestCount,
+        customer_name: `${customerStore.customerData.firstName} ${customerStore.customerData.lastName}`.trim() || 'Walk-in Customer',
+        items: orderStore.orderItems.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.variant?.price || item.price,
@@ -566,100 +664,140 @@ export default function POSDesktop() {
         timestamp: new Date().toISOString()
       };
       
-      await printing.printCustomerReceipt(receiptData, state.orderType);
+      await printing.handlePrintReceipt(finalTotal);
+      
+      // Clear saved session from IndexedDB (order complete, no need to restore)
+      await clearCurrentSession();
       
       // Reset order state
-      updateState({
-        orderItems: [],
-        customerData: {
-          firstName: '',
-          lastName: '',
-          phone: '',
-          email: '',
-          notes: '',
-          tableNumber: '',
-          guestCount: 1,
-          address: '',
-          street: '',
-          city: '',
-          postcode: '',
-          deliveryNotes: ''
-        },
-        selectedTableNumber: null,
-        guestCount: 1,
-        showOrderConfirmation: false,
-        showPaymentModal: false
-      });
+      orderStore.clearOrder();
+      customerStore.clearCustomer();
       
       toast.success('💰 Payment completed successfully!');
     } catch (error) {
       console.error('❌ [POSDesktop] Payment completion failed:', error);
       toast.error('Payment completion failed. Please try again.');
     }
-  }, [state, orderProcessing, printing, updateState]);
+  }, [orderProcessing, printing, clearCurrentSession]);
 
-  // ============================================================================
   // THERMAL PRINTING HANDLERS WITH OFFLINE QUEUING
-  // ============================================================================
 
   const handleSendToKitchen = useCallback(async () => {
-    if (!state.orderItems || state.orderItems.length === 0) {
+    if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
       toast.error('No items to send to kitchen');
       return;
     }
     
-    await printing.printKitchenTicket(state, updateState);
-  }, [state, printing, updateState]);
+    await printing.handleSendToKitchen();
+  }, [printing]);
 
   const handlePrintBill = useCallback(async () => {
-    if (!state.orderItems || state.orderItems.length === 0) {
+    if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
       toast.error('No items to print bill for');
       return;
     }
     
-    await printing.printBill(state, updateState);
-  }, [state, printing, updateState]);
+    await printing.handlePrintBill(orderTotal);
+  }, [printing, orderTotal]);
 
   const handleSaveUpdate = useCallback(async () => {
-    console.log('Save/Update order');
+    if (isDev) console.log('Save/Update order');
     toast.success('Order saved');
   }, []);
 
   const handleCompleteOrder = useCallback(async () => {
-    if (!state.orderItems || state.orderItems.length === 0) {
+    if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
       toast.error('No items to complete');
       return;
     }
     
-    await printing.completeOrder(state, updateState);
-  }, [state, printing, updateState]);
+    await printing.handlePrintReceipt(orderTotal);
+  }, [printing, orderTotal]);
 
   const handleSplitBill = useCallback(async () => {
-    console.log('Split bill');
+    if (isDev) console.log('Split bill');
     toast.success('Bill split');
   }, []);
 
   const handleCustomerDataUpdate = useCallback((field: string, value: string) => {
-    updateState({
-      customerData: {
-        ...state.customerData,
-        [field]: value
-      }
+    customerStore.updateCustomer({
+      ...customerStore.customerData,
+      [field]: value
     });
-  }, [state.customerData, updateState]);
+  }, []);
 
   const handleSchedulingChange = useCallback((data: any) => {
-    console.log('Scheduling change:', data);
+    if (isDev) console.log('Scheduling change:', data);
+  }, []);
+  
+  // ============================================================================
+  // MODAL ORCHESTRATION HANDLERS
+  // ============================================================================
+  
+  // Single Payment Flow handlers
+  const handleClosePaymentModal = useCallback(() => {
+    uiStore.setModal('showPaymentFlow', false);
+  }, []);
+  
+  // Payment Modal handlers
+  const handleShowPaymentModal = useCallback(() => {
+    if (isDev) console.log('💳 [POSDesktop] Opening payment flow');
+    uiStore.setModal('showPaymentFlow', true);
+  }, []);
+  
+  // NEW: Payment Flow Completion Handler
+  const handlePaymentFlowComplete = useCallback(async (result: PaymentFlowResult) => {
+    if (isDev) console.log('💳 [POSDesktop] Payment flow completed:', result);
+    
+    if (!result.success) {
+      console.error('Payment flow failed');
+      uiStore.setModal('showPaymentFlow', false);
+      return;
+    }
+    
+    try {
+      // Print receipt
+      await printing.handlePrintReceipt(result.orderTotal);
+      
+      // Clear saved session from IndexedDB (order complete, no need to restore)
+      await clearCurrentSession();
+      
+      // Reset order state and close modal
+      orderStore.clearOrder();
+      customerStore.clearCustomer();
+      uiStore.setModal('showPaymentFlow', false);
+      
+      toast.success('💰 Payment completed successfully!');
+    } catch (error) {
+      console.error('❌ [POSDesktop] Payment completion failed:', error);
+      toast.error('Payment completion failed. Please try again.');
+    }
+  }, [printing, clearCurrentSession]);
+  
+  // Customer Modal handlers
+  const handleShowCustomerModal = useCallback(() => {
+    if (isDev) console.log('👤 [POSDesktop] Opening customer modal');
+    uiStore.setModal('showCustomerModal', true);
+  }, []);
+  
+  // Table Selection handlers (for DINE-IN orders)
+  const handleShowTableSelection = useCallback(() => {
+    if (isDev) console.log('📋 [POSDesktop] Opening table selection');
+    // For DINE-IN, we use guest count modal which includes table selection
+    uiStore.setModal('showGuestCountModal', true);
+  }, []);
+  
+  const handleCloseTableSelection = useCallback(() => {
+    if (isDev) console.log('❌ [POSDesktop] Closing table selection');
+    uiStore.setModal('showGuestCountModal', false);
   }, []);
 
   const isOrderReady = useCallback(() => {
-    if (state.orderItems.length === 0) return false;
-    return validateCustomerData(state.orderType);
-  }, [state.orderItems.length, state.orderType, validateCustomerData]);
+    if (orderStore.orderItems.length === 0) return false;
+    return validateCustomerData(orderStore.orderType);
+  }, [validateCustomerData]);
 
-  // ============================================================================
   // PRINTER STATUS MONITORING
-  // ============================================================================
   
   const logger = createLogger('POSDesktop');
 
@@ -688,11 +826,9 @@ export default function POSDesktop() {
   // ✅ Update global state when printer status changes
   useEffect(() => {
     if (printerStatus?.queuedJobs !== undefined) {
-      updateState({
-        queuedJobsCount: printerStatus.queuedJobs
-      });
+      uiStore.setQueuedJobsCount(printerStatus.queuedJobs);
     }
-  }, [printerStatus?.queuedJobs, updateState]);
+  }, [printerStatus?.queuedJobs]);
 
   const handleManualPrintQueueProcess = async () => {
     try {
@@ -725,6 +861,41 @@ export default function POSDesktop() {
     }
   };
 
+  // ============================================================================
+  // AUTH-RELATED EFFECTS (must be before conditional returns)
+  // ============================================================================
+  
+  // ✅ ENABLED: Redirect to login if not authenticated (WITH NAVIGATION GUARD)
+  useEffect(() => {
+    if (hasRedirectedRef.current) {
+      return;
+    }
+    
+    const now = Date.now();
+    if (now - lastRedirectTimeRef.current < REDIRECT_COOLDOWN) {
+      return;
+    }
+
+    if (!authLoading && !isAuthenticated) {
+      hasRedirectedRef.current = true;
+      lastRedirectTimeRef.current = now;
+      navigate('/pos-login', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+  
+  // ✅ ENABLED: Reset redirect guard when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      hasRedirectedRef.current = false;
+    }
+  }, [isAuthenticated]);
+  
+  // Cleanup subscriptions on unmount only
+  useEffect(() => {
+    if (isDev) console.log('🧹 POSDesktop: Cleaning up real-time menu subscriptions...');
+    cleanupRealtimeMenuStore();
+  }, [isDev]); // Empty deps = only runs on mount/unmount
+
   // Initialize menu store with fast POS bundle loading
   useEffect(() => {
     // React StrictMode guard - prevents double initialization
@@ -746,7 +917,7 @@ export default function POSDesktop() {
         // Only log in development
         const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
         if (isDevelopment) {
-          console.log('🚀 [POSDesktop] Starting fast initialization with POS bundle...');
+          if (isDev) console.log('🚀 [POSDesktop] Starting fast initialization with POS bundle...');
         }
         
         // Try fast bundle loading first
@@ -761,14 +932,14 @@ export default function POSDesktop() {
         
         if (bundleSuccess) {
           if (isDevelopment) {
-            console.log('✅ [POSDesktop] Fast bundle loaded successfully');
+            if (isDev) console.log('✅ [POSDesktop] Fast bundle loaded successfully');
           }
           
           // ✅ FIX: Don't auto-select section - let it default to null to show ALL items
           // The categories array contains real DB categories (UUIDs), not synthetic section IDs
           // When selectedMenuCategory is null, updateFilteredItems shows all items (correct behavior)
           if (isDevelopment) {
-            console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
+            if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
           }
           
           // Mark first interactive
@@ -777,11 +948,11 @@ export default function POSDesktop() {
         } else {
           // Fallback to full initialization if bundle fails
           if (isDevelopment) {
-            console.log('⚠️ [POSDesktop] Bundle loading failed, falling back to full initialization');
+            if (isDev) console.log('⚠️ [POSDesktop] Bundle loading failed, falling back to full initialization');
           }
           
           if (isActive) {
-            await realtimeMenuStore.initialize();
+            await useRealtimeMenuStore.getState().initialize();
           }
           
           // Check again after async operation
@@ -791,7 +962,7 @@ export default function POSDesktop() {
           
           // ✅ FIX: Don't auto-select section here either
           if (isDevelopment) {
-            console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
+            if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
           }
         }
         
@@ -804,7 +975,7 @@ export default function POSDesktop() {
           setTimeout(() => {
             if (isActive) {
               const summary = posPerf.getSummary();
-              console.log('📊 [POSDesktop] Performance Summary:', summary);
+              if (isDev) console.log('📊 [POSDesktop] Performance Summary:', summary);
             }
           }, 100);
         }
@@ -866,7 +1037,8 @@ export default function POSDesktop() {
           }
           
           // Start real-time subscriptions for menu data
-          realtimeMenuStore.startRealtimeSubscriptions();
+          const menuStore = useRealtimeMenuStore.getState();
+          menuStore.startRealtimeSubscriptions();
           
           // Check if effect is still active after startup
           if (!isActive) {
@@ -905,41 +1077,68 @@ export default function POSDesktop() {
       posPerf.resetInitialization('pos_desktop_subscriptions');
     };
   }, []);
+  
+  // ============================================================================
+  // CONDITIONAL RENDERING (check auth state early)
+  // ============================================================================
+  
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(15, 15, 15, 0.98) 0%, rgba(25, 25, 25, 0.65) 100%)' }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render POSDesktop if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Handle category selection
   const handleCategoryChange = (categoryId: string | null) => {
     // ✅ NEW: Start real-time subscriptions on first interaction
     startRealtimeSubscriptionsIfNeeded();
     
+    // ✅ NETWORK OPTIMIZATION: Subscribe to selected category only
+    const menuStore = useRealtimeMenuStore.getState();
+    menuStore.subscribeToCategory(categoryId);
+    
     // ✅ FIXED: Pass categoryId directly to store without validation
     // The store has all categories including synthetic sections and real DB categories
-    realtimeMenuStore.setSelectedMenuCategory(categoryId);
+    menuStore.setSelectedMenuCategory(categoryId);
   };
   
-  // ============================================================================
   // RENDER HELPERS
-  // ============================================================================
   
   // Header Component
   const renderHeader = () => {
     return (
       <div>
         {/* Management Header - First Row */}
-        <ManagementHeader
-          title="Point of Sale"
-          className="border-b border-gray-700"
-          showGradient={false}
-          onAdminSuccess={handleAdminAuthenticated}
-        />
+        <div className="relative">
+          <ManagementHeader
+            title="Point of Sale"
+            className="border-b border-gray-700"
+            showGradient={false}
+            onAdminSuccess={handleManagementAuthSuccess}
+            onLogout={handleLogout}
+          />
+        </div>
 
         {/* POS Navigation - Second Row */}
         <POSNavigation
           className="border-b border-gray-700 px-4 py-2"
-          activeView={state.activeView}
-          currentOrderType={state.orderType}
+          activeView={uiStore.activeView}
+          currentOrderType={orderStore.orderType}
           onOrderTypeChange={handleOrderTypeChange}
-          aiOrdersCount={newOrdersCount}  // Use real count from store
-          onlineOrdersCount={0}  // TODO: Wire up online orders count
+          aiOrdersCount={0}
+          onlineOrdersCount={0}
+          showAdminControls={true}
         />
       </div>
     );
@@ -947,21 +1146,13 @@ export default function POSDesktop() {
 
   // Main View Renderer - NEW: Add view switching logic like POSDesktop
   const renderViewContent = () => {
-    switch (state.activeView) {
+    switch (uiStore.activeView) {
       case 'online-orders':
         return (
           <OnlineOrderManagement 
             onBack={() => {
-              updateState({ activeView: 'pos', orderType: 'DINE-IN' });
-            }} 
-          />
-        );
-      
-      case 'ai-orders':
-        return (
-          <AIOrdersPanel 
-            onBack={() => {
-              updateState({ activeView: 'pos', orderType: 'DINE-IN' });
+              uiStore.setActiveView('pos');
+              orderStore.setOrderType('DINE-IN');
             }} 
           />
         );
@@ -970,7 +1161,8 @@ export default function POSDesktop() {
         return (
           <ReservationsPlaceholder 
             onBack={() => {
-              updateState({ activeView: 'pos', orderType: 'DINE-IN' });
+              uiStore.setActiveView('pos');
+              orderStore.setOrderType('DINE-IN');
             }} 
           />
         );
@@ -983,231 +1175,269 @@ export default function POSDesktop() {
 
   // Main POS View
   const renderMainPOSView = () => {
-    return (
-      <div className="grid" style={{
-        gridTemplateColumns: '300px 200px 1fr 300px', // Customer Details | Categories | Menu Items | Order Summary
-        gridTemplateRows: '1fr', // Single row fills all available height
-        height: 'calc(100vh - 110px)', // Viewport-driven: 100vh - (ManagementHeader ~60px + POSNavigation ~50px)
-        minHeight: 'calc(100vh - 110px)', // Enforce minimum
-        maxHeight: 'calc(100vh - 110px)', // Prevent overflow
-        gap: '1rem',
-        padding: '1rem',
-        background: `linear-gradient(135deg, rgba(15, 15, 15, 0.98) 0%, rgba(25, 25, 25, 0.95) 50%, rgba(20, 20, 20, 0.98) 100%)`, // Enhanced gradient from MYA-788
-        boxShadow: '0 12px 30px -8px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.08)', // Professional shadows from MYA-788
-        border: '1px solid rgba(124, 93, 250, 0.15)', // Purple accent border from MYA-788
-        position: 'relative',
-        transition: 'all 0.3s ease',
-        borderRadius: '12px', // Increased border radius for premium feel
-        backdropFilter: 'blur(10px)', // Backdrop blur from MYA-788
-        overflow: 'hidden' // Prevent grid itself from scrolling
-      }}>
-        {/* Zone 1 - Customer Details: Order-type-specific customer information (300px width) */}
-        <div style={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}>
-          <div className="h-full rounded-xl overflow-hidden shadow-xl flex flex-col" style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 15, 0.98) 0%, rgba(25, 25, 25, 0.95) 50%, rgba(20, 20, 20, 0.98) 100%)', // Enhanced gradient
-            boxShadow: '0 12px 30px -8px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.08)', // Improved shadow with inner border
-            border: '1px solid rgba(124, 93, 250, 0.15)', // Purple accent border
-            backdropFilter: 'blur(10px)' // Added backdrop filter for premium feel
-          }}>
-            {/* Header */}
-            <div className="flex-shrink-0 p-4 border-b border-gray-700/30">
-              <h3 className="text-lg font-semibold mb-1" style={{
-                backgroundImage: `linear-gradient(135deg, white 30%, ${designColors.brand.purple} 100%)`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                textShadow: '0 0 10px rgba(124, 93, 250, 0.2)'
-              }}>
-                {state.orderType === 'DINE-IN' ? 'Table Selection' : state.orderType === 'DELIVERY' ? 'Delivery Details' : state.orderType === 'COLLECTION' ? 'Collection Details' : 'Customer Details'}
-              </h3>
-              {/* Gradient Underline */}
-              <div 
-                className="w-24 h-1 rounded-full mt-2"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${designColors.brand.purple}, transparent)`
-                }}
+    // Define zones once to reuse in both legacy and responsive shells
+    const zoneCustomer = (
+      <POSZoneErrorBoundary zoneName="Order Type & Customer Selection" onReset={() => orderStore.setOrderType('COLLECTION')}>
+        <div 
+          className="flex flex-col min-w-0 flex-1 min-h-0"
+          style={{
+            height: '100%',
+            minHeight: 0,
+            flexShrink: 0,
+            background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(15, 15, 15, 0.95) 100%)',
+            boxShadow: '0 8px 20px -4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header */}
+          <div className="px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'rgba(255, 255, 255, 0.03)' }}>
+            <h2 className="text-base font-semibold" style={{
+              backgroundImage: `linear-gradient(135deg, white 30%, ${QSAITheme.purple.light} 100%)`,
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              color: 'transparent'
+            }}>Order & Customer</h2>
+          </div>
+
+          {/* Customer badge or Dine-In table selector */}
+          <div className="flex-1 min-h-0 p-3 space-y-3">
+            {orderStore.orderType === "DINE-IN" && (
+              <DineInTableSelector
+                selectedTable={orderStore.selectedTableNumber}
+                onTableSelect={handleTableSelect}
+                tableOrders={persistentTableOrders}
+                className="w-full"
               />
-              <p className="text-gray-400 text-sm">
-                {state.orderType === 'DINE-IN' ? 'Choose an available table for dine-in service' : `Order type: ${state.orderType}`}
-              </p>
-            </div>
-            
-            {/* Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* DINE-IN: Table Selection Grid */}
-              {state.orderType === "DINE-IN" && (
-                <div className="space-y-4">
-                  <DineInTableSelector
-                    selectedTable={state.selectedTableNumber}
-                    onTableSelect={handleTableSelect}
-                    tableOrders={persistentTableOrders}
-                    className=""
-                  />
-                  {state.selectedTableNumber && (
-                    <div className="text-sm text-gray-400 mt-4">
-                      Table {state.selectedTableNumber} • {state.guestCount} guests
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Customer Details Badge for other order types */}
-              {(state.orderType === "DELIVERY" || state.orderType === "COLLECTION" || state.orderType === "WAITING") && (
-                <CustomerSummaryBadge
-                  orderType={state.orderType}
-                  onClick={handleCustomerDetailsClick}
-                  onClear={handleClearCustomerDetails}
-                  className="w-full"
-                />
-              )}
-            </div>
+            )}
+            {(orderStore.orderType === "DELIVERY" || orderStore.orderType === "COLLECTION" || orderStore.orderType === "WAITING") && (
+              <CustomerSummaryBadge
+                orderType={orderStore.orderType}
+                onClick={handleCustomerDetailsClick}
+                onClear={handleClearCustomerDetails}
+                className="w-full"
+              />
+            )}
           </div>
         </div>
+      </POSZoneErrorBoundary>
+    );
 
-        {/* Zone 2 - Categories: Menu category navigation (200px width) */}
-        <CategorySidebar
-          categories={categories}
-          onCategorySelect={handleCategoryChange}
-          selectedCategory={selectedCategory}
-          isLoading={menuLoading}
-        />
-        
-        {/* Zone 3 - Menu Items: Main menu item selection area (flexible 1fr) */}
-        <POSMenuSelector
-          onAddToOrder={handleAddToOrder}
-          onCustomizeItem={handleCustomizeItemFromMenu}
-          onCategoryChange={handleCategoryChange}
-          className="h-full"
-          showSkeletons={initialization.initialLoad}
-          orderType={state.orderType}
-        />
-        
-        {/* Zone 4 - Order Summary: Current order details and actions (300px width) */}
-        <OrderSummaryPanel
-          orderItems={getDisplayOrderItems()}
-          orderType={state.orderType}
-          tableNumber={state.selectedTableNumber}
-          guestCount={state.guestCount}
-          customerFirstName={state.customerData.firstName}
-          customerLastName={state.customerData.lastName}
-          customerPhone={state.customerData.phone}
-          customerAddress={state.customerData.address}
-          customerStreet={state.customerData.street}
-          customerPostcode={state.customerData.postcode}
-          customerData={state.customerData}
-          onRemoveItem={handleRemoveItem}
-          onUpdateQuantity={handleUpdateQuantity}
-          onClearOrder={handleClearOrder}
-          onProcessPayment={handleProcessOrder}
-          onSendToKitchen={handleSendToKitchen}
-          onPrintBill={handlePrintBill}
-          onSaveUpdate={handleSaveUpdate}
-          onTableSelect={handleTableSelect}
-          onCustomerDetailsClick={handleCustomerDetailsClick}
-          onTableSelectionClick={() => {
-            console.log('📋 [POSDesktop] Table selection requested for DINE-IN order');
-            // For DINE-IN orders, we need to select a table and guest count first
-            updateState({ 
-              showGuestCountModal: true,
-              selectedTableNumber: 1 // Default to table 1, will be updated in modal
-            });
-          }}
-          onCustomizeItem={handleCustomizeItem}
-          onIncrementItem={handleIncrementItem}
-          onDecrementItem={handleDecrementItem}
-          onUpdateNotes={handleUpdateNotes}
-          onCompleteOrder={handleCompleteOrder}
-          onSplitBill={handleSplitBill}
-          onClearCustomerDetails={handleClearCustomerDetails}
-          onCustomerDataUpdate={handleCustomerDataUpdate}
-          validateCustomerData={validateCustomerData}
-          isOrderReady={isOrderReady}
-          onSchedulingChange={handleSchedulingChange}
-          schedulingData={null}
-          
-          // ✅ NEW: Direct props control for Order Confirmation Modal
-          showOrderConfirmation={state.showOrderConfirmation}
-          onCloseOrderConfirmation={() => updateState({ showOrderConfirmation: false })}
-          onShowOrderConfirmation={() => updateState({ showOrderConfirmation: true })}
-          
-          // ✅ NEW: Payment completion handler
-          onPaymentComplete={handlePaymentSuccess}
-          
-          className="h-full"
-        />
-      </div>
+    const zoneCategories = (
+      <POSZoneErrorBoundary zoneName="Category Sidebar" onReset={() => realtimeMenuStore.setSelectedMenuCategory(null)}>
+        <div className="min-w-0" style={{ minHeight: 0, overflow: 'hidden', height: '100%' }}>
+          {initialization.initialLoad ? (
+            <CategorySidebarSkeleton />
+          ) : (
+            <CategorySidebar
+              categories={categories}
+              onCategorySelect={handleCategoryChange}
+              selectedCategory={selectedCategory}
+              isLoading={menuLoading}
+            />
+          )}
+        </div>
+      </POSZoneErrorBoundary>
+    );
+
+    const zoneMenu = (
+      <POSZoneErrorBoundary zoneName="Menu Selector" onReset={() => realtimeMenuStore.setSelectedMenuCategory(null)} showHomeButton>
+        <div className="min-w-0" style={{ minHeight: 0, overflow: 'hidden', height: '100%' }}>
+          <POSMenuSelector
+            onAddToOrder={handleAddToOrder}
+            onCustomizeItem={handleCustomizeItemFromMenu}
+            onCategoryChange={handleCategoryChange}
+            className="h-full"
+            showSkeletons={initialization.initialLoad}
+            orderType={orderStore.orderType}
+          />
+        </div>
+      </POSZoneErrorBoundary>
+    );
+
+    const zoneSummary = (
+      <POSZoneErrorBoundary zoneName="Order Summary" onReset={handleClearOrder} showHomeButton>
+        <div className="min-w-0" style={{ minHeight: 0, overflow: 'hidden', height: '100%' }}>
+          {initialization.initialLoad ? (
+            <OrderSummarySkeleton />
+          ) : (
+            <OrderSummaryPanel
+              orderItems={orderStore.orderItems}
+              orderType={orderStore.orderType}
+              tableNumber={orderStore.selectedTableNumber}
+              guestCount={orderStore.guestCount}
+              customerFirstName={customerStore.customerData.firstName}
+              customerLastName={customerStore.customerData.lastName}
+              customerPhone={customerStore.customerData.phone}
+              customerEmail={customerStore.customerData.email}
+              customerAddress={customerStore.customerData.address}
+              customerPostcode={customerStore.customerData.postcode}
+              deliveryFee={orderStore.deliveryFee}
+              onAddItem={(item) => {
+                orderStore.setOrderItems([...orderStore.orderItems, item]);
+              }}
+              onRemoveItem={(index) => {
+                const newItems = [...orderStore.orderItems];
+                newItems.splice(index, 1);
+                orderStore.setOrderItems(newItems);
+              }}
+              onUpdateItem={(index, updates) => {
+                const newItems = [...orderStore.orderItems];
+                newItems[index] = { ...newItems[index], ...updates };
+                orderStore.setOrderItems(newItems);
+              }}
+              onClearOrder={handleClearOrder}
+              onCompleteOrder={handleCompleteOrder}
+              onProcessPayment={handleCompleteOrder}
+              onPaymentSuccess={handlePaymentSuccess}
+              onSendToKitchen={handleSendToKitchen}
+              onSaveUpdate={handleSaveUpdate}
+              onTableSelect={(tableNum) => orderStore.setSelectedTableNumber(tableNum)}
+              onTableSelectionClick={handleShowTableSelection}
+              onCloseTableSelection={handleCloseTableSelection}
+              onCustomizeItem={handleCustomizeItem}
+              onCustomerDetailsClick={handleCustomerDetailsClick}
+              onSchedulingChange={handleSchedulingChange}
+              schedulingData={null}
+              onShowPaymentModal={handleShowPaymentModal}
+            />
+          )}
+        </div>
+      </POSZoneErrorBoundary>
+    );
+
+    return (
+      <ResponsivePOSShell
+        zones={{
+          customer: zoneCustomer,
+          categories: zoneCategories,
+          menu: zoneMenu,
+          summary: zoneSummary,
+        }}
+      />
     );
   };
 
   // Main app structure - Fixed: Removed circular call
   return (
     <CustomizeOrchestratorProvider>
-      {/* Main POS Layout */}
-      <div className="flex flex-col h-full">
-        {/* Header and Navigation */}
-        {renderHeader()}
+      {/* Main POS Layout - Two-row grid: content + footer */}
+      <div 
+        className="grid grid-rows-[1fr_auto] h-screen"
+      >
+        {/* Row 1: Header + Navigation + Main Content */}
+        <div className="flex flex-col overflow-hidden">
+          {/* Header and Navigation */}
+          {renderHeader()}
 
-        {/* Main Content - Use view content renderer */}
-        <div className="flex-1 overflow-hidden">
-          {renderViewContent()}
+          {/* Main Content - Use view content renderer */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {renderViewContent()}
+          </div>
+        </div>
+
+        {/* Row 2: Professional Footer - Always at bottom, never overlaps */}
+        <div>
+          <POSFooter 
+            currentOrderType={orderStore.orderType}
+            className=""
+          />
         </div>
 
         {/* Guest Count Modal for Table Selection */}
-        {state.showGuestCountModal && (
-          <POSGuestCountModalClean
-            isOpen={state.showGuestCountModal}
-            onClose={() => updateState({ showGuestCountModal: false })}
-            onSave={handleGuestCountSave}
-            tableNumber={state.selectedTableNumber}
-            onTableChange={(tableNumber) => updateState({ selectedTableNumber: tableNumber })}
+        {uiStore.showGuestCountModal && (
+          <POSGuestCountModalClean 
+            isOpen={uiStore.showGuestCountModal}
+            onClose={() => uiStore.setModal('showGuestCountModal', false)}
+            tableNumber={orderStore.selectedTableNumber || 0}
+            onConfirm={(guestCount) => orderStore.setGuestCount(guestCount)}
           />
         )}
 
-        {/* Dine-In Order Modal for Seated Tables */}
-        {state.showDineInModal && state.selectedTableNumber && state.selectedTableNumber > 0 && (
-          <DineInOrderModal
-            isOpen={state.showDineInModal}
-            onClose={() => updateState({ showDineInModal: false })}
-            tableNumber={state.selectedTableNumber}
+        {/* Dine-In Modal when table already seated */}
+        {uiStore.showDineInModal && (
+          <DineInOrderModal 
+            isOpen={uiStore.showDineInModal}
+            onClose={() => uiStore.setModal('showDineInModal', false)}
+            tableNumber={orderStore.selectedTableNumber || 0}
           />
         )}
 
-        {/* Customer Details Modal */}
-        {state.showCustomerModal && (
+        {/* Customer Details Modal for COLLECTION/WAITING/DELIVERY */}
+        {uiStore.showCustomerModal && (
           <CustomerDetailsModal
-            isOpen={state.showCustomerModal}
+            isOpen={uiStore.showCustomerModal}
             onClose={closeCustomerModal}
             onSave={handleCustomerSave}
-            orderType={state.orderType}
-            initialData={state.customerData}
-            orderValue={calculateOrderTotal()}
+            orderType={orderStore.orderType}
+            initialData={customerStore.customerData}
+            orderValue={orderTotal}
             onOrderTypeSwitch={handleOrderTypeSwitch}
             onManagerOverride={handleManagerOverride}
-            // NEW: pass promise-based approval and granted flag
             requestManagerApproval={requestManagerApproval}
             managerOverrideGranted={managerOverrideGranted}
           />
         )}
 
-        {/* Professional Footer */}
-        <POSFooter 
-          currentOrderType={state.orderType}
-          className=""
+        {/* Admin Side Panel - Opens after successful management password authentication */}
+        <AdminSidePanel
+          isOpen={showAdminPanel}
+          onClose={() => setShowAdminPanel(false)}
+          defaultTab="dashboard"
         />
 
-        {/* NEW: Management Password Dialog for critical overrides */}
-        <ManagementPasswordDialog
-          isOpen={isManagementDialogOpen}
-          onClose={handleManagementAuthCancel}
-          onAuthenticated={handleManagementAuthSuccess}
-          userId={user?.id}
-        />
+        {/* Session Restore Dialog - NEW: Prompt user to restore saved session */}
+        <Dialog open={uiStore.showSessionRestoreDialog} onOpenChange={(open) => !open && handleSessionDiscard()}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>🔄 Restore Previous Order?</DialogTitle>
+              <DialogDescription>
+                {pendingSession && (
+                  <>
+                    Found a saved order from{' '}
+                    <strong>{Math.round((Date.now() - pendingSession.timestamp) / 1000 / 60)} minutes ago</strong>.
+                    <br />
+                    <br />
+                    <div className="text-sm space-y-1">
+                      <div>🛍️ <strong>{pendingSession.orderItems.length} items</strong></div>
+                      <div>📦 <strong>{pendingSession.orderType}</strong></div>
+                      {pendingSession.selectedTableNumber && (
+                        <div>🎲 Table <strong>{pendingSession.selectedTableNumber}</strong></div>
+                      )}
+                      <div>💷 Total: <strong>£{pendingSession.total.toFixed(2)}</strong></div>
+                    </div>
+                    <br />
+                    Would you like to restore this order or start fresh?
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={handleSessionDiscard}>
+                🗑️ Start Fresh
+              </Button>
+              <Button onClick={handleSessionRestore}>
+                ✅ Restore Order
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+      
+      {/* Payment Flow Orchestrator - Single modal for all payment flows */}
+      <PaymentFlowOrchestrator
+        isOpen={uiStore.showPaymentFlow}
+        onClose={handleClosePaymentModal}
+        orderItems={orderStore.orderItems}
+        orderTotal={orderTotal}
+        orderType={orderStore.orderType}
+        tableNumber={orderStore.selectedTableNumber || undefined}
+        guestCount={orderStore.guestCount}
+        customerData={customerStore.customerData}
+        deliveryFee={0} // TODO: Calculate delivery fee if applicable
+        onPaymentComplete={handlePaymentFlowComplete}
+      />
     </CustomizeOrchestratorProvider>
   );
 }
