@@ -15,7 +15,6 @@ import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
 import { useRestaurantSettings } from '../utils/useRestaurantSettings';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
-import PaymentReconciliationPanel from './PaymentReconciliationPanel';
 import { RefundManagementPanel } from './RefundManagementPanel';
 import { VoiceOrderNotificationPanel } from './VoiceOrderNotificationPanel';
 import { VoiceOrderTestPanel } from './VoiceOrderTestPanel';
@@ -397,7 +396,6 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
               <TabsContent value="payments-delivery" className="space-y-4">
                 <div className="grid gap-6">
                   <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>Payment & Delivery Management</h3>
-                  <PaymentReconciliationPanel />
                   <RefundManagementPanel />
                 </div>
               </TabsContent>
