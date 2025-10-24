@@ -1,6 +1,3 @@
-
-
-
 /**
  * Standardized menu data model types for use across all components
  * in both the public website menu and POS system
@@ -219,6 +216,9 @@ export interface OrderItem {
   image_url?: string; // Add image URL for thumbnails in order summary
   modifiers: ModifierSelection[];
   customizations?: CustomizationSelection[];
+  // Category tracking for receipt section organization
+  category_id?: string;
+  category_name?: string;
   // Set Meal specific fields
   item_type?: 'menu_item' | 'set_meal'; // Distinguish between regular menu items and set meals
   set_meal_code?: string; // Set meal code (e.g., SM001)
@@ -227,6 +227,10 @@ export interface OrderItem {
     quantity: number;
     category_name?: string;
   }>; // Items included in the set meal for display purposes
+  // Customer identification for kitchen tickets (MYA-1103)
+  customer_name?: string;        // e.g., "John" or "Customer 1"
+  customer_number?: number;      // e.g., 1, 2, 3
+  customer_tab_id?: string;      // UUID of customer tab
 }
 
 /**
