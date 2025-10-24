@@ -1,9 +1,9 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { MenuItem, OrderItem } from '../utils/menuTypes';
 import { EditOrderItemModal } from './EditOrderItemModal';
 import { SetMealCustomizeModal } from './SetMealCustomizeModal';
 import { toast } from 'sonner';
+import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 
 // Types for the orchestrator
 interface CustomizeRequest {
@@ -51,14 +51,31 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
     currentMenuItem: null,
     onSave: null,
   });
+  
+  // 🎯 Access categories to look up category_name
+  const { categories } = useRealtimeMenuStore();
 
   // Helper function to convert MenuItem to OrderItem
   const createOrderItemFromMenuItem = (menuItem: MenuItem): OrderItem => {
+    // 🔍 Look up category_name from category_id
+    const category = categories.find(cat => cat.id === menuItem.category_id);
+    const categoryName = category?.name || 'Uncategorized';
+    
+    console.log('📦 [CustomizeOrchestrator] Creating OrderItem with category data:', {
+      menu_item_id: menuItem.id,
+      item_name: menuItem.name,
+      category_id: menuItem.category_id,
+      category_name: categoryName,
+      found_category: !!category
+    });
+    
     // Check if it's a set meal
     if ((menuItem as any).item_type === 'set_meal') {
       return {
         id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         menu_item_id: menuItem.id,
+        category_id: menuItem.category_id,
+        category_name: categoryName,
         name: menuItem.name,
         quantity: 1,
         price: menuItem.price || 0,
@@ -73,6 +90,23 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
 
     // For regular menu items, use default variant if available
     const variants = (menuItem as any).variants || [];
+    
+    // 🔍 ENHANCED DEBUG: Log complete variant data structure
+    console.log('🔍 [VARIANT DEBUG] Full variant data for item:', {
+      item_id: menuItem.id,
+      item_name: menuItem.name,
+      total_variants: variants.length,
+      variants_detail: variants.map((v: any) => ({
+        id: v.id,
+        name: v.name,
+        variant_name: v.variant_name,
+        protein_type_name: v.protein_type_name,
+        is_default: v.is_default,
+        price: v.price,
+        all_fields: Object.keys(v)
+      }))
+    });
+    
     let variantId: string = 'default';
     let variantName: string = 'Standard';
     let basePrice = menuItem.price || 0;
@@ -80,13 +114,24 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
     if (variants.length > 0) {
       const defaultVariant = variants.find((v: any) => v.is_default) || variants[0];
       variantId = defaultVariant.id;
-      variantName = defaultVariant.name || defaultVariant.variant_name || 'Standard';
+      // Use database-generated variant_name (e.g., "CHICKEN TIKKA MASALA") instead of manual construction
+      variantName = defaultVariant.variant_name || menuItem.name || 'Standard';
       basePrice = defaultVariant.price || menuItem.price || 0;
+      
+      // 🔍 LOG SELECTED VARIANT
+      console.log('✅ [VARIANT SELECTED] Using variant:', {
+        variant_id: variantId,
+        variant_name: variantName,
+        source: defaultVariant.variant_name ? 'variant_name field' : 'fallback to item name',
+        price: basePrice
+      });
     }
 
     return {
       id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       menu_item_id: menuItem.id,
+      category_id: menuItem.category_id,
+      category_name: categoryName,
       name: menuItem.name,
       quantity: 1,
       price: basePrice,
