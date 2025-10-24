@@ -7,12 +7,11 @@ import { useSystemStatus } from 'utils/pollingService';
 // NEW: Import offline status utilities
 import { getOfflineStatus, onOfflineStatusChange } from '../utils/serviceWorkerManager';
 import { outboxSyncManager } from '../utils/outboxSyncManager';
-import { bufferedPaymentManager } from '../utils/bufferedPaymentManager';
-import type { OutboxSyncStatus, PaymentManagerStatus } from '../utils/outboxSyncManager';
+import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
 
 interface POSFooterProps {
   className?: string;
-  currentOrderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "AI_ORDERS" | "ONLINE_ORDERS";
+  currentOrderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
 }
 
 /**
@@ -43,7 +42,6 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
   // NEW: Offline status monitoring
   const [isOffline, setIsOffline] = useState(getOfflineStatus());
   const [offlineSyncStatus, setOfflineSyncStatus] = useState<OutboxSyncStatus | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentManagerStatus | null>(null);
   
   const [internetStatus, setInternetStatus] = useState<{
     online: boolean;
@@ -84,19 +82,12 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
       setOfflineSyncStatus(status);
     });
     
-    // Monitor payment status  
-    const unsubscribePayment = bufferedPaymentManager.onStatusChange((status) => {
-      setPaymentStatus(status);
-    });
-    
     // Initial status fetch
     outboxSyncManager.getStatus().then(setOfflineSyncStatus).catch(console.error);
-    bufferedPaymentManager.getStatus().then(setPaymentStatus).catch(console.error);
     
     return () => {
       unsubscribeOffline();
       unsubscribeSync();
-      unsubscribePayment();
     };
   }, []);
   
@@ -176,9 +167,8 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     // NEW: Check offline status first
     if (isOffline) {
       const hasPendingOps = (offlineSyncStatus?.pendingOperations || 0) > 0;
-      const hasPendingPayments = (paymentStatus?.pendingPayments || 0) > 0;
       
-      if (hasPendingOps || hasPendingPayments) {
+      if (hasPendingOps) {
         return { label: 'Offline • Queued', color: 'text-yellow-400' };
       }
       return { label: 'Offline • Ready', color: 'text-orange-400' };
@@ -186,7 +176,7 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     
     const allConnected = printerStatus.connected && internetStatus.online && stripeStatus.connected;
     const anyLoading = printerStatus.loading || internetStatus.loading || stripeStatus.loading;
-    const isSyncing = offlineSyncStatus?.isSyncing || paymentStatus?.isProcessing;
+    const isSyncing = offlineSyncStatus?.isSyncing;
     
     if (isSyncing) {
       return { label: 'Syncing', color: 'text-blue-400' };
@@ -209,7 +199,6 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
       'DELIVERY': { label: 'DELIVERY', color: '#10B981' },
       'COLLECTION': { label: 'COLLECTION', color: '#F59E0B' },
       'WAITING': { label: 'WAITING', color: '#8B5CF6' },
-      'AI_ORDERS': { label: 'AI ORDERS', color: QSAITheme.purple.light },
       'ONLINE_ORDERS': { label: 'ONLINE', color: QSAITheme.purple.dark }
     };
     
@@ -251,21 +240,19 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     if (!isOffline) return null;
     
     const pendingOps = offlineSyncStatus?.pendingOperations || 0;
-    const pendingPayments = paymentStatus?.pendingPayments || 0;
-    const totalPending = pendingOps + pendingPayments;
     
     return (
       <div className="flex items-center gap-1.5 group relative">
         <span className="text-sm">📵</span>
         <span className="text-xs font-bold text-orange-400 bg-orange-400/20 px-1.5 py-0.5 rounded text-center min-w-[20px]">
-          {totalPending}
+          {pendingOps}
         </span>
         {/* Tooltip */}
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black bg-opacity-90 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
           <div>Offline Mode Active</div>
-          {totalPending > 0 && (
+          {pendingOps > 0 && (
             <div className="text-orange-300">
-              {pendingOps} orders, {pendingPayments} payments queued
+              {pendingOps} orders queued
             </div>
           )}
         </div>
@@ -279,12 +266,11 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
   return (
     <footer 
       className={`
-        fixed bottom-0 left-0 right-0 h-10 
+        h-10 
         ${QSAITheme.background.panel} 
         border-t border-qsai-purple/10
         px-4 py-2
         flex items-center justify-between
-        z-40
         ${className}
       `}
       style={{
@@ -362,11 +348,10 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
             loading={stripeStatus.loading}
             icon="💳"
             label="Payments"
-            extraInfo={isOffline ? `${paymentStatus?.pendingPayments || 0} pending` : undefined}
           />
           
           {/* NEW: Sync status indicator when online */}
-          {!isOffline && (offlineSyncStatus?.isSyncing || paymentStatus?.isProcessing) && (
+          {!isOffline && (offlineSyncStatus?.isSyncing) && (
             <div className="flex items-center gap-1">
               <span className="text-sm animate-spin">🔄</span>
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
