@@ -121,8 +121,8 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
     try {
       setIsLoading(true);
       
-      // Fetch orders from the dedicated online menu orders API
-      const response = await brain.get_online_menu_orders({
+      // Fetch orders from the dedicated online orders API
+      const response = await brain.get_online_orders({
         page: 1,
         page_size: 100
       });
@@ -429,6 +429,22 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
       case 'COMPLETED': return 'bg-green-700/20 text-green-600 border-green-700/20';
       case 'CANCELLED': return 'bg-red-500/20 text-red-500 border-red-500/20';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
+    }
+  };
+
+  // Get action metadata (icon and label) for quick actions
+  const getNextAction = (action: string) => {
+    switch (action) {
+      case 'CONFIRM':
+        return { icon: <CheckCircle className="h-4 w-4" />, label: 'Confirm Order' };
+      case 'START_PREPARATION':
+        return { icon: <ChefHat className="h-4 w-4" />, label: 'Start Preparation' };
+      case 'SET_READY_TIME':
+        return { icon: <Clock className="h-4 w-4" />, label: 'Set Ready Time' };
+      case 'MARK_COMPLETED':
+        return { icon: <Package className="h-4 w-4" />, label: 'Mark Completed' };
+      default:
+        return { icon: <MoreHorizontal className="h-4 w-4" />, label: action };
     }
   };
 
