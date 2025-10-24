@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Clock, Utensils } from 'lucide-react';
@@ -66,7 +67,7 @@ export function TableSelectionModal({
           // ✅ FIXED: Check persistedTableOrders correctly - it's Record<number, TableOrder>, not an array
           const tableOrder = persistedTableOrders[table.table_number];
           const hasPersistedOrders = tableOrder && tableOrder.order_items && tableOrder.order_items.length > 0;
-          const isSeated = tableOrder && tableOrder.status === 'Seated';
+          const isSeated = tableOrder && tableOrder.status === 'SEATED';
           
           return {
             tableNumber: table.table_number,
