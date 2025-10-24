@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { THERMAL_FONTS } from 'utils/thermalFonts';
 import { QSAITheme } from 'utils/QSAIDesign';
 import brain from 'brain';
+import { QRCodeConfig } from 'utils/receiptDesignerTypes';
+import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 
 interface OrderData {
   order_id: string;
@@ -17,6 +19,14 @@ interface OrderData {
     quantity: number;
   }>;
 }
+
+// Helper function to transform text to Title Case
+const toTitleCase = (str: string): string => {
+  if (!str) return '';
+  return str.split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
+};
 
 // New interface for form-based thermal receipt data
 interface ThermalReceiptFormData {
@@ -39,15 +49,8 @@ interface ThermalReceiptFormData {
   logoWidth?: number;
   logoHeight?: number;
   
-  // QR Codes
-  qrCodes: Array<{
-    id: string;
-    title: string;
-    content: string;
-    size: number;
-    position: 'header' | 'footer';
-    placement: 'left' | 'center' | 'right';
-  }>;
+  // QR Codes - NOW USING PROPER TYPE
+  qrCodes: QRCodeConfig[];
   
   orderType: 'dine_in' | 'collection' | 'delivery';
   receiptNumber?: string;
@@ -131,64 +134,59 @@ export default function ThermalPreview({
   // Debug log to check what we're receiving
   console.log('ThermalPreview received:', { mode, formData, paperWidth, receiptFormat });
   
-  // State for category section mappings
-  const [sectionMappings, setSectionMappings] = useState<{[key: string]: number}>({});
-  const [isLoadingMappings, setIsLoadingMappings] = useState(false);
+  // Build category → section order map from store (in-memory, no API calls)
+  const categories = useRealtimeMenuStore(state => state.categories);
+  const menuItems = useRealtimeMenuStore(state => state.menuItems);
   
-  // Load section mappings when component mounts
-  useEffect(() => {
-    const loadSectionMappings = async () => {
-      if (isLoadingMappings) return;
-      
-      setIsLoadingMappings(true);
-      try {
-        const response = await brain.get_category_section_mappings();
-        const result = await response.json();
-        
-        console.log('🔍 Section mappings API response:', result);
-        
-        if (result.success && result.mappings && result.mappings.length > 0) {
-          // Create a lookup map: menu_item_id -> section_order
-          const itemToSectionMap: {[key: string]: number} = {};
-          
-          // We need to fetch menu items to map menu_item_id to category
-          const menuResponse = await brain.get_real_menu_data();
-          const menuResult = await menuResponse.json();
-          
-          console.log('🔍 Menu data API response:', menuResult);
-          
-          if (menuResult.success && menuResult.menu_items) {
-            // Create category_id to section mapping
-            const categoryToSection: {[key: string]: number} = {};
-            result.mappings.forEach((mapping: any) => {
-              categoryToSection[mapping.category_id] = mapping.print_order;
-            });
-            
-            // Map menu_item_id to section using category_id
-            menuResult.menu_items.forEach((item: any) => {
-              const sectionOrder = categoryToSection[item.category_id] || 999;
-              itemToSectionMap[item.id] = sectionOrder;
-            });
-            
-            setSectionMappings(itemToSectionMap);
-            console.log('🎯 Section mappings loaded:', itemToSectionMap);
-          } else {
-            console.warn('⚠️ Menu data API failed or returned no items');
-          }
-        } else {
-          console.warn('⚠️ Section mappings API failed or returned no mappings');
-        }
-      } catch (error) {
-        console.error('❌ Failed to load section mappings:', error);
-        // Fallback to simple alphabetical sorting
-        setSectionMappings({});
-      } finally {
-        setIsLoadingMappings(false);
+  // Build menu_item_id → category_id lookup
+  const itemToCategoryMap = useMemo(() => {
+    const map: {[menuItemId: string]: string} = {};
+    menuItems.forEach(item => {
+      if (item.id && item.category_id) {
+        map[item.id] = item.category_id;
       }
+    });
+    return map;
+  }, [menuItems]);
+  
+  const categoryToSectionMap = useMemo(() => {
+    const map: {[categoryId: string]: number} = {};
+    
+    // Map section-ids to numbers (canonical database structure)
+    const sectionToNumber: {[sectionId: string]: number} = {
+      'section-starters': 1,
+      'section-main-course': 2,
+      'section-side-dishes': 3,
+      'section-accompaniments': 4,
+      'section-desserts-coffee': 5,
+      'section-drinks': 6,
+      'section-extras': 7
     };
     
-    loadSectionMappings();
-  }, []);
+    categories.forEach(category => {
+      // Skip section-level categories (they are parents, not children)
+      if (category.id && category.id.startsWith('section-')) {
+        return;
+      }
+      
+      // Get section number from parent_category_id
+      const sectionNumber = sectionToNumber[category.parent_category_id] || 999;
+      map[category.id] = sectionNumber;
+    });
+    
+    return map;
+  }, [categories]);
+  
+  // Build category_id → category_name lookup for category subheadings
+  const categoryNameMap = useMemo(() => {
+    const map: {[categoryId: string]: string} = {};
+    categories.forEach(category => {
+      if (category.id && category.name) {
+        map[category.id] = category.name;
+      }
+    });
+    return map;
+  }, [categories]);
   
   // DEBUG: Log specific fields we're having trouble with
   if (mode === 'form' && formData) {
@@ -204,7 +202,7 @@ export default function ThermalPreview({
   if (mode === 'form' && formData) {
     // Use receiptFormat from props or formData
     const format = receiptFormat || formData.receiptFormat || 'front_of_house';
-    return renderFormBasedReceipt(formData, paperWidth, format, sectionMappings);
+    return renderFormBasedReceipt(formData, paperWidth, format, categoryToSectionMap, itemToCategoryMap, categoryNameMap);
   }
   
   // Original canvas-based rendering for backward compatibility
@@ -216,7 +214,9 @@ function renderFormBasedReceipt(
   data: ThermalReceiptFormData, 
   paperWidth: 58 | 80, 
   receiptFormat: 'front_of_house' | 'kitchen_customer',
-  sectionMappings: {[key: string]: number} = {}
+  categoryToSectionMap: {[key: string]: number} = {},
+  itemToCategoryMap: {[key: string]: string} = {},
+  categoryNameMap: {[key: string]: string} = {}
 ) {
   const charWidth = paperWidth === 58 ? 32 : 42;
   
@@ -364,7 +364,7 @@ function renderFormBasedReceipt(
                 maxWidth: paperWidth === 58 ? '150px' : '200px',
                 maxHeight: '80px',
                 objectFit: 'contain',
-                filter: 'contrast(1.2) brightness(0.9)' // Enhance contrast for thermal printing
+                filter: 'contrast(1.2)' // Enhanced contrast without brightness reduction
               }}
             />
           </div>
@@ -584,346 +584,229 @@ function renderFormBasedReceipt(
         </div>
         
         {data.orderItems && data.orderItems.length > 0 ? (
-          // First group identical items
           (() => {
-            // Group items by name, variant, and customizations
-            const groupedItems = data.orderItems.reduce((groups: any[], item: any) => {
-              // Create a unique key for grouping identical items
-              const variantKey = item.variant ? `_${item.variant.name}` : '';
-              const customizationsKey = item.customizations ? 
-                item.customizations
-                  .map((c: any) => `${c.name}_${c.price}`)
-                  .sort()
-                  .join('|') : '';
-              const instructionsKey = item.instructions ? `_inst:${item.instructions}` : '';
-              
-              const groupKey = `${item.name}${variantKey}_${customizationsKey}${instructionsKey}`;
-              
-              // Find existing group or create new one
-              const existingGroup = groups.find(g => g.groupKey === groupKey);
-              
-              if (existingGroup) {
-                // Add to existing group
-                existingGroup.quantity += item.quantity;
-                existingGroup.total += item.total || 0;
-              } else {
-                // Create new group
-                groups.push({
-                  ...item,
-                  groupKey,
-                  quantity: item.quantity,
-                  total: item.total || 0
-                });
-              }
-              
-              return groups;
-            }, []);
+            // Check if we have customer-grouped data (DINE-IN with customer tabs)
+            const hasCustomerData = data.orderItems.some((item: any) => item.customer_id || item.customer_name);
             
-            return groupedItems;
-          })()
-            .sort((a, b) => {
-              // Sort by section order (1-7) using sectionMappings lookup
-              const getSectionOrder = (item: any) => {
-                // Use the sectionMappings lookup table that maps menu_item_id to section order
-                // Only use mappings if they're loaded (not empty object)
-                if (sectionMappings && Object.keys(sectionMappings).length > 0 && item.menu_item_id && sectionMappings[item.menu_item_id]) {
-                  return sectionMappings[item.menu_item_id];
+            if (hasCustomerData && (data.orderMode === 'DINE-IN' || data.orderType === 'dine_in')) {
+              // CUSTOMER-GROUPED RENDERING
+              const customerGroups = data.orderItems.reduce((groups: any, item: any) => {
+                const customerId = item.customer_id || 'ungrouped';
+                const customerName = item.customer_name || 'Other Items';
+                
+                if (!groups[customerId]) {
+                  groups[customerId] = {
+                    customerName,
+                    items: []
+                  };
                 }
-                
-                // Enhanced fallback: check the actual item name for common section patterns
-                const itemName = (item.name || '').toUpperCase();
-                
-                // Common starter patterns
-                if (itemName.includes('SAMOSA') || itemName.includes('BHAJI') || itemName.includes('PURI') || 
-                    itemName.includes('TIKKA') && !itemName.includes('(MAIN)') || itemName.includes('PACKORA') ||
-                    itemName.includes('KEBAB') || itemName.includes('SOUP') || itemName.includes('PRAWN COCKTAIL')) {
-                  return 1; // STARTERS
-                }
-                
-                // Main course patterns
-                if (itemName.includes('(MAIN)') || itemName.includes('MIXED GRILL') || itemName.includes('TANDOORI CHICKEN (MAIN)')) {
-                  return 2; // MAIN COURSE
-                }
-                
-                // Rice and bread patterns
-                if (itemName.includes('RICE') || itemName.includes('NAAN') || itemName.includes('CHAPATI') || itemName.includes('PARATHA')) {
-                  return 3; // SIDE DISHES
-                }
-                
-                // Accompaniments patterns
-                if (itemName.includes('CHUTNEY') || itemName.includes('PICKLE') || itemName.includes('RAITA') || itemName.includes('SAUCE')) {
-                  return 4; // ACCOMPANIMENTS
-                }
-                
-                // Desserts and coffee patterns
-                if (itemName.includes('KULFI') || itemName.includes('DESSERT') || itemName.includes('COFFEE') || itemName.includes('TEA')) {
-                  return 5; // DESSERTS & COFFEE
-                }
-                
-                // Drinks patterns
-                if (itemName.includes('DRINK') || itemName.includes('WINE') || itemName.includes('BEER') || itemName.includes('LASSI')) {
-                  return 6; // DRINKS & WINE
-                }
-                
-                // Set meal patterns
-                if (itemName.includes('SET') || itemName.includes('MEAL') || itemName.includes('FEAST') || itemName.includes('SPECIAL')) {
-                  return 7; // SET MEALS
-                }
-                
-                // Final fallback to original category mapping
-                const categoryToSection: { [key: string]: number } = {
-                  'STARTERS': 1,
-                  'MAIN COURSE': 2, 
-                  'SIDE DISHES': 3,
-                  'ACCOMPANIMENTS': 4,
-                  'DESSERTS & COFFEE': 5,
-                  'DRINKS & WINE': 6,
-                  'SET MEALS': 7
-                };
-                
-                const categoryName = item.category_name || item.category?.name || '';
-                const sectionOrder = categoryToSection[categoryName.toUpperCase()] || 999;
-                
-                return sectionOrder;
-              };
+                groups[customerId].items.push(item);
+                return groups;
+              }, {});
               
-              const aSection = getSectionOrder(a);
-              const bSection = getSectionOrder(b);
-              
-              // Debug logging - only if mappings are loaded
-              if (Object.keys(sectionMappings).length > 0) {
-                console.log(`🔄 Sorting: ${a.name} (menu_item_id: ${a.menu_item_id}, section ${aSection}) vs ${b.name} (menu_item_id: ${b.menu_item_id}, section ${bSection})`);
-              }
-              
-              // Primary sort: by section order (1-7)
-              if (aSection !== bSection) {
-                return aSection - bSection;
-              }
-              
-              // Secondary sort: alphabetically within same section
-              const aName = a.name || '';
-              const bName = b.name || '';
-              return aName.localeCompare(bName);
-            })
-            // Group items by section and render with section headers
-            .reduce((acc: any[], item: any, index: number, sortedItems: any[]) => {
-              // Get section info for current item
-              const getSectionOrder = (item: any) => {
-                if (sectionMappings && Object.keys(sectionMappings).length > 0 && item.menu_item_id && sectionMappings[item.menu_item_id]) {
-                  return sectionMappings[item.menu_item_id];
-                }
-                
-                const itemName = (item.name || '').toUpperCase();
-                if (itemName.includes('SAMOSA') || itemName.includes('BHAJI') || itemName.includes('PURI') || 
-                    itemName.includes('TIKKA') && !itemName.includes('(MAIN)') || itemName.includes('PACKORA') ||
-                    itemName.includes('KEBAB') || itemName.includes('SOUP') || itemName.includes('PRAWN COCKTAIL')) {
-                  return 1;
-                }
-                if (itemName.includes('(MAIN)') || itemName.includes('MIXED GRILL') || itemName.includes('TANDOORI CHICKEN (MAIN)')) {
-                  return 2;
-                }
-                if (itemName.includes('RICE') || itemName.includes('NAAN') || itemName.includes('CHAPATI') || itemName.includes('PARATHA')) {
-                  return 3;
-                }
-                if (itemName.includes('CHUTNEY') || itemName.includes('PICKLE') || itemName.includes('RAITA') || itemName.includes('SAUCE')) {
-                  return 4;
-                }
-                if (itemName.includes('KULFI') || itemName.includes('DESSERT') || itemName.includes('COFFEE') || itemName.includes('TEA')) {
-                  return 5;
-                }
-                if (itemName.includes('DRINK') || itemName.includes('WINE') || itemName.includes('BEER') || itemName.includes('LASSI')) {
-                  return 6;
-                }
-                if (itemName.includes('SET') || itemName.includes('MEAL') || itemName.includes('FEAST') || itemName.includes('SPECIAL')) {
-                  return 7;
-                }
-                
-                const categoryToSection: { [key: string]: number } = {
-                  'STARTERS': 1, 'MAIN COURSE': 2, 'SIDE DISHES': 3,
-                  'ACCOMPANIMENTS': 4, 'DESSERTS & COFFEE': 5, 'DRINKS & WINE': 6, 'SET MEALS': 7
-                };
-                const categoryName = item.category_name || item.category?.name || '';
-                return categoryToSection[categoryName.toUpperCase()] || 999;
-              };
-              
-              const currentSectionOrder = getSectionOrder(item);
-              const previousSectionOrder = index > 0 ? getSectionOrder(sortedItems[index - 1]) : null;
-              
-              // Section name mapping
-              const getSectionName = (sectionOrder: number): string => {
-                const sectionNames: { [key: number]: string } = {
-                  1: 'STARTERS',
-                  2: 'MAIN COURSE', 
-                  3: 'SIDE DISHES',
-                  4: 'ACCOMPANIMENTS',
-                  5: 'DESSERTS & COFFEE',
-                  6: 'DRINKS & WINE',
-                  7: 'SET MEALS'
-                };
-                return sectionNames[sectionOrder] || 'OTHER';
-              };
-              
-              // Add section header if this is a new section
-              if (currentSectionOrder !== previousSectionOrder) {
-                const sectionName = getSectionName(currentSectionOrder);
-                acc.push(
+              // Render each customer's items
+              return Object.entries(customerGroups).map(([customerId, group]: [string, any]) => (
+                <div key={customerId} className="mb-4">
+                  {/* Customer Name Header */}
                   <div 
-                    key={`section-${currentSectionOrder}`} 
-                    className={`text-center my-2 ${
-                      isKitchenReceipt 
-                        ? 'text-lg font-black text-gray-800' 
-                        : 'text-xs font-medium text-gray-600'
+                    className={`text-left font-bold border-b-2 border-gray-400 pb-1 mb-2 ${
+                      isKitchenReceipt ? 'text-lg' : 'text-sm'
                     }`}
                     style={{ 
                       fontFamily: receiptFont.cssFamily,
-                      fontSize: isKitchenReceipt ? '16px' : '10px',
-                      fontWeight: isKitchenReceipt ? 'bold' : '500',
-                      marginTop: index === 0 ? '8px' : '16px',
-                      marginBottom: '8px'
+                      fontSize: isKitchenReceipt ? '16px' : '13px'
                     }}
                   >
-                    ----{sectionName}----
+                    👤 {group.customerName}
                   </div>
-                );
-              }
-              
-              // Add the item itself
-              acc.push(
-                <div key={item.id || index} className="mb-1">
-                  {/* Main item line with smart name selection */}
-                  <div className="flex justify-between items-start" style={{ fontFamily: itemsFont.cssFamily }}>
-                    <span 
-                      className={`${itemNameWeight}`}
-                      style={{
-                        fontSize: isKitchenReceipt ? '18px' : undefined,
-                        fontWeight: isKitchenReceipt ? 'bold' : undefined,
-                        fontFamily: itemsFont.cssFamily
-                      }}
-                    >
-                      {/* Updated display format: Show 'X x ITEM_NAME' instead of 'X ITEM_NAME' */}
-                      {item.quantity > 1 ? `${item.quantity} x ` : `${item.quantity} `}{(() => {
-                        const hasProteinVariant = item.protein_type && item.variantName && 
-                          !['regular', 'standard', 'default', 'normal'].includes(item.variantName.toLowerCase());
-                        return hasProteinVariant ? item.variantName : item.name;
-                      })()}
-                    </span>
-                    {/* Hide item prices for kitchen receipts */}
-                    {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
+                  
+                  {/* Render this customer's items - using existing logic */}
+                  <div className="space-y-1">
+                    {group.items.map((item: any, idx: number) => (
+                      <div key={item.id || idx} className="mb-1">
+                        <div className="flex justify-between items-start" style={{ fontFamily: itemsFont.cssFamily }}>
+                          <span 
+                            className={`${itemNameWeight}`}
+                            style={{
+                              fontSize: isKitchenReceipt ? '18px' : undefined,
+                              fontWeight: isKitchenReceipt ? 'bold' : undefined,
+                              fontFamily: itemsFont.cssFamily
+                            }}
+                          >
+                            {item.quantity > 1 ? `${item.quantity} x ` : `${item.quantity} `}{item.variantName || item.name}
+                          </span>
+                          {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
+                            <span 
+                              className={`${isKitchenReceipt ? 'font-bold text-base' : 'font-medium'}`}
+                              style={{ fontFamily: itemsFont.cssFamily }}
+                            >
+                              £{item.total?.toFixed(2) || '0.00'}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {item.customizations && item.customizations.length > 0 && (
+                          <div className="ml-4 space-y-0" style={{ fontFamily: itemsFont.cssFamily }}>
+                            {item.customizations.map((customization: any, custIndex: number) => (
+                              <div key={custIndex} className="flex justify-between text-sm">
+                                <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
+                                  + {customization.name}
+                                </span>
+                                {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
+                                  <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
+                                    {customization.is_free || customization.price === 0 || customization.price === null || customization.price === undefined ? 
+                                      '£0.00' : 
+                                      `£${(customization.price || 0).toFixed(2)}`
+                                    }
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {(item.instructions || item.notes) && (
+                          <div className={
+                            isKitchenReceipt ? 
+                              'ml-4 font-black text-base bg-yellow-200 p-2 rounded border-2 border-yellow-400 text-yellow-900' : 
+                              'ml-4 text-xs text-gray-600 italic'
+                          }>
+                            {isKitchenReceipt ? '⚠️ SPECIAL NOTE: ' : 'Special Note: '}
+                            <span className={isKitchenReceipt ? 'font-black uppercase' : 'normal-case'}>
+                              {item.instructions || item.notes}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ));
+            }
+            
+            // NO CUSTOMER GROUPING - Simple item list rendering
+            return (
+              <div className="space-y-1">
+                {data.orderItems.map((item: any, idx: number) => (
+                  <div key={item.id || idx} className="mb-1">
+                    <div className="flex justify-between items-start" style={{ fontFamily: itemsFont.cssFamily }}>
                       <span 
-                        className={`${isKitchenReceipt ? 'font-bold text-base' : 'font-medium'}`}
-                        style={{ fontFamily: itemsFont.cssFamily }}
+                        className={`${itemNameWeight}`}
+                        style={{
+                          fontSize: isKitchenReceipt ? '18px' : undefined,
+                          fontWeight: isKitchenReceipt ? 'bold' : undefined,
+                          fontFamily: itemsFont.cssFamily
+                        }}
                       >
-                        £{item.total?.toFixed(2) || '0.00'}
+                        {item.quantity > 1 ? `${item.quantity} x ` : `${item.quantity} `}{item.variantName || item.name}
                       </span>
+                      {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
+                        <span 
+                          className={`${isKitchenReceipt ? 'font-bold text-base' : 'font-medium'}`}
+                          style={{ fontFamily: itemsFont.cssFamily }}
+                        >
+                          £{item.total?.toFixed(2) || '0.00'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {item.customizations && item.customizations.length > 0 && (
+                      <div className="ml-4 space-y-0" style={{ fontFamily: itemsFont.cssFamily }}>
+                        {item.customizations.map((customization: any, custIndex: number) => (
+                          <div key={custIndex} className="flex justify-between text-sm">
+                            <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
+                              + {customization.name}
+                            </span>
+                            {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
+                              <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
+                                {customization.is_free || customization.price === 0 || customization.price === null || customization.price === undefined ? 
+                                  '£0.00' : 
+                                  `£${(customization.price || 0).toFixed(2)}`
+                                }
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {(item.instructions || item.notes) && (
+                      <div className={
+                        isKitchenReceipt ? 
+                          'ml-4 font-black text-base bg-yellow-200 p-2 rounded border-2 border-yellow-400 text-yellow-900' : 
+                          'ml-4 text-xs text-gray-600 italic'
+                      }>
+                        {isKitchenReceipt ? '⚠️ SPECIAL NOTE: ' : 'Special Note: '}
+                        <span className={isKitchenReceipt ? 'font-black uppercase' : 'normal-case'}>
+                          {item.instructions || item.notes}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  
-                  {/* Enhanced customizations display with individual pricing */}
-                  {item.customizations && item.customizations.length > 0 && (
-                    <div className="ml-4 space-y-0" style={{ fontFamily: itemsFont.cssFamily }}>
-                      {item.customizations.map((customization: any, custIndex: number) => (
-                        <div key={custIndex} className="flex justify-between text-sm">
-                          <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
-                            + {customization.name}
-                          </span>
-                          {/* Hide customization prices for kitchen receipts */}
-                          {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
-                            <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
-                              {customization.is_free || customization.price === 0 || customization.price === null || customization.price === undefined ? 
-                                '£0.00' : 
-                                `£${(customization.price || 0).toFixed(2)}`
-                              }
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Fallback support for legacy modifiers */}
-                  {!item.customizations && item.modifiers && item.modifiers.length > 0 && (
-                    <div className="ml-4 space-y-0" style={{ fontFamily: itemsFont.cssFamily }}>
-                      {item.modifiers.map((modifier: any, modIndex: number) => (
-                        <div key={modIndex} className="flex justify-between text-sm">
-                          <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
-                            + {modifier.name}
-                          </span>
-                          {/* Hide modifier prices for kitchen receipts */}
-                          {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
-                            <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
-                              £{(modifier.price || 0).toFixed(2)}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Enhanced special instructions/notes with format-specific styling */}
-                  {(item.instructions || item.notes) && (
-                    <div className={
-                      isKitchenReceipt ? 
-                        'ml-4 font-black text-base bg-yellow-200 p-2 rounded border-2 border-yellow-400 text-yellow-900' : 
-                        'ml-4 text-xs text-gray-600 italic'
-                    }>
-                      {isKitchenReceipt ? '⚠️ SPECIAL NOTE: ' : 'Special Note: '}
-                      <span className={isKitchenReceipt ? 'font-black uppercase' : 'normal-case'}>
-                        {item.instructions || item.notes}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-              
-              return acc;
-            }, [])
+                ))}
+              </div>
+            );
+          })()
         ) : (
-          <div className="text-center text-gray-500 italic">
-            No items added yet
-          </div>
+          <div className="text-gray-500 italic">No items</div>
         )}
       </div>
 
-      {/* Totals - Use receiptFont for financial summary - HIDE FOR KITCHEN RECEIPTS */}
-      {!(isKitchenReceipt && (data.orderType === 'dine_in' || data.orderMode === 'DINE-IN')) && (
-        <div 
-          className={`space-y-1 ${isKitchenReceipt ? 'text-base font-bold' : 'text-sm'}`}
-          style={{ fontFamily: receiptFont.cssFamily }} // Apply receipt font to totals section
-        >
-          <div className="flex justify-between">
-            <span>Subtotal:</span>
-            <span>£{(data.subtotal || 0).toFixed(2)}</span>
-          </div>
-          {data.serviceCharge > 0 && (
+      {/* Totals - Only show for customer receipts */}
+      {!isKitchenReceipt && (() => {
+        // Calculate subtotal from orderItems (don't trust formData.subtotal as it may be 0)
+        const calculatedSubtotal = (data.orderItems || []).reduce((sum, item) => {
+          const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+          const itemQty = typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 0;
+          return sum + (itemPrice * itemQty);
+        }, 0);
+        
+        const subtotal = calculatedSubtotal > 0 ? calculatedSubtotal : (data.subtotal || 0);
+        const serviceCharge = data.serviceCharge || 0;
+        const deliveryFee = data.deliveryFee || 0;
+        const discount = data.discount || 0;
+        const grandTotal = subtotal + serviceCharge + deliveryFee - discount;
+        
+        return (
+          <div 
+            className={`space-y-1 ${isKitchenReceipt ? 'text-base font-bold' : 'text-sm'}`}
+            style={{ fontFamily: receiptFont.cssFamily }} // Apply receipt font to totals section
+          >
             <div className="flex justify-between">
-              <span>Service Charge:</span>
-              <span>£{data.serviceCharge.toFixed(2)}</span>
+              <span>Subtotal:</span>
+              <span>£{subtotal.toFixed(2)}</span>
             </div>
-          )}
-          {data.deliveryFee > 0 && (
+            {data.serviceCharge > 0 && (
+              <div className="flex justify-between">
+                <span>Service Charge:</span>
+                <span>£{data.serviceCharge.toFixed(2)}</span>
+              </div>
+            )}
+            {data.deliveryFee > 0 && (
+              <div className="flex justify-between">
+                <span>Delivery:</span>
+                <span>£{data.deliveryFee.toFixed(2)}</span>
+              </div>
+            )}
+            {data.discount > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span>Discount:</span>
+                <span>-£{data.discount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="pt-1">
+              <div className={`flex justify-between ${isKitchenReceipt ? 'text-lg font-black' : 'text-base font-bold'}`}>
+                <span>TOTAL:</span>
+                <span>£{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
             <div className="flex justify-between">
-              <span>Delivery Fee:</span>
-              <span>£{data.deliveryFee.toFixed(2)}</span>
-            </div>
-          )}
-          {data.discount > 0 && (
-            <div className="flex justify-between text-red-600">
-              <span>Discount:</span>
-              <span>-£{data.discount.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="pt-1">
-            <div className={`flex justify-between ${isKitchenReceipt ? 'text-lg font-black' : 'text-base font-bold'}`}>
-              <span>TOTAL:</span>
-              <span>£{((data.subtotal || 0) + (data.serviceCharge || 0) + (data.deliveryFee || 0) - (data.discount || 0)).toFixed(2)}</span>
+              <span>Payment:</span>
+              <span className="uppercase">{data.paymentMethod || 'CASH'}</span>
             </div>
           </div>
-          <div className="flex justify-between">
-            <span>Payment:</span>
-            <span className="uppercase">{data.paymentMethod || 'CASH'}</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Footer - Use receiptFont for footer content */}
       {(data.footerMessage || data.terms || (data.showCustomFooter && data.customFooterText)) && (
