@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -13,11 +13,13 @@ import { toast } from 'sonner';
 
 interface ImageUploadDitheringProps {
   onImageProcessed: (imageData: string) => void;
+  currentImage?: string; // Optional prop to restore existing image
   className?: string;
 }
 
 const ImageUploadDithering: React.FC<ImageUploadDitheringProps> = ({
   onImageProcessed,
+  currentImage,
   className = ''
 }) => {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -25,20 +27,58 @@ const ImageUploadDithering: React.FC<ImageUploadDitheringProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Sync internal state when currentImage prop changes (restores display from store)
+  useEffect(() => {
+    if (currentImage && currentImage !== processedImage) {
+      setProcessedImage(currentImage);
+      // Don't set originalImage since we only have the processed version
+    } else if (!currentImage) {
+      // Clear state if prop is cleared
+      setOriginalImage(null);
+      setProcessedImage(null);
+    }
+  }, [currentImage]);
+  
   // Floyd-Steinberg Dithering Algorithm
   const floydSteinbergDithering = (imageData: ImageData): ImageData => {
     const { data, width, height } = imageData;
     const output = new ImageData(width, height);
     const outputData = output.data;
     
-    // Copy original data
-    for (let i = 0; i < data.length; i++) {
-      outputData[i] = data[i];
+    // Track which pixels were originally transparent
+    const transparentPixels = new Set<number>();
+    
+    // Copy original data and identify transparent pixels
+    for (let i = 0; i < data.length; i += 4) {
+      outputData[i] = data[i];         // R
+      outputData[i + 1] = data[i + 1]; // G
+      outputData[i + 2] = data[i + 2]; // B
+      outputData[i + 3] = data[i + 3]; // A
+      
+      // Mark transparent pixels (alpha < 255)
+      if (data[i + 3] < 255) {
+        transparentPixels.add(i / 4); // Store pixel index
+      }
+    }
+    
+    // First pass: Convert all transparent pixels to white BEFORE dithering
+    for (const pixelIndex of transparentPixels) {
+      const index = pixelIndex * 4;
+      outputData[index] = 255;     // R - pure white
+      outputData[index + 1] = 255; // G - pure white
+      outputData[index + 2] = 255; // B - pure white
+      outputData[index + 3] = 255; // A - opaque
     }
     
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const index = (y * width + x) * 4;
+        const pixelIndex = y * width + x;
+        
+        // Skip dithering for originally transparent pixels
+        if (transparentPixels.has(pixelIndex)) {
+          continue;
+        }
         
         // Convert to grayscale
         const gray = Math.round(
@@ -57,11 +97,18 @@ const ImageUploadDithering: React.FC<ImageUploadDitheringProps> = ({
         outputData[index + 2] = newPixel; // Blue
         outputData[index + 3] = 255;     // Alpha
         
-        // Distribute error to neighboring pixels
+        // Distribute error to neighboring pixels (but NOT to transparent pixels)
         const distributeError = (dx: number, dy: number, factor: number) => {
           const nx = x + dx;
           const ny = y + dy;
           if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const neighborPixelIndex = ny * width + nx;
+            
+            // CRITICAL FIX: Don't distribute error to transparent pixels
+            if (transparentPixels.has(neighborPixelIndex)) {
+              return; // Skip this neighbor
+            }
+            
             const nIndex = (ny * width + nx) * 4;
             const errorValue = (error * factor) / 16;
             
