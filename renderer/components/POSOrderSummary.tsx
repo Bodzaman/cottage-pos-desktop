@@ -1,7 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
-import { Card } from '@/components/ui/card';
+import React, { useState, useRef, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -27,7 +26,6 @@ import {
   Save
 } from 'lucide-react';
 import { OrderItem, ModifierSelection, CustomizationSelection, TipSelection } from '../utils/menuTypes';
-import { POSStripePaymentModal } from './POSStripePaymentModal';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
 import { pendingPaymentService } from '../utils/pendingPaymentService';
 import { colors, globalColors, QSAITheme, effects } from '../utils/QSAIDesign';
@@ -131,9 +129,9 @@ const validateMinimumOrderValue = async (orderType: string, total: number) => {
     const data = await response.json();
     
     if (data.success && data.settings?.delivery) {
-      const minimumOrderValue = data.settings.delivery.minimum_order_value || 15;
+      const minimumOrderValue = data.settings.delivery.minimum_order_value;
       
-      if (total < minimumOrderValue) {
+      if (minimumOrderValue && total < minimumOrderValue) {
         return {
           valid: false,
           error: `Minimum order value for delivery is £${minimumOrderValue.toFixed(2)}. Current total: £${total.toFixed(2)}`
@@ -983,7 +981,9 @@ export function POSOrderSummary({
                 // Set payment completed state instead of calling onProcessPayment
                 setIsPaymentComplete(true);
                 toast.success(`Payment complete - ready for collection`, {
-                  description: orderType === 'WAITING' ? 'Customer is waiting - confirm collection when ready' : 'Customer can collect when ready'
+                  description: orderType === 'WAITING' 
+                    ? 'Customer is waiting - confirm collection when ready' 
+                    : 'Customer can collect when ready'
                 });
               } else {
                 onProcessPayment();
@@ -1222,7 +1222,7 @@ export function POSOrderSummary({
       <div className="flex-1 min-h-0 overflow-y-auto" style={{
         background: `linear-gradient(145deg, rgba(18, 18, 18, 0.8), rgba(26, 26, 26, 0.8))`,
         backdropFilter: 'blur(16px)',
-        boxShadow: 'inset 0 1px 8px rgba(0, 0, 0, 0.2), inset 0 -1px 8px rgba(0, 0, 0, 0.2)',
+        boxShadow: 'inset 0 1px 8px rgba(0,0,0,0.2), inset 0 -1px 8px rgba(0,0,0,0.2)',
         borderTop: `1px solid ${globalColors.purple.primaryTransparent}20`
       }}>
         <div className="p-4"> {/* Padding container */}
@@ -1807,36 +1807,6 @@ export function POSOrderSummary({
           )}
         </div>
       </div>
-      
-      {/* Payment Modal - POSSendToKitchenDialog only for DINE-IN orders now */}
-      {orderType === "DINE-IN" && (
-        <POSSendToKitchenDialog
-          isOpen={showSendToKitchenDialog}
-          onClose={() => setShowSendToKitchenDialog(false)}
-          orderItems={orderItems}
-          orderType={orderType}
-          orderTotal={(() => {
-            console.log('🔍 PosOrderSummary → POSSendToKitchenDialog orderTotal:', {
-              total,
-              totalType: typeof total,
-              orderItemsLength: orderItems.length,
-              showSendToKitchenDialog
-            });
-            return total;
-          })()}
-          tableNumber={tableNumber}
-          customerFirstName={customerFirstName}
-          customerLastName={customerLastName}
-          customerPhone={customerPhone}
-          customerAddress={customerAddress}
-          customerStreet={customerStreet}
-          customerPostcode={customerPostcode}
-          guestCount={guestCount}
-          onPlaceOrder={handlePlaceOrder}
-          onTakePayment={handleTakePaymentWithTip}
-          onPaymentComplete={onProcessPayment}
-        />
-      )}
       
       {/* Multi-custom Details Modal */}
       <MultiCustomDetailsModal
