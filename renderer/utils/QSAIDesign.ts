@@ -1,6 +1,7 @@
 
 
 
+
 /**
  * Enhanced design system for Cottage Tandoori POS interface
  * Implements a premium black and white aesthetic with purple accents
@@ -51,7 +52,8 @@ export const colors = {
     tertiary: '#222222', // Soft black for cards
     dark: '#0A0A0A', // Deeper black for headers and contrasting elements
     panel: '#1E1E1E', // Dark soft black for ALL panels
-    card: 'rgba(30, 30, 30, 0.95)' // Semi-transparent soft black for card backgrounds
+    card: 'rgba(30, 30, 30, 0.95)', // Semi-transparent soft black for card backgrounds
+    highlight: '#2A2A2A' // Lighter soft black for highlights and selected states
   },
   purple: {
     primary: '#5B21B6', // Deeper purple (updated from #7C5DFA for premium consistency)
