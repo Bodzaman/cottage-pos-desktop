@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { User, Users, MapPin, Phone, Edit3, Mail, FileText, Trash2 } from 'lucide-react';
 import { useCustomerDataStore } from 'utils/customerDataStore';
@@ -13,12 +11,12 @@ interface CustomerSummaryBadgeProps {
   className?: string;
 }
 
-export const CustomerSummaryBadge: React.FC<CustomerSummaryBadgeProps> = ({ 
+const CustomerSummaryBadge = React.memo<CustomerSummaryBadgeProps>(function CustomerSummaryBadge({ 
   orderType, 
   onClick, 
   onClear, // Add onClear prop
   className = '' 
-}) => {
+}) {
   const { customerData, hasRequiredCustomerData } = useCustomerDataStore();
   
   const hasData = hasRequiredCustomerData(orderType);
@@ -391,6 +389,10 @@ export const CustomerSummaryBadge: React.FC<CustomerSummaryBadgeProps> = ({
       )}
     </button>
   );
-};
+});
 
+// Set display name for debugging
+CustomerSummaryBadge.displayName = 'CustomerSummaryBadge';
+
+export { CustomerSummaryBadge };
 export default CustomerSummaryBadge;
