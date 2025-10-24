@@ -3,7 +3,7 @@
  * Provides unified event handling for view switching from ManagementHeader buttons
  */
 
-export type HeaderViewType = 'pos' | 'reservations' | 'kitchen' | 'online-orders' | 'ai-orders' | 'website' | 'reconciliation' | 'admin';
+export type HeaderViewType = 'pos' | 'reservations' | 'kitchen' | 'online-orders' | 'website' | 'reconciliation' | 'admin';
 
 export interface HeaderViewChangeEvent {
   view: HeaderViewType;
