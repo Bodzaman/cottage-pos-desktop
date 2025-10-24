@@ -18,18 +18,18 @@ import {
   Receipt,
   AlertCircle,
   RefreshCw,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { globalColors as QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { OrderItem } from '../utils/menuTypes';
 import POSTipSelector, { TipSelection } from './POSTipSelector';
-import POSManualCardEntry from './POSManualCardEntry';
 import { PaymentResult } from '../utils/menuTypes';
 import { toast } from 'sonner';
 import { safeCurrency, safeTotalWithTip } from '../utils/numberUtils';
 import { Card, CardContent } from '@/components/ui/card';
-import { POSStripePayment } from './POSStripePayment';
+import CardTerminalModal from './CardTerminalModal';
 import brain from 'brain';
 
 // Payment Flow State Machine
@@ -37,6 +37,7 @@ enum PaymentStep {
   TIP_SELECTION = 'tip-selection',
   PAYMENT_METHOD = 'payment-method', 
   CARD_INPUT = 'card-input',
+  ADYEN_TERMINAL = 'adyen-terminal',
   PROCESSING = 'processing',
   SUCCESS = 'success',
   FAILED = 'failed'
@@ -86,6 +87,7 @@ export function POSUnifiedPaymentModal({
   const [cashAmountReceived, setCashAmountReceived] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [failedPaymentError, setFailedPaymentError] = useState<string>('');
+  const [showAdyenTerminal, setShowAdyenTerminal] = useState(false);
   
   // Calculated values
   const totalWithTip = safeTotalWithTip(orderTotal, selectedTip.amount);
@@ -106,6 +108,7 @@ export function POSUnifiedPaymentModal({
       setSelectedPaymentMethod(null);
       setCashAmountReceived(0);
       setIsProcessing(false);
+      setShowAdyenTerminal(false);
     }
   }, [isOpen, orderType]);
 
@@ -149,9 +152,9 @@ export function POSUnifiedPaymentModal({
       const data = await response.json();
       
       if (data.success && data.settings?.delivery) {
-        const minimumOrderValue = data.settings.delivery.minimum_order_value || 15;
+        const minimumOrderValue = data.settings.delivery.minimum_order_value;
         
-        if (totalWithTip < minimumOrderValue) {
+        if (minimumOrderValue && totalWithTip < minimumOrderValue) {
           return {
             valid: false,
             error: `Minimum order value for delivery is £${minimumOrderValue.toFixed(2)}. Current total: £${totalWithTip.toFixed(2)}`
@@ -241,6 +244,39 @@ export function POSUnifiedPaymentModal({
   
   const handleStripeError = (error: string) => {
     console.log('💳 Stripe payment failed:', error);
+    setCurrentStep(PaymentStep.FAILED);
+    setFailedPaymentError(error);
+  };
+  
+  // Adyen payment handlers
+  const processAdyenPayment = async () => {
+    console.log('⚡ Opening Adyen Terminal Modal');
+    setSelectedPaymentMethod('CARD'); // Adyen is also card
+    setShowAdyenTerminal(true);
+  };
+  
+  const handleAdyenPaymentSuccess = (paymentData: any) => {
+    console.log('✅ Adyen payment successful:', paymentData);
+    setShowAdyenTerminal(false);
+    setCurrentStep(PaymentStep.SUCCESS);
+    
+    const paymentResult: PaymentResult = {
+      method: 'CARD',
+      amount: paymentData.amount,
+      reference: paymentData.pspReference,
+      tipAmount: selectedTip.amount,
+      totalWithTip: paymentData.amount
+    };
+    
+    setTimeout(() => {
+      onPaymentComplete(selectedTip, paymentResult);
+      onClose();
+    }, 2000);
+  };
+  
+  const handleAdyenPaymentFailed = (error: string) => {
+    console.log('❌ Adyen payment failed:', error);
+    setShowAdyenTerminal(false);
     setCurrentStep(PaymentStep.FAILED);
     setFailedPaymentError(error);
   };
@@ -420,24 +456,27 @@ export function POSUnifiedPaymentModal({
                   </div>
                 </motion.button>
                 
-                {/* Card Payment */}
+                {/* Adyen Payment */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={goToCardInput}
-                  className="p-6 rounded-xl text-white transition-all duration-300 group border border-white/20 hover:border-purple-500/50"
+                  onClick={processAdyenPayment}
+                  className="p-6 rounded-xl text-white transition-all duration-300 group border border-white/20 hover:border-purple-500/50 relative"
                   style={{
                     ...styles.frostedGlassStyle,
                     background: 'linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%)'
                   }}
                 >
+                  <div className="absolute top-2 right-2">
+                    <span className="px-2 py-1 bg-purple-500/20 border border-purple-400/30 rounded text-xs font-bold text-purple-300">⚡ NEW</span>
+                  </div>
                   <div className="flex flex-col items-center space-y-3">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-white/20 transition-colors" style={{ backgroundColor: 'rgba(124, 93, 250, 0.2)' }}>
-                      <CreditCard className="h-6 w-6" style={{ color: QSAITheme.purple.primary }} />
+                      <Smartphone className="h-6 w-6" style={{ color: QSAITheme.purple.primary }} />
                     </div>
                     <div className="text-center">
-                      <h3 className="font-bold text-lg">CARD</h3>
-                      <p className="text-sm opacity-80">Contactless or Chip & Pin</p>
+                      <h3 className="font-bold text-lg">ADYEN</h3>
+                      <p className="text-sm opacity-80">Card terminal</p>
                     </div>
                   </div>
                 </motion.button>
@@ -649,6 +688,23 @@ export function POSUnifiedPaymentModal({
           )}
         </AnimatePresence>
       </DialogContent>
+      
+      {/* Adyen Card Terminal Modal */}
+      {showAdyenTerminal && (
+        <CardTerminalModal
+          isOpen={showAdyenTerminal}
+          onClose={() => {
+            setShowAdyenTerminal(false);
+            setCurrentStep(PaymentStep.PAYMENT_METHOD);
+          }}
+          orderTotal={totalWithTip}
+          orderId={`POS-${Date.now()}`}
+          orderType={orderType as 'WAITING' | 'COLLECTION' | 'DELIVERY'}
+          customerName={customerName}
+          onPaymentSuccess={handleAdyenPaymentSuccess}
+          onPaymentFailed={handleAdyenPaymentFailed}
+        />
+      )}
     </Dialog>
   );
 }
