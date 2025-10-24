@@ -29,6 +29,9 @@ import SearchResultsDropdown from "./SearchResultsDropdown";
 import { OrderDetailDialog } from "./OrderDetailDialog";
 import brain from "brain";
 import { OrderModel } from "types";
+import { usePOSAuth } from "../utils/usePOSAuth";
+import { AvatarDropdown } from "./AvatarDropdown";
+import { APP_BASE_PATH } from 'app';
 
 
 export interface Props {
@@ -38,15 +41,17 @@ export interface Props {
   className?: string;
   showGradient?: boolean;
   onAdminSuccess?: () => void; // New callback for POS admin overlay
+  onLogout?: () => void; // Logout callback from parent component
 }
 
-const ManagementHeader: React.FC<Props> = ({ 
+export const ManagementHeader: React.FC<Props> = ({ 
   title, 
   selectedStore, 
   currentSection, 
   className, 
   showGradient, 
-  onAdminSuccess 
+  onAdminSuccess,
+  onLogout
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -54,6 +59,9 @@ const ManagementHeader: React.FC<Props> = ({
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showMenuManagementModal, setShowMenuManagementModal] = useState(false);
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
+  
+  // Get auth info for dropdown
+  const { email, role, profileImageUrl } = usePOSAuth();
   
   // Order search state (replacing menu search)
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,6 +204,16 @@ const ManagementHeader: React.FC<Props> = ({
       }
     }
   };
+
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      // Fallback: navigate to login
+      console.log('Logout clicked from dropdown - no handler provided');
+      navigate('/pos-login');
+    }
+  };
   
   return (
     <header 
@@ -302,38 +320,42 @@ const ManagementHeader: React.FC<Props> = ({
             <QuickNavigation />
           </div>
           
-          {/* Visual Divider */}
-          <div 
-            className="w-px h-8" 
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-          />
-          
-          {/* Admin Button - Priority Position */}
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="relative text-gray-400 hover:text-white flex items-center gap-2 transition-all duration-300 px-4 py-2 font-medium"
-            style={{
-              background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)',
-              border: '1px solid rgba(124, 93, 250, 0.3)',
-              borderRadius: '0.75rem',
-              boxShadow: '0 2px 10px rgba(124, 93, 250, 0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.25) 0%, rgba(124, 93, 250, 0.15) 100%)';
-              e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.5)';
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(124, 93, 250, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)';
-              e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.3)';
-              e.currentTarget.style.boxShadow = '0 2px 10px rgba(124, 93, 250, 0.1)';
-            }}
-            onClick={() => setShowPasswordDialog(true)}
-          >
-            <Shield className="h-4 w-4" />
-            <span>Admin</span>
-          </Button>
+          {/* Admin Button with Dropdown */}
+          {email && (
+            <AvatarDropdown
+              email={email}
+              role={role}
+              profileImageUrl={profileImageUrl}
+              onLogout={handleLogout}
+              onAdminClick={() => setShowPasswordDialog(true)}
+              trigger={
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="relative text-gray-400 hover:text-white flex items-center gap-2 transition-all duration-300 px-4 py-2 font-medium"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)',
+                    border: '1px solid rgba(124, 93, 250, 0.3)',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 2px 10px rgba(124, 93, 250, 0.1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.25) 0%, rgba(124, 93, 250, 0.15) 100%)';
+                    e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(124, 93, 250, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)';
+                    e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(124, 93, 250, 0.1)';
+                  }}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>Admin</span>
+                </Button>
+              }
+            />
+          )}
         </div>
       </div>
       
@@ -414,5 +436,3 @@ const ManagementHeader: React.FC<Props> = ({
     </header>
   );
 };
-
-export default ManagementHeader;
