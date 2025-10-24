@@ -1,9 +1,5 @@
-
-
-
-
 import React, { createContext, useState, useEffect, useContext, ReactNode, useRef } from 'react';
-import { supabase } from './supabaseClient';
+import { supabase, ensureSupabaseConfigured } from './supabaseClient';
 import { toast } from 'sonner';
 
 // Simple types for clean auth system
@@ -118,12 +114,23 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   const isAdmin = profile?.is_admin || false;
   const isCustomer = isAuthenticated && !isAdmin;
 
-  // Initialize auth state
+  // Initialize auth state (gate behind ensured Supabase config)
   useEffect(() => {
-    const getSession = async () => {
+    let unsub: { unsubscribe: () => void } | null = null;
+
+    const initAuth = async () => {
       try {
+        // CRITICAL: Wait for real Supabase config before accessing auth
+        await ensureSupabaseConfigured();
+
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user || null);
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setUser(session?.user || null);
+          setIsLoading(false);
+        });
+        unsub = subscription;
       } catch (error) {
         console.error('Error getting auth session:', error);
         setUser(null);
@@ -132,16 +139,14 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
       }
     };
 
-    getSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      setIsLoading(false);
-    });
+    initAuth();
 
     return () => {
-      subscription.unsubscribe();
+      try {
+        unsub?.unsubscribe();
+      } catch {
+        // no-op
+      }
     };
   }, []);
 
@@ -149,91 +154,151 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   useEffect(() => {
     if (user && !profile && !isFetching.current) {
       console.log('🔄 [SimpleAuth] Starting customer data fetch...');
-      console.trace('[SimpleAuth] Fetch triggered');
       isFetching.current = true;
       
       const fetchProfile = async () => {
         try {
-          // Fetch customer profile from new clean table
-          const { data: profileData, error: profileError } = await supabase
-            .from('customer_profiles')
-            .select('id, email, first_name, last_name, phone, customer_reference_number, is_admin, created_at, updated_at, image_url, google_profile_image, auth_provider')
-            .eq('id', user.id)
-            .single();
+          // CRITICAL: Ensure Supabase is fully configured before any table calls
+          await ensureSupabaseConfigured();
 
-          if (profileError) {
-            // If no profile exists, create one for new users
-            if (profileError.code === 'PGRST116') { // No rows returned
-              const newProfile = {
-                id: user.id,
-                email: user.email || '',
-                first_name: user.user_metadata?.full_name?.split(' ')[0] || null,
-                last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
-                phone: null,
-                customer_reference_number: null, // Will be assigned later
-                is_admin: user.email === 'bod@barkworthhathaway.com',
-                image_url: null,
-                google_profile_image: null,
-                auth_provider: null
-              };
+          // Try to fetch by auth_user_id first (canonical linkage)
+          let profileData: any | null = null;
+          let profileError: any | null = null;
+          let hasAuthUserId = true;
+
+          // Add retry logic for schema cache lag
+          const maxRetries = 2;
+          let attempt = 0;
+          let byAuth: any = null;
+
+          while (attempt < maxRetries) {
+            byAuth = await supabase
+              .from('customers')
+              .select('id, email, first_name, last_name, phone, customer_reference_number, created_at, updated_at, image_url, google_profile_image')
+              .eq('auth_user_id', user.id)
+              .maybeSingle();
+
+            // Check if we hit schema cache issue
+            if (byAuth.error) {
+              const isSchemaCache = (byAuth.error as any)?.code === 'PGRST204' && 
+                                   String((byAuth.error as any)?.message || '').includes("'auth_user_id'");
               
-              const { data: createdProfile, error: createError } = await supabase
-                .from('customer_profiles')
-                .insert([newProfile])
-                .select('id, email, first_name, last_name, phone, customer_reference_number, is_admin, created_at, updated_at, image_url, google_profile_image, auth_provider')
-                .single();
-              
-              if (createError) {
-                console.error('❌ [SimpleAuth] Error creating customer profile:', createError);
-                setProfile(null);
-              } else {
-                // Map the customer_reference_number to customer_ref_number for consistency
-                // Ensure Date fields are properly handled to prevent object-to-primitive conversion errors
-                const safeCreatedAt = typeof createdProfile.created_at === 'string' 
-                  ? createdProfile.created_at 
-                  : String(new Date(createdProfile.created_at).toISOString());
-                const safeUpdatedAt = typeof createdProfile.updated_at === 'string' 
-                  ? createdProfile.updated_at 
-                  : String(new Date(createdProfile.updated_at).toISOString());
-                
-                const mappedProfile = {
-                  ...createdProfile,
-                  customer_ref_number: createdProfile.customer_reference_number,
-                  created_at: safeCreatedAt,
-                  updated_at: safeUpdatedAt
-                };
-                setProfile(mappedProfile);
+              if (isSchemaCache && attempt < maxRetries - 1) {
+                console.warn(`⚠️ [SimpleAuth] Schema cache miss on attempt ${attempt + 1}/${maxRetries} - waiting 2s before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                attempt++;
+                continue;
               }
+              
+              // Final attempt failed or different error
+              profileError = byAuth.error;
+              if (isSchemaCache) {
+                console.warn('⚠️ [SimpleAuth] customers.auth_user_id not found in schema cache after retries - falling back to id based lookup');
+                hasAuthUserId = false;
+              }
+              break;
+            }
+            
+            // Success
+            if (byAuth.data) {
+              profileData = byAuth.data;
+            }
+            break;
+          }
+
+          // Fallback: legacy records where id === auth user id
+          if (!profileData) {
+            const byId = await supabase
+              .from('customers')
+              .select('id, email, first_name, last_name, phone, customer_reference_number, created_at, updated_at, image_url, google_profile_image')
+              .eq('id', user.id)
+              .maybeSingle();
+
+            if (byId.error && !profileError) profileError = byId.error;
+            if (byId.data) profileData = byId.data;
+          }
+
+          // Fetch admin flag from profiles (self-only via RLS)
+          const { data: adminRow } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+          const adminFlag = adminRow?.is_admin ?? false;
+
+          if (!profileData) {
+            // If no profile exists, create one for new users. Prefer DB-generated id
+            const newProfileInsert: any = {
+              email: user.email || '',
+              first_name: user.user_metadata?.full_name?.split(' ')[0] || null,
+              last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
+              phone: null,
+              customer_reference_number: null,
+              image_url: null,
+              google_profile_image: null
+            };
+            if (hasAuthUserId) {
+              newProfileInsert.auth_user_id = user.id;
             } else {
+              // As a last resort in environments without auth_user_id, set id = auth uid for linkage
+              (newProfileInsert as any).id = user.id;
+            }
+            const created = await supabase
+              .from('customers')
+              .insert([newProfileInsert])
+              .select('id, email, first_name, last_name, phone, customer_reference_number, created_at, updated_at, image_url, google_profile_image')
+              .single();
+
+            if (created.error) {
+              console.error('❌ [SimpleAuth] Error creating customer record:', created.error);
               setProfile(null);
+            } else if (created.data) {
+              const createdProfile = created.data as any;
+              const safeCreatedAt = typeof createdProfile.created_at === 'string' 
+                ? createdProfile.created_at 
+                : String(new Date(createdProfile.created_at).toISOString());
+              const safeUpdatedAt = typeof createdProfile.updated_at === 'string' 
+                ? createdProfile.updated_at 
+                : String(new Date(createdProfile.updated_at).toISOString());
+              const mappedProfile = {
+                ...createdProfile,
+                is_admin: adminFlag,
+                customer_ref_number: createdProfile.customer_reference_number,
+                created_at: safeCreatedAt,
+                updated_at: safeUpdatedAt
+              } as CustomerProfile & { customer_ref_number?: string | null };
+              setProfile(mappedProfile);
+              // Use this id for downstream fetches
+              profileData = createdProfile;
             }
           } else {
-            // Map the customer_reference_number to customer_ref_number for consistency
-            // Ensure Date fields are properly handled to prevent object-to-primitive conversion errors
+            // Map and set
             const safeCreatedAt = typeof profileData.created_at === 'string' 
               ? profileData.created_at 
               : String(new Date(profileData.created_at).toISOString());
             const safeUpdatedAt = typeof profileData.updated_at === 'string' 
               ? profileData.updated_at 
               : String(new Date(profileData.updated_at).toISOString());
-            
             const mappedProfile = {
               ...profileData,
+              is_admin: adminFlag,
               customer_ref_number: profileData.customer_reference_number,
               created_at: safeCreatedAt,
               updated_at: safeUpdatedAt
-            };
+            } as CustomerProfile & { customer_ref_number?: string | null };
             setProfile(mappedProfile);
           }
 
-          // Only fetch additional data if profile operations succeeded
-          if (profileData || profileError?.code === 'PGRST116') {
+          // Only fetch additional data if we have a profile row (either existing or newly created)
+          if (profileData) {
+            const customerId = profileData.id as string;
+
             // Fetch customer addresses with error boundary
             try {
               const { data: addressData, error: addressError } = await supabase
                 .from('customer_addresses')
                 .select('*')
-                .eq('customer_id', user.id)
+                .eq('customer_id', customerId)
                 .order('is_default', { ascending: false });
 
               if (addressError) {
@@ -252,7 +317,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
               const { data: favoritesData, error: favoritesError } = await supabase
                 .from('customer_favorites')
                 .select('*')
-                .eq('customer_id', user.id)
+                .eq('customer_id', customerId)
                 .order('created_at', { ascending: false });
 
               if (favoritesError) {
@@ -362,7 +427,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
-      return { error };
+    return { error };
     } catch (error) {
       return { error };
     }
@@ -371,7 +436,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   // Profile actions
   const updateProfile = async (data: Partial<CustomerProfile>) => {
     console.log('🔧 [SimpleAuth] updateProfile called with:', data);
-    if (!user || !profile) {
+    if (!user) {
       console.log('❌ [SimpleAuth] updateProfile: User not authenticated');
       return { error: { message: 'User not authenticated' } };
     }
@@ -379,10 +444,24 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     try {
       const safeUpdatedAt = String(new Date().toISOString());
       console.log('🔧 [SimpleAuth] About to update with ISO date:', safeUpdatedAt);
-      const { error } = await supabase
-        .from('customer_profiles')
-        .update({ ...data, updated_at: safeUpdatedAt })
-        .eq('id', user.id);
+      // Exclude is_admin from updates to customers table
+      const { is_admin: _omitIsAdmin, auth_provider: _omitAuthProvider, ...rest } = (data || {}) as any;
+
+      // Prefer updating by the resolved customer id; fall back to auth_user_id
+      let error: any = null;
+      if (profile?.id) {
+        const res = await supabase.from('customers').update({ ...rest, updated_at: safeUpdatedAt }).eq('id', profile.id);
+        error = res.error;
+      } else {
+        // Try update via auth_user_id first
+        let res = await supabase.from('customers').update({ ...rest, updated_at: safeUpdatedAt }).eq('auth_user_id', user.id);
+        error = res.error;
+        if (error && (error as any).code === 'PGRST204' && String((error as any).message || '').includes("'auth_user_id'")) {
+          console.warn('⚠️ [SimpleAuth] updateProfile: auth_user_id column missing - retrying update by id fallback');
+          res = await supabase.from('customers').update({ ...rest, updated_at: safeUpdatedAt }).eq('id', user.id);
+          error = res.error;
+        }
+      }
 
       if (error) {
         console.log('❌ [SimpleAuth] updateProfile database error:', error);
@@ -391,7 +470,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
 
       console.log('✅ [SimpleAuth] updateProfile success, updating local state');
       // Update local profile state
-      setProfile(prev => prev ? { ...prev, ...data } : null);
+      setProfile(prev => prev ? { ...prev, ...rest } as CustomerProfile : prev);
       return { error: null };
     } catch (error) {
       console.error('❌ [SimpleAuth] updateProfile catch error:', error);
@@ -401,14 +480,14 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
 
   // Address actions
   const addAddress = async (addressData: Omit<CustomerAddress, 'id' | 'customer_id' | 'created_at' | 'updated_at'>) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' }, address: null };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' }, address: null };
     }
 
     try {
       const { data, error } = await supabase
         .from('customer_addresses')
-        .insert([{ ...addressData, customer_id: user.id }])
+        .insert([{ ...addressData, customer_id: profile.id }])
         .select()
         .single();
 
@@ -425,8 +504,8 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   };
 
   const updateAddress = async (id: string, data: Partial<CustomerAddress>) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' } };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' } };
     }
 
     try {
@@ -434,7 +513,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
         .from('customer_addresses')
         .update({ ...data, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       if (error) {
         return { error };
@@ -449,8 +528,8 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   };
 
   const deleteAddress = async (id: string) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' } };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' } };
     }
 
     try {
@@ -458,7 +537,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
         .from('customer_addresses')
         .delete()
         .eq('id', id)
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       if (error) {
         return { error };
@@ -473,8 +552,8 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   };
 
   const setDefaultAddress = async (id: string) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' } };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' } };
     }
 
     try {
@@ -482,14 +561,14 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
       await supabase
         .from('customer_addresses')
         .update({ is_default: false })
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       // Then set the selected address as default
       const { error } = await supabase
         .from('customer_addresses')
         .update({ is_default: true })
         .eq('id', id)
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       if (error) {
         return { error };
@@ -504,8 +583,8 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   };
 
   const unsetDefaultAddress = async () => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' } };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' } };
     }
 
     try {
@@ -513,7 +592,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
       const { error } = await supabase
         .from('customer_addresses')
         .update({ is_default: false })
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       if (error) {
         return { error };
@@ -535,13 +614,13 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     variantName?: string | null, 
     imageUrl?: string | null
   ) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' }, favorite: null };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' }, favorite: null };
     }
 
     try {
       const favoriteData = {
-        customer_id: user.id,
+        customer_id: profile.id,
         menu_item_id: menuItemId,
         menu_item_name: menuItemName,
         variant_id: variantId,
@@ -568,8 +647,8 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   };
 
   const removeFavorite = async (id: string) => {
-    if (!user) {
-      return { error: { message: 'User not authenticated' } };
+    if (!user || !profile?.id) {
+      return { error: { message: 'User not authenticated or profile not loaded' } };
     }
 
     try {
@@ -577,7 +656,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
         .from('customer_favorites')
         .delete()
         .eq('id', id)
-        .eq('customer_id', user.id);
+        .eq('customer_id', profile.id);
 
       if (error) {
         return { error };
