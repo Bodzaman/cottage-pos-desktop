@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -81,7 +82,7 @@ export function POSGuestCountModalClean({
         const tablesData: TableData[] = data.tables.map((table: PosTableResponse) => ({
           number: table.table_number,
           capacity: table.capacity,
-          isAvailable: table.status === 'available',
+          isAvailable: table.status === 'AVAILABLE',
           status: table.status
         }));
         
