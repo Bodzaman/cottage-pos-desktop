@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -88,7 +89,13 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   
   // CustomizeOrchestrator onSave callback to capture order items
   const handleOrchestratorSave = (orderItem: OrderItem) => {
-    console.log('🎯 ThermalReceiptMenuModal: Orchestrator saved order item:', orderItem);
+    console.log('📝 ThermalReceiptMenuModal - Saving order item from orchestrator:', {
+      name: orderItem.name,
+      menu_item_id: orderItem.menu_item_id,
+      category_id: orderItem.category_id,
+      category_name: orderItem.category_name,
+      variant: orderItem.variantName
+    });
     
     // Enhanced order item with all necessary fields
     const enhancedOrderItem: OrderItem = {
