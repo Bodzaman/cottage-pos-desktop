@@ -119,7 +119,7 @@ interface MenuStoreState {
   forceFullRefresh: () => Promise<void>; // Add force refresh method
   invalidateCache: () => void; // ✅ NEW: Manual cache invalidation
   
-  // 🚀 NEW: Selective subscription methods
+  // 🚀 NEW: Subscribe to specific category for selective data loading
   subscribeToCategory: (categoryId: string | null) => void;
   
   // NEW: Bundle-specific initialization without real-time subscriptions
@@ -615,6 +615,16 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       unsubscribeFromChanges: () => {
         cleanupSubscriptions();
         set({ isConnected: false });
+      },
+      
+      // 🚀 NEW: Subscribe to specific category for selective data loading
+      subscribeToCategory: (categoryId: string | null) => {
+        // Track active category subscription
+        subscriptionState.activeItemsSubscriptionCategory = categoryId;
+        
+        // Note: For now, this is primarily for tracking purposes
+        // Full selective subscription implementation can be added later for network optimization
+        // The actual filtering happens in updateFilteredItems()
       },
       
       triggerCorpusSync: async () => {
