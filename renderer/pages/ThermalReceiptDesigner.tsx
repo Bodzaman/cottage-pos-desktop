@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -105,7 +106,7 @@ interface FormData {
   itemsFont: string; // Font for order items section only
   
   // Order Information
-  orderType: 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'ai_orders' | 'online_orders';
+  orderType: 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'online_orders';
   receiptNumber: string;
   orderDate: string;
   orderTime: string;
@@ -1559,7 +1560,6 @@ export default function ThermalReceiptDesigner() {
                             <SelectItem value="collection">Collection</SelectItem>
                             <SelectItem value="delivery">Delivery</SelectItem>
                             <SelectItem value="waiting">Waiting</SelectItem>
-                            <SelectItem value="ai_orders">AI Orders</SelectItem>
                             <SelectItem value="online_orders">Online Orders</SelectItem>
                           </SelectContent>
                         </Select>
