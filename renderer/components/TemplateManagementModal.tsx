@@ -17,6 +17,7 @@ import { QSAITheme, styles } from 'utils/QSAIDesign';
 import brain from 'brain';
 import { TemplateResponse, TemplateCreateRequest } from 'types';
 import { OrderModeAssignmentModal } from 'components/OrderModeAssignmentModal';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 
 // Template data structure matching the ThermalReceiptFormData
 interface Template {
@@ -67,6 +68,9 @@ export function TemplateManagementModal({
   onLoadTemplate,
   className = ''
 }: Props) {
+  // Get authenticated user
+  const { user } = useSimpleAuth();
+  
   // State management
   const [templates, setTemplates] = useState<TemplateLibraryItem[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -86,12 +90,17 @@ export function TemplateManagementModal({
   }, [isOpen]);
   
   const loadTemplates = async () => {
+    if (!user?.id) {
+      toast.error('Please sign in to manage templates');
+      return;
+    }
+    
     try {
       setIsLoading(true);
       
       // Load templates and assignments concurrently
       const [templatesResponse, assignmentsResponse] = await Promise.all([
-        brain.list_receipt_templates(),
+        brain.list_receipt_templates({ user_id: user.id }),
         brain.get_template_assignments()
       ]);
       
@@ -159,7 +168,7 @@ export function TemplateManagementModal({
   const loadTemplateDetails = async (templateId: string) => {
     try {
       setIsLoading(true);
-      const response = await brain.get_template3({ templateId });
+      const response = await brain.get_receipt_template({ templateId, user_id: 'current_user' });
       const data = await response.json();
       
       if (data.success && data.template) {
@@ -190,7 +199,7 @@ export function TemplateManagementModal({
   const deleteTemplate = async (templateId: string, templateName: string) => {
     try {
       setIsLoading(true);
-      const response = await brain.delete_template3({ templateId });
+      const response = await brain.delete_receipt_template({ templateId }, { user_id: 'current_user' });
       const data = await response.json();
       
       if (data.success) {
@@ -207,6 +216,35 @@ export function TemplateManagementModal({
       toast.error('Failed to delete template');
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const handleDelete = async (templateId: string) => {
+    if (!user?.id) {
+      toast.error('Please sign in to delete templates');
+      return;
+    }
+    
+    if (!window.confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const response = await brain.delete_receipt_template(
+        { templateId },
+        { user_id: user.id }
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Template deleted successfully');
+        loadTemplates(); // Refresh list
+      } else {
+        toast.error(data.message || 'Failed to delete template');
+      }
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast.error('Failed to delete template');
     }
   };
   
@@ -388,7 +426,6 @@ export function TemplateManagementModal({
                                         'waiting': { label: 'Waiting', color: QSAITheme.purple.light },
                                         'collection': { label: 'Collection', color: QSAITheme.green.primary },
                                         'delivery': { label: 'Delivery', color: QSAITheme.blue.primary },
-                                        'ai_orders': { label: 'AI Orders', color: QSAITheme.orange.primary },
                                         'online_orders': { label: 'Online Orders', color: QSAITheme.red.primary }
                                       }[mode] || { label: mode, color: '#6b7280' };
                                       
