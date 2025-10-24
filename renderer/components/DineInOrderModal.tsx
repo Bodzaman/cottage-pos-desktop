@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { X, Plus, Users, User, Edit2, Save, Trash2 } from 'lucide-react';
-import { OrderItem, MenuItem, Category } from 'types';
+import { OrderItem, MenuItem, Category, CustomerTab } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useTableOrdersStore, tableOrdersStore } from 'utils/tableOrdersStore';
@@ -18,6 +18,7 @@ import DineInCategoryList from 'components/DineInCategoryList';
 import DineInMenuGrid from 'components/DineInMenuGrid';
 import DineInOrderSummary from 'components/DineInOrderSummary';
 import BillReviewModal from 'components/BillReviewModal';
+import { BillViewModal } from 'components/BillViewModal';
 import CustomerTabsCompact from 'components/CustomerTabsCompact';
 import ConfirmationDialog from 'components/ConfirmationDialog';
 import { toast } from 'sonner';
@@ -47,16 +48,15 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     forceRefresh,
     // NEW: Customer tab functions
     customerTabs,
-    activeCustomerTab,
     loadCustomerTabsForTable,
     createCustomerTab,
     addItemsToCustomerTab,
-    setActiveCustomerTab,
     getCustomerTabsForTable,
     getActiveCustomerTab,
     renameCustomerTab,
     closeCustomerTab,
-    removeItemFromCustomerTab
+    removeItemFromCustomerTab,
+    completeCustomerTab
   } = useTableOrdersStore();
   
   // UI state
@@ -65,6 +65,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   // ✅ STAGING WORKFLOW: Items added to staging first, then explicitly saved to database
   const [stagingItems, setStagingItems] = useState<OrderItem[]>([]);
   const [showBillReview, setShowBillReview] = useState(false);
+  const [showBillView, setShowBillView] = useState(false);
   
   // NEW: Customer tab UI state
   const [isCreatingNewTab, setIsCreatingNewTab] = useState(false);
@@ -453,6 +454,61 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     setShowBillReview(true);
   };
   
+  // NEW: Handle View Bill with customer breakdown
+  const handleViewBill = () => {
+    if (combinedOrderItems.length === 0) {
+      toast.error('No items to bill');
+      return;
+    }
+    
+    setShowBillView(true);
+  };
+  
+  // NEW: Process payment from BillViewModal
+  const handleProcessPayment = async (customerIds: (string | null)[], amount: number) => {
+    console.log('💳 Processing payment for customers:', customerIds, 'Amount:', amount);
+    
+    try {
+      // Mark customer tabs as paid
+      for (const customerId of customerIds) {
+        if (customerId) {
+          const success = await completeCustomerTab(customerId);
+          if (success) {
+            console.log(`✅ Marked customer tab ${customerId} as paid`);
+          } else {
+            console.error(`❌ Failed to mark customer tab ${customerId} as paid`);
+          }
+        }
+      }
+      
+      // Refresh customer tabs to reflect payment status
+      await loadCustomerTabsForTable(selectedTableTab);
+      
+      // Check if all customers have paid
+      const allCustomersPaid = currentTableCustomerTabs.every(tab => 
+        customerIds.includes(tab.id) || tab.status === 'paid'
+      );
+      
+      // Check if all table-level items are accounted for
+      const tableHasNoOrders = !persistedTableOrders[selectedTableTab]?.order_items?.length;
+      
+      if (allCustomersPaid && tableHasNoOrders) {
+        // All customers paid and no table-level orders, reset table
+        await resetTableToAvailable(selectedTableTab);
+        toast.success(`✅ Table ${selectedTableTab} bill completed - table reset to available`);
+        setShowBillView(false);
+        onClose();
+      } else {
+        // Partial payment completed
+        toast.success(`✅ Payment processed for ${customerIds.length} customer${customerIds.length > 1 ? 's' : ''}`);
+        setShowBillView(false);
+      }
+    } catch (error) {
+      console.error('❌ Error processing payment:', error);
+      toast.error('Failed to process payment');
+    }
+  };
+  
   // Handle final bill print from bill review modal
   const handleFinalBillPrint = async () => {
     try {
@@ -587,11 +643,14 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
             >
               <DineInOrderSummary
                 orderItems={combinedOrderItems}
+                customerTabs={currentTableCustomerTabs}
+                activeCustomerTabId={currentActiveCustomerTab?.id || null}
                 onUpdateQuantity={handleUpdateQuantity}
                 onRemoveItem={handleRemoveItem}
                 onSave={handleSave}
                 onSendToKitchen={handleSendToKitchen}
                 onFinalBill={handleFinalBill}
+                onViewBill={handleViewBill}
               />
             </div>
           </div>
@@ -606,6 +665,16 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         orderItems={combinedOrderItems}
         linkedTables={linkedTables}
         onPrintFinalBill={handleFinalBillPrint}
+      />
+      
+      {/* NEW: Bill View Modal with Customer Breakdown */}
+      <BillViewModal
+        isOpen={showBillView}
+        onClose={() => setShowBillView(false)}
+        tableNumber={selectedTableTab}
+        orderItems={combinedOrderItems}
+        customerTabs={currentTableCustomerTabs}
+        onProcessPayment={handleProcessPayment}
       />
       
       {/* Confirmation Dialog for Item Deletion */}
