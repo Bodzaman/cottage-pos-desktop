@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +8,7 @@ import { toast } from 'sonner';
 import brain from 'brain';
 import { Save } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 
 export interface Props {
   isOpen: boolean;
@@ -24,11 +23,17 @@ export const SaveTemplateDialog: React.FC<Props> = ({
   currentDesign,
   onTemplateSaved
 }) => {
+  const { user } = useSimpleAuth();
   const [templateName, setTemplateName] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
+    if (!user?.id) {
+      toast.error('Please sign in to save templates');
+      return;
+    }
+    
     if (!templateName.trim()) {
       toast.error('Please enter a template name');
       return;
@@ -37,13 +42,14 @@ export const SaveTemplateDialog: React.FC<Props> = ({
     setIsSaving(true);
     try {
       const response = await brain.create_receipt_template({
+        user_id: user.id,
         name: templateName.trim(),
         description: description.trim(),
-        sections: currentDesign.sections || [],
-        settings: currentDesign.settings || {}
+        design_data: currentDesign
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      if (data.id) {
         toast.success(`Template "${templateName}" saved successfully!`);
         setTemplateName('');
         setDescription('');
