@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Lock, Key, AlertCircle, ShieldCheck } from "lucide-react";
+import { Lock, Key, AlertCircle, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { colors } from "../utils/designSystem";
 import brain from "brain";
 import { verifyManagementPassword } from "../utils/management-auth";
@@ -13,7 +13,7 @@ interface ManagementPasswordDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onAuthenticated: () => void;
-  userId?: string; // Making userId optional as we're using universal password
+  userId?: string;
 }
 
 const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
@@ -29,6 +29,37 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  // Show/hide password states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Clear all fields when dialog closes
+  const handleClose = () => {
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setError(null);
+    setShowPasswordChange(false);
+    setShowPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    onClose();
+  };
+  
+  // Auto-hide password when user clicks away (blur)
+  const handlePasswordBlur = () => {
+    setShowPassword(false);
+  };
+  
+  const handleNewPasswordBlur = () => {
+    setShowNewPassword(false);
+  };
+  
+  const handleConfirmPasswordBlur = () => {
+    setShowConfirmPassword(false);
+  };
   
   const handleAuthenticate = async () => {
     if (!password.trim()) {
@@ -53,7 +84,7 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
         } else {
           toast.success("Management access granted");
           onAuthenticated();
-          onClose();
+          handleClose(); // Clear passwords on success
         }
       } else {
         setError("Invalid password. Please try again.");
@@ -92,12 +123,7 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
       if (result.success) {
         toast.success("Password changed successfully");
         onAuthenticated();
-        onClose();
-        // Reset form
-        setShowPasswordChange(false);
-        setPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+        handleClose(); // Clear all fields on success
       } else {
         setError(result.message || "Failed to change password");
       }
@@ -120,7 +146,7 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent 
         className="sm:max-w-md" 
         style={{ 
@@ -159,20 +185,33 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
                 <Key className="h-4 w-4" />
                 Password
               </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                autoFocus
-                style={{ 
-                  background: colors.background.secondary, 
-                  borderColor: error ? "rgb(220, 38, 38)" : colors.border.light 
-                }}
-                className="focus:border-purple-500 focus:ring-purple-500"
-                disabled={isAuthenticating}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handlePasswordBlur}
+                  autoFocus
+                  style={{ 
+                    background: colors.background.secondary, 
+                    borderColor: error ? "rgb(220, 38, 38)" : colors.border.light,
+                    paddingRight: '40px'
+                  }}
+                  className="focus:border-purple-500 focus:ring-purple-500"
+                  disabled={isAuthenticating}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  disabled={isAuthenticating}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -181,21 +220,34 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
                   <Key className="h-4 w-4" />
                   New Password
                 </Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  autoFocus
-                  style={{ 
-                    background: colors.background.secondary, 
-                    borderColor: error ? "rgb(220, 38, 38)" : colors.border.light 
-                  }}
-                  className="focus:border-purple-500 focus:ring-purple-500"
-                  disabled={isChangingPassword}
-                  placeholder="Enter new password (min 8 characters)"
-                />
+                <div className="relative">
+                  <Input
+                    id="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={handleNewPasswordBlur}
+                    autoFocus
+                    style={{ 
+                      background: colors.background.secondary, 
+                      borderColor: error ? "rgb(220, 38, 38)" : colors.border.light,
+                      paddingRight: '40px'
+                    }}
+                    className="focus:border-purple-500 focus:ring-purple-500"
+                    disabled={isChangingPassword}
+                    placeholder="Enter new password (min 8 characters)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                    disabled={isChangingPassword}
+                    tabIndex={-1}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -203,20 +255,33 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
                   <Lock className="h-4 w-4" />
                   Confirm Password
                 </Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  style={{ 
-                    background: colors.background.secondary, 
-                    borderColor: error ? "rgb(220, 38, 38)" : colors.border.light 
-                  }}
-                  className="focus:border-purple-500 focus:ring-purple-500"
-                  disabled={isChangingPassword}
-                  placeholder="Confirm new password"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={handleConfirmPasswordBlur}
+                    style={{ 
+                      background: colors.background.secondary, 
+                      borderColor: error ? "rgb(220, 38, 38)" : colors.border.light,
+                      paddingRight: '40px'
+                    }}
+                    className="focus:border-purple-500 focus:ring-purple-500"
+                    disabled={isChangingPassword}
+                    placeholder="Confirm new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                    disabled={isChangingPassword}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -225,7 +290,7 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
         <DialogFooter>
           <Button 
             variant="outline" 
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isAuthenticating || isChangingPassword}
             className="mr-2"
           >
