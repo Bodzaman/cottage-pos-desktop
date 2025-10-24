@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -5,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   ShoppingCart,
@@ -28,8 +30,6 @@ import {
 import { OrderItem, ModifierSelection, CustomizationSelection, TipSelection } from '../utils/menuTypes';
 import { ConfirmationModal } from './ConfirmationModal';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
-import { POSStripePaymentModal } from './POSStripePaymentModal';
-import POSUnifiedPaymentModal from './POSUnifiedPaymentModal';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
@@ -66,25 +66,17 @@ interface Props {
   onTableSelectionClick?: () => void;
   onCustomizeItem?: (index: number, item: OrderItem) => void;
   
-  // Payment Modal props
-  showPaymentModal?: boolean;
-  onClosePaymentModal?: () => void;
-  showStripePayment?: boolean;
-  onCloseStripePayment?: () => void;
-  onConfirmPayment?: (result: any) => void;
-  onCompleteStripePayment?: (result: any) => void;
+  // Payment Modal props - SIMPLIFIED
+  onShowPaymentModal?: () => void;
   onPrintReceipt?: () => void;
-  onEditOrder?: () => void;
-  onSaveAndPrint?: () => void;
-  onPaymentSuccess?: (result: any) => void;
-  isStandalone?: boolean;
-  hideTableNumber?: boolean;
-  hideCustomerBadge?: boolean;
   
   // ✅ NEW: Direct props control for Order Confirmation Modal
   showOrderConfirmation?: boolean;
   onCloseOrderConfirmation?: () => void;
   onShowOrderConfirmation?: () => void;
+  
+  // ✅ ADD: Action callback for order confirmation
+  onOrderConfirmed?: (action: 'payment' | 'no_payment' | 'add_to_order' | 'send_to_kitchen' | 'make_changes') => void;
   
   // ✅ NEW: Table Selection Modal props
   showTableSelection?: boolean;
@@ -100,8 +92,10 @@ interface Props {
  * Enhanced order summary panel with proper component architecture and QSAI design
  * Follows the clean architecture pattern from DineInOrderSummary but adapted for main POS workflow
  * Now includes integrated Stripe payment functionality
+ * 
+ * PERFORMANCE: Memoized to prevent re-renders when props unchanged
  */
-export function OrderSummaryPanel({
+const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   orderItems,
   orderType,
   tableNumber,
@@ -125,24 +119,14 @@ export function OrderSummaryPanel({
   onTableSelectionClick,
   onCustomizeItem,
   
-  // Payment Modal props
-  showPaymentModal = false,
-  onClosePaymentModal,
-  showStripePayment = false,
-  onCloseStripePayment,
-  onConfirmPayment,
-  onCompleteStripePayment,
+  // Payment Modal props - SIMPLIFIED
+  onShowPaymentModal,
   onPrintReceipt,
-  onEditOrder,
-  onSaveAndPrint,
-  onPaymentSuccess,
-  isStandalone = false,
-  hideTableNumber = false,
-  hideCustomerBadge = false,
   
   showOrderConfirmation = false,
   onCloseOrderConfirmation,
   onShowOrderConfirmation,
+  onOrderConfirmed,
   showTableSelection = false,
   onCloseTableSelection,
   className = ''
@@ -160,22 +144,19 @@ export function OrderSummaryPanel({
   const [customizingOrderItem, setCustomizingOrderItem] = useState<OrderItem | null>(null);
   const [customizingItemIndex, setCustomizingItemIndex] = useState<number>(-1);
   
+  // ✅ FIX: Add missing state for final bill modal (DINE-IN)
+  const [showFinalBillModal, setShowFinalBillModal] = useState(false);
+  
   // UI State Management
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ action: () => void; label: string } | null>(null);
   
-  // Payment modal and Stripe payment states (still needed)
-  const [internalShowStripePayment, setInternalShowStripePayment] = useState<boolean>(false);
-  const [paymentProcessing, setPaymentProcessing] = useState<boolean>(false);
+  // Removed legacy local modal state in favor of parent Orchestrator
+  // const [internalShowStripePayment, setInternalShowStripePayment] = useState<boolean>(false);
+  // const [showPaymentModalState, setShowPaymentModal] = useState<boolean>(false);
+  // const [paymentProcessing, setPaymentProcessing] = useState<boolean>(false);
   const [isPaymentComplete, setIsPaymentComplete] = useState<boolean>(false);
   const [currentTipSelection, setCurrentTipSelection] = useState<TipSelection | null>(null);
-  
-  // Sync prop with internal state
-  useEffect(() => {
-    if (showStripePayment !== internalShowStripePayment) {
-      setInternalShowStripePayment(showStripePayment);
-    }
-  }, [showStripePayment, internalShowStripePayment]);
   
   // Get customer data from store
   const { customerData: storeCustomerData } = useCustomerDataStore();
@@ -286,8 +267,12 @@ export function OrderSummaryPanel({
     }
 
     // All validations passed - open Order Confirmation Modal
-    console.log('✅ All validations passed, opening Order Confirmation Modal');
-    if (onShowOrderConfirmation) {
+    console.log('✅ All validations passed, opening Payment Flow Orchestrator');
+    // Prefer new unified payment flow orchestrator
+    if (onShowPaymentModal) {
+      onShowPaymentModal();
+    } else if (onShowOrderConfirmation) {
+      // Fallback to legacy order confirmation modal if orchestrator callback not provided
       onShowOrderConfirmation();
     }
   };
@@ -306,46 +291,13 @@ export function OrderSummaryPanel({
   };
 
   // Order Confirmation Modal handlers
-  const handleOrderConfirmation = (action: 'payment' | 'no_payment' | 'make_changes' | 'add_to_order' | 'send_to_kitchen') => {
-    // ✅ Close via parent prop callback instead of local state
-    if (onCloseOrderConfirmation) {
-      onCloseOrderConfirmation();
-    }
+  const handleOrderConfirmation = (action: 'payment' | 'no_payment' | 'add_to_order' | 'send_to_kitchen' | 'make_changes') => {
+    console.log('🎯 [OrderSummaryPanel] handleOrderConfirmation called with action:', action);
     
-    switch (action) {
-      case 'payment':
-        // Open payment modal for DELIVERY/WAITING/COLLECTION orders
-        setShowPaymentModal(true);
-        break;
-      case 'no_payment':
-        // Process order without payment
-        handleProcessOrderOnly();
-        break;
-      case 'add_to_order':
-        // For DINE-IN: Save to table order without sending to kitchen
-        handleAddToOrder();
-        break;
-      case 'send_to_kitchen':
-        // For DINE-IN: Send order to kitchen (includes saving to table)
-        handleSendToKitchen();
-        break;
-      case 'make_changes':
-        // Just close modal and return to order building
-        break;
+    // ✅ CHANGE: Delegate to parent orchestrator instead of managing local state
+    if (onOrderConfirmed) {
+      onOrderConfirmed(action);
     }
-  };
-
-  const handleConfirmAction = () => {
-    if (pendingAction) {
-      pendingAction.action();
-    }
-    setShowConfirmationModal(false);
-    setPendingAction(null);
-  };
-
-  const handleCloseConfirmation = () => {
-    setShowConfirmationModal(false);
-    setPendingAction(null);
   };
 
   // DINE-IN workflow handlers
@@ -485,48 +437,43 @@ export function OrderSummaryPanel({
       return;
     }
     
-    // Open payment modal
-    setShowPaymentModal(true);
+    // ✅ Call parent handler instead of local state
+    if (onShowPaymentModal) {
+      onShowPaymentModal();
+    }
   };
 
   // Handle payment success
-  const handlePaymentSuccess = async (paymentResult: PaymentResult) => {
+  const handlePaymentSuccess = async (
+    tipSelection: TipSelection,
+    paymentResult?: PaymentResult
+  ) => {
     try {
-      setPaymentProcessing(true);
-      setCurrentTipSelection(paymentResult.tipSelection || null);
+      // setPaymentProcessing(true);
+      setCurrentTipSelection(tipSelection || null);
+      
+      console.log('💳 [OrderSummaryPanel] Payment success - calling parent callback');
       
       // Send to kitchen if not already sent
       if (onSendToKitchen) {
         onSendToKitchen();
       }
       
-      // Complete the order
-      if (onProcessPayment) {
-        onProcessPayment();
-      } else if (onCompleteOrder) {
-        onCompleteOrder();
+      // ✅ Call parent payment success handler to clear cart and complete order
+      if (onPaymentSuccess) {
+        console.log('✅ [OrderSummaryPanel] Invoking parent onPaymentSuccess callback');
+        await onPaymentSuccess(tipSelection, paymentResult);
       }
       
+      // Local state updates
       setIsPaymentComplete(true);
-      setShowPaymentModal(false);
-      
-      toast.success(`Payment successful - ${formatCurrency(paymentResult.totalWithTip)}`, {
-        description: `Method: ${paymentResult.method} • Order completed`
-      });
+      // setPaymentProcessing(false);
       
     } catch (error) {
-      console.error('❌ Payment processing failed:', error);
-      toast.error('Payment processing failed');
-    } finally {
-      setPaymentProcessing(false);
+      console.error('❌ [OrderSummaryPanel] Payment success handler failed:', error);
+      // setPaymentProcessing(false);
+      toast.error('Failed to complete payment');
     }
-  };
-
-  // Handle payment modal close
-  const handlePaymentModalClose = () => {
-    setShowPaymentModal(false);
-    setShowStripePayment(false);
-    setPaymentProcessing(false);
   };
 
   // Calculate totals - including customizations
@@ -551,8 +498,6 @@ export function OrderSummaryPanel({
     orderItemsCount: orderItems.length,
     subtotal,
     orderType,
-    showPaymentModal,
-    showStripePayment: internalShowStripePayment
   };
   
   // Only log when order actually changes, not on every render
@@ -602,59 +547,76 @@ export function OrderSummaryPanel({
   };
 
   // Payment handlers - following old POSOrderSummary pattern
-  const handleCashPayment = () => {
-    // Process cash payment - similar to old implementation
-    const paymentResult: PaymentResult = {
-      method: 'cash',
-      amount: total,
+  const handleCashPayment = async () => {
+    const paymentResult: TipSelection = {
+      type: 'cash',
+      amount: 0,
+      method: 'CASH',
       reference: `CASH-${Date.now()}`,
       tipAmount: currentTipSelection?.amount || 0,
       totalWithTip: total + (currentTipSelection?.amount || 0)
     };
     
+    console.log('💵 [OrderSummaryPanel] Cash payment - calling handlePaymentSuccess');
     handlePaymentSuccess(paymentResult);
   };
 
   const handleInitiateCardPayment = () => {
-    setShowStripePayment(true);
-    setShowPaymentModal(true);
+    // ✅ Call parent handler instead of local state
+    if (onShowPaymentModal) {
+      onShowPaymentModal();
+    }
   };
 
-  const handleStripeSuccess = (paymentResult: PaymentResult) => {
-    console.log('Stripe payment successful:', paymentResult);
-    setShowPaymentModal(false);
-    setShowStripePayment(false);
+  const handleStripeSuccess = async (paymentResult: TipSelection) => {
+    console.log('💳 [OrderSummaryPanel] Stripe payment success:', paymentResult);
+    
+    // If parent provides a hide callback, invoke it
+    if (onHidePaymentModal) {
+      onHidePaymentModal();
+    }
+    
     setIsPaymentComplete(true);
     
+    console.log('💳 [OrderSummaryPanel] Stripe - calling handlePaymentSuccess');
     handlePaymentSuccess(paymentResult);
   };
 
   return (
     <div
-      className={cn('flex flex-col h-full border-l', className)}
-      style={{ borderColor: QSAITheme.border.light, backgroundColor: QSAITheme.background.panel }}
+      className={cn('grid h-full border-l', className)}
+      style={{ 
+        borderColor: QSAITheme.border.light, 
+        backgroundColor: QSAITheme.background.panel,
+        gridTemplateRows: 'auto 1fr auto',
+        gridTemplateColumns: '1fr',
+        overflow: 'hidden' // ✅ CRITICAL: Constrains grid within parent bounds
+      }}
     >
-      {/* Header */}
+      {/* Zone 1: Fixed Header */}
       <div 
-        className="p-4 border-b" 
-        style={{ borderColor: QSAITheme.border.medium }}
+        className="p-4 border-b overflow-hidden" 
+        style={{ 
+          borderColor: QSAITheme.border.medium,
+          gridRow: '1 / 2'
+        }}
       >
         <div className="space-y-2">
           <h3 className="font-semibold text-sm" style={{
-            backgroundImage: `linear-gradient(135deg, white 30%, ${designColors.brand.purple} 100%)`,
+            backgroundImage: `linear-gradient(135deg, white 30%, ${QSAITheme.purple.light} 100%)`,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             display: 'inline-block'
           }}>
-            Order Summary
+            ORDER SUMMARY
           </h3>
           
           {/* Gradient underline */}
           <div 
             className="w-24 h-1 rounded-full"
             style={{
-              background: `linear-gradient(90deg, transparent, ${designColors.brand.purple}, transparent)`
+              background: `linear-gradient(90deg, transparent, ${QSAITheme.purple.light}, transparent)`
             }}
           />
           
@@ -672,8 +634,15 @@ export function OrderSummaryPanel({
         </div>
       </div>
 
-      {/* Order Items */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      {/* Zone 2: Scrollable Items */}
+      <div 
+        className="overflow-y-auto p-3 space-y-2"
+        style={{ 
+          gridRow: '2 / 3',
+          minHeight: 0,
+          overflowX: 'hidden' // ✅ Prevent horizontal scroll
+        }}
+      >
         {orderItems.length === 0 ? (
           <div className="text-center py-8">
             <Utensils className="w-8 h-8 mx-auto mb-2 opacity-50" style={{ color: QSAITheme.text.muted }} />
@@ -841,14 +810,14 @@ export function OrderSummaryPanel({
               </div>
               
               {/* Bottom section: Quantity controls, Customize button, Price */}
-              <div className="flex items-center justify-between gap-3 pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+              <div className="flex items-center justify-between gap-2 pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
                 {/* Quantity controls */}
                 <div className="flex items-center space-x-2 flex-shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity(index, Math.max(1, item.quantity - 1))}
-                    className="h-7 w-7 p-0"
+                    className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
                       backgroundColor: QSAITheme.background.secondary
@@ -865,7 +834,7 @@ export function OrderSummaryPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                    className="h-7 w-7 p-0"
+                    className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
                       backgroundColor: QSAITheme.background.secondary
@@ -882,7 +851,7 @@ export function OrderSummaryPanel({
                   onClick={() => {
                     handleOpenCustomization(index, item);
                   }}
-                  className="text-xs px-3 py-1 h-7 flex-shrink-0"
+                  className="text-xs px-2 py-1 h-6 flex-shrink-0"
                   style={{
                     borderColor: QSAITheme.purple.primary,
                     color: 'white',
@@ -890,7 +859,7 @@ export function OrderSummaryPanel({
                   }}
                 >
                   <Cog className="w-3 h-3 mr-1" />
-                  Customize
+                  Custom
                 </Button>
                 
                 {/* Price */}
@@ -903,94 +872,91 @@ export function OrderSummaryPanel({
         )}
       </div>
 
-      {/* Footer with totals and actions */}
-      {orderItems.length > 0 && (
-        <div 
-          className="border-t p-4 space-y-3"
-          style={{ borderColor: QSAITheme.border.medium }}
-        >
-          {/* Totals */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span style={{ color: QSAITheme.text.muted }}>Subtotal:</span>
-              <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(subtotal)}</span>
-            </div>
-            
-            {/* Service charge - only show if enabled and dine-in */}
-            {orderType === "DINE-IN" && posSettings?.service_charge?.enabled && serviceCharge > 0 && (
+      {/* Zone 3: Fixed Footer with totals and actions */}
+      {/* ✅ ALWAYS render container to reserve grid space, conditionally render content */}
+      <div 
+        className="border-t p-4 space-y-3 overflow-hidden"
+        style={{ 
+          borderColor: QSAITheme.border.light,
+          gridRow: '3 / 4'
+        }}
+      >
+        {orderItems.length > 0 ? (
+          <>
+            {/* Totals */}
+            <div className="space-y-1">
               <div className="flex justify-between text-sm">
-                <span style={{ color: QSAITheme.text.muted }}>Service ({posSettings.service_charge.percentage}%):</span>
-                <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(serviceCharge)}</span>
+                <span style={{ color: QSAITheme.text.muted }}>Subtotal:</span>
+                <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(subtotal)}</span>
               </div>
-            )}
-            
-            {/* Delivery fee - only show if enabled and delivery order */}
-            {orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled && deliveryFee > 0 && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: QSAITheme.text.muted }}>Delivery:</span>
-                <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(deliveryFee)}</span>
+              
+              {/* Service charge - only show if enabled and dine-in */}
+              {orderType === "DINE-IN" && posSettings?.service_charge?.enabled && serviceCharge > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: QSAITheme.text.muted }}>Service ({posSettings.service_charge.percentage}%):</span>
+                  <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(serviceCharge)}</span>
+                </div>
+              )}
+              
+              {/* Delivery fee - only show if enabled and delivery order */}
+              {orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled && deliveryFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: QSAITheme.text.muted }}>Delivery:</span>
+                  <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(deliveryFee)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between font-semibold border-t pt-1" style={{ borderColor: QSAITheme.border.light }}>
+                <span style={{ color: QSAITheme.text.primary }}>Total:</span>
+                <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(total)}</span>
               </div>
-            )}
-            
-            <div className="flex justify-between font-semibold border-t pt-1" style={{ borderColor: QSAITheme.border.light }}>
-              <span style={{ color: QSAITheme.text.primary }}>Total:</span>
-              <span style={{ color: QSAITheme.text.primary }}>{formatCurrency(total)}</span>
             </div>
-          </div>
 
-          {/* Action buttons - Unified Process Order workflow for all order types */}
-          <div className="space-y-2">
-            {/* Unified Process Order Button */}
+            {/* Action buttons - Unified Process Order workflow for all order types */}
+            <div className="space-y-2">
+              {/* Unified Process Order Button */}
+              <Button
+                size="sm"
+                onClick={handleProcessOrder}  // ✅ Always use internal handler to show modal
+                className="w-full text-xs h-9 font-medium"
+                style={{
+                  backgroundColor: QSAITheme.purple.primary,
+                  borderColor: QSAITheme.purple.primary,
+                  color: 'white',
+                  boxShadow: `0 4px 8px ${QSAITheme.purple.glow}`
+                }}
+              >
+                <Receipt className="w-3 h-3 mr-2" />
+                Process Order • {formatCurrency(total)}
+              </Button>
+            </div>
+
+            {/* Clear Order Button */}
             <Button
+              variant="outline"
               size="sm"
-              onClick={handleProcessOrder}  // ✅ Always use internal handler to show modal
-              className="w-full text-xs h-9 font-medium"
+              onClick={onClearOrder}
+              className="w-full text-xs h-8"
               style={{
-                backgroundColor: QSAITheme.purple.primary,
-                borderColor: QSAITheme.purple.primary,
-                color: 'white',
-                boxShadow: `0 4px 8px ${QSAITheme.purple.glow}`
+                borderColor: QSAITheme.border.medium,
+                color: QSAITheme.text.muted
               }}
             >
-              <Receipt className="w-3 h-3 mr-2" />
-              Process Order • {formatCurrency(total)}
+              Clear Order
             </Button>
+          </>
+        ) : (
+          <div className="text-center py-2">
+            <p className="text-xs" style={{ color: QSAITheme.text.muted }}>
+              Add items to see totals and actions
+            </p>
           </div>
+        )}
+      </div>
 
-          {/* Clear Order Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearOrder}
-            className="w-full text-xs h-8"
-            style={{
-              borderColor: QSAITheme.border.medium,
-              color: QSAITheme.text.muted
-            }}
-          >
-            Clear Order
-          </Button>
-        </div>
-      )}
-
-      {/* Payment Modal */}
-      <POSUnifiedPaymentModal
-        isOpen={showPaymentModal}
-        onClose={handlePaymentModalClose}
-        orderItems={orderItems}
-        orderTotal={total}
-        orderType={orderType}
-        tableNumber={tableNumber}
-        customerFirstName={customerFirstName || customerData?.firstName || ''}
-        customerLastName={customerLastName || customerData?.lastName || ''}
-        customerPhone={customerPhone || customerData?.phone || ''}
-        customerAddress={customerAddress || customerData?.address || ''}
-        onPaymentComplete={handlePaymentSuccess}
-      />
-
-      {/* Order Confirmation Modal with Context-Aware CTAs */}
+      {/* Order Confirmation Modal - stays until fully migrated into orchestrator */}
       <OrderConfirmationModal
-        isOpen={showOrderConfirmation}  // ✅ Use internal state instead of prop
+        isOpen={!!showOrderConfirmation}
         onClose={handleOrderConfirmationClose}
         orderItems={orderItems}
         orderType={orderType}
@@ -1000,49 +966,151 @@ export function OrderSummaryPanel({
         customerLastName={customerLastName || customerData?.lastName || ''}
         customerPhone={customerPhone || customerData?.phone || ''}
         customerAddress={customerAddress || customerData?.address || ''}
-        customerStreet={customerStreet || ''}
-        customerPostcode={customerPostcode || ''}
-        subtotal={subtotal}
-        serviceCharge={serviceCharge}
-        deliveryFee={deliveryFee}
-        total={total}
         onConfirm={handleOrderConfirmation}
-        actionLabel={'Process Order'}
       />
 
-      {/* ✅ NEW: Staff Customization Modal for editing order items */}
-      {isCustomizationModalOpen && customizingOrderItem && (() => {
-        // Find the matching MenuItem from the store
-        const menuItem = menuItems.find(mi => mi.id === customizingOrderItem.menu_item_id);
-        
-        // Find the matching variant if one exists
-        const variant = customizingOrderItem.variant_id 
-          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id)
-          : null;
-        
-        if (!menuItem) {
-          console.warn('MenuItem not found for OrderItem:', customizingOrderItem);
-          return null;
-        }
-        
-        return (
-          <StaffCustomizationModal
-            item={menuItem}
-            variant={variant}
-            isOpen={isCustomizationModalOpen}
-            onClose={() => {
-              setIsCustomizationModalOpen(false);
-              setCustomizingOrderItem(null);
-              setCustomizingItemIndex(-1);
-            }}
-            onConfirm={handleCustomizationConfirm}
-            orderType={orderType}
-            initialQuantity={customizingOrderItem.quantity}
-          />
-        );
-      })()}
+      {/* Table Selection Modal (DINE-IN) */}
+      <TableSelectionModal 
+        isOpen={!!showTableSelection}
+        onClose={onCloseTableSelection || (() => {})}
+        onSelectTable={handleTableSelect}
+      />
+
+      {/* Bill Review Dialog (DINE-IN) - Final Bill Confirmation */}
+      <Dialog open={showFinalBillModal} onOpenChange={setShowFinalBillModal}>
+        <DialogContent 
+          className="max-w-2xl"
+          style={{
+            backgroundColor: QSAITheme.background.card,
+            border: `1px solid ${QSAITheme.border.medium}`,
+            boxShadow: `0 0 40px ${QSAITheme.purple.glow}`
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle 
+              className="text-2xl font-bold flex items-center gap-3"
+              style={{ color: QSAITheme.text.primary }}
+            >
+              <Receipt className="w-6 h-6" style={{ color: QSAITheme.purple.primary }} />
+              Final Bill Review
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Table Info */}
+            <div 
+              className="p-4 rounded-lg"
+              style={{ 
+                backgroundColor: QSAITheme.background.secondary,
+                border: `1px solid ${QSAITheme.border.medium}`
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" style={{ color: QSAITheme.purple.primary }} />
+                  <span className="font-semibold" style={{ color: QSAITheme.text.primary }}>
+                    Table {tableNumber}
+                  </span>
+                </div>
+                {guestCount && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" style={{ color: QSAITheme.text.muted }} />
+                    <span style={{ color: QSAITheme.text.secondary }}>
+                      {guestCount} {guestCount === 1 ? 'Guest' : 'Guests'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div className="space-y-2">
+              <h3 className="font-semibold" style={{ color: QSAITheme.text.secondary }}>Order Summary</h3>
+              <div 
+                className="max-h-64 overflow-y-auto space-y-2 p-3 rounded-lg"
+                style={{ 
+                  backgroundColor: QSAITheme.background.secondary,
+                  border: `1px solid ${QSAITheme.border.medium}`
+                }}
+              >
+                {orderItems.map((item, index) => (
+                  <div 
+                    key={index}
+                    className="flex justify-between items-start pb-2"
+                    style={{ borderBottom: index < orderItems.length - 1 ? `1px solid ${QSAITheme.border.light}` : 'none' }}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium" style={{ color: QSAITheme.text.primary }}>
+                          {item.quantity}x {item.name}
+                        </span>
+                        {item.variantName && (
+                          <Badge variant="secondary" className="text-xs">
+                            {item.variantName}
+                          </Badge>
+                        )}
+                      </div>
+                      {item.notes && (
+                        <p className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
+                          Note: {item.notes}
+                        </p>
+                      )}
+                    </div>
+                    <span className="font-medium ml-4" style={{ color: QSAITheme.text.primary }}>
+                      {formatCurrency(item.price * item.quantity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Total */}
+            <div 
+              className="p-4 rounded-lg"
+              style={{ 
+                backgroundColor: QSAITheme.purple.primary,
+                border: `1px solid ${QSAITheme.purple.light}`
+              }}
+            >
+              <div className="flex justify-between items-center">
+                <span className="text-xl font-bold" style={{ color: '#FFFFFF' }}>Total</span>
+                <span className="text-2xl font-bold" style={{ color: '#FFFFFF' }}>
+                  {formatCurrency(subtotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowFinalBillModal(false)}
+              style={{
+                borderColor: QSAITheme.border.medium,
+                color: QSAITheme.text.secondary
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmFinalBill}
+              style={{
+                backgroundColor: QSAITheme.purple.primary,
+                color: '#FFFFFF'
+              }}
+              className="hover:opacity-90 transition-opacity"
+            >
+              <Receipt className="w-4 h-4 mr-2" />
+              Print & Close Table
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+});
+
+// ✅ Named export for compatibility
+export { OrderSummaryPanel };
 
 export default OrderSummaryPanel;
