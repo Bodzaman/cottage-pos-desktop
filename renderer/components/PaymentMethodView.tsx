@@ -18,7 +18,7 @@ export function PaymentMethodView({
   totalWithTip,
   onSelectPaymentMethod,
   onBack,
-  availableMethods = ['CASH', 'ADYEN'] // Default to CASH and ADYEN
+  availableMethods = ['CASH', 'STRIPE'] // Default to CASH and STRIPE
 }: PaymentMethodViewProps) {
   // Payment method configurations
   const paymentMethods = [
@@ -30,11 +30,11 @@ export function PaymentMethodView({
       available: availableMethods.includes('CASH')
     },
     {
-      id: 'ADYEN' as const,
+      id: 'STRIPE' as const,
       name: 'Card Payment',
-      description: 'Credit/Debit card via Adyen',
+      description: 'Credit/Debit card via Stripe',
       icon: CreditCard,
-      available: availableMethods.includes('ADYEN')
+      available: availableMethods.includes('STRIPE')
     }
   ];
 
