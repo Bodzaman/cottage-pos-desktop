@@ -4,6 +4,8 @@ import brain from 'brain';
 import type { OrderItem } from './menuTypes';
 import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
+import type { CustomerReceiptRequest } from 'types';
+import { useTemplateAssignments } from './useTemplateAssignments';
 
 /**
  * Hook: usePrintingOperations
@@ -62,6 +64,9 @@ export function usePrintingOperations(
 ) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [lastPrintedAt, setLastPrintedAt] = useState<Date | null>(null);
+  
+  // Use validated template assignments hook
+  const templateAssignments = useTemplateAssignments();
 
   // ============================================================================
   // HELPER: Get Template Assignment for Order Mode
@@ -225,49 +230,82 @@ export function usePrintingOperations(
       return false;
     }
 
+    if (!selectedTableNumber) {
+      toast.error('Table number is required for bill printing');
+      return false;
+    }
+
     setIsPrinting(true);
     try {
-      // Fetch template assignment for dine-in
-      const { customerTemplateId } = await getTemplateAssignment('DINE-IN');
+      // Fetch validated customer template for dine-in bills
+      const customerTemplateId = await templateAssignments.getCustomerTemplateId('DINE-IN');
       
-      const billData = {
-        tableNumber: selectedTableNumber,
-        guestCount,
-        items: orderItems.map(item => {
-          let itemPrice = item.price;
-          
-          // Add modifier prices
-          if (item.modifiers && item.modifiers.length > 0) {
-            item.modifiers.forEach(mod => {
-              itemPrice += mod.price_adjustment || 0;
-            });
-          }
-          
-          return {
-            name: item.name,
-            variant_name: item.variant_name || null,
-            quantity: item.quantity,
-            unitPrice: itemPrice,
-            total: itemPrice * item.quantity
-          };
-        }),
-        subtotal: orderTotal,
-        serviceCharge: orderTotal * 0.125, // 12.5% service charge
-        total: orderTotal * 1.125,
-        timestamp: new Date().toISOString(),
-        template_id: customerTemplateId // ✅ Pass template ID
+      // Calculate bill totals
+      const subtotal = orderTotal;
+      const serviceCharge = orderTotal * 0.125; // 12.5% service charge
+      const tax = (orderTotal + serviceCharge) * 0.20; // 20% VAT on subtotal + service
+      const total = subtotal + serviceCharge + tax;
+      
+      // Build items for receipt
+      const receiptItems = orderItems.map(item => {
+        let itemPrice = item.price;
+        
+        // Add modifier prices
+        if (item.modifiers && item.modifiers.length > 0) {
+          item.modifiers.forEach(mod => {
+            itemPrice += mod.price_adjustment || 0;
+          });
+        }
+        
+        return {
+          name: item.name,
+          variant_name: item.variant_name || null,
+          quantity: item.quantity,
+          unitPrice: itemPrice,
+          total: itemPrice * item.quantity,
+          modifiers: item.modifiers?.map(m => m.option_name) || []
+        };
+      });
+
+      // Build CustomerReceiptRequest matching backend model
+      const receiptData: CustomerReceiptRequest = {
+        orderNumber: `TABLE-${selectedTableNumber}-${Date.now()}`,
+        orderType: 'DINE-IN',
+        items: receiptItems,
+        tax,
+        deliveryFee: 0,
+        template_data: {
+          ...(customerTemplateId && { template_id: customerTemplateId }),
+          tableNumber: selectedTableNumber,
+          guestCount,
+          subtotal,
+          serviceCharge,
+          total,
+          timestamp: new Date().toISOString()
+        },
+        orderSource: 'POS',
+        table: `Table ${selectedTableNumber}`,
+        paymentMethod: 'Card'
       };
 
-      console.log('🖨️ Printing bill with template:', customerTemplateId);
+      console.log('🖨️ Printing dine-in bill for table:', selectedTableNumber);
+      if (customerTemplateId) {
+        console.log(`✅ Using validated template: ${customerTemplateId}`);
+      } else {
+        console.log('⚠️ No template assigned - using default formatting');
+      }
 
-      // Call backend print endpoint (if exists)
-      // const response = await brain.print_bill(billData);
-      // const result = await response.json();
+      // Call the thermal printer endpoint
+      const response = await brain.print_customer_receipt(receiptData);
+      const result = await response.json();
 
-      // For now, simulate success (until print_bill endpoint exists)
-      setLastPrintedAt(new Date());
-      toast.success(`Bill printed for Table ${selectedTableNumber}`);
-      return true;
+      if (result.success) {
+        setLastPrintedAt(new Date());
+        toast.success(`✅ Bill printed for Table ${selectedTableNumber}`);
+        return true;
+      } else {
+        throw new Error(result.error || 'Print failed');
+      }
     } catch (error) {
       console.error('❌ Error printing bill:', error);
       toast.error('Failed to print bill');
