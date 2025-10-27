@@ -1,14 +1,21 @@
 /**
  * PaymentProcessingView - Payment processing step in unified payment flow
- * Handles both ADYEN (card) and CASH payment methods
- * Embeds Adyen Drop-in for card payments, shows animation for cash
+ * Handles both STRIPE (card) and CASH payment methods
+ * Embeds Stripe Elements for card payments, shows animation for cash
  * Part of PaymentFlowOrchestrator state machine
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import {
+  PaymentElement,
+  Elements,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Loader2, CreditCard, Banknote, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Banknote, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentProcessingViewProps } from '../utils/paymentFlowTypes';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
@@ -25,12 +32,174 @@ enum ProcessingState {
   FAILED = 'failed'
 }
 
-// Global window type for Adyen
-declare global {
-  interface Window {
-    AdyenCheckout: any;
-  }
+// ============================================================================
+// STRIPE CHECKOUT FORM (Child component that uses Stripe hooks)
+// ============================================================================
+
+function StripePaymentForm({
+  orderId,
+  totalAmount,
+  onPaymentSuccess,
+  onPaymentFailed,
+}: {
+  orderId: string;
+  totalAmount: number;
+  onPaymentSuccess: (data: { method: 'STRIPE'; amount: number; pspReference?: string }) => void;
+  onPaymentFailed: (errorMessage: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      console.log('💳 [Stripe] Confirming payment...');
+
+      // Confirm the payment
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/pos-desktop`,
+        },
+        redirect: 'if_required', // Only redirect if 3DS is required
+      });
+
+      if (error) {
+        console.error('❌ [Stripe] Payment error:', error);
+        const errorMsg = error.message || 'Payment failed';
+        setErrorMessage(errorMsg);
+        toast.error('Payment failed', {
+          description: errorMsg,
+        });
+        onPaymentFailed(errorMsg);
+      } else if (paymentIntent) {
+        console.log('✅ [Stripe] Payment succeeded:', paymentIntent.id);
+
+        // Confirm with backend
+        try {
+          const confirmResponse = await brain.confirm_payment({
+            payment_intent_id: paymentIntent.id,
+            order_id: orderId,
+          });
+
+          const confirmData = await confirmResponse.json();
+
+          if (confirmData.success) {
+            toast.success('Payment successful!', {
+              description: `${safeCurrency(totalAmount)} charged via card`,
+            });
+            onPaymentSuccess({
+              method: 'STRIPE',
+              amount: totalAmount,
+              pspReference: paymentIntent.id,
+            });
+          } else {
+            throw new Error(confirmData.message || 'Failed to confirm payment');
+          }
+        } catch (confirmError: any) {
+          console.error('❌ [Stripe] Error confirming payment:', confirmError);
+          // Payment succeeded but confirmation failed - still call success
+          toast.success('Payment successful!', {
+            description: `${safeCurrency(totalAmount)} charged via card`,
+          });
+          onPaymentSuccess({
+            method: 'STRIPE',
+            amount: totalAmount,
+            pspReference: paymentIntent.id,
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ [Stripe] Unexpected error:', err);
+      const errorMsg = err.message || 'An unexpected error occurred';
+      setErrorMessage(errorMsg);
+      toast.error('Payment error', {
+        description: errorMsg,
+      });
+      onPaymentFailed(errorMsg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Payment Element */}
+      <div className="min-h-[200px]">
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+            paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
+          }}
+        />
+      </div>
+
+      {/* Error Message */}
+      {errorMessage && (
+        <Card
+          className="border-red-500/30"
+          style={{
+            ...styles.frostedGlassStyle,
+            background: 'rgba(239, 68, 68, 0.1)',
+          }}
+        >
+          <CardContent className="p-4">
+            <p className="text-red-400 text-sm">{errorMessage}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submit Button */}
+      <Button
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className="w-full h-14 text-white font-bold text-lg"
+        style={{
+          ...styles.frostedGlassStyle,
+          background: QSAITheme.purple.primary,
+        }}
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          `Pay ${safeCurrency(totalAmount)}`
+        )}
+      </Button>
+
+      {/* Processing Overlay */}
+      {isProcessing && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
+        >
+          <div className="text-center">
+            <Loader2 className="h-16 w-16 mx-auto mb-4 animate-spin" style={{ color: QSAITheme.purple.primary }} />
+            <p className="text-white text-lg font-semibold">Processing payment...</p>
+            <p className="text-white/60 text-sm mt-2">Please do not close this window</p>
+          </div>
+        </motion.div>
+      )}
+    </form>
+  );
 }
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export function PaymentProcessingView({
   paymentMethod,
@@ -44,102 +213,68 @@ export function PaymentProcessingView({
 }: PaymentProcessingViewProps) {
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.INITIALIZING);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [adyenCheckout, setAdyenCheckout] = useState<any>(null);
-  const adyenContainerRef = useRef<HTMLDivElement>(null);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   // ============================================================================
-  // ADYEN INITIALIZATION (for CARD payments)
+  // STRIPE INITIALIZATION (for CARD payments)
   // ============================================================================
   
   useEffect(() => {
-    if (paymentMethod === 'ADYEN') {
-      initializeAdyenDropin();
+    if (paymentMethod === 'STRIPE') {
+      initializeStripe();
     } else if (paymentMethod === 'CASH') {
       // CASH payments are handled by button click
       setProcessingState(ProcessingState.READY);
     }
   }, [paymentMethod]);
 
-  const initializeAdyenDropin = async () => {
+  const initializeStripe = async () => {
     try {
       setProcessingState(ProcessingState.INITIALIZING);
+      console.log('🔧 [Stripe] Initializing Stripe...');
       
-      // 1. Get Adyen client key
-      const configResponse = await brain.get_payment_config();
+      // 1. Get Stripe publishable key
+      const configResponse = await brain.get_stripe_publishable_key();
       const config = await configResponse.json();
-      const adyenClientKey = config.adyen_client_key;
+      const publishableKey = config.publishable_key;
       
-      if (!adyenClientKey) {
-        throw new Error('Adyen client key not configured');
+      if (!publishableKey) {
+        throw new Error('Stripe publishable key not configured');
       }
       
-      // 2. Create Adyen payment session
-      const sessionResponse = await brain.create_payment_session({
-        amount: Math.round(totalAmount * 100), // Convert to minor units (pence)
-        currency: 'GBP',
+      console.log('🔑 [Stripe] Loading Stripe SDK...');
+      const stripe = loadStripe(publishableKey);
+      setStripePromise(stripe);
+      
+      // 2. Create Payment Intent
+      console.log('💳 [Stripe] Creating Payment Intent...');
+      const intentResponse = await brain.create_payment_intent({
+        amount: Math.round(totalAmount * 100), // Convert to pence
+        currency: 'gbp',
         order_id: orderId,
         order_type: orderType,
+        customer_email: undefined,
         customer_name: customerName || 'POS Customer',
-        return_url: `${window.location.origin}/pos-desktop`
+        description: `POS Order - ${orderType}`,
       });
       
-      const sessionData = await sessionResponse.json();
+      const intentData = await intentResponse.json();
       
-      if (!sessionData.success) {
-        throw new Error(sessionData.message || 'Failed to create payment session');
+      if (!intentData.success || !intentData.client_secret) {
+        throw new Error(intentData.message || 'Failed to create payment intent');
       }
       
-      // 3. Load Adyen Web Drop-in library (if not already loaded)
-      if (!window.AdyenCheckout) {
-        const script = document.createElement('script');
-        script.src = 'https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.59.0/adyen.js';
-        script.async = true;
-        
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        
-        // Load Adyen CSS
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.59.0/adyen.css';
-        document.head.appendChild(link);
-      }
-      
-      // 4. Initialize Adyen Checkout
-      const checkout = await window.AdyenCheckout({
-        environment: 'test',
-        clientKey: adyenClientKey,
-        session: {
-          id: sessionData.session_id,
-          sessionData: sessionData.session_data
-        },
-        onPaymentCompleted: (result: any) => {
-          console.log('✅ [Adyen] Payment completed:', result);
-          handleAdyenSuccess(result);
-        },
-        onError: (error: any) => {
-          console.error('❌ [Adyen] Payment error:', error);
-          handleAdyenError(error.message || 'Payment failed');
-        }
-      });
-      
-      // 5. Mount Drop-in to container
-      if (adyenContainerRef.current) {
-        const dropin = checkout.create('dropin').mount(adyenContainerRef.current);
-        setAdyenCheckout(dropin);
-      }
-      
+      setClientSecret(intentData.client_secret);
       setProcessingState(ProcessingState.READY);
+      console.log('✅ [Stripe] Stripe initialized successfully');
       
     } catch (error: any) {
-      console.error('❌ [PaymentProcessing] Adyen initialization failed:', error);
-      setErrorMessage(error.message || 'Failed to initialize payment terminal');
+      console.error('❌ [PaymentProcessing] Stripe initialization failed:', error);
+      setErrorMessage(error.message || 'Failed to initialize payment system');
       setProcessingState(ProcessingState.FAILED);
-      toast.error('Payment terminal error', {
-        description: error.message || 'Failed to initialize Adyen'
+      toast.error('Payment system error', {
+        description: error.message || 'Failed to initialize Stripe'
       });
     }
   };
@@ -148,25 +283,16 @@ export function PaymentProcessingView({
   // PAYMENT HANDLERS
   // ============================================================================
   
-  const handleAdyenSuccess = (result: any) => {
+  const handleStripeSuccess = (data: { method: 'STRIPE'; amount: number; pspReference?: string }) => {
     setProcessingState(ProcessingState.SUCCESS);
-    
-    toast.success('Payment successful!', {
-      description: `${safeCurrency(totalAmount)} charged via card`
-    });
     
     // Delay to show success state
     setTimeout(() => {
-      onPaymentSuccess({
-        method: 'ADYEN',
-        amount: totalAmount,
-        pspReference: result.pspReference,
-        sessionId: result.sessionId
-      });
+      onPaymentSuccess(data);
     }, 1500);
   };
   
-  const handleAdyenError = (error: string) => {
+  const handleStripeError = (error: string) => {
     setProcessingState(ProcessingState.FAILED);
     setErrorMessage(error);
     onPaymentFailed(error);
@@ -194,11 +320,56 @@ export function PaymentProcessingView({
 
   const handleRetry = () => {
     setErrorMessage('');
-    if (paymentMethod === 'ADYEN') {
-      initializeAdyenDropin();
+    if (paymentMethod === 'STRIPE') {
+      initializeStripe();
     } else {
       setProcessingState(ProcessingState.READY);
     }
+  };
+
+  // Stripe appearance configuration
+  const stripeAppearance = {
+    theme: 'night' as const,
+    variables: {
+      colorPrimary: QSAITheme.purple.primary,
+      colorBackground: 'rgba(255, 255, 255, 0.08)',
+      colorText: '#FFFFFF',
+      colorDanger: '#EF4444',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      spacingUnit: '4px',
+      borderRadius: '6px',
+    },
+    rules: {
+      '.Input': {
+        border: '1px solid rgba(255, 255, 255, 0.25)',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        color: '#FFFFFF',
+      },
+      '.Input:hover': {
+        border: '1px solid rgba(255, 255, 255, 0.35)',
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+      },
+      '.Input:focus': {
+        border: `1px solid ${QSAITheme.purple.primary}`,
+        boxShadow: `0 0 0 3px ${QSAITheme.purple.glow}`,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+      },
+      '.Label': {
+        color: '#FFFFFF',
+        fontWeight: '500',
+      },
+      '.Tab': {
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      },
+      '.Tab:hover': {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      },
+      '.Tab--selected': {
+        borderColor: QSAITheme.purple.primary,
+        backgroundColor: 'rgba(91, 33, 182, 0.1)',
+      },
+    },
   };
 
   // ============================================================================
@@ -216,10 +387,10 @@ export function PaymentProcessingView({
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-white mb-2">
-          {paymentMethod === 'ADYEN' ? 'Card Payment' : 'Cash Payment'}
+          {paymentMethod === 'STRIPE' ? 'Card Payment' : 'Cash Payment'}
         </h2>
         <p className="text-sm text-white/60">
-          {paymentMethod === 'ADYEN' 
+          {paymentMethod === 'STRIPE' 
             ? 'Enter card details to complete payment'
             : 'Confirm cash payment from customer'}
         </p>
@@ -253,23 +424,30 @@ export function PaymentProcessingView({
             className="text-center py-12"
           >
             <Loader2 className="h-16 w-16 mx-auto mb-4 animate-spin" style={{ color: QSAITheme.purple.primary }} />
-            <div className="text-white">Initializing payment terminal...</div>
+            <div className="text-white">Initializing payment system...</div>
           </motion.div>
         )}
 
-        {/* READY STATE - ADYEN */}
-        {processingState === ProcessingState.READY && paymentMethod === 'ADYEN' && (
+        {/* READY STATE - STRIPE */}
+        {processingState === ProcessingState.READY && paymentMethod === 'STRIPE' && clientSecret && stripePromise && (
           <motion.div
-            key="adyen-ready"
+            key="stripe-ready"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            {/* Adyen Drop-in Container */}
+            {/* Stripe Elements Container */}
             <Card style={styles.frostedGlassStyle}>
               <CardContent className="p-6">
-                <div ref={adyenContainerRef} className="w-full" />
+                <Elements stripe={stripePromise} options={{ clientSecret, appearance: stripeAppearance }}>
+                  <StripePaymentForm
+                    orderId={orderId}
+                    totalAmount={totalAmount}
+                    onPaymentSuccess={handleStripeSuccess}
+                    onPaymentFailed={handleStripeError}
+                  />
+                </Elements>
               </CardContent>
             </Card>
           </motion.div>
