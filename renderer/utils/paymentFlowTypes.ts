@@ -20,7 +20,7 @@ export enum PaymentFlowStep {
 /**
  * Payment method types supported in the orchestrator
  */
-export type PaymentMethod = 'CASH' | 'ADYEN' | 'STRIPE';
+export type PaymentMethod = 'CASH' | 'STRIPE';
 
 /**
  * Customer data for payment processing
@@ -125,7 +125,6 @@ export interface OrderConfirmationViewProps {
   deliveryFee?: number;
   onContinueToPayment: () => void;
   onAddToOrder: () => void;
-  onSendToKitchen: () => void;
   onMakeChanges: () => void;
   onBack?: () => void;
 }
