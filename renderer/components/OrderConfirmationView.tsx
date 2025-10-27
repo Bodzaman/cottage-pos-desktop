@@ -18,10 +18,8 @@ import {
   Phone,
   Home,
   Users,
-  ChefHat,
   ArrowRight,
-  Edit,
-  Plus
+  Edit
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { OrderConfirmationViewProps } from '../utils/paymentFlowTypes';
@@ -39,7 +37,6 @@ export function OrderConfirmationView({
   deliveryFee = 0,
   onContinueToPayment,
   onAddToOrder,
-  onSendToKitchen,
   onMakeChanges,
   onBack
 }: OrderConfirmationViewProps) {
@@ -248,37 +245,15 @@ export function OrderConfirmationView({
           <ArrowRight className="h-5 w-5 ml-2" />
         </Button>
 
-        {/* Secondary Actions Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            onClick={onSendToKitchen}
-            className="h-12 border-white/20 text-white/80 hover:bg-white/10 hover:border-purple-500/50"
-            style={styles.frostedGlassStyle}
-          >
-            <ChefHat className="h-4 w-4 mr-2" />
-            Send to Kitchen
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onAddToOrder}
-            className="h-12 border-white/20 text-white/80 hover:bg-white/10 hover:border-purple-500/50"
-            style={styles.frostedGlassStyle}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add to Order
-          </Button>
-        </div>
-
-        {/* Make Changes Button */}
+        {/* Secondary Action: Edit Order */}
         <Button
           variant="outline"
           onClick={onMakeChanges}
-          className="w-full h-12 border-white/20 text-white/60 hover:bg-white/5 hover:border-white/30"
+          className="w-full h-12 border-white/20 text-white/80 hover:bg-white/10 hover:border-purple-500/50"
           style={styles.frostedGlassStyle}
         >
           <Edit className="h-4 w-4 mr-2" />
-          Make Changes to Order
+          Edit Order
         </Button>
       </div>
     </motion.div>
