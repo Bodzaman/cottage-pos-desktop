@@ -241,7 +241,7 @@ export function PaymentFlowOrchestrator({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className="max-w-2xl max-h-[90vh] overflow-hidden border-gray-700 text-white p-8"
+        className="max-w-2xl max-h-[90vh] overflow-y-auto border-gray-700 text-white p-8"
         style={{
           background: '#1E1E1E',
           ...styles.frostedGlassStyle
@@ -262,7 +262,6 @@ export function PaymentFlowOrchestrator({
               deliveryFee={deliveryFee}
               onContinueToPayment={handleContinueToPayment}
               onAddToOrder={handleAddToOrder}
-              onSendToKitchen={handleSendToKitchen}
               onMakeChanges={handleMakeChanges}
               onBack={onClose}
             />
@@ -289,7 +288,7 @@ export function PaymentFlowOrchestrator({
               totalWithTip={totalWithTip}
               onSelectPaymentMethod={handleSelectPaymentMethod}
               onBack={goToPreviousStep}
-              availableMethods={['CASH', 'ADYEN']}
+              availableMethods={['CASH', 'STRIPE']}
             />
           )}
 
