@@ -17,6 +17,16 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -76,6 +86,7 @@ import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
 import { PaymentFlowResult } from 'utils/paymentFlowTypes';
+import { PaymentChoiceModal } from 'components/PaymentChoiceModal';
 
 // View Components - Import from POSDesktop for parity
 import { OnlineOrderManagement } from 'components/OnlineOrderManagement';
@@ -86,6 +97,7 @@ import { MenuCategory, MenuItem, OrderItem, ModifierSelection } from '../utils/m
 import { CustomerData } from '../utils/customerDataStore';
 import { TipSelection, PaymentResult } from '../utils/menuTypes';
 import { FIXED_SECTIONS, type SectionId, filterItemsBySection } from 'utils/sectionMapping';
+import { usePOSSettingsWithAutoFetch } from '@/utils/posSettingsStore';
 
 // Custom hooks
 import { useTableManagement } from 'utils/useTableManagement';
@@ -229,61 +241,26 @@ export default function POSDesktop() {
   } = tableOrdersStore;
   
   // ============================================================================
-  // MAIN STATE MANAGEMENT (moved up before conditional logic)
+  // HOOKS & STATE
   // ============================================================================
   
-  // REMOVED: Replaced by focused stores
-  // const [state, setState] = useState<POSState>({
-  //   // View Management
-  //   activeView: "pos",
-  //   previousView: "",
-    
-  //   // Order Management
-  //   orderType: "DINE-IN",
-  //   selectedTableNumber: null as number | null,
-  //   guestCount: 1,
-  //   orderItems: [] as OrderItem[],
-    
-  //   // Customer Information
-  //   customerData: {
-  //     firstName: '',
-  //     lastName: '',
-  //     phone: '',
-  //     email: '',
-  //     notes: '',
-  //     tableNumber: '',
-  //     guestCount: 1,
-  //     address: '',
-  //     street: '',
-  //     city: '',
-  //     postcode: '',
-  //     deliveryNotes: ''
-  //   },
-    
-  //   // UI State
-  //   showCustomerModal: false,
-  //   showVariantSelector: false,
-  //   pendingOrderConfirmation: false,
-  //   showGuestCountModal: false,
-  //   showDineInModal: false,
-  //   showPaymentFlow: false, // NEW: Single payment flow state
-  //   showSessionRestoreDialog: false,
-  // });
+  // ✅ Get POS settings from store for delivery fee calculation
+  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
   
-  // Helper function to update state
-  // const updateState = useCallback((updates: Partial<POSState>) => {
-  //   setState(prev => ({ ...prev, ...updates }));
-  // }, []);
-
-  // Calculate order total from items
+  // Calculate order total
   const orderTotal = useMemo(() => 
     orderStore.orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
     [orderStore.orderItems]
   );
   
-  // ============================================================================
-  // CUSTOM HOOKS FOR LOGIC EXTRACTION
-  // ============================================================================
+  // ✅ Calculate delivery fee using same logic as OrderSummaryPanel
+  const deliveryFee = useMemo(() => {
+    return orderStore.orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled
+      ? posSettings.delivery_charge.amount
+      : 0;
+  }, [orderStore.orderType, posSettings]);
+  
+  // Initialize POS with restored sessions
   const initialization = usePOSInitialization({
     onViewChange: (view) => {
       if (view === 'pos') {
@@ -443,15 +420,10 @@ export default function POSDesktop() {
 
   // CUSTOM HOOKS - Core Business Logic
   
-  // ✅ FIXED: Stabilize setter function with useCallback to prevent infinite re-renders
-  const setOrderItems = useCallback((items: OrderItem[] | ((prev: OrderItem[]) => OrderItem[])) => {
-    orderStore.setOrderItems(typeof items === 'function' ? items(orderStore.orderItems) : items);
-  }, []);
-  
-  // Order Management Hook - ✅ Now receives stable function reference
+  // Order Management Hook - ✅ Pass store method directly (no wrapper)
   const orderManagement = useOrderManagement(
     orderStore.orderItems,
-    setOrderItems
+    orderStore.setOrderItems // ✅ Direct store method - handles functional updates correctly
   );
   
   // Customer Flow Hook - ✅ Fixed: Pass all 5 required parameters
@@ -733,18 +705,130 @@ export default function POSDesktop() {
   // ============================================================================
   // MODAL ORCHESTRATION HANDLERS
   // ============================================================================
-  
+
   // Single Payment Flow handlers
   const handleClosePaymentModal = useCallback(() => {
     uiStore.setModal('showPaymentFlow', false);
   }, []);
-  
+
+  // NEW: Payment choice modal state
+  const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
+
   // Payment Modal handlers
-  const handleShowPaymentModal = useCallback(() => {
+  const handleShowPaymentModal = useCallback(async () => {
     if (isDev) console.log('💳 [POSDesktop] Opening payment flow');
+    
+    // For DINE-IN orders, bypass payment processing - just print bill
+    if (orderStore.orderType === 'DINE-IN') {
+      if (isDev) console.log('🍽️ [POSDesktop] DINE-IN order - printing bill only, no payment processing');
+      
+      try {
+        // Print bill to thermal printer
+        await printing.handlePrintBill(orderTotal);
+        
+        // Clear saved session from IndexedDB (order complete, no need to restore)
+        await clearCurrentSession();
+        
+        // Reset order state
+        orderStore.clearOrder();
+        customerStore.clearCustomer();
+        
+        toast.success('✅ Bill printed successfully!');
+      } catch (error) {
+        console.error('❌ [POSDesktop] Bill printing failed:', error);
+        toast.error('Failed to print bill. Please try again.');
+      }
+      return;
+    }
+    
+    // For WAITING, COLLECTION, DELIVERY orders → Show payment choice modal
+    if (isDev) console.log(`💳 [POSDesktop] ${orderStore.orderType} order - showing payment choice modal`);
+    setShowPaymentChoiceModal(true);
+  }, [orderStore.orderType, printing, orderTotal, clearCurrentSession]);
+
+  // NEW: Handle "Take Payment Now" choice
+  const handleTakePaymentNow = useCallback(() => {
+    if (isDev) console.log('💳 [POSDesktop] User chose "Take Payment Now" - opening Stripe payment flow');
+    setShowPaymentChoiceModal(false);
     uiStore.setModal('showPaymentFlow', true);
   }, []);
-  
+
+  // NEW: Handle "Pay Later" choice - Skip payment, print receipt, clear order
+  const handlePayLater = async () => {
+    console.log('💳 [POSDesktop] Pay Later selected - printing receipt without payment');
+    
+    // Close the payment choice modal
+    setShowPaymentChoiceModal(false);
+    
+    try {
+      // Generate order number
+      const orderNumber = generateOrderNumber();
+      
+      // Fetch validated template ID for current order mode
+      const templateId = await templateAssignments.getCustomerTemplateId(orderStore.orderType);
+      
+      // Format items for receipt printing
+      const receiptItems = orderStore.orderItems.map(item => {
+        const itemPrice = item.variant?.price || item.price || 0;
+        return {
+          name: item.variant?.name || item.name,
+          quantity: item.quantity,
+          price: itemPrice,
+          total: itemPrice * item.quantity,
+          modifiers: item.modifiers?.map(m => m.option_name) || []
+        };
+      });
+      
+      // Build receipt data matching CustomerReceiptRequest
+      const receiptData = {
+        orderNumber,
+        orderType: orderStore.orderType as string,
+        items: receiptItems,
+        tax: 0,
+        deliveryFee: 0,
+        orderSource: 'POS',
+        template_data: {
+          subtotal: orderTotal,
+          total: orderTotal,
+          timestamp: new Date().toISOString(),
+          // Include template_id only if template exists (validated)
+          ...(templateId && { template_id: templateId })
+        }
+      };
+      
+      console.log('🖨️ [POSDesktop] Printing receipt for pay-later order:', receiptData);
+      if (templateId) {
+        console.log(`✅ Using validated template: ${templateId}`);
+      } else {
+        console.log('⚠️ No template assigned or template missing - using default formatting');
+      }
+      
+      // Print customer receipt via brain API
+      const printResponse = await brain.print_customer_receipt(receiptData);
+      const printResult = await printResponse.json();
+      
+      if (!printResult.success) {
+        throw new Error(printResult.error || 'Print failed');
+      }
+      
+      console.log('✅ [POSDesktop] Receipt printed for pay-later order');
+      
+      // Show success message
+      toast.success('Order processed - Payment pending', {
+        description: `Order ${orderNumber} ready for ${orderStore.orderType.toLowerCase()}. Collect payment on pickup/delivery.`,
+      });
+      
+      // Clear the order from POS
+      orderStore.clearOrder();
+      
+    } catch (error) {
+      console.error('❌ [POSDesktop] Error in pay-later flow:', error);
+      toast.error('Failed to process order', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  };
+
   // NEW: Payment Flow Completion Handler
   const handlePaymentFlowComplete = useCallback(async (result: PaymentFlowResult) => {
     if (isDev) console.log('💳 [POSDesktop] Payment flow completed:', result);
@@ -1423,21 +1507,31 @@ export default function POSDesktop() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Payment Choice Modal - NEW: Choose between immediate payment or pay later */}
+        <PaymentChoiceModal
+          isOpen={showPaymentChoiceModal}
+          onClose={() => setShowPaymentChoiceModal(false)}
+          onTakePaymentNow={handleTakePaymentNow}
+          onPayLater={handlePayLater}
+          orderTotal={orderTotal}
+          orderType={orderStore.orderType as 'WAITING' | 'COLLECTION' | 'DELIVERY'}
+        />
+
+        {/* Payment Flow Orchestrator - Full Stripe payment flow */}
+        <PaymentFlowOrchestrator
+          isOpen={uiStore.showPaymentFlow}
+          onClose={handleClosePaymentModal}
+          orderItems={orderStore.orderItems}
+          orderTotal={orderTotal}
+          orderType={orderStore.orderType}
+          tableNumber={orderStore.selectedTableNumber || undefined}
+          guestCount={orderStore.guestCount}
+          customerData={customerStore.customerData}
+          deliveryFee={deliveryFee}
+          onPaymentComplete={handlePaymentFlowComplete}
+        />
       </div>
-      
-      {/* Payment Flow Orchestrator - Single modal for all payment flows */}
-      <PaymentFlowOrchestrator
-        isOpen={uiStore.showPaymentFlow}
-        onClose={handleClosePaymentModal}
-        orderItems={orderStore.orderItems}
-        orderTotal={orderTotal}
-        orderType={orderStore.orderType}
-        tableNumber={orderStore.selectedTableNumber || undefined}
-        guestCount={orderStore.guestCount}
-        customerData={customerStore.customerData}
-        deliveryFee={0} // TODO: Calculate delivery fee if applicable
-        onPaymentComplete={handlePaymentFlowComplete}
-      />
     </CustomizeOrchestratorProvider>
   );
 }
