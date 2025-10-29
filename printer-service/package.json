@@ -1,0 +1,22 @@
+{
+  "name": "cottage-tandoori-printer-service",
+  "version": "1.0.0",
+  "description": "Thermal printer service for Cottage Tandoori POS",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-thermal-printer": "^4.4.4",
+    "winston": "^3.11.0",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Cottage Tandoori",
+  "license": "UNLICENSED",
+  "private": true
+}
