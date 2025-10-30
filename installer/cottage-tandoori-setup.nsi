@@ -1,5 +1,7 @@
 !define APP_NAME "Cottage Tandoori POS"
+!ifndef APP_VERSION
 !define APP_VERSION "1.0.0"
+!endif
 !define COMPANY_NAME "Cottage Tandoori"
 !define SERVICE_NAME "CottagePrinterService"
 !define SERVICE_DISPLAY "Cottage Tandoori Printer Service"
