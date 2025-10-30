@@ -1,122 +1,96 @@
-name: Publish Electron Assets on Release
+name: Build and Release Printer Service Installer
 
 on:
   release:
     types: [published]
-
-permissions:
-  contents: write
-  actions: read
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 jobs:
-  publish-assets:
+  build:
     runs-on: windows-latest
-    timeout-minutes: 60
-
+    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: yarn install
-
-    - name: Bump package.json version from release tag
-      shell: bash
-      run: |
-        # Extract version from release tag (remove 'v' prefix)
-        TAG_VERSION="${{ github.event.release.tag_name }}"
-        VERSION="${TAG_VERSION#v}"
-        echo "Release tag: $TAG_VERSION"
-        echo "Package version: $VERSION"
-
-        # Update package.json version
-        npm version $VERSION --no-git-tag-version
-        echo "Updated package.json to version $VERSION"
-
-    - name: Build Electron app (no publish)
-      run: yarn run dist
-      env:
-        CI: true
-
-    - name: Validate version consistency before upload
-      shell: bash
-      env:
-        RELEASE_TAG: ${{ github.event.release.tag_name }}
-      run: |
-        VERSION="${RELEASE_TAG#v}"
-        echo "Validating version consistency for release $RELEASE_TAG..."
-
-        # Check package.json version
-        PACKAGE_VERSION=$(node -p "require('./package.json').version")
-        echo "Package.json version: $PACKAGE_VERSION"
-
-        # Check latest.yml version
-        if [ -f "dist/latest.yml" ]; then
-          YML_VERSION=$(grep -o 'version: [0-9]*\.[0-9]*\.[0-9]*' dist/latest.yml | cut -d' ' -f2)
-          echo "latest.yml version: $YML_VERSION"
-
-          if [ "$YML_VERSION" != "$VERSION" ]; then
-            echo "❌ ERROR: latest.yml version ($YML_VERSION) != release version ($VERSION)"
-            exit 1
-          fi
-        fi
-
-        if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
-          echo "❌ ERROR: package.json version ($PACKAGE_VERSION) != release version ($VERSION)"
-          exit 1
-        fi
-
-        # Verify exe filename contains correct version
-        EXE_FILE=$(find dist/ -name "*-$VERSION-Setup.exe")
-        if [ -z "$EXE_FILE" ]; then
-          echo "❌ ERROR: No .exe file found with version $VERSION"
-          echo "Available files:"
-          find dist/ -name "*.exe"
-          exit 1
-        fi
-
-        echo "✅ All version checks passed!"
-
-    - name: Upload release assets
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        RELEASE_TAG: ${{ github.event.release.tag_name }}
-      run: |
-        echo "Uploading assets for release: $RELEASE_TAG"
-
-        # Find all artifacts
-        EXE_FILE=$(find dist/ -name "*.exe" | head -1)
-        YML_FILE=$(find dist/ -name "latest.yml" | head -1)
-        BLOCKMAP_FILE=$(find dist/ -name "*.blockmap" | head -1)
-
-        if [ -f "$EXE_FILE" ]; then
-          echo "Uploading: $EXE_FILE"
-          gh release upload "$RELEASE_TAG" "$EXE_FILE" --clobber
-        fi
-
-        if [ -f "$YML_FILE" ]; then
-          echo "Uploading: $YML_FILE"
-          gh release upload "$RELEASE_TAG" "$YML_FILE" --clobber
-        fi
-
-        if [ -f "$BLOCKMAP_FILE" ]; then
-          echo "Uploading: $BLOCKMAP_FILE"
-          gh release upload "$RELEASE_TAG" "$BLOCKMAP_FILE" --clobber
-        fi
-
-        echo "Upload complete!"
-
-    - name: Verify upload
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        RELEASE_TAG: ${{ github.event.release.tag_name }}
-      run: |
-        echo "Checking uploaded assets..."
-        gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        working-directory: printer-service
+        run: npm ci
+      
+      - name: Download NSSM (Windows Service Manager)
+        run: |
+          Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "nssm.zip"
+          Expand-Archive -Path "nssm.zip" -DestinationPath "."
+          Move-Item "nssm-2.24/win64/nssm.exe" "installer/nssm.exe"
+        shell: pwsh
+      
+      - name: Download Node.js standalone binary
+        run: |
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v18.18.0/node-v18.18.0-win-x64.zip" -OutFile "node.zip"
+          Expand-Archive -Path "node.zip" -DestinationPath "."
+          New-Item -ItemType Directory -Force -Path "installer/node-runtime"
+          Move-Item "node-v18.18.0-win-x64/node.exe" "installer/node-runtime/node.exe"
+        shell: pwsh
+      
+      - name: Copy printer service files to installer directory
+        run: |
+          New-Item -ItemType Directory -Force -Path "installer/printer-service"
+          Copy-Item -Recurse -Force "printer-service/*" "installer/printer-service/"
+        shell: pwsh
+      
+      - name: Setup NSIS
+        run: |
+          choco install nsis -y
+          refreshenv
+        shell: pwsh
+      
+      - name: Build installer with NSIS
+        run: |
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer/printer-service-setup.nsi
+        shell: pwsh
+      
+      - name: Get version from release or input
+        id: get_version
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+            $version = "${{ github.event.release.tag_name }}"
+          } else {
+            $version = "${{ github.event.inputs.version }}"
+          }
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+      
+      - name: Rename installer with version
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          Move-Item "installer/CottageTandooriPrinterService-Setup.exe" "CottageTandooriPrinterService-$version.exe"
+        shell: pwsh
+      
+      - name: Upload installer to release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./CottageTandooriPrinterService-${{ steps.get_version.outputs.version }}.exe
+          asset_name: CottageTandooriPrinterService-${{ steps.get_version.outputs.version }}.exe
+          asset_content_type: application/octet-stream
+      
+      - name: Upload installer artifact (manual workflow)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: printer-service-installer
+          path: CottageTandooriPrinterService-${{ steps.get_version.outputs.version }}.exe
+          retention-days: 30
