@@ -1,0 +1,7 @@
+Cottage Tandoori POS System
+Copyright (c) 2025 Cottage Tandoori
+
+All rights reserved.
+
+This software is provided for use by Cottage Tandoori and authorized personnel only.
+Unauthorized copying, distribution, or modification is prohibited.
