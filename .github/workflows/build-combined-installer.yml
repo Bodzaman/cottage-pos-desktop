@@ -53,8 +53,8 @@ jobs:
 
       - name: Download portable Node.js v18 LTS
         run: |
-          Write-Host "Downloading Node.js v18 LTS..."
-          Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v18.x/node-v18.20.4-win-x64.zip" -OutFile "node-v18.zip"
+          Write-Host "Downloading Node.js v18.20.4..."
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v18.20.4/node-v18.20.4-win-x64.zip" -OutFile "node-v18.zip"
 
           Write-Host "Extracting node.exe..."
           Expand-Archive -Path "node-v18.zip" -DestinationPath "temp-node" -Force
@@ -69,7 +69,7 @@ jobs:
           Remove-Item "node-v18.zip"
           Remove-Item "temp-node" -Recurse -Force
 
-          Write-Host "Node.js ready!"
+          Write-Host "✅ Node.js ready!"
         shell: pwsh
 
       - name: Download NSSM v2.24
@@ -90,7 +90,7 @@ jobs:
           Remove-Item "nssm.zip"
           Remove-Item "temp-nssm" -Recurse -Force
 
-          Write-Host "NSSM ready!"
+          Write-Host "✅ NSSM ready!"
         shell: pwsh
 
       - name: Get version number
@@ -122,7 +122,7 @@ jobs:
             exit 1
           }
 
-          Write-Host "Build complete!"
+          Write-Host "✅ Build complete!"
         shell: pwsh
 
       - name: Verify installer was created
