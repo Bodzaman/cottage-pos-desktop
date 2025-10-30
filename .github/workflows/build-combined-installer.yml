@@ -34,13 +34,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
       - name: Install POS Desktop dependencies
-        run: npm install
+        run: yarn install
 
       - name: Build Electron POS app
-        run: npm run build
+        run: yarn run build
 
       - name: Install Printer Service dependencies  
         working-directory: printer-service
@@ -55,7 +54,7 @@ jobs:
       - name: Download portable Node.js v18 LTS
         run: |
           Write-Host "Downloading Node.js v18 LTS..."
-          Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v18.x/node-v18.20.8-win-x64.zip" -OutFile "node-v18.zip"
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v18.x/node-v18.20.4-win-x64.zip" -OutFile "node-v18.zip"
 
           Write-Host "Extracting node.exe..."
           Expand-Archive -Path "node-v18.zip" -DestinationPath "temp-node" -Force
@@ -64,7 +63,7 @@ jobs:
             New-Item -ItemType Directory -Path "printer-service"
           }
 
-          Copy-Item "temp-node\\node-v18.20.8-win-x64\\node.exe" "printer-service\\node.exe" -Force
+          Copy-Item "temp-node\\node-v18.20.4-win-x64\\node.exe" "printer-service\\node.exe" -Force
 
           Write-Host "Cleaning up..."
           Remove-Item "node-v18.zip"
