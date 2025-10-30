@@ -120,7 +120,10 @@ jobs:
           Write-Host "Building combined installer..."
           Write-Host "NSIS location: C:\\Program Files (x86)\\NSIS\\makensis.exe"
 
-          & "C:\\Program Files (x86)\\NSIS\\makensis.exe" /DAPP_VERSION=$env:VERSION /V3 installer\\cottage-tandoori-setup.nsi
+          $version = "${{ steps.get_version.outputs.version }}"
+          Write-Host "Version: $version"
+
+          & "C:\\Program Files (x86)\\NSIS\\makensis.exe" /DAPP_VERSION=$version /V3 installer\\cottage-tandoori-setup.nsi
 
           if ($LASTEXITCODE -ne 0) {
             Write-Error "NSIS build failed with exit code $LASTEXITCODE"
