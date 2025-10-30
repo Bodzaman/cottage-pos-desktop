@@ -1,128 +1,246 @@
 # Cottage Tandoori POS Desktop
 
-Professional Desktop Point of Sale System for Cottage Tandoori Restaurant
+**AI-Powered Restaurant Management System**
 
-## 🚀 Features
+A next-generation Electron desktop application combining point-of-sale functionality with intelligent thermal printing services.
 
-- **Modern Electron Application** - Built with TypeScript and modern best practices
-- **Professional Windows Installer** - NSIS installer with proper desktop integration
-- **Auto-Updates** - Seamless background updates via electron-updater
-- **Real-time POS Integration** - Direct connection to Cottage Tandoori web platform
-- **Offline Capabilities** - Local data persistence and graceful degradation
-- **Thermal Printing Support** - USB printer integration for receipts
+---
 
-## 📦 Installation
+## 🏗️ Repository Structure
 
-### For Users
-1. Download the latest installer from [Releases](https://github.com/Bodzaman/cottage-pos-desktop/releases)
-2. Run `Cottage-Tandoori-POS-Setup-{version}.exe`
-3. Follow the installation wizard
-4. Launch from desktop shortcut or Start Menu
+This repository contains **two integrated components** installed together:
 
-### For Developers
+### 1. **POS Desktop Application** (Electron App)
+- **Location:** `src/` directory
+- **Technology:** Electron + React + TypeScript
+- **Features:**
+  - Four order modes: DINE-IN | WAITING | COLLECTION | DELIVERY
+  - Real-time menu synchronization with Supabase
+  - Customer management and order tracking
+  - Integrated payment processing via Adyen
+  - Admin dashboards and analytics
+  - Offline-first architecture
+
+### 2. **Printer Service** (Windows Background Service)
+- **Location:** `printer-service/` directory
+- **Technology:** Node.js + Express
+- **Features:**
+  - Runs as Windows service using NSSM
+  - ESC/POS thermal printer support
+  - HTTP API on port 3000
+  - Kitchen ticket printing
+  - Customer receipt generation
+  - Template-based formatting
+
+### 3. **Unified Installer**
+- **Location:** `installer/` directory
+- **Technology:** NSIS (Nullsoft Scriptable Install System)
+- **Package:** Single installer deploying both POS app and printer service
+- **Output:** `CottageTandooriPOS-Setup-v{version}.exe`
+
+---
+
+## 🚀 Development
+
+### Prerequisites
+- Node.js 18.x or higher
+- npm or yarn
+- Windows 10/11 (for full testing with printer service)
+
+### POS Desktop Development
+
 ```bash
-# Clone repository
-git clone https://github.com/Bodzaman/cottage-pos-desktop.git
-cd cottage-pos-desktop
-
 # Install dependencies
 npm install
 
 # Run in development mode
-npm run dev
+npm start
 
 # Build for production
 npm run build
-
-# Create Windows installer
-npm run dist:win
 ```
 
-## 🛠️ Development Scripts
-
-- `npm run dev` - Start development with hot reload
-- `npm run build` - Build for production
-- `npm run dist` - Create distributable packages
-- `npm run dist:win` - Create Windows NSIS installer
-- `npm run lint` - Run ESLint
-- `npm run type-check` - TypeScript type checking
-
-## 🏗️ Architecture
-
-```
-cottage-pos-desktop/
-├── src/
-│   ├── main/           # Main Electron process
-│   └── preload/        # Preload scripts (security bridge)
-├── dist/               # Compiled TypeScript
-├── release/            # Built installers
-├── assets/             # App icons and resources
-└── .github/workflows/  # CI/CD automation
-```
-
-## 🔄 Auto-Publishing
-
-The application automatically builds and publishes Windows installers when tags are pushed:
+### Printer Service Development
 
 ```bash
-# Create and push a new release
-git tag v1.0.1
-git push origin v1.0.1
+# Navigate to printer service
+cd printer-service
+
+# Install dependencies
+npm install
+
+# Run in development mode (requires thermal printer)
+npm run dev
+
+# Test health endpoint
+curl http://localhost:3000/health
 ```
 
-This triggers GitHub Actions to:
-1. Build the application
-2. Create Windows NSIS installer
-3. Publish to GitHub Releases
-4. Update auto-updater feed
+### Building the Unified Installer
 
-## 🔧 Configuration
+The installer is built automatically via GitHub Actions when a release is created.
 
-### Environment Variables
-- `NODE_ENV` - Set to 'development' for dev mode
-- `GH_TOKEN` - GitHub token for auto-publishing (CI only)
+**Manual Build (Windows only):**
+```bash
+# Ensure NSIS is installed
+# Build both components first
+npm run build
+cd printer-service && npm install --production
 
-### Build Configuration
-All build settings are in `package.json` under the `build` section:
-- Windows NSIS installer configuration
-- Auto-updater settings
-- File packaging rules
-- Code signing (when certificates available)
-
-## 🖨️ Printing Support
-
-The POS supports USB thermal printers:
-- Epson TM-T20III (primary)
-- Star TSP143III
-- Generic ESC/POS compatible printers
-
-## 📱 Integration
-
-The desktop app integrates with the main Cottage Tandoori platform:
-- **Development**: Points to Databutton workspace
-- **Production**: Points to deployed application
-- **Real-time sync**: Orders, menu updates, reporting
-- **Offline mode**: Local data persistence when disconnected
-
-## 🔒 Security
-
-- Context isolation enabled
-- Node integration disabled in renderer
-- Secure preload script with controlled API exposure
-- No remote module access
-- Web security enforced in production
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🆘 Support
-
-For technical support or bug reports:
-1. Check [Issues](https://github.com/Bodzaman/cottage-pos-desktop/issues)
-2. Create new issue with detailed description
-3. Contact restaurant management for urgent issues
+# Run NSIS compiler
+makensis installer/cottage-pos-installer.nsi
+```
 
 ---
 
-**Built with ❤️ for Cottage Tandoori Restaurant**
+## 📦 Distribution
+
+### Automated GitHub Releases
+
+Every release triggers a GitHub Actions workflow that:
+1. Builds the Electron POS app for Windows x64
+2. Packages the printer service with NSSM
+3. Creates a unified NSIS installer
+4. Uploads installer as a release asset
+
+### Creating a Release
+
+```bash
+# Tag and push
+git tag v1.2.0
+git push origin v1.2.0
+
+# Or create via GitHub UI
+# Workflow runs automatically on tag push
+```
+
+---
+
+## 🔧 Tech Stack
+
+### POS Desktop
+- **Framework:** Electron
+- **UI:** React + TypeScript
+- **State:** Zustand stores
+- **Styling:** Tailwind CSS + shadcn/ui
+- **Database:** Supabase (PostgreSQL)
+- **Payments:** Adyen Terminal API
+- **Build:** electron-builder
+
+### Printer Service
+- **Runtime:** Node.js
+- **Server:** Express
+- **Printer:** node-thermal-printer (ESC/POS)
+- **Logging:** Winston
+- **Service Wrapper:** NSSM (Non-Sucking Service Manager)
+
+### Deployment
+- **Installer:** NSIS
+- **CI/CD:** GitHub Actions
+- **Release:** Automated via workflow
+
+---
+
+## 📂 Directory Overview
+
+```
+cottage-pos-desktop/
+├── .github/
+│   └── workflows/
+│       └── build-release.yml        # GitHub Actions workflow
+├── src/                             # Electron main process
+│   ├── main.js                      # App entry point
+│   ├── preload.js                   # IPC bridge
+│   └── renderer/                    # React UI components
+│       ├── pages/
+│       ├── components/
+│       └── utils/
+├── printer-service/                 # Windows service for printing
+│   ├── src/
+│   │   ├── server.js                # Express HTTP server
+│   │   ├── config.js                # Service configuration
+│   │   ├── logger.js                # Winston logger
+│   │   └── printer/                 # ESC/POS logic
+│   ├── tools/
+│   │   └── nssm.exe                 # Service wrapper (v2.24)
+│   ├── package.json
+│   └── README.md
+├── installer/                       # NSIS installer scripts
+│   ├── cottage-pos-installer.nsi    # Main installer script
+│   └── README.md
+├── package.json                     # Root Electron package
+└── README.md                        # This file
+```
+
+---
+
+## 🔐 Security & Credentials
+
+- **Supabase credentials:** Configured in renderer code
+- **Adyen API keys:** Stored in environment variables
+- **User authentication:** Supabase Auth with role-based access
+- **Printer service:** Localhost-only (127.0.0.1:3000)
+
+---
+
+## 📖 Documentation
+
+- **POS Desktop:** See `src/README.md` (if available)
+- **Printer Service:** See `printer-service/README.md`
+- **Installer:** See `installer/README.md`
+- **API Docs:** Run printer service and visit `/health`
+
+---
+
+## 🧪 Testing
+
+### POS Desktop
+```bash
+npm test
+```
+
+### Printer Service
+```bash
+cd printer-service
+npm test
+```
+
+### End-to-End
+Install built `.exe` on Windows test machine and verify:
+1. POS app launches
+2. Printer service is running (check Windows Services)
+3. Kitchen ticket prints correctly
+4. Receipt generation works
+
+---
+
+## 🤝 Contributing
+
+This is a proprietary codebase for **Cottage Tandoori Restaurant**.
+
+For development questions, contact: **Boss🫡**
+
+---
+
+## 📄 License
+
+Proprietary - All Rights Reserved © 2024 Cottage Tandoori
+
+---
+
+## 🆘 Support
+
+**Issues?**
+- Check printer service logs: `C:\ProgramData\CottageTandoori\PrinterService\logs`
+- Check POS app logs: User AppData folder
+- Verify thermal printer USB connection
+- Ensure Windows Firewall allows localhost:3000
+
+**Common Fixes:**
+- Restart printer service: `services.msc` → Cottage Tandoori Printer Service → Restart
+- Reinstall printer service: Run installer with `/S` flag
+- Check NSSM service status: `nssm status CottageTandooriPrinterService`
+
+---
+
+**Built with ❤️ for Cottage Tandoori by Boss🫡's AI Agent**
