@@ -41,6 +41,11 @@ jobs:
       - name: Build Electron POS app
         run: yarn run build
 
+      - name: Package with Electron Builder
+        run: npx electron-builder --win --x64 --dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Printer Service dependencies  
         working-directory: printer-service
         run: npm install --production
