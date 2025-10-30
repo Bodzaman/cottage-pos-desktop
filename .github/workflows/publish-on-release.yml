@@ -25,7 +25,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: printer-service
-        run: npm ci
+        run: npm install
       
       - name: Download NSSM (Windows Service Manager)
         run: |
