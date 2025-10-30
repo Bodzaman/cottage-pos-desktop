@@ -1,18 +1,85 @@
+# ============================================================================
+# Cottage Tandoori POS Desktop + Printer Service
+# ============================================================================
+
 # Dependencies
 node_modules/
-npm-debug.log*
+printer-service/node_modules/
+package-lock.json
+printer-service/package-lock.json
 
 # Build outputs
 dist/
-build/icon.ico
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
+out/
+build/
+printer-service/dist/
 
 # Electron specific
-out/
+.webpack/
+.erb/
+
+# Installer outputs
+installer/*.exe
+installer/CottageTandooriPOS-*.exe
+*.nsi~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+printer-service/logs/
+printer-service/*.log
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+printer-service/.env
+printer-service/.env.local
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Printer service specific
+printer-service/temp/
+printer-service/uploads/
+
+# Build artifacts
+*.tgz
+*.zip
+*.tar.gz
+
+# Debug
+.vscode-test/
