@@ -42,10 +42,10 @@ jobs:
           echo "Building version: $version"
       
       - name: Install Electron dependencies
-        run: npm ci
+        run: npm install
       
       - name: Build Electron app
-        run: npm run build
+        run: npm run dist
         env:
           CI: false
       
