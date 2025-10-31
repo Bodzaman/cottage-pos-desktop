@@ -1,61 +1,61 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.0.6",
-  "description": "Professional Desktop POS System for Cottage Tandoori Restaurant",
-  "main": "dist/main/main.js",
-  "homepage": "https://github.com/Bodzaman/cottage-pos-desktop",
-  "author": {
-    "name": "Cottage Tandoori",
-    "email": "support@cottagetandoori.com"
-  },
-  "license": "MIT",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Cottage Tandoori POS Desktop Application with Integrated Printer Service",
+  "main": "main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
-    "dev:vite": "vite",
-    "dev:electron": "wait-on tcp:5173 && electron .",
-    "build": "npm run build:vite && npm run build:electron",
-    "build:vite": "vite build",
-    "build:electron": "tsc -p tsconfig.main.json",
-    "dist": "npm run build && electron-builder --publish never",
-    "dist:win": "npm run build && electron-builder --win",
-    "pack": "npm run build && electron-builder --dir",
-    "postinstall": "electron-builder install-app-deps",
-    "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit",
-    "publish": "npm run build && electron-builder --publish always"
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "pos",
+    "restaurant",
+    "electron",
+    "cottage-tandoori"
+  ],
+  "author": "Cottage Tandoori",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
   },
   "dependencies": {
-    "electron-updater": "^6.1.7",
-    "electron-log": "^5.0.1",
-    "electron-store": "^8.1.0",
-    "@electron-toolkit/utils": "^3.0.0",
-    "@electron-toolkit/preload": "^3.0.0",
-    "node-thermal-printer": "^4.4.2",
-    "better-sqlite3": "^9.0.0"
-  },
-  "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "typescript": "^5.3.3",
-    "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
-    "@types/node": "^20.10.5",
-    "vite": "^5.0.0",
-    "@vitejs/plugin-react": "^4.2.0",
-    "@types/better-sqlite3": "^7.6.8"
+    "express": "^4.18.2",
+    "escpos": "^3.0.0-alpha.6",
+    "usb": "^2.11.0"
   },
   "build": {
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
     "directories": {
       "output": "dist",
-      "app": "."
+      "buildResources": "build"
     },
     "files": [
-      "dist/**/*",
-      "node_modules/**/*",
-      "package.json"
+      "**/*",
+      "!**/*.md",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "extraResources": [
+      {
+        "from": "printer-service",
+        "to": "printer-service",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "win": {
       "target": [
@@ -66,35 +66,25 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-Setup.${ext}",
-      "publisherName": "Cottage Tandoori",
-      "verifyUpdateCodeSignature": false,
-      "requestedExecutionLevel": "asInvoker"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "perMachine": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
-      "runAfterFinish": true,
-      "allowElevation": true
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "displayLanguageSelector": false,
+      "runAfterFinish": true
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Bodzaman",
-        "repo": "cottage-pos-desktop",
-        "private": false,
-        "token": null,
-        "publishAutoUpdate": true
-      }
-    ],
-    "copyright": "Copyright \u00a9 2025 Cottage Tandoori"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Bodzaman/cottage-pos-desktop.git"
+    "directories": {
+      "output": "dist"
+    }
   }
 }
