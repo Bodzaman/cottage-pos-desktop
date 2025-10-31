@@ -63,11 +63,11 @@ Section "Install" SEC01
     
     ; Copy Electron POS Desktop files
     ; NOTE: makensis.exe is invoked from repo root, so paths are relative to root
-    File /r "dist\win-unpacked\*"
+    File /r "dist\win-unpacked\*.*"
     
     ; Copy printer service files
     SetOutPath "$INSTDIR\printer-service"
-    File /r "printer-service\*"
+    File /r "printer-service\*.*"
     
     ; Create uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
