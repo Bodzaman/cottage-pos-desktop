@@ -65,8 +65,7 @@
             "x64"
           ]
         }
-      ],
-      "icon": "build/icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -77,9 +76,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Cottage Tandoori POS",
       "include": "build/installer.nsh",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
       "displayLanguageSelector": false,
       "runAfterFinish": true
     },
