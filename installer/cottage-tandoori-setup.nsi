@@ -8,7 +8,7 @@
 !define SERVICE_DESCRIPTION "Background service for ESC/POS thermal printing"
 
 Name "${APP_NAME}"
-OutFile "CottageTandooriSetup-${APP_VERSION}.exe"
+OutFile "installer\\CottageTandooriSetup-${APP_VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${COMPANY_NAME}"
 
 ; Request admin privileges
@@ -62,13 +62,12 @@ Section "Install" SEC01
     SetOutPath "$INSTDIR"
     
     ; Copy Electron POS Desktop files
-    ; NOTE: Path is relative to where makensis.exe is invoked (repo root)
-    ; The installer/ directory is a subdirectory, so we use ..\dist\win-unpacked\
-    File /r "..\dist\win-unpacked\*.*"
+    ; NOTE: makensis.exe is invoked from repo root, so paths are relative to root
+    File /r "dist\win-unpacked\*.*"
     
     ; Copy printer service files
     SetOutPath "$INSTDIR\printer-service"
-    File /r "..\printer-service\*.*"
+    File /r "printer-service\*.*"
     
     ; Create uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
