@@ -105,6 +105,3 @@ See `.github/workflows/build-combined-installer.yml`
 ## Support
 
 For issues or questions, contact the development team.
-
-
-<!-- Build triggered: 2025-10-31 16:14:50 UTC -->
