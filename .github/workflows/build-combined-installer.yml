@@ -1,205 +1,134 @@
-name: Build Combined POS + Printer Installer
+name: Build Combined Installer
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'installer/**'
       - 'printer-service/**'
-      - 'src/**'
-      - 'public/**'
-      - 'package.json'
   workflow_dispatch:
     inputs:
       version:
         description: 'Version number (e.g., 1.0.1)'
         required: true
         default: '1.0.1'
-  release:
-    types: [published]
-
-permissions:
-  contents: write
-
+      
 jobs:
-  build-combined-installer:
+  build:
     runs-on: windows-latest
-    timeout-minutes: 45
-
+    permissions:
+      contents: write
+    
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js 18
+      
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-
-      - name: Install POS Desktop dependencies
-        run: yarn install
-
-      - name: Build Electron POS app
-        run: yarn run build
-
-      - name: Package with Electron Builder
-        run: npx electron-builder --win --x64 --dir
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Printer Service dependencies  
-        working-directory: printer-service
-        run: npm install --production
-
-      - name: Setup NSIS
-        run: |
-          choco install nsis -y
-          & "C:\\ProgramData\\chocolatey\\bin\\refreshenv.cmd"
-        shell: pwsh
-
-      - name: Download portable Node.js v18 LTS
-        run: |
-          Write-Host "Downloading Node.js v18.20.4..."
-          Invoke-WebRequest -Uri "https://nodejs.org/dist/v18.20.4/node-v18.20.4-win-x64.zip" -OutFile "node-v18.zip"
-
-          Write-Host "Extracting node.exe..."
-          Expand-Archive -Path "node-v18.zip" -DestinationPath "temp-node" -Force
-
-          if (-not (Test-Path "printer-service")) {
-            New-Item -ItemType Directory -Path "printer-service"
-          }
-
-          Copy-Item "temp-node\\node-v18.20.4-win-x64\\node.exe" "printer-service\\node.exe" -Force
-
-          Write-Host "Cleaning up..."
-          Remove-Item "node-v18.zip"
-          Remove-Item "temp-node" -Recurse -Force
-
-          Write-Host "✅ Node.js ready!"
-        shell: pwsh
-
-      - name: Download NSSM v2.24
-        run: |
-          Write-Host "Downloading NSSM..."
-          Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "nssm.zip"
-
-          Write-Host "Extracting nssm.exe..."
-          Expand-Archive -Path "nssm.zip" -DestinationPath "temp-nssm" -Force
-
-          if (-not (Test-Path "printer-service\\tools")) {
-            New-Item -ItemType Directory -Path "printer-service\\tools"
-          }
-
-          Copy-Item "temp-nssm\\nssm-2.24\\win64\\nssm.exe" "printer-service\\tools\\nssm.exe" -Force
-
-          Write-Host "Cleaning up..."
-          Remove-Item "nssm.zip"
-          Remove-Item "temp-nssm" -Recurse -Force
-
-          Write-Host "✅ NSSM ready!"
-        shell: pwsh
-
-      - name: Get version number
+          cache: 'npm'
+      
+      - name: Get version
         id: get_version
+        shell: powershell
         run: |
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $version = "${{ github.event.inputs.version }}"
-          } elseif ("${{ github.event_name }}" -eq "release") {
-            $version = "${{ github.event.release.tag_name }}".TrimStart('v')
           } else {
-            # Use package.json version for push events
-            $packageJson = Get-Content "package.json" | ConvertFrom-Json
-            $version = $packageJson.version
+            $version = "1.0.1"
           }
-
-          Write-Host "Version: $version"
           echo "version=$version" >> $env:GITHUB_OUTPUT
-        shell: pwsh
-
-      - name: Build combined installer with NSIS
+          echo "Building version: $version"
+      
+      - name: Install Electron dependencies
+        run: npm ci
+      
+      - name: Build Electron app
+        run: npm run build
+        env:
+          CI: false
+      
+      - name: Verify Electron build
+        shell: powershell
         run: |
-          Write-Host "Building combined installer..."
-          Write-Host "NSIS location: C:\\Program Files (x86)\\NSIS\\makensis.exe"
-
+          if (Test-Path "dist\win-unpacked") {
+            Write-Host "[OK] Electron build successful - dist/win-unpacked exists"
+            $fileCount = (Get-ChildItem -Path "dist\win-unpacked" -Recurse).Count
+            Write-Host "  Files in build: $fileCount"
+          } else {
+            Write-Host "[ERROR] Electron build failed - dist/win-unpacked not found"
+            exit 1
+          }
+      
+      - name: Install printer service dependencies
+        working-directory: printer-service
+        run: npm install --production
+      
+      - name: Install NSIS
+        shell: powershell
+        run: |
+          choco install nsis -y
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+      
+      - name: Verify NSIS installation
+        shell: powershell
+        run: |
+          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsisPath) {
+            Write-Host "[OK] NSIS found at: $nsisPath"
+            & $nsisPath /VERSION
+          } else {
+            Write-Host "[ERROR] NSIS not found"
+            exit 1
+          }
+      
+      - name: Build NSIS installer
+        shell: powershell
+        run: |
           $version = "${{ steps.get_version.outputs.version }}"
           Write-Host "Version: $version"
-
-          & "C:\\Program Files (x86)\\NSIS\\makensis.exe" /DAPP_VERSION=$version /V3 installer\\cottage-tandoori-setup.nsi
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "NSIS build failed with exit code $LASTEXITCODE"
-            exit 1
-          }
-
-          Write-Host "✅ Build complete!"
-        shell: pwsh
-
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DAPP_VERSION=$version /V3 installer\cottage-tandoori-setup.nsi
+      
       - name: Verify installer was created
+        shell: powershell
         run: |
           $version = "${{ steps.get_version.outputs.version }}"
-          $installerPath = "installer\\CottageTandooriSetup-$version.exe"
-
+          $installerPath = "installer\CottageTandooriSetup-$version.exe"
+          
           if (Test-Path $installerPath) {
-            $size = (Get-Item $installerPath).Length / 1MB
-            Write-Host "✅ Installer created: $installerPath"
-            Write-Host "📦 Size: $([math]::Round($size, 2)) MB"
+            $size = (Get-Item $installerPath).Length
+            Write-Host "[OK] Installer created successfully"
+            Write-Host "  Path: $installerPath"
+            Write-Host "  Size: $([math]::Round($size/1MB, 2)) MB"
           } else {
-            Write-Error "❌ Installer not found at $installerPath"
-            Write-Host "Files in installer directory:"
-            Get-ChildItem installer
+            Write-Host "[ERROR] Installer not found at $installerPath"
+            Get-ChildItem installer -Filter *.exe
             exit 1
           }
-        shell: pwsh
-
-      - name: Upload installer as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cottage-tandoori-combined-installer
-          path: installer/CottageTandooriSetup-${{ steps.get_version.outputs.version }}.exe
-          retention-days: 90
-
-      - name: Create GitHub Release (manual dispatch)
-        if: github.event_name == 'workflow_dispatch'
+      
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.get_version.outputs.version }}-combined
-          name: "Combined Installer v${{ steps.get_version.outputs.version }}"
+          name: Combined Installer v${{ steps.get_version.outputs.version }}
           body: |
-            ## 🎉 Cottage Tandoori Combined Installer
-
-            **What's Included:**
-            - ✅ POS Desktop Application (Electron)
-            - ✅ Thermal Printer Service (Windows Service)
-            - ✅ Node.js Runtime (bundled)
-            - ✅ NSSM Service Manager (bundled)
-
-            **Installation:**
+            ## Cottage Tandoori Combined Installer
+            
+            This installer includes:
+            - POS Desktop (Electron app)
+            - Printer Service (Windows service)
+            
+            ### Installation
             1. Download `CottageTandooriSetup-${{ steps.get_version.outputs.version }}.exe`
-            2. Run as Administrator
-            3. Follow installation wizard
-            4. Both POS and Printer Service will be installed automatically
-
-            **System Requirements:**
-            - Windows 10/11 (64-bit)
-            - Administrator privileges for service installation
-
-            **What Gets Installed:**
-            - POS Desktop → `C:\\Program Files\\Cottage Tandoori POS`
-            - Printer Service → `C:\\Program Files\\Cottage Tandoori POS\\printer-service`
-            - Windows Service → Auto-starts on boot
+            2. Run as administrator
+            3. Follow setup wizard
+            
+            The printer service will be installed as a Windows service and started automatically.
           files: |
             installer/CottageTandooriSetup-${{ steps.get_version.outputs.version }}.exe
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload to existing release
-        if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./installer/CottageTandooriSetup-${{ steps.get_version.outputs.version }}.exe
-          asset_name: CottageTandooriSetup-${{ steps.get_version.outputs.version }}.exe
-          asset_content_type: application/octet-stream
