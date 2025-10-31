@@ -7,6 +7,7 @@ on:
     paths:
       - 'installer/**'
       - 'printer-service/**'
+      - 'package.json'
   workflow_dispatch:
     inputs:
       version:
@@ -36,7 +37,9 @@ jobs:
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $version = "${{ github.event.inputs.version }}"
           } else {
-            $version = "1.0.1"
+            # Read version from package.json
+            $packageJson = Get-Content -Path "package.json" -Raw | ConvertFrom-Json
+            $version = $packageJson.version
           }
           echo "version=$version" >> $env:GITHUB_OUTPUT
           echo "Building version: $version"
