@@ -33,7 +33,7 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_WELCOME
 
 ; License page
-!insertmacro MUI_PAGE_LICENSE "installer\\LICENSE.txt"
+!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
 
 ; Directory selection page
 !insertmacro MUI_PAGE_DIRECTORY
