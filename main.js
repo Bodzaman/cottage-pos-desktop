@@ -160,10 +160,10 @@ class CottageTandooriPOS {
                                 type: 'info',
                                 title: 'About Cottage Tandoori POS',
                                 message: 'Cottage Tandoori POS v1.0.0',
-                                detail: 'Professional Restaurant Point of Sale System
+                                detail: `Professional Restaurant Point of Sale System
 
 Built with Electron
-Copyright © 2024 Cottage Tandoori Restaurant'
+Copyright © 2024 Cottage Tandoori Restaurant`
                             });
                         }
                     }
