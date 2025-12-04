@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -82,6 +82,7 @@ export interface POSOrderSummaryProps {
   // New callback props for modal management
   onOpenCustomerModal?: () => void;
   onOpenTableModal?: () => void;
+  onPrintBill?: () => void;
 }
 
 const itemVariants = {
@@ -197,7 +198,8 @@ export function POSOrderSummary({
   
   // New callback props for modal management
   onOpenCustomerModal = () => {},
-  onOpenTableModal = () => {}
+  onOpenTableModal = () => {},
+  onPrintBill = () => {}
 }: POSOrderSummaryProps) {
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState<boolean>(false);
@@ -903,7 +905,9 @@ export function POSOrderSummary({
                 // Set payment completed state instead of calling onProcessPayment
                 setIsPaymentComplete(true);
                 toast.success(`Payment complete - ready for collection`, {
-                  description: orderType === 'WAITING' ? 'Customer is waiting - confirm collection when ready' : 'Customer can collect when ready'
+                  description: orderType === 'WAITING' 
+                    ? 'Customer is waiting - confirm collection when ready' 
+                    : 'Customer can collect when ready'
                 });
               } else {
                 onProcessPayment();
