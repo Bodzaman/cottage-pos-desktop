@@ -7,6 +7,9 @@
  * - Routes to view components based on current step
  * - Smooth transitions with AnimatePresence
  * - Clean data flow: Parent → Orchestrator → Views
+ * - Supports two modes:
+ *   - "payment": Full payment flow (confirmation → tip → payment method → processing → result)
+ *   - "pay-later": Confirmation only (confirmation → print directly)
  * 
  * REPLACES:
  * - OrderConfirmationModal (now OrderConfirmationView)
@@ -35,6 +38,7 @@ import { styles } from '../utils/QSAIDesign';
 export function PaymentFlowOrchestrator({
   isOpen,
   onClose,
+  mode,
   orderItems,
   orderTotal,
   orderType,
@@ -143,6 +147,22 @@ export function PaymentFlowOrchestrator({
 
   // Order Confirmation Actions
   const handleContinueToPayment = () => {
+    // If pay-later mode, skip payment flow and complete immediately
+    if (mode === 'pay-later') {
+      // Return result without payment data, triggering print directly
+      onPaymentComplete({
+        success: true,
+        orderItems,
+        orderTotal: totalWithTip,
+        tipAmount: 0, // No tips for pay-later
+        paymentMethod: 'CASH', // Default to CASH for pay-later
+        orderId
+      });
+      onClose();
+      return;
+    }
+    
+    // Normal payment flow
     goToNextStep(PaymentFlowStep.ORDER_CONFIRMATION);
   };
 
@@ -253,6 +273,7 @@ export function PaymentFlowOrchestrator({
           {currentStep === PaymentFlowStep.ORDER_CONFIRMATION && (
             <OrderConfirmationView
               key="order-confirmation"
+              mode={mode}
               orderItems={orderItems}
               orderType={orderType}
               orderTotal={orderTotal}
