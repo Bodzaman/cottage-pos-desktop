@@ -40,6 +40,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'renderer'),
+      'brain': resolve(__dirname, 'renderer/brain'),
+      'constants': resolve(__dirname, 'renderer/constants'),
       'components': resolve(__dirname, 'renderer/components'),
       'utils': resolve(__dirname, 'renderer/utils'),
       'pages': resolve(__dirname, 'renderer/pages')
