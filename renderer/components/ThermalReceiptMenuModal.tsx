@@ -1,10 +1,8 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { OrderItem, MenuItem, Category } from 'types';
+import { AppApisTableOrdersOrderItem, AppApisMenuManagementMenuItem, AppApisMenuManagementCategory } from 'brain/data-contracts';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { CustomizeOrchestratorProvider } from 'components/CustomizeOrchestrator';
 import DineInCategoryList from 'components/DineInCategoryList';
@@ -16,7 +14,7 @@ import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onOrderComplete: (orderItems: OrderItem[]) => void;
+  onOrderComplete: (orderItems: AppApisTableOrdersOrderItem[]) => void;
 }
 
 /**
@@ -30,7 +28,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [pendingItems, setPendingItems] = useState<OrderItem[]>([]);
+  const [pendingItems, setPendingItems] = useState<AppApisTableOrdersOrderItem[]>([]);
   const [isInitializing, setIsInitializing] = useState(false);
   
   // Initialize menu store when modal opens
@@ -88,7 +86,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   }, [isOpen]);
   
   // CustomizeOrchestrator onSave callback to capture order items
-  const handleOrchestratorSave = (orderItem: OrderItem) => {
+  const handleOrchestratorSave = (orderItem: AppApisTableOrdersOrderItem) => {
     console.log('📝 ThermalReceiptMenuModal - Saving order item from orchestrator:', {
       name: orderItem.name,
       menu_item_id: orderItem.menu_item_id,
@@ -98,7 +96,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
     });
     
     // Enhanced order item with all necessary fields
-    const enhancedOrderItem: OrderItem = {
+    const enhancedOrderItem: AppApisTableOrdersOrderItem = {
       ...orderItem,
       basePrice: orderItem.basePrice || orderItem.price,
       total: (orderItem.basePrice || orderItem.price) * orderItem.quantity,
