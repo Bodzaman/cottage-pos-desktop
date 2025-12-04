@@ -1,10 +1,20 @@
 
 
+
+
+
+
+
+
+
+
+
+
 // ... existing code ...
 
 import { create } from 'zustand';
 import brain from 'brain';
-import { PersistentTableOrder, TableOrderItem } from './tableOrderTypes';
+import { TableOrderItem } from './tableTypes';
 import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
 
@@ -292,12 +302,12 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       if (data.table_orders && data.table_orders.length > 0) {
         if (isDev) console.log('🔄 [tableOrdersStore] Processing orders...');
         data.table_orders.forEach((order) => {
-          const items = order.items || [];
+          const items = order.order_items || [];
           if (isDev) {
             console.log(`📝 [tableOrdersStore] Processing order ${order.id} for table ${order.table_number}:`, {
               itemsCount: items.length,
               status: order.status,
-              items: items.map(i => ({ name: i.item_name, quantity: i.quantity }))
+              items: items.map(i => ({ name: i.name, quantity: i.quantity }))
             });
           }
 
@@ -307,13 +317,19 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
             tableName: order.table_name || `Table ${order.table_number}`,
             items: items.map(item => ({
               id: item.id?.toString() || crypto.randomUUID(),
-              name: item.item_name,
+              menu_item_id: item.menu_item_id,
+              variant_id: item.variant_id || '',
+              name: item.name,
               quantity: item.quantity,
-              basePrice: item.base_price,
-              total: item.total_price,
-              category: item.category || '',
-              modifiers: item.modifiers || [],
-              kitchenInstructions: item.kitchen_instructions || '',
+              price: item.price,
+              total: item.price * item.quantity,
+              variantName: item.variant_name || undefined,
+              notes: item.notes || undefined,
+              protein_type: item.protein_type || undefined,
+              image_url: item.image_url || undefined,
+              modifiers: [],
+              customizations: item.customizations || [],
+              category_id: item.category || '',
             })),
             subtotal: order.subtotal,
             tax: order.tax,
@@ -1172,7 +1188,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         set((state) => ({
           tableOrders: {
             ...state.tableOrders,
-            [tableNumber]: persistedOrder.order_items
+            [tableNumber]: persistedOrder.items
           }
         }));
       }
@@ -1221,7 +1237,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
             },
             tableOrders: {
               ...state.tableOrders,
-              [tableNumber]: tableOrder.order_items
+              [tableNumber]: tableOrder.items
             }
           }));
           
@@ -1246,13 +1262,27 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       const state = get();
       const tableOrder = state.persistedTableOrders[tableNumber];
       
-      if (!tableOrder || !tableOrder.order_items) {
+      if (!tableOrder || !tableOrder.items) {
         toast.error('No order found for this table');
         return false;
       }
       
       // Create updated items array without the item at specified index
-      const updatedItems = tableOrder.order_items.filter((_, index) => index !== itemIndex);
+      const updatedItems = tableOrder.items.filter((_, index) => index !== itemIndex);
+      
+      // Transform items to backend format (same as addItemsToTable)
+      const backendItems = updatedItems.map(item => ({
+        id: item.id,
+        menu_item_id: item.menu_item_id || item.id,
+        variant_id: item.variant_id || null,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        variant_name: item.variantName || null,
+        notes: item.notes || null,
+        protein_type: item.protein_type || null,
+        image_url: item.image_url || null
+      }));
       
       // Update local state immediately for fast UI
       set((state) => ({
@@ -1264,7 +1294,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       
       // Update in Supabase
       const response = await brain.update_table_order({ tableNumber }, {
-        order_items: updatedItems
+        order_items: backendItems
       });
       
       if (response.ok) {
@@ -1286,7 +1316,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       set((state) => ({
         tableOrders: {
           ...state.tableOrders,
-          [tableNumber]: tableOrder.order_items
+          [tableNumber]: tableOrder.items
         }
       }));
       
