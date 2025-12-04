@@ -30,8 +30,7 @@
     "appId": "com.cottagetandoori.pos",
     "productName": "Cottage Tandoori POS",
     "directories": {
-      "output": "dist",
-      "buildResources": "build"
+      "output": "dist"
     },
     "files": [
       "**/*",
@@ -78,9 +77,6 @@
       "include": "build/installer.nsh",
       "displayLanguageSelector": false,
       "runAfterFinish": true
-    },
-    "directories": {
-      "output": "dist"
     }
   }
 }
