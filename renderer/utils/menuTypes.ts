@@ -69,25 +69,35 @@ export interface SetMeal {
  * MenuItem variant (different protein types, sizes, or preparations of a menu item)
  */
 export interface ItemVariant {
-  id: string;
-  menu_item_id: string;
-  protein_type_id: string | null;
-  protein_type_name?: string; // Populated from join with protein_types table
-  name: string | null; // Optional custom name for the variant (also serves as POS Label override)
-  variant_name?: string | null; // Generated variant name (e.g., "Chicken Tikka Massala")
-  price: number; // Base price (takeaway price)
-  price_dine_in: number | null; // Optional different price for dine-in
-  price_delivery: number | null; // Optional different price for delivery
-  is_default: boolean;
-  description_override?: string | null;
-  spice_level_override?: number | null;
-  dietary_tags_override?: string[] | null;
-  available_for_delivery?: boolean;
-  available_for_takeaway?: boolean;
-  available_for_dine_in?: boolean;
-  variant_code?: string | null; // Hierarchical code for variant (e.g., MAIN-001A)
-  created_at?: string;
-  updated_at?: string;
+  id?: string;
+  protein_type_id: string;
+  name: string;
+  description?: string;
+  description_state?: 'inherited' | 'custom';
+  price: number;
+  price_dine_in?: number;
+  price_delivery?: number;
+  is_default?: boolean;
+  image_url?: string;
+  image_asset_id?: string;
+  image_state?: 'inherited' | 'custom';
+  display_order?: number;
+  
+  // Food-specific variant fields
+  spice_level?: number;
+  allergens?: string[];
+  allergen_notes?: string;
+  dietary_tags_override?: string[];
+  
+  // Dietary flags (variant-specific overrides)
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  is_halal?: boolean;
+  is_dairy_free?: boolean;
+  is_nut_free?: boolean;
+  
+  featured?: boolean;
 }
 
 /**
@@ -100,6 +110,12 @@ export interface MenuItem {
   // Unified description field from database migration
   description: string | null;
   image_url: string | null;
+  // ✅ NEW: Optimized image variants from media_assets table
+  image_variants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null;
   spice_indicators: string | null;
   category_id: string;
   // Array of ingredients for the dish
