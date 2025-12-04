@@ -3,7 +3,7 @@
  * Replaces scattered console.log statements for better performance
  */
 
-import { mode, Mode } from 'app';
+import { mode, Mode } from './environment';
 
 // Log levels with priority
 export enum LogLevel {
