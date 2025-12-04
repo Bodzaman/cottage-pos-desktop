@@ -27,7 +27,8 @@ const initialCustomerData: CustomerData = {
   street: '',
   city: '',
   postcode: '',
-  deliveryNotes: ''
+  deliveryNotes: '',
+  deliveryFee: undefined
 };
 
 export const useCustomerDataStore = create<CustomerDataStore>((set, get) => ({
