@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, Settings, ShoppingCart, Clock, CreditCard, Bot, Cog, Power, Zap } from 'lucide-react';
+import { ChevronDown, Settings, ShoppingCart, Clock, CreditCard, Bot, Cog, Power, Zap, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
 import { useRestaurantSettings } from '../utils/useRestaurantSettings';
+import { usePOSSettings } from '../utils/posSettingsStore';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { RefundManagementPanel } from './RefundManagementPanel';
 import { VoiceOrderNotificationPanel } from './VoiceOrderNotificationPanel';
@@ -48,6 +49,12 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
   );
   const [autoApproveOrders, setAutoApproveOrders] = useState(
     settings?.general?.autoApproveOrders ?? true
+  );
+
+  // POS settings hook for POS toggles
+  const { settings: posSettings, updateSettings: updatePOSSettings, isLoading: isPOSLoading } = usePOSSettings();
+  const [variantCarouselEnabled, setVariantCarouselEnabled] = useState(
+    posSettings?.variant_carousel_enabled ?? true
   );
 
   // Define the 6 settings sections as in-place actions
@@ -183,6 +190,27 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
     }
   };
 
+  const handleVariantCarouselToggle = async (enabled: boolean) => {
+    try {
+      setVariantCarouselEnabled(enabled);
+      
+      // Update POS settings
+      const updatedSettings = {
+        ...posSettings!,
+        variant_carousel_enabled: enabled
+      };
+      
+      const success = await updatePOSSettings(updatedSettings);
+      if (!success) {
+        setVariantCarouselEnabled(!enabled); // Revert on error
+      }
+    } catch (error) {
+      console.error('Failed to update variant carousel setting:', error);
+      setVariantCarouselEnabled(!enabled); // Revert on error
+      toast.error('Failed to update setting');
+    }
+  };
+
   const handleConfigureDetails = () => {
     handleAuthenticatedAction(() => {
       setActiveTab('online-orders');
@@ -293,6 +321,61 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
                           size="sm"
                           className="w-full text-xs h-7 mt-2"
                           onClick={handleConfigureDetails}
+                          style={{
+                            borderColor: globalColors.purple.primary,
+                            color: globalColors.purple.primary,
+                            backgroundColor: 'transparent'
+                          }}
+                        >
+                          Configure Details
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : section.id === 'pos-settings' ? (
+                <div className="p-3">
+                  <div className="flex items-start space-x-3 w-full mb-3">
+                    <div 
+                      className="flex-shrink-0 mt-0.5"
+                      style={{ color: globalColors.purple.primary }}
+                    >
+                      {section.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 
+                        className="text-sm font-medium mb-1"
+                        style={{ color: globalColors.text.primary }}
+                      >
+                        {section.title}
+                      </h4>
+                      <p 
+                        className="text-xs leading-relaxed mb-3"
+                        style={{ color: globalColors.text.secondary }}
+                      >
+                        {section.description}
+                      </p>
+                      
+                      {/* Quick Controls */}
+                      <div className="space-y-3 border-t pt-3" style={{ borderColor: globalColors.border.light }}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Image className="h-3 w-3" style={{ color: variantCarouselEnabled ? globalColors.purple.primary : globalColors.text.muted }} />
+                            <span className="text-xs font-medium" style={{ color: globalColors.text.primary }}>Variant Carousel</span>
+                          </div>
+                          <Switch
+                            checked={variantCarouselEnabled}
+                            onCheckedChange={handleVariantCarouselToggle}
+                            className="scale-75"
+                            disabled={isPOSLoading}
+                          />
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs h-7 mt-2"
+                          onClick={() => handleSectionClick(section)}
                           style={{
                             borderColor: globalColors.purple.primary,
                             color: globalColors.purple.primary,
