@@ -9,7 +9,7 @@ interface AdminSidePanelProps {
   defaultTab?: string;
 }
 
-export function AdminSidePanel({ isOpen, onClose, defaultTab = 'dashboard' }: AdminSidePanelProps) {
+export function AdminSidePanel({ isOpen, onClose, defaultTab = 'menu' }: AdminSidePanelProps) {
   // Handle Escape key to close panel
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
