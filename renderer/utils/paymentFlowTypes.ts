@@ -6,6 +6,11 @@
 import { OrderItem } from './menuTypes';
 
 /**
+ * Payment flow mode - determines the flow behavior
+ */
+export type PaymentFlowMode = 'payment' | 'pay-later';
+
+/**
  * Payment flow steps - internal state machine for the orchestrator
  */
 export enum PaymentFlowStep {
@@ -84,6 +89,7 @@ export interface ReceiptData {
 export interface PaymentFlowOrchestratorProps {
   isOpen: boolean;
   onClose: () => void;
+  mode: PaymentFlowMode; // NEW: determines if payment flow or pay-later flow
   orderItems: OrderItem[];
   orderTotal: number;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
@@ -116,6 +122,7 @@ export interface PaymentFlowState {
  * Props for OrderConfirmationView
  */
 export interface OrderConfirmationViewProps {
+  mode: PaymentFlowMode; // NEW: determines CTA text and behavior
   orderItems: OrderItem[];
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   orderTotal: number;
