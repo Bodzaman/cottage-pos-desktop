@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import brain from 'brain';
+import type { OrderType } from './menuTypes';
 import type { OrderItem } from './menuTypes';
-import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
 import type { CustomerReceiptRequest } from 'types';
 import { useTemplateAssignments } from './useTemplateAssignments';
+import { getElectronHeaders } from './electronDetection';
 
 /**
  * Hook: usePrintingOperations
@@ -126,8 +127,8 @@ export function usePrintingOperations(
 
       console.log('🖨️ Printing kitchen ticket with template:', kitchenTemplateId);
 
-      // Call backend print endpoint
-      const response = await brain.print_kitchen_ticket(ticketData);
+      // Call backend print endpoint with Electron mode headers
+      const response = await brain.print_kitchen_ticket(ticketData, getElectronHeaders());
       const result = await response.json();
 
       if (result.success) {
@@ -196,13 +197,19 @@ export function usePrintingOperations(
 
       console.log('🖨️ Printing customer receipt with orderNumber:', orderNumber);
 
-      // Call backend print endpoint
-      const response = await brain.print_customer_receipt(receiptData);
+      // Call backend print endpoint with Electron mode headers
+      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
       const result = await response.json();
 
       if (result.success) {
         setLastPrintedAt(new Date());
-        toast.success('Receipt printed');
+        // Check if dev environment (message contains "dev environment")
+        const isDevMode = result.message?.toLowerCase().includes('dev environment');
+        if (isDevMode) {
+          toast.success('Receipt formatted successfully (dev mode)');
+        } else {
+          toast.success('Receipt printed');
+        }
         return true;
       } else {
         throw new Error(result.error || 'Print failed');
@@ -295,8 +302,8 @@ export function usePrintingOperations(
         console.log('⚠️ No template assigned - using default formatting');
       }
 
-      // Call the thermal printer endpoint
-      const response = await brain.print_customer_receipt(receiptData);
+      // Call the thermal printer endpoint with Electron mode headers
+      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
       const result = await response.json();
 
       if (result.success) {
@@ -350,8 +357,8 @@ export function usePrintingOperations(
 
       console.log('🖨️ Printing kitchen ticket with template:', kitchenTemplateId);
 
-      // Call backend print endpoint
-      const response = await brain.print_kitchen_ticket(ticketData);
+      // Call backend print endpoint with Electron mode headers
+      const response = await brain.print_kitchen_ticket(ticketData, getElectronHeaders());
       const result = await response.json();
 
       if (result.success) {
