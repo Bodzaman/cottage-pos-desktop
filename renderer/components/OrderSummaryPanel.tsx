@@ -662,37 +662,51 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
               <div className="flex items-start space-x-3">
                 {/* Larger thumbnail image */}
                 <div className="flex-shrink-0">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      className="w-16 h-16 rounded-lg object-cover border"
-                      style={{ borderColor: QSAITheme.border.medium }}
-                      onError={(e) => {
-                        // On error, replace with fallback div
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const itemName = item.name || 'Item';
-                          parent.innerHTML = `
-                            <div class="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
-                              style="background: linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%); border-color: ${QSAITheme.border.medium};">
-                              ${itemName.charAt(0).toUpperCase()}
-                            </div>
-                          `;
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div 
-                      className="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
-                      style={{ 
-                        background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
-                        borderColor: QSAITheme.border.medium
-                      }}
-                    >
-                      {(item.name || 'Item').charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  {/* ✅ FIXED: Resolve variant image using correct hierarchy */}
+                  {(() => {
+                    // Resolve variant object from store using variant_id
+                    let resolvedImageUrl = item.image_url; // Default fallback
+                    
+                    if (item.variant_id && itemVariants) {
+                      const variantObj = itemVariants.find(v => v.id === item.variant_id);
+                      if (variantObj) {
+                        // Priority: display_image_url (backend-resolved) → image_url (raw) → item fallback
+                        resolvedImageUrl = variantObj.display_image_url || variantObj.image_url || item.image_url;
+                      }
+                    }
+                    
+                    return resolvedImageUrl ? (
+                      <img
+                        src={resolvedImageUrl}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-lg object-cover border"
+                        style={{ borderColor: QSAITheme.border.medium }}
+                        onError={(e) => {
+                          // On error, replace with fallback div
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const itemName = item.name || 'Item';
+                            parent.innerHTML = `
+                              <div class="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
+                                style="background: linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%); border-color: ${QSAITheme.border.medium};">
+                                ${itemName.charAt(0).toUpperCase()}
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div 
+                        className="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
+                          borderColor: QSAITheme.border.medium
+                        }}
+                      >
+                        {(item.name || 'Item').charAt(0).toUpperCase()}
+                      </div>
+                    );
+                  })()}
                 </div>
                 
                 {/* Item details */}
@@ -914,21 +928,72 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
             {/* Action buttons - Unified Process Order workflow for all order types */}
             <div className="space-y-2">
-              {/* Unified Process Order Button */}
-              <Button
-                size="sm"
-                onClick={handleProcessOrder}  // ✅ Always use internal handler to show modal
-                className="w-full text-xs h-9 font-medium"
-                style={{
-                  backgroundColor: QSAITheme.purple.primary,
-                  borderColor: QSAITheme.purple.primary,
-                  color: 'white',
-                  boxShadow: `0 4px 8px ${QSAITheme.purple.glow}`
-                }}
-              >
-                <Receipt className="w-3 h-3 mr-2" />
-                Process Order • {formatCurrency(total)}
-              </Button>
+              {orderType === "DINE-IN" ? (
+                /* DINE-IN Mode: Two separate buttons for kitchen and billing */
+                <>
+                  {/* Send to Kitchen Button */}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (onSendToKitchen) {
+                        onSendToKitchen();
+                      }
+                    }}
+                    disabled={orderItems.length === 0}
+                    className="w-full text-xs h-9 font-medium"
+                    style={{
+                      backgroundColor: orderItems.length === 0 ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
+                      borderColor: QSAITheme.purple.primary,
+                      color: 'white',
+                      boxShadow: orderItems.length === 0 ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
+                      opacity: orderItems.length === 0 ? 0.5 : 1,
+                      cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <ChefHat className="w-3 h-3 mr-2" />
+                    Send to Kitchen
+                  </Button>
+
+                  {/* Print Bill Button */}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (onPrintBill) {
+                        onPrintBill();
+                      }
+                    }}
+                    disabled={orderItems.length === 0}
+                    variant="outline"
+                    className="w-full text-xs h-9 font-medium"
+                    style={{
+                      borderColor: QSAITheme.purple.primary,
+                      color: orderItems.length === 0 ? QSAITheme.text.disabled : QSAITheme.purple.primary,
+                      backgroundColor: 'transparent',
+                      opacity: orderItems.length === 0 ? 0.5 : 1,
+                      cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <Receipt className="w-3 h-3 mr-2" />
+                    Print Bill
+                  </Button>
+                </>
+              ) : (
+                /* Other Modes: Unified Process Order Button */
+                <Button
+                  size="sm"
+                  onClick={handleProcessOrder}  // ✅ Always use internal handler to show modal
+                  className="w-full text-xs h-9 font-medium"
+                  style={{
+                    backgroundColor: QSAITheme.purple.primary,
+                    borderColor: QSAITheme.purple.primary,
+                    color: 'white',
+                    boxShadow: `0 4px 8px ${QSAITheme.purple.glow}`
+                  }}
+                >
+                  <Receipt className="w-3 h-3 mr-2" />
+                  Process Order • {formatCurrency(total)}
+                </Button>
+              )}
             </div>
 
             {/* Clear Order Button */}
