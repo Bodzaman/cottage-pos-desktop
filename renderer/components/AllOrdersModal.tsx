@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { useNavigate } from 'react-router-dom';
@@ -82,8 +81,9 @@ const convertBackendOrder = (backendOrder: any): OrderData => {
   };
 };
 
-const AllOrdersModal: React.FC<AllOrdersModalProps> = ({ isOpen, onClose }) => {
-  const { isStaff, user } = useSimpleAuth();
+export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({ isOpen, onClose }) => {
+  const authContext = useSimpleAuth();
+  const { isStaff = false, user = null } = authContext || {};
   const navigate = useNavigate();
   
   // State
