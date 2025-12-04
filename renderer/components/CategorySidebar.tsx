@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Category } from '../utils/menuTypes';
 import { QSAITheme } from '../utils/QSAIDesign';
-import { FIXED_SECTIONS } from 'utils/sectionMapping';
+import { FIXED_SECTIONS, SECTION_UUID_MAP } from 'utils/sectionMapping';
 import {
   Tooltip,
   TooltipContent,
@@ -29,7 +29,6 @@ const CategorySidebar = React.memo(function CategorySidebar({
       const saved = localStorage.getItem('pos_expanded_categories');
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch (error) {
-      console.warn('Failed to load expanded categories from localStorage:', error);
       return new Set();
     }
   });
@@ -55,12 +54,35 @@ const CategorySidebar = React.memo(function CategorySidebar({
     return () => clearTimeout(timer);
   }, [selectedCategory]);
   
-  // Get child categories for a specific section
+  // Get child categories for a section using real UUID parent_category_id
   const getChildCategories = (sectionId: string) => {
-    const sectionParentId = `section-${sectionId}`;
-    return categories
-      .filter(cat => cat.parent_category_id === sectionParentId && cat.active)
-      .sort((a, b) => a.display_order - b.display_order);
+    // ✅ Use real UUID instead of virtual "section-*" ID
+    const sectionUuid = SECTION_UUID_MAP[sectionId as keyof typeof SECTION_UUID_MAP];
+    
+    if (!sectionUuid) {
+      console.warn(`⚠️ No UUID found for section: ${sectionId}`);
+      return [];
+    }
+    
+    // Step 1: Find direct children of the section
+    const directChildren = categories.filter(cat => cat.parent_category_id === sectionUuid && cat.active);
+    
+    // Step 2: For 3-level hierarchy, get grandchildren instead of direct children
+    // If there's only one direct child with the same name as section, skip it and show its children
+    if (directChildren.length === 1) {
+      const intermediateCategory = directChildren[0];
+      const grandchildren = categories
+        .filter(cat => cat.parent_category_id === intermediateCategory.id && cat.active)
+        .sort((a, b) => a.display_order - b.display_order);
+      
+      // If grandchildren exist, return them instead
+      if (grandchildren.length > 0) {
+        return grandchildren;
+      }
+    }
+    
+    // Otherwise return direct children (for sections without 3-level hierarchy)
+    return directChildren.sort((a, b) => a.display_order - b.display_order);
   };
   
   // Auto-scroll to show expanded category
