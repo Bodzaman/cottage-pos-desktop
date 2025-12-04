@@ -22,8 +22,9 @@ import {
 import { motion } from 'framer-motion';
 import { globalColors as QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { safeCurrency } from '../utils/numberUtils';
-import { AppApisTableOrdersOrderItem } from 'types';
+import { AppApisTableOrdersOrderItem } from 'brain/data-contracts';
 import cn from 'classnames';
+import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -95,6 +96,55 @@ export function OrderConfirmationModal({
     if (action !== 'make_changes') {
       onClose();
     }
+  };
+
+  /**
+   * Map current order data to ThermalReceiptDisplay format
+   */
+  const mapToReceiptOrderData = () => {
+    return {
+      orderId: `POS-${Date.now()}`,
+      orderNumber: `OC-${Math.floor(Math.random() * 9000) + 1000}`,
+      orderType: orderType,
+      items: orderItems.map(item => ({
+        id: item.id || item.menu_item_id || `item-${Date.now()}`,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        variant: item.variant_name ? {
+          id: item.id || `variant-${Date.now()}`,
+          name: item.variant_name,
+          price_adjustment: 0
+        } : undefined,
+        customizations: item.modifiers?.map(mod => ({
+          id: mod.id || `mod-${Date.now()}`,
+          name: mod.name,
+          price: mod.price || 0
+        })) || [],
+        instructions: item.notes || undefined
+      })),
+      subtotal,
+      serviceCharge: serviceCharge || 0,
+      deliveryFee: deliveryFee || 0,
+      total,
+      
+      // Conditional fields based on order type
+      tableNumber: orderType === 'DINE-IN' ? tableNumber?.toString() : undefined,
+      guestCount: orderType === 'DINE-IN' ? guestCount : undefined,
+      
+      customerName: customerFirstName && customerLastName 
+        ? `${customerFirstName} ${customerLastName}` 
+        : customerFirstName || customerLastName,
+      customerPhone: customerPhone || undefined,
+      customerEmail: customerEmail || undefined,
+      
+      deliveryAddress: orderType === 'DELIVERY' && (customerAddress || customerStreet || customerPostcode)
+        ? [customerAddress, customerStreet, customerPostcode].filter(Boolean).join(', ')
+        : undefined,
+        
+      collectionTime: schedulingData?.pickup_time?.toLocaleString() || undefined,
+      timestamp: new Date().toISOString()
+    };
   };
 
   const getOrderTypeIcon = () => {
@@ -308,172 +358,22 @@ export function OrderConfirmationModal({
         </div>
 
         {/* ============================================ */}
-        {/* ZONE 2: SCROLLABLE REVIEW AREA              */}
+        {/* ZONE 2: THERMAL RECEIPT PREVIEW (Scrollable) */}
         {/* ============================================ */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex-1 px-6 py-4 space-y-6 custom-scrollbar"
-          style={scrollAreaStyle}
+        <div 
+          style={scrollAreaStyle} 
+          className="px-6 py-4 bg-gradient-to-b from-zinc-900/50 to-zinc-800/50"
         >
-          {/* Order Items */}
-          <div className="space-y-3">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-              <Receipt className="w-5 h-5" style={{ color: QSAITheme.purple.primary }} />
-              Order Items ({orderItems.length})
-            </h3>
-            
-            <div className="space-y-3">
-              {orderItems.map((item, index) => (
-                <div
-                  key={`${item.id}-${index}`}
-                  className="p-4 rounded-lg"
-                  style={styles.glassCard}
-                >
-                  <div className="flex items-start gap-4">
-                    {/* Item Image Thumbnail */}
-                    <div className="flex-shrink-0">
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="w-20 h-20 rounded-lg object-cover border border-slate-600"
-                          style={{ borderColor: 'rgba(124, 93, 250, 0.3)' }}
-                        />
-                      ) : (
-                        <div 
-                          className="w-20 h-20 rounded-lg border border-slate-600 flex items-center justify-center bg-slate-800"
-                          style={{ borderColor: 'rgba(124, 93, 250, 0.3)' }}
-                        >
-                          <Receipt className="w-8 h-8 text-slate-500" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Item Details */}
-                    <div className="flex-1 space-y-3">
-                      {/* Item Header */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-semibold text-white text-lg">{item.name}</h4>
-                          {item.variant_name && item.variant_name.toLowerCase() !== 'standard' && (
-                            <p className="text-sm text-slate-400">Variant: {item.variant_name}</p>
-                          )}
-                          {item.protein_type && (
-                            <p className="text-sm text-slate-400">Protein: {item.protein_type}</p>
-                          )}
-                        </div>
-                        
-                        {/* Quantity and Total Price */}
-                        <div className="text-right">
-                          <div className="text-lg font-bold" style={{ color: QSAITheme.purple.primary }}>
-                            {item.quantity} × {safeCurrency(item.price)}
-                          </div>
-                          <div className="text-xl font-bold text-white">
-                            {safeCurrency(item.quantity * item.price)}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Item Customizations & Modifiers */}
-                      {(item.notes || (item.modifiers && item.modifiers.length > 0) || (item.customizations && item.customizations.length > 0)) && (
-                        <div className="space-y-2">
-                          {/* Customer Notes */}
-                          {item.notes && (
-                            <div className="p-3 rounded bg-slate-800/50 border-l-2" style={{ borderLeftColor: QSAITheme.purple.primary }}>
-                              <p className="text-sm text-slate-300">
-                                <span className="font-medium text-purple-400">Notes:</span> {item.notes}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Modifiers */}
-                          {item.modifiers && item.modifiers.length > 0 && (
-                            <div className="p-3 rounded bg-blue-900/20 border-l-2 border-blue-400">
-                              <p className="text-sm font-medium text-blue-400 mb-1">Modifiers:</p>
-                              <div className="space-y-1">
-                                {item.modifiers.map((modifier, modIndex) => (
-                                  <div key={modIndex} className="flex justify-between text-sm">
-                                    <span className="text-slate-300">{modifier.name}</span>
-                                    {modifier.price > 0 && (
-                                      <span className="text-blue-300">+{safeCurrency(modifier.price)}</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Customizations */}
-                          {item.customizations && item.customizations.length > 0 && (
-                            <div className="p-3 rounded bg-green-900/20 border-l-2 border-green-400">
-                              <p className="text-sm font-medium text-green-400 mb-1">Customizations:</p>
-                              <div className="space-y-1">
-                                {item.customizations.map((customization, custIndex) => (
-                                  <div key={custIndex} className="flex justify-between text-sm">
-                                    <span className="text-slate-300">{customization.name}</span>
-                                    {customization.price > 0 && (
-                                      <span className="text-green-300">+{safeCurrency(customization.price)}</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="max-w-md mx-auto">
+            <ThermalReceiptDisplay
+              orderMode={orderType}
+              orderData={mapToReceiptOrderData()}
+              paperWidth={80}
+              showZoomControls={false}
+              className="shadow-2xl"
+            />
           </div>
-
-          {/* Order Total Breakdown */}
-          <div className="space-y-3">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-              <CreditCard className="w-5 h-5" style={{ color: QSAITheme.purple.primary }} />
-              Order Total
-            </h3>
-            
-            <div 
-              className="p-4 rounded-lg space-y-3"
-              style={styles.glassCard}
-            >
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Subtotal:</span>
-                <span className="font-medium">{safeCurrency(subtotal)}</span>
-              </div>
-              
-              {serviceCharge > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Service Charge:</span>
-                  <span className="font-medium">{safeCurrency(serviceCharge)}</span>
-                </div>
-              )}
-              
-              {deliveryFee > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Delivery Fee:</span>
-                  <span className="font-medium">{safeCurrency(deliveryFee)}</span>
-                </div>
-              )}
-              
-              <Separator className="bg-slate-700" />
-              
-              <div className="flex justify-between items-center">
-                <span className="text-xl font-bold text-white">Grand Total:</span>
-                <span 
-                  className="text-2xl font-bold"
-                  style={{ color: QSAITheme.purple.primary }}
-                >
-                  {safeCurrency(total)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        </div>
 
         {/* ============================================ */}
         {/* ZONE 3: FIXED ACTION BAR (Non-scrolling)    */}
