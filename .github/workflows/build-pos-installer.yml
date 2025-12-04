@@ -16,30 +16,44 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Install dependencies
         run: npm install
-      
+
+      - name: Build React frontend with Vite
+        run: npm run build:renderer
+
+      - name: Verify frontend build
+        run: |
+          echo "Checking dist directory:"
+          dir dist
+          if not exist "dist\index.html" (
+            echo "ERROR: Frontend build failed - index.html not found!"
+            exit /b 1
+          )
+          echo "✅ Frontend build successful"
+        shell: cmd
+
       - name: Build Electron app with electron-builder
         run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: List output files
         run: |
-          echo "Contents of dist directory:"
-          dir dist
+          echo "Contents of release directory:"
+          dir release
         shell: cmd
-      
+
       - name: Read version from package.json
         id: package-version
         shell: pwsh
@@ -47,7 +61,7 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           echo "Detected version: $version"
-      
+
       - name: Upload installer to release
         if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
@@ -55,14 +69,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
+          asset_path: ./release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
           asset_name: Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
           asset_content_type: application/octet-stream
-      
+
       - name: Upload installer as artifact (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: pos-installer
-          path: ./dist/*.exe
+          path: ./release/*.exe
           retention-days: 30
