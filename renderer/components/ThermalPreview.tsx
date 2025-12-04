@@ -525,7 +525,11 @@ function renderFormBasedReceipt(
         {/* Merged Date + Time on one line */}
         <div className="text-center text-xs" style={{ fontFamily: receiptFont.cssFamily, marginBottom: isKitchenReceipt ? '4px' : '2px' }}>
           <span style={{ fontWeight: 'normal' }}>
-            {new Date().toLocaleDateString()} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {(() => {
+              // Use timestamp from data if available, otherwise use current time
+              const orderDate = data.timestamp ? new Date(data.timestamp) : new Date();
+              return `${orderDate.toLocaleDateString('en-GB')} • ${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            })()}
           </span>
         </div>
       </div>
@@ -799,10 +803,6 @@ function renderFormBasedReceipt(
                 <span>TOTAL:</span>
                 <span>£{grandTotal.toFixed(2)}</span>
               </div>
-            </div>
-            <div className="flex justify-between">
-              <span>Payment:</span>
-              <span className="uppercase">{data.paymentMethod || 'CASH'}</span>
             </div>
           </div>
         );
