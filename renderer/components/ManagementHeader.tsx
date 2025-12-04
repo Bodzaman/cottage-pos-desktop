@@ -31,7 +31,7 @@ import brain from "brain";
 import { OrderModel } from "types";
 import { usePOSAuth } from "../utils/usePOSAuth";
 import { AvatarDropdown } from "./AvatarDropdown";
-import { APP_BASE_PATH } from 'app';
+import { APP_BASE_PATH } from '../utils/environment';
 
 
 export interface Props {
