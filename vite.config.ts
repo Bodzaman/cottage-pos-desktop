@@ -17,52 +17,39 @@ export default defineConfig({
 
   // Build configuration for Electron renderer
   build: {
-    outDir: 'dist/renderer',
+    outDir: 'dist',
     emptyOutDir: true,
 
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'src/renderer/index.html')
+        main: resolve(__dirname, 'renderer/index.html')
       }
     },
 
     // Optimize for Electron
-    target: 'chrome120', // Modern Chromium version
+    target: 'chrome120',
     minify: 'esbuild',
     sourcemap: true,
 
     // Asset handling
     assetsDir: 'assets',
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1500
   },
 
-  // Path resolution
+  // Path resolution to match our renderer/ structure
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src/renderer'),
-      '@components': resolve(__dirname, 'src/renderer/components'),
-      '@stores': resolve(__dirname, 'src/renderer/stores'),
-      '@utils': resolve(__dirname, 'src/renderer/utils'),
-      '@types': resolve(__dirname, 'src/shared/types')
+      '@': resolve(__dirname, 'renderer'),
+      'components': resolve(__dirname, 'renderer/components'),
+      'utils': resolve(__dirname, 'renderer/utils'),
+      'pages': resolve(__dirname, 'renderer/pages')
     }
   },
 
   // Electron-specific optimizations
   define: {
-    __VERSION__: JSON.stringify(process.env.npm_package_version || '2.0.0'),
+    __VERSION__: JSON.stringify(process.env.npm_package_version || '1.2.4'),
     __DEV__: JSON.stringify(process.env.NODE_ENV === 'development')
-  },
-
-  // CSS configuration
-  css: {
-    modules: {
-      localsConvention: 'camelCase'
-    },
-    preprocessorOptions: {
-      scss: {
-        additionalData: `@import "@/styles/variables.scss";`
-      }
-    }
   },
 
   // Optimization
@@ -71,7 +58,7 @@ export default defineConfig({
     exclude: ['electron']
   },
 
-  // Base path for production builds
+  // Base path for production builds (important for Electron)
   base: './',
 
   // Environment variables
