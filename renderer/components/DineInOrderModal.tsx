@@ -14,14 +14,18 @@ import { OrderItem, MenuItem, Category, CustomerTab } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useTableOrdersStore, tableOrdersStore } from 'utils/tableOrdersStore';
-import DineInCategoryList from 'components/DineInCategoryList';
+import { DineInCategoryPillsHorizontal } from 'components/DineInCategoryPillsHorizontal';
 import DineInMenuGrid from 'components/DineInMenuGrid';
 import DineInOrderSummary from 'components/DineInOrderSummary';
 import BillReviewModal from 'components/BillReviewModal';
 import { BillViewModal } from 'components/BillViewModal';
 import CustomerTabsCompact from 'components/CustomerTabsCompact';
 import ConfirmationDialog from 'components/ConfirmationDialog';
+import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal';
+import { DineInBillPreviewModal } from 'components/DineInBillPreviewModal';
 import { toast } from 'sonner';
+import brain from 'brain';
+import { getElectronHeaders } from 'utils/electronDetection';
 
 interface Props {
   isOpen: boolean;
@@ -37,7 +41,7 @@ interface Props {
  * Preserves all existing functionality while adding individual customer management
  */
 export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = [] }: Props) {
-  const { menuItems, categories } = useRealtimeMenuStore();
+  const { menuItems, categories, filteredMenuItems, selectedMenuCategory } = useRealtimeMenuStore();
   
   // Table orders store with NEW customer tab support
   const { 
@@ -60,12 +64,15 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   } = useTableOrdersStore();
   
   // UI state
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTableTab, setSelectedTableTab] = useState<number>(tableNumber);
   // ✅ STAGING WORKFLOW: Items added to staging first, then explicitly saved to database
   const [stagingItems, setStagingItems] = useState<OrderItem[]>([]);
   const [showBillReview, setShowBillReview] = useState(false);
   const [showBillView, setShowBillView] = useState(false);
+  
+  // NEW: Thermal receipt preview modals state
+  const [showKitchenPreviewModal, setShowKitchenPreviewModal] = useState(false);
+  const [showBillPreviewModal, setShowBillPreviewModal] = useState(false);
   
   // NEW: Customer tab UI state
   const [isCreatingNewTab, setIsCreatingNewTab] = useState(false);
@@ -84,9 +91,15 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   // ✅ STAGING WORKFLOW: Warning system for unsaved staging items
   const hasUnsavedItems = stagingItems.length > 0;
   
+  // ✅ Handle category selection - matches POSDesktop pattern
+  const handleCategorySelect = (categoryId: string | null) => {
+    const menuStore = useRealtimeMenuStore.getState();
+    menuStore.setSelectedMenuCategory(categoryId);
+  };
+  
   // Get existing table order items
   const existingTableOrder = persistedTableOrders[selectedTableTab];
-  const existingItems = existingTableOrder?.order_items || [];
+  const existingItems = existingTableOrder?.items || [];
   
   // NEW: Get customer tabs for current table
   const currentTableCustomerTabs = getCustomerTabsForTable(selectedTableTab);
@@ -105,17 +118,15 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   
   const combinedOrderItems = getDisplayItems();
   
-  // Filter menu items by selected category
-  const filteredMenuItems = selectedCategory
-    ? menuItems.filter(item => item.category_id === selectedCategory && item.active)
-    : menuItems.filter(item => item.active); // Show all active items when no specific category selected
-    
-  // Sort filtered menu items by display_order
-  const sortedFilteredMenuItems = filteredMenuItems.sort((a, b) => {
-    const aOrder = a.display_order || 999;
-    const bOrder = b.display_order || 999;
-    return aOrder - bOrder;
-  });
+  // ✅ USE MENU STORE FILTERING: Get filtered items from store instead of manual filtering
+  // The store's updateFilteredItems() handles parent/child category logic correctly
+  const sortedFilteredMenuItems = filteredMenuItems
+    .filter(item => item.is_active)
+    .sort((a, b) => {
+      const aOrder = a.display_order || 999;
+      const bOrder = b.display_order || 999;
+      return aOrder - bOrder;
+    });
   
   // All linked tables including main table
   const allTables = [tableNumber, ...linkedTables].sort((a, b) => a - b);
@@ -125,7 +136,10 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     if (isOpen) {
       setSelectedTableTab(tableNumber);
       setStagingItems([]);
-      setSelectedCategory(null); // Default to "All Items" for quick browsing
+      
+      // ✅ Reset menu store filter to show all items
+      const menuStore = useRealtimeMenuStore.getState();
+      menuStore.setSelectedMenuCategory(null);
       
       // NEW: Reset customer tab UI state
       setIsCreatingNewTab(false);
@@ -136,8 +150,8 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   // Load existing order data when modal opens
   useEffect(() => {
     if (isOpen && tableNumber) {
-      // Force refresh to ensure we have latest data from database
-      forceRefresh();
+      // ✅ No forceRefresh needed - store already has data from initialization
+      // addItemsToTable updates persistedTableOrders immediately, so data persists
       
       // NEW: Load customer tabs for all linked tables
       const allTables = [tableNumber, ...linkedTables];
@@ -145,7 +159,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         loadCustomerTabsForTable(table);
       });
     }
-  }, [isOpen, tableNumber, forceRefresh, loadCustomerTabsForTable]); // Remove linkedTables from dependencies to prevent loop
+  }, [isOpen, tableNumber, loadCustomerTabsForTable]); // Remove linkedTables from dependencies to prevent loop
   
   // NEW: Handle table tab switching - load customer tabs
   const handleTableTabSwitch = (table: number) => {
@@ -409,7 +423,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
   };
   
   // ✅ STAGING WORKFLOW: Send to Kitchen - commits staging items to database + kitchen status
-  const handleSendToKitchen = async () => {
+  const handleSendToKitchenDirect = async () => {
     if (stagingItems.length === 0) {
       toast.info('No new items in staging to send to kitchen');
       return;
@@ -428,8 +442,7 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         console.log('🍳 Sending staging items to kitchen via table:', stagingItems);
         await addItemsToTable(selectedTableTab, stagingItems);
         toast.success(`🍳 Sent ${stagingItems.length} items to kitchen`);
-        // Refresh table orders to show new items
-        await forceRefresh();
+        // ✅ No forceRefresh needed - addItemsToTable already updates persistedTableOrders
       }
 
       // Clear staging after successful send
@@ -442,16 +455,173 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
     }
   };
   
+  // NEW: Open kitchen preview modal (called by button)
+  const handleSendToKitchen = async () => {
+    if (stagingItems.length === 0) {
+      toast.info('No new items to send to kitchen');
+      return;
+    }
+    
+    // ✅ WYSIWYG GUARANTEE: Auto-persist staging BEFORE opening preview
+    try {
+      await handleSendToKitchenDirect();
+      
+      // ✅ Data is immediately available - addItemsToTable updates persistedTableOrders synchronously
+      // No delay or verification needed
+      setShowKitchenPreviewModal(true);
+    } catch (error) {
+      console.error('❌ Failed to persist staging before preview:', error);
+      toast.error('Failed to save items before preview');
+    }
+  };
+  
+  // NEW: Handle kitchen print from preview modal
+  const handleKitchenPrint = async () => {
+    try {
+      // Generate order number for tracking
+      const orderNumber = `TABLE-${tableNumber}-${Date.now()}`;
+      
+      // ✅ WYSIWYG: Use persisted table order data (same source as preview)
+      const tableOrder = persistedTableOrders[selectedTableTab];
+      if (!tableOrder || !tableOrder.order_items || tableOrder.order_items.length === 0) {
+        toast.error('No items to print');
+        return false;
+      }
+      
+      // Prepare kitchen ticket data
+      const kitchenData = {
+        orderNumber,
+        orderType: 'DINE-IN',
+        items: tableOrder.order_items.map(item => ({
+          name: item.name,
+          variant_name: item.variant_name || null,
+          quantity: item.quantity,
+          notes: item.notes || '',
+          modifiers: item.modifiers || []
+        })),
+        table: `Table ${tableNumber}`,
+        specialInstructions: tableOrder.special_instructions || null,
+        template_data: {
+          guestCount: tableOrder.guest_count || currentTableCustomerTabs.length || 1,
+          tableNumber
+        },
+        orderSource: 'POS'
+      };
+
+      console.log('🖨️ Sending kitchen ticket to printer:', kitchenData);
+
+      // Call print API with Electron headers
+      const response = await brain.print_kitchen_ticket(kitchenData, getElectronHeaders());
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Kitchen ticket printed successfully');
+        setShowKitchenPreviewModal(false);
+        return true;
+      } else {
+        throw new Error(result.error || 'Print failed');
+      }
+    } catch (error) {
+      console.error('❌ Kitchen print failed:', error);
+      toast.error('Failed to print kitchen ticket');
+      return false;
+    }
+  };
+  
   // Print final bill workflow
-  const handleFinalBill = () => {
+  const handleFinalBill = async () => {
     if (combinedOrderItems.length === 0) {
       toast.error('No items to bill');
       return;
     }
     
-    // Close dine-in modal and open bill review modal
-    onClose();
-    setShowBillReview(true);
+    // ✅ WYSIWYG GUARANTEE: If staging has items, persist them BEFORE opening preview
+    if (stagingItems.length > 0) {
+      try {
+        await handleSendToKitchenDirect();
+        // After persistence, staging is cleared and items are in DB
+      } catch (error) {
+        console.error('❌ Failed to persist staging before bill preview:', error);
+        toast.error('Failed to save items before preview');
+        return;
+      }
+    }
+    
+    // Open bill preview modal showing persisted data
+    setShowBillPreviewModal(true);
+  };
+  
+  // NEW: Handle actual bill print from preview modal
+  const handleBillPrint = async (orderTotal: number) => {
+    try {
+      // Generate order number for tracking
+      const orderNumber = `TABLE-${tableNumber}-${Date.now()}`;
+      
+      // ✅ WYSIWYG: Use persisted table order data (same source as preview)
+      const tableOrder = persistedTableOrders[selectedTableTab];
+      if (!tableOrder || !tableOrder.order_items || tableOrder.order_items.length === 0) {
+        toast.error('No items to print');
+        return false;
+      }
+      
+      // Calculate totals
+      const items = tableOrder.order_items.map(item => {
+        let itemPrice = item.price;
+        
+        // Add modifier prices
+        if (item.modifiers && item.modifiers.length > 0) {
+          item.modifiers.forEach(mod => {
+            itemPrice += mod.price_adjustment || 0;
+          });
+        }
+        
+        return {
+          name: item.name,
+          variant_name: item.variant_name || null,
+          quantity: item.quantity,
+          unitPrice: itemPrice,
+          total: itemPrice * item.quantity,
+          modifiers: item.modifiers?.map(m => m.option_name) || []
+        };
+      });
+
+      const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      const tax = subtotal * 0.2; // 20% VAT
+      const total = subtotal + tax;
+
+      // Prepare customer receipt data
+      const receiptData = {
+        orderNumber,
+        orderType: 'DINE-IN',
+        items,
+        tax,
+        deliveryFee: 0,
+        template_data: {
+          tableNumber,
+          guestCount: order.guest_count,
+          subtotal,
+          total,
+          paymentMethod: 'Pending' // Will be updated when payment is processed
+        },
+        orderSource: 'POS'
+      };
+
+      console.log('🖨️ Sending bill receipt to printer:', receiptData);
+
+      // Call print API with Electron headers
+      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Bill printed successfully');
+        setShowBillPreviewModal(false);
+      } else {
+        throw new Error(result.error || 'Print failed');
+      }
+    } catch (error) {
+      console.error('❌ Bill print failed:', error);
+      toast.error('Failed to print bill');
+    }
   };
   
   // NEW: Handle View Bill with customer breakdown
@@ -610,30 +780,28 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
             />
           </div>
           
-          {/* 3-Panel Layout: Categories | Menu Items | Order Summary */}
-          <div className="flex-1 grid grid-cols-[200px_1fr_300px] gap-4 min-h-0 overflow-hidden">
-            {/* Left Panel: Categories */}
+          {/* 2-Panel Layout: Menu Area | Order Summary */}
+          <div className="flex-1 grid grid-cols-[1fr_300px] gap-4 min-h-0 overflow-hidden">
+            {/* Left Panel: Menu Area with Horizontal Category Pills */}
             <div 
-              className="border rounded-lg overflow-hidden"
+              className="border rounded-lg flex flex-col overflow-hidden"
               style={{ borderColor: QSAITheme.border.light }}
             >
-              <DineInCategoryList
+              {/* Horizontal Category Pills Navigation */}
+              <DineInCategoryPillsHorizontal
                 categories={categories}
-                selectedCategory={selectedCategory}
-                onCategorySelect={setSelectedCategory}
+                selectedCategory={selectedMenuCategory}
+                onCategorySelect={handleCategorySelect}
                 menuItems={menuItems}
               />
-            </div>
-            
-            {/* Center Panel: Menu Items */}
-            <div 
-              className="border rounded-lg overflow-hidden"
-              style={{ borderColor: QSAITheme.border.light }}
-            >
-              <DineInMenuGrid
-                selectedCategory={selectedCategory}
-                onAddToOrder={handleAddToOrder}
-              />
+              
+              {/* Menu Grid - now with proper scrolling */}
+              <div className="flex-1 overflow-auto">
+                <DineInMenuGrid
+                  selectedCategory={selectedMenuCategory}
+                  onAddToOrder={handleAddToOrder}
+                />
+              </div>
             </div>
             
             {/* Right Panel: Order Summary */}
@@ -699,6 +867,27 @@ export function DineInOrderModal({ isOpen, onClose, tableNumber, linkedTables = 
         confirmText="Yes, Cancel"
         cancelText="Keep Editing"
         isDestructive={true}
+      />
+      
+      {/* NEW: Kitchen Preview Modal */}
+      <DineInKitchenPreviewModal
+        isOpen={showKitchenPreviewModal}
+        onClose={() => setShowKitchenPreviewModal(false)}
+        orderItems={persistedTableOrders[selectedTableTab]?.order_items || []}
+        tableNumber={selectedTableTab}
+        guestCount={currentTableCustomerTabs.length || 1}
+        onPrintKitchen={handleKitchenPrint}
+      />
+      
+      {/* NEW: Bill Preview Modal */}
+      <DineInBillPreviewModal
+        isOpen={showBillPreviewModal}
+        onClose={() => setShowBillPreviewModal(false)}
+        orderItems={combinedOrderItems}
+        tableNumber={selectedTableTab}
+        guestCount={currentTableCustomerTabs.length || 1}
+        orderTotal={combinedOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+        onPrintBill={handleBillPrint}
       />
     </>
   );
