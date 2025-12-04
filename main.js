@@ -85,11 +85,11 @@ class CottageTandooriPOS {
         this.createApplicationMenu();
 
         // Load POSII URL
-        const posiiUrl = this.isProduction 
-            ? 'https://exoticcreations.databutton.app/cottage-tandoori-restaurant/posii'
-            : 'https://databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/devx/ui/posii';
-            
-        this.mainWindow.loadURL(posiiUrl);
+        // Load local bundled frontend
+        const indexPath = path.join(__dirname, 'dist', 'index.html');
+        
+        log.info(`Loading POS from: ${indexPath}`);
+        this.mainWindow.loadFile(indexPath);
 
         this.mainWindow.once('ready-to-show', () => {
             this.mainWindow.show();
