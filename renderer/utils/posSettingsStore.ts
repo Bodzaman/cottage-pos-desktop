@@ -51,7 +51,8 @@ const defaultPOSSettings: POSSettings = {
     radius_miles: 6.0,
     minimum_order_value: 15.0,
     allowed_postcodes: ["RH20", "BN5", "RH13", "BN6", "RH14"]
-  }
+  },
+  variant_carousel_enabled: true
 };
 
 export const usePOSSettings = create<POSSettingsStore>((set, get) => ({
