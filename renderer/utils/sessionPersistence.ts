@@ -87,7 +87,7 @@ class SessionPersistenceDB {
             setTimeout(() => {
               console.log('✅ [SessionDB] IndexedDB initialized (with upgrade)');
               resolve();
-            }, 50);
+            }, 200);
           };
           upgradeTransaction.onerror = () => {
             console.error('❌ [SessionDB] Upgrade transaction failed');
@@ -98,7 +98,7 @@ class SessionPersistenceDB {
           setTimeout(() => {
             console.log('✅ [SessionDB] IndexedDB initialized');
             resolve();
-          }, 10);
+          }, 50);
         }
       };
     });
