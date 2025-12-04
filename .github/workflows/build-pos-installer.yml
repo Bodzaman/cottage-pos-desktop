@@ -51,8 +51,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist/Cottage Tandoori POS-Setup-${{ steps.package-version.outputs.VERSION }}.exe
-          asset_name: Cottage-Tandoori-POS-Setup-${{ steps.package-version.outputs.VERSION }}.exe
+          asset_path: ./dist/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
+          asset_name: Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
           asset_content_type: application/octet-stream
       
       - name: Upload installer as artifact (workflow_dispatch)
