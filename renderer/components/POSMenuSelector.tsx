@@ -3,8 +3,6 @@ import { List, LayoutGrid, Grid3x3, SearchX } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { POSItemCardV2 } from './POSItemCardV2';
-import { POSItemListView } from './POSItemListView';
 import { POSMenuSearch } from './POSMenuSearch';
 import { PremiumMenuCard } from './PremiumMenuCard';
 import { POSMenuItemCard } from './POSMenuItemCard';
