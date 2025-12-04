@@ -51,6 +51,12 @@ interface Props {
   className?: string;
 }
 
+// Safe color access helper
+const getPurplePrimary = () => QSAITheme?.purple?.primary || '#5B21B6';
+const getPurpleLight = () => QSAITheme?.purple?.light || '#7C3AED';
+const getGreenPrimary = () => QSAITheme?.green?.primary || '#10B981';
+const getBluePrimary = () => QSAITheme?.blue?.primary || '#3B82F6';
+
 /**
  * TemplateManagementModal - Template library management for ThermalReceiptDesigner
  * Features:
@@ -145,7 +151,9 @@ export function TemplateManagementModal({
         const assignments = assignmentsData.assignments || {};
         
         // Convert object structure to template assignment map
-        Object.entries(assignments).forEach(([orderMode, templateId]) => {
+        // assignments is Record<string, TemplateAssignment> where TemplateAssignment has customer_template_id
+        Object.entries(assignments).forEach(([orderMode, assignment]) => {
+          const templateId = assignment.customer_template_id;
           if (templateId && typeof templateId === 'string') {
             if (!assignmentMap[templateId]) {
               assignmentMap[templateId] = [];
@@ -272,8 +280,8 @@ export function TemplateManagementModal({
       >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: QSAITheme.purple.primary + '20' }}>
-              <Settings className="w-6 h-6" style={{ color: QSAITheme.purple.primary }} />
+            <div className="p-2 rounded-lg" style={{ backgroundColor: getPurplePrimary() + '20' }}>
+              <Settings className="w-6 h-6" style={{ color: getPurplePrimary() }} />
             </div>
             Template Management
           </DialogTitle>
@@ -303,7 +311,7 @@ export function TemplateManagementModal({
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <div className="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full" style={{ borderColor: QSAITheme.purple.primary }} />
+                    <div className="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full" style={{ borderColor: getPurplePrimary() }} />
                     <span>Loading templates...</span>
                   </div>
                 </div>
@@ -361,14 +369,14 @@ export function TemplateManagementModal({
                                 {/* FOH Preview */}
                                 <div className="flex-1">
                                   <div className="text-xs font-medium mb-2 flex items-center gap-1">
-                                    <Monitor className="w-3 h-3" style={{ color: QSAITheme.purple.primary }} />
+                                    <Monitor className="w-3 h-3" style={{ color: getPurplePrimary() }} />
                                     FOH (Customer)
                                   </div>
                                   <div 
                                     className="w-full h-24 border rounded-lg flex items-center justify-center overflow-hidden"
                                     style={{ 
                                       backgroundColor: '#f8f9fa',
-                                      borderColor: QSAITheme.purple.primary + '30'
+                                      borderColor: getPurpleLight() + '30'
                                     }}
                                   >
                                     {template.foh_preview_url ? (
@@ -389,14 +397,14 @@ export function TemplateManagementModal({
                                 {/* Kitchen Preview */}
                                 <div className="flex-1">
                                   <div className="text-xs font-medium mb-2 flex items-center gap-1">
-                                    <ChefHat className="w-3 h-3" style={{ color: QSAITheme.purple.light }} />
+                                    <ChefHat className="w-3 h-3" style={{ color: getPurpleLight() }} />
                                     Kitchen
                                   </div>
                                   <div 
                                     className="w-full h-24 border rounded-lg flex items-center justify-center overflow-hidden"
                                     style={{ 
                                       backgroundColor: '#f8f9fa',
-                                      borderColor: QSAITheme.purple.light + '30'
+                                      borderColor: getPurpleLight() + '30'
                                     }}
                                   >
                                     {template.kitchen_preview_url ? (
@@ -422,11 +430,10 @@ export function TemplateManagementModal({
                                   {templateAssignments[template.id] && templateAssignments[template.id].length > 0 ? (
                                     templateAssignments[template.id].map((mode) => {
                                       const modeDisplay = {
-                                        'dine_in': { label: 'Dine In', color: QSAITheme.purple.primary },
-                                        'waiting': { label: 'Waiting', color: QSAITheme.purple.light },
-                                        'collection': { label: 'Collection', color: QSAITheme.green.primary },
-                                        'delivery': { label: 'Delivery', color: QSAITheme.blue.primary },
-                                        'online_orders': { label: 'Online Orders', color: QSAITheme.red.primary }
+                                        'dine_in': { label: 'Dine In', color: getPurplePrimary() },
+                                        'waiting': { label: 'Waiting', color: getPurpleLight() },
+                                        'collection': { label: 'Collection', color: getGreenPrimary() },
+                                        'delivery': { label: 'Delivery', color: getBluePrimary() }
                                       }[mode] || { label: mode, color: '#6b7280' };
                                       
                                       return (
@@ -603,7 +610,7 @@ export function TemplateManagementModal({
                     <Button
                       onClick={() => loadTemplate(selectedTemplate)}
                       className="w-full"
-                      style={{ backgroundColor: QSAITheme.purple.primary }}
+                      style={{ backgroundColor: getPurplePrimary() }}
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Load Template
@@ -656,8 +663,8 @@ export function TemplateManagementModal({
               >
                 <DialogHeader className="p-6 pb-0">
                   <DialogTitle className="text-xl font-bold flex items-center gap-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: QSAITheme.purple.primary + '20' }}>
-                      <Maximize2 className="w-5 h-5" style={{ color: QSAITheme.purple.primary }} />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: getPurplePrimary() + '20' }}>
+                      <Maximize2 className="w-5 h-5" style={{ color: getPurplePrimary() }} />
                     </div>
                     Template Preview: {selectedTemplate.name}
                   </DialogTitle>
@@ -682,14 +689,14 @@ export function TemplateManagementModal({
                     <TabsContent value="foh" className="flex-1 mt-0">
                       <div className="h-full flex flex-col">
                         <div className="text-sm font-medium mb-3 flex items-center gap-2">
-                          <Monitor className="w-4 h-4" style={{ color: QSAITheme.purple.primary }} />
+                          <Monitor className="w-4 h-4" style={{ color: getPurplePrimary() }} />
                           Customer Receipt Preview
                         </div>
                         <div 
                           className="flex-1 border rounded-lg p-6 overflow-auto"
                           style={{ 
                             backgroundColor: '#ffffff',
-                            borderColor: QSAITheme.purple.primary + '30'
+                            borderColor: getPurplePrimary() + '30'
                           }}
                         >
                           {selectedTemplate.design_data ? (
@@ -757,14 +764,14 @@ export function TemplateManagementModal({
                     <TabsContent value="kitchen" className="flex-1 mt-0">
                       <div className="h-full flex flex-col">
                         <div className="text-sm font-medium mb-3 flex items-center gap-2">
-                          <ChefHat className="w-4 h-4" style={{ color: QSAITheme.purple.light }} />
+                          <ChefHat className="w-4 h-4" style={{ color: getPurpleLight() }} />
                           Kitchen Copy Preview
                         </div>
                         <div 
                           className="flex-1 border rounded-lg p-6 overflow-auto"
                           style={{ 
                             backgroundColor: '#ffffff',
-                            borderColor: QSAITheme.purple.light + '30'
+                            borderColor: getPurpleLight() + '30'
                           }}
                         >
                           {selectedTemplate.design_data ? (
@@ -840,7 +847,7 @@ export function TemplateManagementModal({
                         loadTemplate(selectedTemplate);
                         setShowFullPreview(false);
                       }}
-                      style={{ backgroundColor: QSAITheme.purple.primary }}
+                      style={{ backgroundColor: getPurplePrimary() }}
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Load Template
