@@ -441,7 +441,12 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         // Process menu items  
         if (itemsResult.status === 'fulfilled' && !itemsResult.value.error) {
           if (itemsResult.value.data) {
-            get().setMenuItems(itemsResult.value.data);
+            // ✅ FIX (MYA-1446): Map is_active → active for consistency
+            const mappedItems = itemsResult.value.data.map((item: any) => ({
+              ...item,
+              active: item.is_active ?? item.active ?? true
+            }));
+            get().setMenuItems(mappedItems);
           }
         } else {
           console.error('❌ Error fetching menu items:', itemsResult.status === 'fulfilled' ? itemsResult.value.error : itemsResult.reason);
@@ -470,8 +475,6 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       // Fetch supplementary data separately
       fetchSupplementaryData: async () => {
         try {
-          // ✅ CRITICAL FIX: Use brain API instead of direct Supabase calls to ensure image_url conversion
-          // Use the main API that handles image conversion properly  
           const response = await brain.get_menu_with_ordering();
           const result = await response.json();
           
@@ -488,54 +491,59 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               get().setCategories(mappedCategories);
             }
             
+            // ✅ OPTION B (MYA-1479): Preserve API structure - keep variants attached to menuItems
             if (menuData.items) {
-              get().setMenuItems(menuData.items);
+              // Map items and ensure variants array is preserved from API response
+              const enrichedItems = menuData.items.map((item: any) => ({
+                ...item,
+                // Ensure variants array is present (API includes enriched variants with image_url)
+                variants: item.variants || []
+              }));
+              
+              get().setMenuItems(enrichedItems);
+              console.log(`✅ [RealtimeMenuStore] Loaded ${enrichedItems.length} menu items with attached variants`);
             }
             
-            // ✅ NEW: Also fetch additional data that might not be in the main API
+            // ✅ BACKWARD COMPATIBILITY: Also extract variants into separate array for components still using itemVariants
+            // This allows gradual migration while maintaining existing functionality
+            const allVariants: ItemVariant[] = [];
+            
+            if (menuData.items) {
+              for (const item of menuData.items) {
+                if (item.variants && Array.isArray(item.variants)) {
+                  // Each variant already has image_url and image_variants from backend enrichment
+                  const enrichedVariants = item.variants.map((v: any) => ({
+                    ...v,
+                    protein_type_name: v.protein_type_name || null
+                  }));
+                  allVariants.push(...enrichedVariants);
+                }
+              }
+            }
+            
+            // Set the enriched variants (includes image_url and image_variants)
+            if (allVariants.length > 0) {
+              get().setItemVariants(allVariants);
+              console.log(`✅ [RealtimeMenuStore] Also extracted ${allVariants.length} variants for backward compatibility`);
+            }
+            
+            // ✅ Fetch other supplementary data that's NOT in the main API
             const dataPromises = [
               supabase.from('menu_protein_types').select('*').order('name'),
-              supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
-              supabase.from('item_variants').select(`
-                id,
-                menu_item_id,
-                protein_type_id,
-                name,
-                variant_name,
-                price,
-                price_dine_in,
-                price_delivery,
-                is_default,
-                is_active,
-                image_url_override,
-                created_at,
-                updated_at,
-                menu_protein_types:protein_type_id(id, name)
-              `).order('menu_item_id')
+              supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order')
             ];
             
             const results = await Promise.allSettled(dataPromises);
-            const [proteinResult, customizationResult, variantsResult] = results;
+            const [proteinResult, customizationResult] = results;
             
             // Process protein types
             if (proteinResult.status === 'fulfilled' && !proteinResult.value.error && proteinResult.value.data) {
               get().setProteinTypes(proteinResult.value.data);
-            } else {
-              console.error('❌ [RealtimeMenuStore] Failed to load protein types:', JSON.stringify(proteinResult));
             }
             
             // Process customizations
             if (customizationResult.status === 'fulfilled' && !customizationResult.value.error && customizationResult.value.data) {
               get().setCustomizations(customizationResult.value.data);
-            }
-            
-            // Process variants
-            if (variantsResult.status === 'fulfilled' && !variantsResult.value.error && variantsResult.value.data) {
-              const enhancedVariants = variantsResult.value.data.map(variant => ({
-                ...variant,
-                protein_type_name: variant.menu_protein_types?.name || null
-              }));
-              get().setItemVariants(enhancedVariants);
             }
             
           } else {
@@ -980,59 +988,26 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       setCategories: (categories: Category[]) => {
         const isDev = import.meta.env?.DEV;
         
-        // Transform incoming categories to include the 7 fixed section parents
+        // ✅ FIX (MYA-1379): Use real UUID-based section records from database
+        // NO LONGER inject virtual "section-*" records - database already has the correct UUIDs
+        
+        // Simply use the categories as-is from the database
         const activeCategories = categories.filter(cat => cat.active);
         
-        // Create synthetic parent categories for the 7 sections
-        const sectionParents: Category[] = FIXED_SECTIONS.map((section) => ({
-          id: `section-${section.id}`,
-          name: section.name,
-          description: section.displayName,
-          display_order: section.order,
-          print_order: section.order,
-          print_to_kitchen: true,
-          image_url: null,
-          parent_category_id: null, // These are top-level
-          active: true,
-          code_prefix: section.codePrefix
-        }));
-        
-        // Map real database categories as children under the appropriate section
-        const childCategories: Category[] = activeCategories.map(cat => {
-          let finalParentId: string;
-          
-          if (cat.parent_category_id && cat.parent_category_id.startsWith('section-')) {
-            // Already has a valid section parent - preserve it!
-            finalParentId = cat.parent_category_id;
-          } else {
-            // No valid section parent - guess based on name/code_prefix
-            const sectionId = mapCategoryToSection(cat);
-            finalParentId = `section-${sectionId}`;
-          }
-          
-          return {
-            ...cat,
-            parent_category_id: finalParentId
-          };
-        });
-        
-        // Combine section parents with child categories
-        const transformedCategories = [...sectionParents, ...childCategories];
-        
         // Build hierarchical structure
-        const parentCategories = transformedCategories.filter(cat => !cat.parent_category_id);
+        const parentCategories = activeCategories.filter(cat => !cat.parent_category_id);
         const subcategories: Record<string, Category[]> = {};
         
         parentCategories.forEach(parent => {
-          subcategories[parent.id] = transformedCategories
+          subcategories[parent.id] = activeCategories
             .filter(cat => cat.parent_category_id === parent.id)
             .sort((a, b) => a.display_order - b.display_order);
         });
         
         set({ 
-          categories: transformedCategories,
+          categories: activeCategories,
           parentCategories,
-          childCategories: transformedCategories.filter(cat => cat.parent_category_id),
+          childCategories: activeCategories.filter(cat => cat.parent_category_id),
           subcategories
         });
       },
@@ -1308,11 +1283,19 @@ function handleMenuItemsChange(payload: any) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
-    const newItem = payload.new as MenuItem;
+    // ✅ FIX (MYA-1446): Map is_active → active for consistency with backend
+    const newItem = {
+      ...payload.new,
+      active: payload.new.is_active ?? payload.new.active ?? true
+    } as MenuItem;
     store.setMenuItems([...store.menuItems, newItem]);
     toast.success(`Menu item "${newItem.name}" added`);
   } else if (payload.eventType === 'UPDATE') {
-    const updatedItem = payload.new as MenuItem;
+    // ✅ FIX (MYA-1446): Map is_active → active for consistency with backend
+    const updatedItem = {
+      ...payload.new,
+      active: payload.new.is_active ?? payload.new.active ?? true
+    } as MenuItem;
     const menuItems = store.menuItems.map(item => 
       item.id === updatedItem.id ? updatedItem : item
     );
