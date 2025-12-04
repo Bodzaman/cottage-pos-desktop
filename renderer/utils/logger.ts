@@ -1,18 +1,9 @@
 /**
  * Centralized Logging System with Environment-Aware Levels
  * Replaces scattered console.log statements for better performance
- * Electron-compatible version (no Databutton framework dependency)
  */
 
-// Environment detection for Electron app
-const isDev = process.env.NODE_ENV === 'development';
-
-export enum Mode {
-  DEV = 'development',
-  PROD = 'production'
-}
-
-const mode = isDev ? Mode.DEV : Mode.PROD;
+import { mode, Mode } from 'app';
 
 // Log levels with priority
 export enum LogLevel {
@@ -57,13 +48,13 @@ class Logger {
   private formatMessage(level: string, message: string, data?: any): string {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const prefix = `[${timestamp}] ${level} [${this.component}]`;
-
+    
     if (data) {
       // Limit object serialization depth for performance
       const serialized = this.safeStringify(data, config.maxObjectDepth);
       return `${prefix} ${message} ${serialized}`;
     }
-
+    
     return `${prefix} ${message}`;
   }
 
@@ -116,16 +107,16 @@ class Logger {
 
   endPerformanceTimer(label: string): number {
     if (!config.enablePerformanceLogs) return 0;
-
+    
     const startTime = this.performanceMarks.get(label);
     if (startTime) {
       const duration = performance.now() - startTime;
       this.performanceMarks.delete(label);
-
+      
       if (duration > 100) { // Only log slow operations
         this.warn(`Performance: ${label} took ${duration.toFixed(2)}ms`);
       }
-
+      
       return duration;
     }
     return 0;
