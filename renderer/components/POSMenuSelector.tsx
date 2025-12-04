@@ -7,6 +7,10 @@ import { POSItemCardV2 } from './POSItemCardV2';
 import { POSItemListView } from './POSItemListView';
 import { POSMenuSearch } from './POSMenuSearch';
 import { PremiumMenuCard } from './PremiumMenuCard';
+import { POSMenuItemCard } from './POSMenuItemCard';
+import { POSSectionPills } from './POSSectionPills';
+import { POSCategoryPills } from './POSCategoryPills';
+import { POSMenuCardSkeleton } from './POSMenuCardSkeleton';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { fuzzyMenuSearch } from 'utils/fuzzyMenuSearch';
 import { usePOSMenuInteractionStore } from 'utils/posMenuInteractionStore';
@@ -23,6 +27,12 @@ interface Props {
   className?: string;
   showSkeletons?: boolean;
   orderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
+  selectedSectionId?: string | null;
+  onSectionSelect?: (sectionId: string | null) => void;
+  childCategories?: any[];
+  selectedCategoryId?: string | null;
+  onCategorySelect?: (categoryId: string | null) => void;
+  variantCarouselEnabled?: boolean; // NEW: POS Settings toggle
 }
 
 export function POSMenuSelector({
@@ -31,7 +41,13 @@ export function POSMenuSelector({
   onCategoryChange,
   className,
   showSkeletons = false,
-  orderType = 'COLLECTION'
+  orderType = 'COLLECTION',
+  selectedSectionId,
+  onSectionSelect,
+  childCategories,
+  selectedCategoryId,
+  onCategorySelect,
+  variantCarouselEnabled = true // NEW: POS Settings toggle
 }: Props) {
   // 🚀 SELECTIVE SUBSCRIPTIONS: Subscribe to specific fields only to prevent unnecessary re-renders
   const categories = useRealtimeMenuStore(state => state.categories, shallow);
@@ -235,7 +251,7 @@ export function POSMenuSelector({
       // Show skeleton cards during initial load
       return (
         <div className={viewMode === 'card' 
-          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-1" 
+          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-1" 
           : "space-y-2 p-1"
         }>
           {Array.from({ length: 8 }, (_, index) => (
@@ -300,22 +316,34 @@ export function POSMenuSelector({
                   
                   {/* Items Grid */}
                   <div className={viewMode === 'card' 
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
                     : "space-y-2"
                   }>
                     {category.items.map((menuItem) => (
-                      <PremiumMenuCard
-                        key={menuItem.id}
-                        item={menuItem}
-                        onSelect={() => {}}
-                        onAddToOrder={onAddToOrder}
-                        onCustomizeItem={onCustomizeItem}
-                        itemVariants={itemVariants}
-                        proteinTypes={proteinTypes}
-                        viewMode={viewMode}
-                        orderType={orderType}
-                        theme="pos"
-                      />
+                      viewMode === 'card' ? (
+                        <POSMenuItemCard
+                          key={menuItem.id}
+                          item={menuItem}
+                          onAddToOrder={onAddToOrder}
+                          onCustomizeItem={onCustomizeItem}
+                          orderType={orderType}
+                          variantCarouselEnabled={variantCarouselEnabled}
+                        />
+                      ) : (
+                        <PremiumMenuCard
+                          key={menuItem.id}
+                          item={menuItem}
+                          onSelect={() => {}}
+                          onAddToOrder={onAddToOrder}
+                          onCustomizeItem={onCustomizeItem}
+                          itemVariants={itemVariants}
+                          proteinTypes={proteinTypes}
+                          viewMode={viewMode}
+                          orderType={orderType}
+                          theme="pos"
+                          variantCarouselEnabled={variantCarouselEnabled}
+                        />
+                      )
                     ))}
                   </div>
                 </div>
@@ -364,22 +392,34 @@ export function POSMenuSelector({
               
               {/* Items Grid */}
               <div className={viewMode === 'card' 
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
                 : "space-y-2"
               }>
                 {category.items.map((menuItem) => (
-                  <PremiumMenuCard
-                    key={menuItem.id}
-                    item={menuItem}
-                    onSelect={() => {}}
-                    onAddToOrder={onAddToOrder}
-                    onCustomizeItem={onCustomizeItem}
-                    itemVariants={itemVariants}
-                    proteinTypes={proteinTypes}
-                    viewMode={viewMode}
-                    orderType={orderType}
-                    theme="pos"
-                  />
+                  viewMode === 'card' ? (
+                    <POSMenuItemCard
+                      key={menuItem.id}
+                      item={menuItem}
+                      onAddToOrder={onAddToOrder}
+                      onCustomizeItem={onCustomizeItem}
+                      orderType={orderType}
+                      variantCarouselEnabled={variantCarouselEnabled}
+                    />
+                  ) : (
+                    <PremiumMenuCard
+                      key={menuItem.id}
+                      item={menuItem}
+                      onSelect={() => {}}
+                      onAddToOrder={onAddToOrder}
+                      onCustomizeItem={onCustomizeItem}
+                      itemVariants={itemVariants}
+                      proteinTypes={proteinTypes}
+                      viewMode={viewMode}
+                      orderType={orderType}
+                      theme="pos"
+                      variantCarouselEnabled={variantCarouselEnabled}
+                    />
+                  )
                 ))}
               </div>
             </div>
@@ -411,22 +451,34 @@ export function POSMenuSelector({
           
           {/* Items Grid */}
           <div className={viewMode === 'card' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
             : "space-y-2"
           }>
             {filteredMenuItems.map((menuItem) => (
-              <PremiumMenuCard
-                key={menuItem.id}
-                item={menuItem}
-                onSelect={() => {}}
-                onAddToOrder={onAddToOrder}
-                onCustomizeItem={onCustomizeItem}
-                itemVariants={itemVariants}
-                proteinTypes={proteinTypes}
-                viewMode={viewMode}
-                orderType={orderType}
-                theme="pos"
-              />
+              viewMode === 'card' ? (
+                <POSMenuItemCard
+                  key={menuItem.id}
+                  item={menuItem}
+                  onAddToOrder={onAddToOrder}
+                  onCustomizeItem={onCustomizeItem}
+                  orderType={orderType}
+                  variantCarouselEnabled={variantCarouselEnabled}
+                />
+              ) : (
+                <PremiumMenuCard
+                  key={menuItem.id}
+                  item={menuItem}
+                  onSelect={() => {}}
+                  onAddToOrder={onAddToOrder}
+                  onCustomizeItem={onCustomizeItem}
+                  itemVariants={itemVariants}
+                  proteinTypes={proteinTypes}
+                  viewMode={viewMode}
+                  orderType={orderType}
+                  theme="pos"
+                  variantCarouselEnabled={variantCarouselEnabled}
+                />
+              )
             ))}
           </div>
         </div>
@@ -436,22 +488,34 @@ export function POSMenuSelector({
     // Fallback: flat list (should not reach here)
     return (
       <div className={viewMode === 'card' 
-        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1" 
+        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-1" 
         : "space-y-2 p-1"
       }>
         {filteredMenuItems.map((menuItem) => (
-          <PremiumMenuCard
-            key={menuItem.id}
-            item={menuItem}
-            onSelect={() => {}}
-            onAddToOrder={onAddToOrder}
-            onCustomizeItem={onCustomizeItem}
-            itemVariants={itemVariants}
-            proteinTypes={proteinTypes}
-            viewMode={viewMode}
-            orderType={orderType}
-            theme="pos"
-          />
+          viewMode === 'card' ? (
+            <POSMenuItemCard
+              key={menuItem.id}
+              item={menuItem}
+              onAddToOrder={onAddToOrder}
+              onCustomizeItem={onCustomizeItem}
+              orderType={orderType}
+              variantCarouselEnabled={variantCarouselEnabled}
+            />
+          ) : (
+            <PremiumMenuCard
+              key={menuItem.id}
+              item={menuItem}
+              onSelect={() => {}}
+              onAddToOrder={onAddToOrder}
+              onCustomizeItem={onCustomizeItem}
+              itemVariants={itemVariants}
+              proteinTypes={proteinTypes}
+              viewMode={viewMode}
+              orderType={orderType}
+              theme="pos"
+              variantCarouselEnabled={variantCarouselEnabled}
+            />
+          )
         ))}
       </div>
     );
