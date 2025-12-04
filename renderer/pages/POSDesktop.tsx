@@ -7,6 +7,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -54,7 +55,6 @@ import { POSNavigation } from '../components/POSNavigation';
 import { DineInTableSelector } from '../components/DineInTableSelector';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { POSSectionPills } from '../components/POSSectionPills';
-import { POSSearchBar } from 'components/POSSearchBar';
 import { POSCategoryPills } from '../components/POSCategoryPills';
 import { POSMenuSelector } from '../components/POSMenuSelector';
 import { OrderSummaryPanel } from '../components/OrderSummaryPanel';
