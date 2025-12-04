@@ -151,6 +151,12 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
           toast.success(`Delivery validated successfully${validationData.distance_miles ? ` • ${validationData.distance_miles.toFixed(1)} miles` : ''}`);
         }
         
+        // ✅ Extract and store calculated delivery fee from validation response
+        if (validationData.data?.delivery_fee !== undefined) {
+          customerData.deliveryFee = validationData.data.delivery_fee;
+          console.log(`💰 Calculated delivery fee: £${customerData.deliveryFee.toFixed(2)}`);
+        }
+        
       } catch (error) {
         console.error('Delivery validation error:', error);
         alert('Unable to validate delivery address. Please check the address and try again.');
