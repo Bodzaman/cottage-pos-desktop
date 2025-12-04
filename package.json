@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Cottage Tandoori POS Desktop Application with Integrated Printer Service",
   "main": "main.js",
   "scripts": {
