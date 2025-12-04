@@ -3,7 +3,7 @@ import { useViewport } from 'utils/useViewport';
 
 export interface ResponsiveZones {
   customer: React.ReactNode;
-  categories: React.ReactNode;
+  categories: React.ReactNode | null;
   menu: React.ReactNode;
   summary: React.ReactNode;
 }
@@ -54,6 +54,27 @@ export function ResponsivePOSShell({ zones }: Props) {
   );
 
   if (layout === "desktop") {
+    // 3-column layout when categories is null (Customer | Menu | Summary)
+    if (!zones.categories) {
+      return (
+        <div
+          className="grid"
+          style={{
+            ...baseContainer,
+            gap: "var(--pos-gap, 1rem)",
+            gridTemplateColumns:
+              "var(--pos-col-customer, 300px) 1fr var(--pos-col-summary, 300px)",
+          }}
+        >
+          {/* Customer | Menu | Summary */}
+          <ZoneWrap>{zones.customer}</ZoneWrap>
+          <ZoneWrap>{zones.menu}</ZoneWrap>
+          <ZoneWrap>{zones.summary}</ZoneWrap>
+        </div>
+      );
+    }
+
+    // 4-column layout with categories (Customer | Categories | Menu | Summary)
     return (
       <div
         className="grid"
@@ -74,6 +95,26 @@ export function ResponsivePOSShell({ zones }: Props) {
   }
 
   if (layout === "laptop") {
+    // 3-column layout when categories is null
+    if (!zones.categories) {
+      return (
+        <div
+          className="grid"
+          style={{
+            ...baseContainer,
+            gap: "var(--pos-gap, 1rem)",
+            gridTemplateColumns:
+              "minmax(260px, var(--pos-col-customer, 300px)) 1fr minmax(260px, var(--pos-col-summary, 300px))",
+          }}
+        >
+          <ZoneWrap>{zones.customer}</ZoneWrap>
+          <ZoneWrap>{zones.menu}</ZoneWrap>
+          <ZoneWrap>{zones.summary}</ZoneWrap>
+        </div>
+      );
+    }
+
+    // 4-column layout with categories
     return (
       <div
         className="grid"
@@ -155,7 +196,7 @@ export function ResponsivePOSShell({ zones }: Props) {
             <ZoneWrap>{zones.customer}</ZoneWrap>
           </div>
         )}
-        {showCategories && (
+        {zones.categories && showCategories && (
           <div
             className="absolute top-4 left-4 w-[260px] max-h-[85%] overflow-hidden z-40"
             style={{
