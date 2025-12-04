@@ -9,28 +9,43 @@ interface WithEnvMode {
   };
 }
 
-export const mode = Mode.PROD; // Desktop app always runs in production mode
+export const mode = (import.meta as unknown as WithEnvMode).env.MODE;
 
-// Production API Configuration (connects to Databutton backend)
-export const APP_ID = "88a315b0-faa2-491d-9215-cf1e283cdee2";
+declare const __APP_ID__: string;
+export const APP_ID = __APP_ID__;
 
-export const API_PATH = "/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
+declare const __API_PATH__: string;
+export const API_PATH = __API_PATH__;
 
-export const API_URL = "https://api.databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
+declare const __API_URL__: string;
+export const API_URL = __API_URL__;
 
-export const API_HOST = "api.databutton.com";
+declare const __API_HOST__: string;
+export const API_HOST = __API_HOST__;
 
-export const API_PREFIX_PATH = "/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
+declare const __API_PREFIX_PATH__: string;
+export const API_PREFIX_PATH = __API_PREFIX_PATH__;
 
-export const WS_API_URL = "wss://api.databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
+declare const __WS_API_URL__: string;
+export const WS_API_URL = __WS_API_URL__;
 
-export const APP_BASE_PATH = "/cottage-tandoori-restaurant";
+declare const __APP_BASE_PATH__: string;
+export const APP_BASE_PATH = __APP_BASE_PATH__;
 
-export const APP_TITLE = "Cottage Tandoori Restaurant";
+declare const __APP_TITLE__: string;
+export const APP_TITLE = __APP_TITLE__;
 
-export const APP_FAVICON_LIGHT = "";
-export const APP_FAVICON_DARK = "";
+declare const __APP_FAVICON_LIGHT__: string;
+export const APP_FAVICON_LIGHT = __APP_FAVICON_LIGHT__;
 
-export const APP_DEPLOY_USERNAME = "exoticcreations";
-export const APP_DEPLOY_APPNAME = "cottage-tandoori-restaurant";
-export const APP_DEPLOY_CUSTOM_DOMAIN = "";
+declare const __APP_FAVICON_DARK__: string;
+export const APP_FAVICON_DARK = __APP_FAVICON_DARK__;
+
+declare const __APP_DEPLOY_USERNAME__: string;
+export const APP_DEPLOY_USERNAME = __APP_DEPLOY_USERNAME__;
+
+declare const __APP_DEPLOY_APPNAME__: string;
+export const APP_DEPLOY_APPNAME = __APP_DEPLOY_APPNAME__;
+
+declare const __APP_DEPLOY_CUSTOM_DOMAIN__: string;
+export const APP_DEPLOY_CUSTOM_DOMAIN = __APP_DEPLOY_CUSTOM_DOMAIN__;
