@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 // Types matching the backend POSSettings model
@@ -73,7 +73,7 @@ export const usePOSSettings = create<POSSettingsStore>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const response = await brain.get_pos_settings();
+      const response = await apiClient.get_pos_settings();
       const result = await response.json();
       
       if (result.settings) {
@@ -107,7 +107,7 @@ export const usePOSSettings = create<POSSettingsStore>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const response = await brain.save_pos_settings({ settings: newSettings });
+      const response = await apiClient.save_pos_settings({ settings: newSettings });
       const result = await response.json();
       
       if (result.success) {
