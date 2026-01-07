@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { cardStyle } from "../utils/designSystem";
-import { mode, Mode } from "app";
+import { mode, Mode } from "../utils/environment";
 
 interface Props {
   children: ReactNode;
