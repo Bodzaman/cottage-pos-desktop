@@ -3,7 +3,7 @@ import { useSimpleAuth } from "../utils/simple-auth-context";
 import { useNavigate } from 'react-router-dom';
 import { createRefundAudit } from '../utils/orderAuditTrail';
 import { globalColors } from '../utils/QSAIDesign';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,7 +120,7 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({ isOpen, onClose 
     setIsLoading(true);
     try {
       // Fetch real orders from the backend
-      const response = await brain.get_orders({
+      const response = await apiClient.get_orders({
         page: 1,
         page_size: 100 // Get more orders for better testing
       });
