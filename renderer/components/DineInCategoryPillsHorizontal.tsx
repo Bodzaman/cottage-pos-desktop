@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { MenuCategory, MenuItem } from 'types';
+import { Category as MenuCategory, MenuItem } from 'utils/menuTypes';
 import { QSAITheme } from 'utils/QSAIDesign';
-import { FIXED_SECTIONS } from 'utils/sectionMapping';
+import { FIXED_SECTIONS, SECTION_UUID_MAP } from 'utils/sectionMapping';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 
 interface Props {
@@ -33,16 +33,35 @@ export function DineInCategoryPillsHorizontal({
   // Track which parent category is expanded
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
 
-  // Get parent categories (no parent_category_id)
-  const parentCategories = categories
-    .filter(cat => !cat.parent_category_id && cat.is_active)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  // ✅ Use FIXED_SECTIONS to match POSDesktop behavior (same as CategorySidebar)
+  const parentCategories = FIXED_SECTIONS
+    .map(section => {
+      // Find category by UUID
+      return categories.find(cat => cat.id === section.uuid && cat.active);
+    })
+    .filter(Boolean) as MenuCategory[];
 
-  // Get child categories for a specific parent
-  const getChildCategories = (parentId: string) => {
-    return categories
-      .filter(cat => cat.parent_category_id === parentId && cat.is_active)
-      .sort((a, b) => a.sort_order - b.sort_order);
+  // ✅ Get child categories for a section using 3-level hierarchy logic (same as CategorySidebar)
+  const getChildCategories = (sectionUuid: string) => {
+    // Step 1: Find direct children of the section
+    const directChildren = categories.filter(cat => cat.parent_category_id === sectionUuid && cat.active);
+    
+    // Step 2: For 3-level hierarchy, get grandchildren instead of direct children
+    // If there's only one direct child with the same name as section, skip it and show its children
+    if (directChildren.length === 1) {
+      const intermediateCategory = directChildren[0];
+      const grandchildren = categories
+        .filter(cat => cat.parent_category_id === intermediateCategory.id && cat.active)
+        .sort((a, b) => a.display_order - b.display_order);
+      
+      // If grandchildren exist, return them instead
+      if (grandchildren.length > 0) {
+        return grandchildren;
+      }
+    }
+    
+    // Otherwise return direct children (for sections without 3-level hierarchy)
+    return directChildren.sort((a, b) => a.display_order - b.display_order);
   };
 
   // Helper to get parent ID of a category
