@@ -31,6 +31,7 @@ interface DineInBillPreviewModalProps {
   guestCount: number;
   orderTotal: number;
   onPrintBill: (orderTotal: number) => Promise<boolean>;
+  onCompletePayment?: () => Promise<void>;
 }
 
 export function DineInBillPreviewModal({
@@ -40,14 +41,9 @@ export function DineInBillPreviewModal({
   tableNumber,
   guestCount,
   orderTotal,
-  onPrintBill
+  onPrintBill,
+  onCompletePayment
 }: DineInBillPreviewModalProps) {
-
-  // DEBUG: Log what we're receiving
-  console.log('🔍 DineInBillPreviewModal - orderItems:', orderItems);
-  console.log('🔍 DineInBillPreviewModal - tableNumber:', tableNumber);
-  console.log('🔍 DineInBillPreviewModal - guestCount:', guestCount);
-  console.log('🔍 DineInBillPreviewModal - orderTotal:', orderTotal);
 
   // Map order data to receipt format for ThermalReceiptDisplay
   const mapToReceiptOrderData = () => {
@@ -90,16 +86,15 @@ export function DineInBillPreviewModal({
       timestamp: new Date().toISOString()
     };
     
-    // DEBUG: Log the mapped data
-    console.log('🔍 DineInBillPreviewModal - mappedData:', mappedData);
-    console.log('🔍 DineInBillPreviewModal - items count:', mappedData.items.length);
-    
     return mappedData;
   };
 
   const handlePrint = async () => {
     const success = await onPrintBill(orderTotal);
     if (success) {
+      if (onCompletePayment) {
+        await onCompletePayment();
+      }
       onClose();
     }
   };
@@ -164,7 +159,7 @@ export function DineInBillPreviewModal({
             }}
           >
             <Receipt className="h-5 w-5 mr-2" />
-            Print Bill
+            Print Final Bill
           </Button>
         </DialogFooter>
       </DialogContent>
