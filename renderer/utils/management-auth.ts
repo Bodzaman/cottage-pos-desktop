@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import brain from "brain";
+import { apiClient } from "app";
 
 /**
  * Authentication status response from management password verification
@@ -71,7 +71,7 @@ export const isManagementAuthenticated = (): boolean => {
  */
 export const verifyManagementPassword = async (password: string): Promise<AuthStatus> => {
   try {
-    const response = await brain.verify_password({ password });
+    const response = await apiClient.verify_password({ password });
     const data = await response.json();
     
     if (data.authenticated) {
