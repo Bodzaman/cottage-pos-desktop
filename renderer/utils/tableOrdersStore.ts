@@ -289,7 +289,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [tableOrdersStore] API error:', response.status, errorText);
-        throw new Error(`Failed to load table orders: ${response.status}`);
+        throw new Error("Failed to load table orders: " + response.status);
       }
 
       const data = (await response.json()) as { table_orders: TableOrderResponse[] };
@@ -311,7 +311,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         data.table_orders.forEach((order) => {
           const items = order.order_items || [];
           if (isDev) {
-            console.log(`📝 [tableOrdersStore] Processing order ${order.id} for table ${order.table_number}:`, {
+            console.log("📝 [tableOrdersStore] Processing order " + order.id + " for table " + order.table_number + ":", {
               itemsCount: items.length,
               status: order.status,
               items: items.map(i => ({ name: i.name, quantity: i.quantity }))
@@ -321,7 +321,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
           persistedOrders[order.table_number] = {
             id: order.id,
             tableId: order.table_number,
-            tableName: order.table_name || `Table ${order.table_number}`,
+            tableName: order.table_name || "Table " + order.table_number,
             items: items.map(item => ({
               id: item.id?.toString() || crypto.randomUUID(),
               menu_item_id: item.menu_item_id,
@@ -400,7 +400,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         }
       }
     } catch (error) {
-      console.error(`Failed to load customer tabs for table ${tableNumber}:`, error);
+      console.error("Failed to load customer tabs for table " + tableNumber + ":", error);
       set(state => ({
         errors: {
           ...state.errors,
@@ -416,7 +416,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // ENHANCED: Create customer tab with optimistic updates
   createCustomerTab: async (tableNumber: number, tabName: string, guestId?: string) => {
     const { options } = get();
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const tempId = "temp-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
     
     // Optimistic update
     if (options.enableOptimisticUpdates) {
@@ -470,7 +470,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
             }
           }));
           
-          toast.success(`Customer tab "${tabName}" created successfully`);
+          toast.success("Customer tab "" + tabName + "" created successfully");
           return realTab.id;
         }
       }
@@ -641,7 +641,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
             }
           }));
           
-          toast.success(`Added ${items.length} items to customer tab`);
+          toast.success("Added " + items.length + " items to customer tab");
           return true;
         }
       }
@@ -1594,13 +1594,13 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
           case 'deleteCustomerTab':
             return await get().deleteCustomerTab(args[0]);
           default:
-            throw new Error(`Unknown operation type: ${operationType}`);
+            throw new Error("Unknown operation type: " + operationType);
         }
       } catch (error) {
-        console.warn(`Retry attempt ${attempt}/${options.maxRetries} failed for ${operationType}:`, error);
+        console.warn("Retry attempt " + attempt + "/" + options.maxRetries + " failed for " + operationType + ":", error);
         
         if (attempt === options.maxRetries) {
-          toast.error(`Failed to ${operationType} after ${options.maxRetries} attempts`);
+          toast.error("Failed to " + operationType + " after " + options.maxRetries + " attempts");
           return false;
         }
         
@@ -1631,11 +1631,11 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
               [tableNumber]: data.customer_tabs
             }
           }));
-          if (isDev) console.log(`✅ Synced ${data.customer_tabs.length} customer tabs for table ${tableNumber}`);
+          if (isDev) console.log("✅ Synced " + data.customer_tabs.length + " customer tabs for table " + tableNumber);
         }
       }
     } catch (error) {
-      console.error(`Failed to sync customer tabs for table ${tableNumber}:`, error);
+      console.error("Failed to sync customer tabs for table " + tableNumber + ":", error);
       set(state => ({
         errors: {
           ...state.errors,
@@ -1663,7 +1663,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
                        realTabs.some(tab => tab.id === activeTabId);
       
       if (!tabExists) {
-        console.warn(`Active customer tab ${activeTabId} not found for table ${tableNumber}`);
+        console.warn("Active customer tab " + activeTabId + " not found for table " + tableNumber);
         // Auto-correct by setting first available tab as active
         const availableTabs = optimisticTabs.length > 0 ? optimisticTabs : realTabs;
         const newActiveTab = availableTabs.length > 0 ? availableTabs[0].id : null;
@@ -1674,7 +1674,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     
     // Check for inconsistencies between optimistic and real state
     if (optimisticTabs.length !== realTabs.length) {
-      console.warn(`State inconsistency detected for table ${tableNumber}: optimistic=${optimisticTabs.length}, real=${realTabs.length}`);
+      console.warn("State inconsistency detected for table " + tableNumber + ": optimistic=" + optimisticTabs.length + ", real=" + realTabs.length);
       return false;
     }
     
@@ -1717,7 +1717,7 @@ if (typeof window !== 'undefined') {
         
         // Skip event-driven DINE-IN tables to prevent dual architecture conflict
         if (isEventDrivenTable) {
-          console.log(`[tableOrdersStore] ⏭️ Skipping legacy polling for DINE-IN table ${tableNumber} (using event-driven architecture)`);
+          console.log("[tableOrdersStore] ⏭️ Skipping legacy polling for DINE-IN table " + tableNumber + " (using event-driven architecture)");
           continue;
         }
         
