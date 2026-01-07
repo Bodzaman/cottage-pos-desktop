@@ -3,7 +3,7 @@
  * 
  * RESPONSIBILITY:
  * Detect if the app is running in Electron environment and provide
- * headers for brain API requests to enable dual-mode printing.
+ * headers for API requests to enable dual-mode printing.
  * 
  * USED BY:
  * - usePrintingOperations: Add X-Electron-Mode header to print requests
@@ -11,10 +11,8 @@
  * 
  * FLOW:
  * 1. Check if window.electronAPI exists (set by Electron preload script)
- * 2. Return appropriate headers for brain client RequestParams
+ * 2. Return appropriate headers for API client requests
  */
-
-import type { RequestParams } from '../brain/http-client';
 
 /**
  * Check if app is running in Electron environment
@@ -30,12 +28,12 @@ export function isElectronMode(): boolean {
 }
 
 /**
- * Get headers for brain API requests based on environment
+ * Get headers for API requests based on environment
  * Used to tell backend whether to use thermal printer service or web mode
  * 
- * @returns RequestParams with X-Electron-Mode header if in Electron
+ * @returns Object with headers containing X-Electron-Mode if in Electron
  */
-export function getElectronHeaders(): Pick<RequestParams, 'headers'> {
+export function getElectronHeaders(): { headers: Record<string, string> } {
   if (isElectronMode()) {
     return {
       headers: {
