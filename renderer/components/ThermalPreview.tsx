@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { THERMAL_FONTS } from 'utils/thermalFonts';
 import { QSAITheme } from 'utils/QSAIDesign';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { QRCodeConfig } from 'utils/receiptDesignerTypes';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 
