@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { PosTableResponse } from 'types';
 import { toast } from 'sonner';
 
@@ -128,7 +128,7 @@ export const useTableConfigStore = create<TableConfigState>((set, get) => ({
       
       if (isDev) console.log('🔄 [Table Config Store] Fetching table data...');
       
-      const response = await brain.get_tables();
+      const response = await apiClient.get_tables();
       const data = await response.json();
       
       if (data.success && Array.isArray(data.tables)) {
