@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useSimpleAuth } from 'utils/simpleAuth';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 import { kitchenService } from 'utils/kitchenService';
 import { orderManagementService } from 'utils/orderManagementService';
-import { createStatusChangeAudit } from 'utils/auditHelpers';
+import { createStatusChangeAudit } from 'utils/orderAuditTrail';
 
 // Table types
 export interface TableOrder {
