@@ -1,7 +1,7 @@
 import { OrderItem } from './menuTypes';
 import { TableOrderItem } from './tableTypes';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 /**
  * Kitchen Ticket Print Job Result
