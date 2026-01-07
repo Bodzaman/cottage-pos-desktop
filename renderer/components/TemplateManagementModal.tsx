@@ -14,7 +14,7 @@ import { Save, Edit3, Trash2, Plus, Eye, Download, Upload, Search, FileText, Clo
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { QSAITheme, styles } from 'utils/QSAIDesign';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { TemplateResponse, TemplateCreateRequest } from 'types';
 import { OrderModeAssignmentModal } from 'components/OrderModeAssignmentModal';
 import { useSimpleAuth } from 'utils/simple-auth-context';
@@ -106,8 +106,8 @@ export function TemplateManagementModal({
       
       // Load templates and assignments concurrently
       const [templatesResponse, assignmentsResponse] = await Promise.all([
-        brain.list_receipt_templates({ user_id: user.id }),
-        brain.get_template_assignments()
+        apiClient.list_receipt_templates({ user_id: user.id }),
+        apiClient.get_template_assignments()
       ]);
       
       const templatesData = await templatesResponse.json();
@@ -119,8 +119,8 @@ export function TemplateManagementModal({
             // Load preview thumbnails
             try {
               const [fohResponse, kitchenResponse] = await Promise.all([
-                brain.get_template_preview({ templateId: template.id, variant: 'foh' }),
-                brain.get_template_preview({ templateId: template.id, variant: 'kitchen' })
+                apiClient.get_template_preview({ templateId: template.id, variant: 'foh' }),
+                apiClient.get_template_preview({ templateId: template.id, variant: 'kitchen' })
               ]);
               
               const fohData = await fohResponse.json();
@@ -176,7 +176,7 @@ export function TemplateManagementModal({
   const loadTemplateDetails = async (templateId: string) => {
     try {
       setIsLoading(true);
-      const response = await brain.get_receipt_template({ templateId, user_id: 'current_user' });
+      const response = await apiClient.get_receipt_template({ templateId, user_id: 'current_user' });
       const data = await response.json();
       
       if (data.success && data.template) {
@@ -207,7 +207,7 @@ export function TemplateManagementModal({
   const deleteTemplate = async (templateId: string, templateName: string) => {
     try {
       setIsLoading(true);
-      const response = await brain.delete_receipt_template({ templateId }, { user_id: 'current_user' });
+      const response = await apiClient.delete_receipt_template({ templateId }, { user_id: 'current_user' });
       const data = await response.json();
       
       if (data.success) {
@@ -238,7 +238,7 @@ export function TemplateManagementModal({
     }
     
     try {
-      const response = await brain.delete_receipt_template(
+      const response = await apiClient.delete_receipt_template(
         { templateId },
         { user_id: user.id }
       );
