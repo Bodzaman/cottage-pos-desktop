@@ -4,7 +4,7 @@
  */
 
 import { offlineStorage, OfflineOrder, OfflineSyncOperation } from './offlineStorage';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { OrderItem } from './menuTypes';
 import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager';
 
@@ -391,7 +391,7 @@ class OutboxSyncManager {
 
   private async syncCreateOrder(data: any): Promise<SyncResult> {
     try {
-      const response = await brain.place_order({
+      const response = await apiClient.place_order({
         order_type: data.orderData.order_type,
         table_number: data.orderData.table_number,
         guest_count: data.orderData.guest_count,
@@ -430,7 +430,7 @@ class OutboxSyncManager {
 
   private async syncUpdateOrderStatus(data: any): Promise<SyncResult> {
     try {
-      const response = await brain.update_order_status({
+      const response = await apiClient.update_order_status({
         order_id: data.orderId,
         status: data.status,
         notes: data.notes,
@@ -458,7 +458,7 @@ class OutboxSyncManager {
 
   private async syncCreatePayment(data: any): Promise<SyncResult> {
     try {
-      const response = await brain.process_payment2({
+      const response = await apiClient.process_payment2({
         order_id: data.orderId,
         payment_method: data.paymentData.payment_method,
         amount: data.paymentData.amount,
