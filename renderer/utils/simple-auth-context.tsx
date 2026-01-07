@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode, useRef } from 'react';
 import { supabase } from 'utils/supabaseClient';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 import { ensureSupabaseConfigured } from 'utils/supabaseClient';
 import { useOnboardingStore } from 'utils/onboardingStore';
@@ -137,6 +137,7 @@ type SimpleAuthProviderProps = {
 };
 
 export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
+  console.log('🟢 SimpleAuthProvider: Component rendering started');
   const [user, setUser] = useState<SimpleUser | null>(null);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
@@ -463,7 +464,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
 
             // NEW: Fetch customer favorite lists with error boundary
             try {
-              const listsResponse = await brain.get_customer_lists({ customerId: customerId });
+              const listsResponse = await apiClient.get_customer_lists({ customerId: customerId });
               const listsData = await listsResponse.json();
               if (listsData.lists) {
                 setFavoriteLists(listsData.lists);
@@ -568,7 +569,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
       // CRITICAL: Auto-confirm email using service role to create active session
       try {
         console.log('📧 [SimpleAuth] Auto-confirming email for instant session...');
-        const confirmResponse = await brain.auto_confirm_email({ user_id: data.user.id });
+        const confirmResponse = await apiClient.auto_confirm_email({ user_id: data.user.id });
         const confirmResult = await confirmResponse.json();
         
         if (confirmResult.success) {
@@ -913,7 +914,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     }
 
     try {
-      const response = await brain.create_favorite_list({ customer_id: profile.id, list_name: listName });
+      const response = await apiClient.create_favorite_list({ customer_id: profile.id, list_name: listName });
       const data = await response.json();
 
       if (data.error || !data.success) {
@@ -946,7 +947,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     }
 
     try {
-      const response = await brain.rename_favorite_list({ list_id: listId, new_name: newName });
+      const response = await apiClient.rename_favorite_list({ list_id: listId, new_name: newName });
       const data = await response.json();
 
       if (data.error) {
@@ -969,7 +970,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     }
 
     try {
-      const response = await brain.delete_favorite_list({ list_id: listId });
+      const response = await apiClient.delete_favorite_list({ list_id: listId });
       const data = await response.json();
 
       if (data.error) {
@@ -990,7 +991,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     }
 
     try {
-      const response = await brain.add_favorite_to_list({ 
+      const response = await apiClient.add_favorite_to_list({ 
         list_id: listId, 
         favorite_id: favoriteId,
         customer_id: profile.id
@@ -1015,7 +1016,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     }
 
     try {
-      const response = await brain.remove_favorite_from_list({ 
+      const response = await apiClient.remove_favorite_from_list({ 
         list_id: listId, 
         favorite_id: favoriteId,
         customer_id: profile.id
@@ -1037,7 +1038,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   const refreshLists = async () => {
     if (!profile?.id) return;
     try {
-      const response = await brain.get_customer_lists({ customerId: profile.id });
+      const response = await apiClient.get_customer_lists({ customerId: profile.id });
       const data = await response.json();
       if (data.lists) {
         setFavoriteLists(data.lists);
