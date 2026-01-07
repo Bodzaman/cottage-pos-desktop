@@ -7,7 +7,7 @@
  */
 
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { createLogger } from './logger';
 
 const logger = createLogger('OnDemandPrinterService');
@@ -84,8 +84,8 @@ export const useOnDemandPrinterService = create<OnDemandPrinterState>((set, get)
       
       const [healthResponse, jobsResponse] = await Promise.race([
         Promise.all([
-          brain.check_printer_health(),
-          brain.get_print_jobs({ limit: 10 }) // Limit to reduce response time
+          apiClient.check_printer_health(),
+          apiClient.get_print_jobs({ limit: 10 })
         ]),
         timeoutPromise
       ]);
