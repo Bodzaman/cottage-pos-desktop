@@ -5,7 +5,7 @@
  * for AI chatbot integration with menu data.
  */
 
-import brain from 'brain';
+import { apiClient } from 'app';
 import { MenuItem, Category, ItemVariant } from './menuTypes';
 
 // AI Context Types
@@ -122,7 +122,7 @@ class AIContextManager {
    */
   async getContextSummary(): Promise<any> {
     try {
-      const response = await brain.getContextSummary();
+      const response = await apiClient.getContextSummary();
       return await response.json();
     } catch (error) {
       console.error('Failed to get context summary:', error);
@@ -139,7 +139,7 @@ class AIContextManager {
     maxSuggestions: number = 3
   ): Promise<MenuValidationResult> {
     try {
-      const response = await brain.validateMenuItem({
+      const response = await apiClient.validateMenuItem({
         item_query: query,
         category_filter: categoryFilter,
         max_suggestions: maxSuggestions
@@ -249,7 +249,7 @@ class AIContextManager {
 
   private async fetchFreshContext(options: any): Promise<AIMenuContext> {
     try {
-      const response = await brain.getFullMenuContext({
+      const response = await apiClient.getFullMenuContext({
         include_inactive: options.includeInactive || false,
         category_filter: options.categoryFilter,
         compact_mode: options.compactMode || false
