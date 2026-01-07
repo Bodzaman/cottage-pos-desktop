@@ -135,7 +135,7 @@ export const useRestaurantTables = () => {
           }
           
           setTables(transformedTables);
-          console.log(`[useRestaurantTables] Loaded ${transformedTables.length} tables from pos_tables`);
+          console.log("[useRestaurantTables] Loaded " + transformedTables.length + " tables from pos_tables");
         }
       } catch (err: any) {
         console.error('[useRestaurantTables] Fetch error:', err);
@@ -218,7 +218,7 @@ export const useRestaurantTables = () => {
         }
       )
       .subscribe((status) => {
-        console.log(`[useRestaurantTables] 📡 Subscription status changed: ${status}`);
+        console.log("[useRestaurantTables] 📡 Subscription status changed: " + status);
         if (status === 'SUBSCRIBED') {
           console.log('[useRestaurantTables] ✅ Successfully subscribed to pos_tables');
         } else if (status === 'CHANNEL_ERROR') {
@@ -272,7 +272,7 @@ export const useRestaurantTables = () => {
         }));
         
         setTables(transformedTables);
-        console.log(`[useRestaurantTables] ✅ Refetch complete: ${transformedTables.length} tables`);
+        console.log("[useRestaurantTables] ✅ Refetch complete: " + transformedTables.length + " tables");
       }
     } catch (err: any) {
       console.error('[useRestaurantTables] ❌ Refetch error:', err);
