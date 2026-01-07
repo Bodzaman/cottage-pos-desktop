@@ -40,29 +40,18 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'renderer'),
+      'app': resolve(__dirname, 'renderer/lib/app-compat.ts'),  // Riff compatibility
       'brain': resolve(__dirname, 'renderer/brain'),
       'constants': resolve(__dirname, 'renderer/constants'),
       'components': resolve(__dirname, 'renderer/components'),
+      'pages': resolve(__dirname, 'renderer/pages'),
       'utils': resolve(__dirname, 'renderer/utils'),
-      'pages': resolve(__dirname, 'renderer/pages')
+      'types': resolve(__dirname, 'renderer/types')
     }
   },
 
-  // Electron-specific optimizations
-  define: {
-    __VERSION__: JSON.stringify(process.env.npm_package_version || '1.2.4'),
-    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development')
-  },
-
-  // Optimization
-  optimizeDeps: {
-    include: ['react', 'react-dom'],
-    exclude: ['electron']
-  },
-
-  // Base path for production builds (important for Electron)
-  base: './',
-
   // Environment variables
-  envPrefix: 'VITE_'
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  }
 });
