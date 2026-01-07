@@ -6,7 +6,7 @@ import { MapPin, Clock, Route, AlertCircle, CheckCircle, XCircle, Navigation, Ma
 import { toast } from 'sonner';
 import { globalColors, styles, effects } from 'utils/QSAIDesign';
 import { useGoogleMaps } from 'utils/googleMapsProvider';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { EnhancedRouteModal } from './EnhancedRouteModal';
 
 interface DeliveryAddress {
@@ -325,7 +325,7 @@ export const RouteVisualization: React.FC<Props> = ({
     setError(null);
     
     try {
-      const response = await brain.calculate_delivery_route({
+      const response = await apiClient.calculate_delivery_route({
         destination_lat: deliveryAddress.latitude,
         destination_lng: deliveryAddress.longitude,
         destination_postcode: deliveryAddress.postcode,
