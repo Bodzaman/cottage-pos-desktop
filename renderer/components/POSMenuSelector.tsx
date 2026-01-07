@@ -219,7 +219,7 @@ export function POSMenuSelector({
 
   // ✅ Gradient style constants for consistency
   const gradientTextStyle = {
-    backgroundImage: "linear-gradient(135deg, white 30%, " + QSAITheme.purple.light + " 100%)",
+    backgroundImage: `linear-gradient(135deg, white 30%, ${QSAITheme.purple.light} 100%)`,
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text'
@@ -239,7 +239,7 @@ export function POSMenuSelector({
           : "space-y-2 p-1"
         }>
           {Array.from({ length: 8 }, (_, index) => (
-            <POSMenuCardSkeleton key={"skeleton-" + index} viewMode={viewMode} />
+            <POSMenuCardSkeleton key={`skeleton-${index}`} viewMode={viewMode} />
           ))}
         </div>
       );
@@ -506,7 +506,7 @@ export function POSMenuSelector({
   };
 
   return (
-    <div className={"h-full flex flex-col overflow-hidden " + className || ''}>
+    <div className={`h-full flex flex-col overflow-hidden ${className || ''}`}>
       {/* HEADER ROW: Breadcrumb Path (Left) | Toggle Buttons (Center) | Search Bar (Right) */}
       <div className="flex items-center justify-between gap-4 mb-4">
         {/* LEFT: Breadcrumb Path */}
@@ -543,14 +543,14 @@ export function POSMenuSelector({
         <div className="flex items-center gap-2 bg-black/40 rounded-lg p-1 border border-purple-500/20">
           <button
             onClick={() => handleViewModeChange('list')}
-            className={"px-4 py-2 rounded-md transition-all duration-200 flex items-center gap-2 " + 
+            className={`px-4 py-2 rounded-md transition-all duration-200 flex items-center gap-2 ${
               viewMode === 'list'
                 ? 'text-white'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }
+            }`}
             style={{
               backgroundColor: viewMode === 'list' ? QSAITheme.purple.primary : 'transparent',
-              boxShadow: viewMode === 'list' ? "0 0 20px " + QSAITheme.purple.primary + "40" : 'none'
+              boxShadow: viewMode === 'list' ? `0 0 20px ${QSAITheme.purple.primary}40` : 'none'
             }}
           >
             <List className="w-4 h-4" />
@@ -558,14 +558,14 @@ export function POSMenuSelector({
           </button>
           <button
             onClick={() => handleViewModeChange('card')}
-            className={"px-4 py-2 rounded-md transition-all duration-200 flex items-center gap-2 " + 
+            className={`px-4 py-2 rounded-md transition-all duration-200 flex items-center gap-2 ${
               viewMode === 'card'
                 ? 'text-white'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }
+            }`}
             style={{
               backgroundColor: viewMode === 'card' ? QSAITheme.purple.primary : 'transparent',
-              boxShadow: viewMode === 'card' ? "0 0 20px " + QSAITheme.purple.primary + "40" : 'none'
+              boxShadow: viewMode === 'card' ? `0 0 20px ${QSAITheme.purple.primary}40` : 'none'
             }}
           >
             <Grid3x3 className="w-4 h-4" />
