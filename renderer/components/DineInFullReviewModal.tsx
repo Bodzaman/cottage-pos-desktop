@@ -144,10 +144,10 @@ function AddCustomerTabDialog({
   // Generate suggested name (Customer 1, Customer 2, etc.)
   const getSuggestedName = () => {
     let counter = 1;
-    while (existingTabNames.includes("Customer " + counter)) {
+    while (existingTabNames.includes(`Customer ${counter}`)) {
       counter++;
     }
-    return "Customer " + counter;
+    return `Customer ${counter}`;
   };
 
   // Reset form when dialog opens
@@ -169,7 +169,7 @@ function AddCustomerTabDialog({
     }
 
     if (existingTabNames.includes(trimmedName)) {
-      setError("Tab "" + trimmedName + "" already exists for this table");
+      setError(`Tab "${trimmedName}" already exists for this table`);
       return;
     }
 
@@ -192,7 +192,7 @@ function AddCustomerTabDialog({
         className="max-w-md"
         style={{
           background: QSAITheme.background.panel,
-          border: "1px solid " + QSAITheme.border.accent,
+          border: `1px solid ${QSAITheme.border.accent}`,
         }}
       >
         <DialogHeader>
@@ -220,7 +220,7 @@ function AddCustomerTabDialog({
               className="w-full px-4 py-3 rounded-lg text-white text-base"
               style={{
                 background: QSAITheme.background.secondary,
-                border: "1px solid " + error ? '#EF4444' : QSAITheme.border.light,
+                border: `1px solid ${error ? '#EF4444' : QSAITheme.border.light}`,
                 outline: 'none',
               }}
             />
@@ -254,8 +254,8 @@ function AddCustomerTabDialog({
                   style={{
                     background: existingTabNames.includes(suggestion)
                       ? QSAITheme.background.secondary
-                      : "rgba(91, 33, 182, 0.15)",
-                    border: "1px solid " + existingTabNames.includes(suggestion) ? QSAITheme.border.light : 'rgba(91, 33, 182, 0.3)',
+                      : `rgba(91, 33, 182, 0.15)`,
+                    border: `1px solid ${existingTabNames.includes(suggestion) ? QSAITheme.border.light : 'rgba(91, 33, 182, 0.3)'}`,
                     color: existingTabNames.includes(suggestion) ? 'rgba(255, 255, 255, 0.3)' : QSAITheme.purple.light,
                     cursor: existingTabNames.includes(suggestion) ? 'not-allowed' : 'pointer',
                   }}
@@ -382,15 +382,15 @@ function CustomerTabGroup({
       className="rounded-lg overflow-hidden"
       style={{
         background: QSAITheme.background.panel,
-        border: "1px solid " + QSAITheme.border.light,
+        border: `1px solid ${QSAITheme.border.light}`,
       }}
     >
       {/* Header Bar */}
       <div
         className="p-4 cursor-pointer transition-colors hover:bg-white/[0.02]"
         style={{
-          background: "rgba(59, 130, 246, 0.05)",
-          borderBottom: isCollapsed ? 'none' : "1px solid " + QSAITheme.border.light,
+          background: `rgba(59, 130, 246, 0.05)`,
+          borderBottom: isCollapsed ? 'none' : `1px solid ${QSAITheme.border.light}`,
         }}
         onClick={() => !isEditingName && onToggleCollapse()}
       >
@@ -420,7 +420,7 @@ function CustomerTabGroup({
                   className="px-3 py-1.5 rounded text-white font-semibold focus:outline-none"
                   style={{
                     background: QSAITheme.background.secondary,
-                    border: "1px solid " + nameError ? '#EF4444' : QSAITheme.border.accent,
+                    border: `1px solid ${nameError ? '#EF4444' : QSAITheme.border.accent}`,
                     maxWidth: '200px',
                   }}
                 />
@@ -462,7 +462,7 @@ function CustomerTabGroup({
                 className="p-2 rounded-lg transition-all hover:scale-105"
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: "1px solid " + QSAITheme.border.light,
+                  border: `1px solid ${QSAITheme.border.light}`,
                 }}
                 title="Edit name"
               >
@@ -474,7 +474,7 @@ function CustomerTabGroup({
                 className="p-2 rounded-lg transition-all hover:scale-105"
                 style={{
                   background: isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                  border: "1px solid " + isEmpty ? 'rgba(239, 68, 68, 0.3)' : QSAITheme.border.light,
+                  border: `1px solid ${isEmpty ? 'rgba(239, 68, 68, 0.3)' : QSAITheme.border.light}`,
                 }}
                 title={isEmpty ? 'Delete tab' : 'Delete tab (has items)'}
               >
@@ -572,7 +572,7 @@ function CustomerTabGroup({
           className="max-w-md"
           style={{
             background: QSAITheme.background.panel,
-            border: "1px solid " + QSAITheme.border.accent,
+            border: `1px solid ${QSAITheme.border.accent}`,
           }}
         >
           <DialogHeader>
@@ -617,7 +617,7 @@ function CustomerTabGroup({
         <AlertDialogContent
           style={{
             background: QSAITheme.background.panel,
-            border: "1px solid " + QSAITheme.border.accent,
+            border: `1px solid ${QSAITheme.border.accent}`,
           }}
         >
           <AlertDialogHeader>
@@ -631,7 +631,7 @@ function CustomerTabGroup({
           <AlertDialogFooter>
             <AlertDialogCancel
               style={{
-                border: "1px solid " + QSAITheme.border.medium,
+                border: `1px solid ${QSAITheme.border.medium}`,
                 color: QSAITheme.text.secondary,
               }}
             >
@@ -827,7 +827,7 @@ export default function DineInFullReviewModal({
     if (selectedFilterTab.startsWith('table-')) {
       // Extract table number from tab ID (e.g., 'table-1' -> 1)
       const tableNum = parseInt(selectedFilterTab.replace('table-', ''));
-      return "Table " + tableNum;
+      return `Table ${tableNum}`;
     }
     return 'Select Table';
   };
@@ -972,8 +972,8 @@ export default function DineInFullReviewModal({
     const total = subtotal * 1.20;
     
     return {
-      orderId: "TABLE-" + tableNumber + "-" + Date.now(),
-      orderNumber: "T" + tableNumber + "-" + Date.now().toString().slice(-6),
+      orderId: `TABLE-${tableNumber}-${Date.now()}`,
+      orderNumber: `T${tableNumber}-${Date.now().toString().slice(-6)}`,
       orderType: 'DINE-IN' as const,
       tableNumber: tableNumber.toString(),
       guestCount: totalLinkedCapacity > 0 ? totalLinkedCapacity : tableCapacity,
@@ -1041,8 +1041,8 @@ export default function DineInFullReviewModal({
         <DialogContent 
           className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 flex flex-col overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, " + QSAITheme.background.primary + " 0%, " + QSAITheme.background.secondary + " 100%)",
-            border: "1px solid " + QSAITheme.border.accent,
+            background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
+            border: `1px solid ${QSAITheme.border.accent}`,
           }}
         >
           {/* ==================== STICKY HEADER ==================== */}
@@ -1096,8 +1096,8 @@ export default function DineInFullReviewModal({
                         ? 'rgba(91, 33, 182, 0.2)'
                         : 'rgba(255, 255, 255, 0.05)',
                       color: selectedFilterTab === 'all' ? QSAITheme.purple.light : QSAITheme.text.muted,
-                      border: "1px solid " + selectedFilterTab === 'all' ? QSAITheme.purple.primary : QSAITheme.border.light,
-                      boxShadow: selectedFilterTab === 'all' ? "0 0 12px " + QSAITheme.purple.glow : 'none',
+                      border: `1px solid ${selectedFilterTab === 'all' ? QSAITheme.purple.primary : QSAITheme.border.light}`,
+                      boxShadow: selectedFilterTab === 'all' ? `0 0 12px ${QSAITheme.purple.glow}` : 'none',
                     }}
                   >
                     All Items ({totalItemCount})
@@ -1116,7 +1116,7 @@ export default function DineInFullReviewModal({
                             ? 'rgba(249, 115, 22, 0.2)'
                             : 'rgba(255, 255, 255, 0.05)',
                           color: isTableFilterActive && selectedFilterTab !== 'all' ? '#F97316' : QSAITheme.text.muted,
-                          border: "1px solid " + isTableFilterActive && selectedFilterTab !== 'all' ? 'rgba(249, 115, 22, 0.5)' : QSAITheme.border.light,
+                          border: `1px solid ${isTableFilterActive && selectedFilterTab !== 'all' ? 'rgba(249, 115, 22, 0.5)' : QSAITheme.border.light}`,
                           boxShadow: isTableFilterActive && selectedFilterTab !== 'all' ? '0 0 12px rgba(249, 115, 22, 0.3)' : 'none',
                         }}
                       >
@@ -1130,7 +1130,7 @@ export default function DineInFullReviewModal({
                       <SelectContent>
                         {allTableNumbers.map(tableNum => {
                           const itemCount = getItemCountForTable(tableNum);
-                          const tabId = "table-" + tableNum;
+                          const tabId = `table-${tableNum}`;
                           const isLinked = tableNum !== tableNumber;
 
                           return (
@@ -1162,7 +1162,7 @@ export default function DineInFullReviewModal({
                             ? 'rgba(168, 85, 247, 0.2)'
                             : 'rgba(255, 255, 255, 0.05)',
                           color: isCustomerTabFilterActive ? '#A855F7' : QSAITheme.text.muted,
-                          border: "1px solid " + isCustomerTabFilterActive ? 'rgba(168, 85, 247, 0.5)' : QSAITheme.border.light,
+                          border: `1px solid ${isCustomerTabFilterActive ? 'rgba(168, 85, 247, 0.5)' : QSAITheme.border.light}`,
                           boxShadow: isCustomerTabFilterActive ? '0 0 12px rgba(168, 85, 247, 0.3)' : 'none',
                         }}
                       >
@@ -1203,8 +1203,8 @@ export default function DineInFullReviewModal({
                       <div
                         className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
                         style={{
-                          background: "rgba(91, 33, 182, 0.1)",
-                          border: "2px solid rgba(91, 33, 182, 0.3)",
+                          background: `rgba(91, 33, 182, 0.1)`,
+                          border: `2px solid rgba(91, 33, 182, 0.3)`,
                         }}
                       >
                         <ClipboardList className="h-8 w-8" style={{ color: QSAITheme.purple.primary }} />
@@ -1222,8 +1222,8 @@ export default function DineInFullReviewModal({
                         onClick={onClose}
                         className="mt-4"
                         style={{
-                          background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
-                          border: "1px solid " + QSAITheme.purple.light
+                          background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
+                          border: `1px solid ${QSAITheme.purple.light}`
                         }}
                       >
                         Close
@@ -1239,7 +1239,7 @@ export default function DineInFullReviewModal({
                         className="rounded-lg p-4"
                         style={{
                           background: QSAITheme.background.tertiary,
-                          border: "1px solid " + QSAITheme.border.medium,
+                          border: `1px solid ${QSAITheme.border.medium}`,
                         }}
                       >
                         <Skeleton
@@ -1309,7 +1309,7 @@ export default function DineInFullReviewModal({
                               className="w-full flex items-center justify-between px-4 py-3 rounded-lg mb-2 transition-all hover:bg-white/5"
                               style={{
                                 background: 'rgba(91, 33, 182, 0.08)',
-                                border: "1px solid " + QSAITheme.border.accent,
+                                border: `1px solid ${QSAITheme.border.accent}`,
                               }}
                             >
                               <div className="flex items-center gap-3">
