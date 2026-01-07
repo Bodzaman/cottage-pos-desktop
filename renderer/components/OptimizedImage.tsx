@@ -92,23 +92,8 @@ export function OptimizedImage({
   onError,
   loading = 'lazy'
 }: OptimizedImageProps) {
-  // DEBUG: Log all incoming props
-  console.log('🔍 [OptimizedImage] Props received:', {
-    alt,
-    variant,
-    preset,
-    hasWebpUrl: !!webpUrl,
-    hasJpegUrl: !!jpegUrl,
-    hasFallbackUrl: !!fallbackUrl,
-    hasMetadata: !!metadata,
-    hasImageVariants: !!image_variants,
-    image_variants: image_variants
-  });
-
   // Use preset as alias for variant if provided
   const effectiveVariant = variant || (preset === 'card' ? 'square' : preset) || 'square';
-  
-  console.log('🎯 [OptimizedImage] Effective variant:', effectiveVariant);
   
   // Extract URLs from metadata if provided
   let effectiveWebpUrl = webpUrl;
@@ -117,11 +102,9 @@ export function OptimizedImage({
   // Priority 1: Check image_variants prop (new format)
   if (image_variants && typeof image_variants === 'object') {
     const variantData = image_variants[effectiveVariant as keyof typeof image_variants];
-    console.log('📦 [OptimizedImage] Variant data extracted:', variantData);
     if (variantData) {
       effectiveWebpUrl = effectiveWebpUrl || variantData.webp || undefined;
       effectiveJpegUrl = effectiveJpegUrl || variantData.jpeg || undefined;
-      console.log('✅ [OptimizedImage] URLs from image_variants:', { effectiveWebpUrl, effectiveJpegUrl });
     }
   }
   
