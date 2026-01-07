@@ -124,17 +124,17 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
     fetchItems();
 
     // Subscribe to real-time updates for items
-    console.log("[useCustomerTabs] 🔌 Creating items subscription for table " + tableNumber);
+    console.log(`[useCustomerTabs] 🔌 Creating items subscription for table ${tableNumber}`);
     
     const itemsSubscription = supabase
-      .channel("dine_in_order_items:" + tableNumber)
+      .channel(`dine_in_order_items:${tableNumber}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'dine_in_order_items',
-          filter: "table_number=eq." + tableNumber
+          filter: `table_number=eq.${tableNumber}`
         },
         (payload) => {
           console.log('[useCustomerTabs] 🔔 ITEMS Real-time callback triggered!', payload);
@@ -154,11 +154,11 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
         }
       )
       .subscribe((status) => {
-        console.log("[useCustomerTabs] 📡 Items subscription status: " + status);
+        console.log(`[useCustomerTabs] 📡 Items subscription status: ${status}`);
       });
 
     return () => {
-      console.log("[useCustomerTabs] 🔌 Unsubscribing from items for table " + tableNumber);
+      console.log(`[useCustomerTabs] 🔌 Unsubscribing from items for table ${tableNumber}`);
       supabase.removeChannel(itemsSubscription);
     };
   }, [supabaseReady, tableNumber]);
@@ -247,17 +247,17 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
     fetchTabs();
 
     // Subscribe to real-time updates
-    console.log("[useCustomerTabs] 🔌 Creating subscription for table " + tableNumber);
+    console.log(`[useCustomerTabs] 🔌 Creating subscription for table ${tableNumber}`);
     
     const subscription = supabase
-      .channel("customer_tabs:" + tableNumber)
+      .channel(`customer_tabs:${tableNumber}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'customer_tabs',
-          filter: "table_number=eq." + tableNumber
+          filter: `table_number=eq.${tableNumber}`
         },
         (payload) => {
           console.log('[useCustomerTabs] 🔔 Real-time callback triggered!', payload);
@@ -291,22 +291,22 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
         }
       )
       .subscribe((status) => {
-        console.log("[useCustomerTabs] 📡 Subscription status changed: " + status);
+        console.log(`[useCustomerTabs] 📡 Subscription status changed: ${status}`);
         if (status === 'SUBSCRIBED') {
-          console.log("[useCustomerTabs] ✅ Successfully subscribed to table " + tableNumber);
+          console.log(`[useCustomerTabs] ✅ Successfully subscribed to table ${tableNumber}`);
         } else if (status === 'CHANNEL_ERROR') {
-          console.error("[useCustomerTabs] ❌ Channel error for table " + tableNumber);
+          console.error(`[useCustomerTabs] ❌ Channel error for table ${tableNumber}`);
           setError(new Error('Real-time subscription failed'));
         } else if (status === 'TIMED_OUT') {
-          console.error("[useCustomerTabs] ⏱️ Subscription timed out for table " + tableNumber);
+          console.error(`[useCustomerTabs] ⏱️ Subscription timed out for table ${tableNumber}`);
           setError(new Error('Real-time subscription timed out'));
         }
       });
 
-    console.log("[useCustomerTabs] 🎯 Subscription object created:", subscription);
+    console.log(`[useCustomerTabs] 🎯 Subscription object created:`, subscription);
 
     return () => {
-      console.log("[useCustomerTabs] 🔌 Unsubscribing from table " + tableNumber);
+      console.log(`[useCustomerTabs] 🔌 Unsubscribing from table ${tableNumber}`);
       subscription.unsubscribe();
     };
   }, [tableNumber]);
