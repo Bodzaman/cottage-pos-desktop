@@ -1,164 +1,125 @@
 import { create } from 'zustand';
-import brain from 'brain';
-import { getDeviceFingerprint } from 'utils/deviceFingerprint';
-import { supabase } from 'utils/supabaseClient';
+import { persist } from 'zustand/middleware';
+import { supabase } from './supabaseClient';
 
-interface POSAuthState {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  email: string | null;
-  userId: string | null;
-  role: string | null;
-  profileImageUrl: string | null;
+interface POSStaffUser {
+  userId: string;
+  username: string;
+  fullName: string;
 }
 
-interface POSAuthActions {
-  checkAuthStatus: () => Promise<void>;
-  login: (email: string, options?: { userId?: string; role?: string; session?: any }) => void;
-  logout: () => Promise<void>;
+interface POSAuthStore {
+  user: POSStaffUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  
+  // Actions
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 /**
- * Zustand store for POS authentication.
- * This is a SINGLETON - all components share the same state instance.
+ * Zustand store for POS staff authentication.
+ * Uses username/password with server-side bcrypt validation via pos_staff_login RPC.
+ * Session persists across page reloads.
  */
-export const usePOSAuth = create<POSAuthState & POSAuthActions>((set, get) => ({
-  // State
-  isAuthenticated: false,
-  isLoading: true,
-  email: null,
-  userId: null,
-  role: null,
-  profileImageUrl: null,
+export const usePOSAuth = create<POSAuthStore>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
 
-  // Actions
-  checkAuthStatus: async () => {
-    try {
-      set({ isLoading: true });
-      
-      // Step 1: Check if device is trusted (skip login flow)
-      const deviceFingerprint = getDeviceFingerprint();
-      const userIdFromStorage = localStorage.getItem('pos_user_id');
-      
-      if (userIdFromStorage) {
-        try {
-          const deviceCheckResponse = await brain.check_user_trusted_device({
-            user_id: userIdFromStorage,
-            device_fingerprint: deviceFingerprint,
-          });
-          const deviceData = await deviceCheckResponse.json();
-          
-          if (deviceData.is_trusted) {
-            // Device is trusted, check if Supabase session is still valid
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session && session.user.id === userIdFromStorage) {
-              // Valid session + trusted device, verify POS access
-              const accessResponse = await brain.check_pos_access({
-                user_id: session.user.id,
-              });
-              const accessData = await accessResponse.json();
-              
-              if (accessData.has_access) {
-                // Fetch profile image
-                let profileImageUrl: string | null = null;
-                try {
-                  const imageResponse = await brain.get_profile_image({ userId: session.user.id });
-                  const imageData = await imageResponse.json();
-                  if (imageData.success && imageData.image_url) {
-                    profileImageUrl = imageData.image_url;
-                  }
-                } catch (err) {
-                  console.log('No profile image found');
-                }
-                
-                set({
-                  isAuthenticated: true,
-                  isLoading: false,
-                  email: session.user.email || null,
-                  userId: session.user.id,
-                  role: accessData.role || null,
-                  profileImageUrl,
-                });
-                return;
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Device trust check failed:', err);
-        }
-      }
-      
-      // Step 2: No trusted device, check Supabase session only
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Verify user has POS access
-        const accessResponse = await brain.check_pos_access({
-          user_id: session.user.id,
-        });
-        const accessData = await accessResponse.json();
+      login: async (username: string, password: string) => {
+        set({ isLoading: true });
         
-        if (accessData.has_access) {
-          // Fetch profile image
-          let profileImageUrl: string | null = null;
-          try {
-            const imageResponse = await brain.get_profile_image({ userId: session.user.id });
-            const imageData = await imageResponse.json();
-            if (imageData.success && imageData.image_url) {
-              profileImageUrl = imageData.image_url;
-            }
-          } catch (err) {
-            console.log('No profile image found');
+        try {
+          // Call RPC for secure server-side validation with bcrypt
+          const { data, error } = await supabase.rpc('pos_staff_login', {
+            p_username: username,
+            p_password: password
+          });
+
+          if (error) {
+            console.error('Login RPC error:', error);
+            throw new Error('Login failed. Please try again.');
           }
+
+          if (!data || data.length === 0) {
+            throw new Error('Invalid username or password');
+          }
+
+          const user = data[0];
           
           set({
+            user: {
+              userId: user.user_id,
+              username: user.username,
+              fullName: user.full_name
+            },
             isAuthenticated: true,
-            isLoading: false,
-            email: session.user.email || null,
-            userId: session.user.id,
-            role: accessData.role || null,
-            profileImageUrl,
+            isLoading: false
           });
-          return;
+        } catch (error) {
+          set({ isLoading: false, isAuthenticated: false, user: null });
+          throw error;
+        }
+      },
+
+      logout: () => {
+        set({ user: null, isAuthenticated: false });
+      },
+
+      changePassword: async (currentPassword: string, newPassword: string) => {
+        const { user } = get();
+        if (!user) {
+          throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase.rpc('pos_staff_change_password', {
+          p_user_id: user.userId,
+          p_current_password: currentPassword,
+          p_new_password: newPassword
+        });
+
+        if (error) {
+          console.error('Change password error:', error);
+          throw new Error(error.message || 'Failed to change password');
         }
       }
-      
-      // No valid auth
-      set({ isAuthenticated: false, isLoading: false, email: null, userId: null, role: null, profileImageUrl: null });
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      set({ isAuthenticated: false, isLoading: false, email: null, userId: null, role: null, profileImageUrl: null });
+    }),
+    {
+      name: 'pos-auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated
+      })
     }
-  },
+  )
+);
 
-  login: (email: string, options?: { userId?: string; role?: string; session?: any }) => {
-    if (options?.userId) {
-      localStorage.setItem('pos_user_id', options.userId);
-    }
-    set({ 
-      isAuthenticated: true, 
-      isLoading: false, 
-      email,
-      userId: options?.userId || null,
-      role: options?.role || null,
-      profileImageUrl: null, // Will be fetched by checkAuthStatus
-    });
-  },
+/**
+ * Hook version for backwards compatibility and easier consumption.
+ * Returns all auth state and actions.
+ */
+export function usePOSAuthHook() {
+  const user = usePOSAuth(state => state.user);
+  const isAuthenticated = usePOSAuth(state => state.isAuthenticated);
+  const isLoading = usePOSAuth(state => state.isLoading);
+  const login = usePOSAuth(state => state.login);
+  const logout = usePOSAuth(state => state.logout);
+  const changePassword = usePOSAuth(state => state.changePassword);
 
-  logout: async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.removeItem('pos_user_id');
-      set({ isAuthenticated: false, isLoading: false, email: null, userId: null, role: null, profileImageUrl: null });
-    } catch (error) {
-      console.error('Logout failed:', error);
-      // Force clear state even if signOut fails
-      localStorage.removeItem('pos_user_id');
-      set({ isAuthenticated: false, isLoading: false, email: null, userId: null, role: null, profileImageUrl: null });
-    }
-  },
-}));
-
-// Initialize auth check on store creation
-usePOSAuth.getState().checkAuthStatus();
+  return {
+    user,
+    userId: user?.userId,
+    username: user?.username,
+    fullName: user?.fullName,
+    isAuthenticated,
+    isLoading,
+    login,
+    logout,
+    changePassword
+  };
+}
