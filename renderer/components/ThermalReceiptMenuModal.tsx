@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
-import { AppApisTableOrdersOrderItem, AppApisMenuManagementMenuItem, AppApisMenuManagementCategory } from 'brain/data-contracts';
+import { Loader2 } from 'lucide-react';
+import { AppApisTableOrdersOrderItem } from 'types';
+import { MenuItem, Category } from 'utils/menuTypes';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { CustomizeOrchestratorProvider } from 'components/CustomizeOrchestrator';
 import DineInCategoryList from 'components/DineInCategoryList';
-import DineInMenuGrid from 'components/DineInMenuGrid';
+import { POSMenuSelector } from 'components/POSMenuSelector';
 import ThermalReceiptOrderSummary from 'components/ThermalReceiptOrderSummary';
 import { toast } from 'sonner';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
@@ -257,8 +258,9 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
                   </div>
                 </div>
               ) : (
-                <DineInMenuGrid
-                  selectedCategory={selectedCategory}
+                <POSMenuSelector
+                  selectedCategoryId={selectedCategory}
+                  onCategorySelect={setSelectedCategory}
                   onAddToOrder={handleOrchestratorSave}
                 />
               )}
