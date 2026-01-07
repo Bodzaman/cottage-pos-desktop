@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { CustomerData, OrderType } from './customerTypes';
+import type { CustomerData } from './customerTypes';
+import type { OrderType } from './masterTypes';
 
 interface CustomerDataStore {
   customerData: CustomerData;
