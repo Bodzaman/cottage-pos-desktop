@@ -26,7 +26,7 @@ export const formatCurrency = (amount: number, showSymbol: boolean = true): stri
  * @returns Formatted percentage string
  */
 export const formatPercentage = (value: number, decimals: number = 1): string => {
-  return `${(value * 100).toFixed(decimals)}%`;
+  return (value * 100).toFixed(decimals) + "%";
 };
 
 /**
@@ -63,12 +63,12 @@ export const formatPhoneNumber = (phone: string): string => {
   
   // Format UK mobile numbers
   if (cleaned.length === 11 && cleaned.startsWith('07')) {
-    return `${cleaned.slice(0, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+    return cleaned.slice(0, 5) + " " + cleaned.slice(5, 8) + " " + cleaned.slice(8);
   }
   
   // Format UK landline numbers
   if (cleaned.length === 11 && cleaned.startsWith('01')) {
-    return `${cleaned.slice(0, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+    return cleaned.slice(0, 5) + " " + cleaned.slice(5, 8) + " " + cleaned.slice(8);
   }
   
   // Return original if no formatting rule matches
@@ -121,5 +121,5 @@ export const snakeToTitleCase = (str: string): string => {
  * @returns Formatted order code
  */
 export const formatOrderCode = (id: string | number, prefix: string = 'ORD'): string => {
-  return `${prefix}-${String(id).padStart(4, '0')}`;
+  return prefix + "-" + String(id).padStart(4, '0');
 };
