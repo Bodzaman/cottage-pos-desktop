@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Loader2, Search, CheckCircle, AlertCircle, Navigation, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -8,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { globalColors } from 'utils/QSAIDesign';
 import { useGoogleMaps } from 'utils/googleMapsProvider';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -94,7 +91,7 @@ export const GooglePlacesAutocompleteEnhanced: React.FC<Props> = ({
   // NEW: Delivery validation function
   const validateDeliveryAddress = async (address: ExtractedAddress): Promise<{valid: boolean, message: string, distance?: number, reason?: string}> => {
     try {
-      const response = await brain.validate_delivery_postcode({
+      const response = await apiClient.validate_delivery_postcode({
         postcode: address.postal_code,
         order_value: orderValue
       });
@@ -454,7 +451,7 @@ export const GooglePlacesAutocompleteEnhanced: React.FC<Props> = ({
       setError(null);
       
       // Use our existing geocoding API
-      const response = await brain.geocode({
+      const response = await apiClient.geocode({
         locationName: address.trim()
       });
       
