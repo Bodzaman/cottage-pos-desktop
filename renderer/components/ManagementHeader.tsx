@@ -27,7 +27,7 @@ import MenuManagementDialog from "./MenuManagementDialog";
 import AllOrdersModal from "./AllOrdersModal";
 import SearchResultsDropdown from "./SearchResultsDropdown";
 import { OrderDetailDialog } from "./OrderDetailDialog";
-import brain from "brain";
+import { apiClient } from "app";
 import { OrderModel } from "types";
 import { usePOSAuth } from "../utils/usePOSAuth";
 import { AvatarDropdown } from "./AvatarDropdown";
@@ -61,7 +61,7 @@ export const ManagementHeader: React.FC<Props> = ({
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
   
   // Get auth info for dropdown
-  const { email, role, profileImageUrl } = usePOSAuth();
+  const { user, isAuthenticated } = usePOSAuth();
   
   // Order search state (replacing menu search)
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +90,7 @@ export const ManagementHeader: React.FC<Props> = ({
           if (query.length >= 2) {
             setIsSearching(true);
             try {
-              const response = await brain.get_orders({
+              const response = await apiClient.get_orders({
                 page: 1,
                 page_size: 20,
                 search: query
@@ -321,40 +321,41 @@ export const ManagementHeader: React.FC<Props> = ({
           </div>
           
           {/* Admin Button with Dropdown */}
-          {email && (
-            <AvatarDropdown
-              email={email}
-              role={role}
-              profileImageUrl={profileImageUrl}
-              onLogout={handleLogout}
-              onAdminClick={() => setShowPasswordDialog(true)}
-              trigger={
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="relative text-gray-400 hover:text-white flex items-center gap-2 transition-all duration-300 px-4 py-2 font-medium"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)',
-                    border: '1px solid rgba(124, 93, 250, 0.3)',
-                    borderRadius: '0.75rem',
-                    boxShadow: '0 2px 10px rgba(124, 93, 250, 0.1)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.25) 0%, rgba(124, 93, 250, 0.15) 100%)';
-                    e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.5)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(124, 93, 250, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)';
-                    e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.3)';
-                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(124, 93, 250, 0.1)';
-                  }}
-                >
-                  <Shield className="h-4 w-4" />
-                  <span>Admin</span>
-                </Button>
-              }
-            />
+          {isAuthenticated && user && (
+            <>
+              <AvatarDropdown
+                username={user.username}
+                fullName={user.fullName}
+                onLogout={handleLogout}
+                onAdminClick={() => setShowPasswordDialog(true)}
+                trigger={
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="relative text-gray-400 hover:text-white flex items-center gap-2 transition-all duration-300 px-4 py-2 font-medium"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)',
+                      border: '1px solid rgba(124, 93, 250, 0.3)',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 2px 10px rgba(124, 93, 250, 0.1)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.25) 0%, rgba(124, 93, 250, 0.15) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.5)';
+                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(124, 93, 250, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(124, 93, 250, 0.3)';
+                      e.currentTarget.style.boxShadow = '0 2px 10px rgba(124, 93, 250, 0.1)';
+                    }}
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Admin</span>
+                  </Button>
+                }
+              />
+            </>
           )}
         </div>
       </div>
