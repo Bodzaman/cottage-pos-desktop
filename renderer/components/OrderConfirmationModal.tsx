@@ -22,7 +22,7 @@ import {
 import { motion } from 'framer-motion';
 import { globalColors as QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { safeCurrency } from '../utils/numberUtils';
-import { AppApisTableOrdersOrderItem } from 'brain/data-contracts';
+import { AppApisTableOrdersOrderItem } from 'types';
 import cn from 'classnames';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 
