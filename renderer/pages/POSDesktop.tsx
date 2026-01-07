@@ -1,14 +1,4 @@
-
-
-
-
-
-
-
-
-
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // External library imports
@@ -16,7 +6,7 @@ import { toast } from 'sonner';
 import { shallow } from 'zustand/shallow';
 
 // Databutton imports
-import brain from 'brain';
+import { supabase } from 'utils/supabaseClient';
 
 // Store imports
 import { useSimpleAuth } from '../utils/simple-auth-context';
@@ -32,6 +22,11 @@ import { usePOSOrderStore } from 'utils/posOrderStore';
 import { usePOSCustomerStore } from 'utils/posCustomerStore';
 import { usePOSUIStore } from 'utils/posUIStore';
 import { usePOSCustomerIntelligence } from 'utils/usePOSCustomerIntelligence';
+
+// NEW: Event-driven architecture hooks for DINE-IN mode
+import { useDineInOrder } from 'utils/useDineInOrder';
+import { useRestaurantTables } from 'utils/useRestaurantTables';
+import { useCustomerTabs } from 'utils/useCustomerTabs';
 
 // Enhanced image preloading imports
 import { useImagePreloader } from '../utils/useImagePreloader';
@@ -64,14 +59,14 @@ import { POSCustomerIntelligencePanel } from '../components/POSCustomerIntellige
 import { OrderCustomerCard } from '../components/OrderCustomerCard';
 import { CustomerDetailsModal } from 'components/CustomerDetailsModal';
 import { CustomerOrderHistoryModal } from 'components/CustomerOrderHistoryModal';
-import { POSGuestCountModalClean } from 'components/POSGuestCountModalClean';
-import { DineInOrderModal } from 'components/DineInOrderModal';
+import { POSGuestCountModal } from 'components/POSGuestCountModal';
+import DineInOrderModal from 'components/DineInOrderModal';
 import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal';
 import { DineInBillPreviewModal } from 'components/DineInBillPreviewModal';
 import ManagementPasswordDialog from 'components/ManagementPasswordDialog';
 import MenuManagementDialog from '../components/MenuManagementDialog';
 import AllOrdersModal from '../components/AllOrdersModal';
-import { CustomizeOrchestrator, CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
+import { CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
 import { POSFooter } from 'components/POSFooter';
 import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
@@ -84,9 +79,10 @@ import { OnlineOrderManagement } from 'components/OnlineOrderManagement';
 import { ReservationsPlaceholder } from 'components/ReservationsPlaceholder';
 
 // Utility imports
-import { MenuCategory, MenuItem, OrderItem, ModifierSelection } from '../utils/menuTypes';
-import { CustomerData } from '../utils/customerDataStore';
-import { TipSelection, PaymentResult } from '../utils/menuTypes';
+import { Category, MenuItem, OrderItem, ModifierSelection } from '../utils/menuTypes';
+import { CustomerData } from '../utils/customerTypes';
+import { TipSelection } from '../components/POSTipSelector';
+import { PaymentResult } from '../utils/menuTypes';
 import { FIXED_SECTIONS, type SectionId, filterItemsBySection } from 'utils/sectionMapping';
 import { usePOSSettingsWithAutoFetch } from '@/utils/posSettingsStore';
 
@@ -107,44 +103,6 @@ import { Button } from '@/components/ui/button';
 // TYPES
 // ============================================================================
 
-// REMOVED: No longer needed - state now managed by focused stores
-// interface POSState {
-//   // View Management
-//   activeView: string;
-//   previousView: string;
-  
-//   // Order Management
-//   orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
-//   selectedTableNumber: number | null;
-//   guestCount: number;
-//   orderItems: OrderItem[];
-  
-//   // Customer Information
-//   customerData: {
-//     firstName: string;
-//     lastName: string;
-//     phone: string;
-//     email: string;
-//     notes: string;
-//     tableNumber: string;
-//     guestCount: number;
-//     address: string;
-//     street: string;
-//     city: string;
-//     postcode: string;
-//     deliveryNotes: string;
-//   };
-  
-//   // UI State
-//   showCustomerModal: boolean;
-//   showVariantSelector: boolean;
-//   pendingOrderConfirmation: boolean;
-//   showGuestCountModal: boolean;
-//   showDineInModal: boolean;
-//   showPaymentFlow: boolean; // NEW: Single payment flow state
-//   showSessionRestoreDialog: boolean;
-// }
-
 /**
  * POSDesktop - Professional Point of Sale interface
  * Clean, production-ready implementation for restaurant operations
@@ -152,11 +110,6 @@ import { Button } from '@/components/ui/button';
  * PROTECTED ROUTE: Requires authentication via /pos-login
  */
 export default function POSDesktop() {
-  // 🔍 DIAGNOSTIC LOGGING - Capture render trigger source
-  const renderTimestamp = Date.now();
-  console.log('🔄 [POSDesktop] Component render', { timestamp: renderTimestamp });
-  console.trace('🔍 [POSDesktop] Render call stack');
-
   // ✅ Development check for console log guards
   const isDev = import.meta.env.DEV;
   
@@ -173,14 +126,27 @@ export default function POSDesktop() {
   useSimpleAuth();
   
   const { 
+    user,
     isAuthenticated, 
-    isLoading: authLoading, 
-    email, 
-    userId,
-    role,
-    profileImageUrl,
+    isLoading: authLoading,
     logout 
   } = usePOSAuth();
+
+  // ============================================================================
+  // AUTHENTICATION GUARD - PHASE 7
+  // ============================================================================
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.log('[POSDesktop] User not authenticated, redirecting to /pos-login');
+      navigate('/pos-login', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Show nothing while checking authentication
+  if (authLoading || !isAuthenticated) {
+    return null;
+  }
 
   const hasRedirectedRef = useRef(false);
   
@@ -222,21 +188,336 @@ export default function POSDesktop() {
   const orderStore = usePOSOrderStore();
   const customerStore = usePOSCustomerStore();
   const uiStore = usePOSUIStore();
+  
+  // Access tableOrdersStore for DINE-IN mode
+  const persistedTableOrders = useTableOrdersStore((state) => state.persistedTableOrders);
 
-  // ✅ FIXED: Use selective subscriptions instead of destructuring entire stores
-  // Only subscribe to the exact fields we need to prevent unnecessary re-renders
+  // ============================================================================
+  // EVENT-DRIVEN HOOKS FOR DINE-IN MODE (Phase 3.3)
+  // ============================================================================
+  // NEW: Real-time hooks for event-driven architecture (DINE-IN only)
+  // Only active when orderType === 'DINE-IN'
+  const { tables: restaurantTables, loading: tablesLoading, refetch: refetchTables } = useRestaurantTables();
+  
+  // ✅ PHASE B: Resolve table_number → UUID for useDineInOrder
+  const selectedTableUuid = useMemo(() => {
+    if (orderStore.orderType !== 'DINE-IN' || !orderStore.selectedTableNumber) {
+      return null;
+    }
+    
+    // Find table by table_number (stored as string in database)
+    const table = restaurantTables.find(
+      t => t.table_number === orderStore.selectedTableNumber.toString()
+    );
+    
+    const tableId = table?.id || null;
+    
+    console.log('[POSDesktop] 🔍 Table UUID Resolution:', {
+      selectedTableNumber: orderStore.selectedTableNumber,
+      foundTable: table,
+      resolvedTableId: tableId
+    });
+    
+    return tableId;
+  }, [orderStore.orderType, orderStore.selectedTableNumber, restaurantTables]);
+
+  // ✅ PHASE 7.2: Calculate linked table context for DineInOrderModal
+  const linkedTableContext = useMemo(() => {
+    if (orderStore.orderType !== 'DINE-IN' || !orderStore.selectedTableNumber) {
+      return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    }
+
+    const selectedTable = restaurantTables.find(
+      t => parseInt(t.table_number) === orderStore.selectedTableNumber
+    );
+
+    if (!selectedTable) {
+      return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    }
+
+    const isLinked = selectedTable.is_linked_table || selectedTable.is_linked_primary;
+    
+    if (!isLinked || !selectedTable.linked_with_tables || selectedTable.linked_with_tables.length === 0) {
+      return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    }
+
+    // Calculate linked table numbers and total capacity
+    const linkedTableNumbers = selectedTable.linked_with_tables;
+    const isPrimaryTable = selectedTable.is_linked_primary || false;
+    
+    // Get all linked tables to calculate total capacity
+    const linkedTableObjects = restaurantTables.filter(
+      t => linkedTableNumbers.includes(parseInt(t.table_number))
+    );
+    
+    const totalLinkedCapacity = selectedTable.capacity + 
+      linkedTableObjects.reduce((sum, t) => sum + (t.capacity || 0), 0);
+
+    if (isDev) console.log('[POSDesktop] 🔗 Linked table context:', {
+      selectedTableNumber: orderStore.selectedTableNumber,
+      linkedTableNumbers,
+      isPrimaryTable,
+      totalLinkedCapacity
+    });
+
+    return { linkedTableNumbers, isPrimaryTable, totalLinkedCapacity };
+  }, [orderStore.orderType, orderStore.selectedTableNumber, restaurantTables, isDev]);
+
+  // 🚀 EVENT-DRIVEN ARCHITECTURE: useDineInOrder hook
+  const {
+    order: dineInOrder, 
+    loading: dineInOrderLoading,
+    error: dineInError,
+    enrichedItems: dineInEnrichedItems,
+    enrichedLoading: dineInEnrichedLoading,
+    enrichedError: dineInEnrichedError,
+    createOrder,
+    addItem: addItemToDineIn,
+    removeItem: removeItemFromDineIn,
+    updateItemQuantity,
+    sendToKitchen: sendDineInToKitchen,
+    requestCheck: requestDineInCheck,
+    updateGuestCount
+  } = useDineInOrder(selectedTableUuid);
+
+  // ✅ FIX: Track latest dineInOrder value in ref to avoid stale closure in polling loops
+  const dineInOrderRef = useRef(dineInOrder);
+
+  // Keep ref synchronized with latest order state
+  useEffect(() => {
+    dineInOrderRef.current = dineInOrder;
+  }, [dineInOrder]);
+
+  // ✅ DEBUG: Log tableId calculation
+  useEffect(() => {
+    const tableId = orderStore.orderType === 'DINE-IN' && orderStore.selectedTableNumber 
+      ? restaurantTables.find(t => t.table_number === orderStore.selectedTableNumber.toString())?.id || null
+      : null;
+    
+    console.log('[POSDesktop] 🔍 DEBUG tableId calculation:', {
+      orderType: orderStore.orderType,
+      selectedTableNumber: orderStore.selectedTableNumber,
+      restaurantTablesCount: restaurantTables.length,
+      restaurantTables: restaurantTables.map(t => ({ id: t.id, table_number: t.table_number })),
+      searchingFor: orderStore.selectedTableNumber?.toString(),
+      foundTable: restaurantTables.find(t => t.table_number === orderStore.selectedTableNumber?.toString()),
+      calculatedTableId: tableId
+    });
+  }, [orderStore.orderType, orderStore.selectedTableNumber, restaurantTables]);
+
+  // NEW: Customer tabs hook for DINE-IN bill splitting
+  const {
+    customerTabs: customerTabsData,
+    activeTabId,
+    setActiveTabId,
+    loading: tabsLoading,
+    error: tabsError,
+    createTab,
+    addItemsToTab,
+    renameTab,
+    closeTab,
+    splitTab,
+    mergeTabs,
+    moveItemsBetweenTabs
+  } = useCustomerTabs(
+    orderStore.orderType === 'DINE-IN' && orderStore.selectedTableNumber
+      ? orderStore.selectedTableNumber
+      : null
+  );
+
+  // ============================================================================
+  // 🚀 PHASE 1: STAGING STATE MANAGEMENT (MYA-1615)
+  // ============================================================================
+
+  // 🚀 CLEAN STAGING ARCHITECTURE (MYA-1615 Phase 1)
+  // 
+  // ARCHITECTURAL PATTERN: Separation of Staging (Ephemeral) vs Database (Persistent)
+  // 
+  // STATE MANAGEMENT:
+  // - dineInStagingItems: Ephemeral cart (managed here at POSDesktop level)
+  // - dineInOrder.items: Persistent database items (managed by useDineInOrder hook)
+  // 
+  // DATA FLOW:
+  // 1. Staff adds items in DineInOrderModal → addToStagingCart() → dineInStagingItems grows
+  // 2. Staff clicks "Save Order" → persistStagingCart() → Calls backend for each item
+  // 3. Backend persists to database → dineInOrder.items updates (real-time)
+  // 4. Staging cart CLEARS → setDineInStagingItems([]) → Ready for next batch
+  // 5. Staff opens "Review Order" → DineInFullReviewModal shows dineInOrder.items
+  // 
+  // MODAL RESPONSIBILITIES:
+  // - DineInOrderModal: Receives stagingItems, displays ONLY staging (adding interface)
+  // - DineInFullReviewModal: Receives dineInOrder.items, displays ONLY database (management interface)
+  // - POSDesktop: Orchestrates both, maintains single source of truth for each
+  // 
+  // WHY THIS PATTERN:
+  // - Clear separation between "unsaved" (staging) and "saved" (database) items
+  // - Prevents confusion in UI (cart clears after save = fresh slate)
+  // - Clean one-way data flow (staging → persist → database → review)
+  // - No modal-to-modal communication (parent orchestrates all state)
+  const [dineInStagingItems, setDineInStagingItems] = useState<OrderItem[]>([]);
+
+  // Handler: Add item to staging cart
+  const addToStagingCart = useCallback((item: OrderItem) => {
+    console.log('[POSDesktop] ➕ Adding item to staging cart:', item.name);
+    setDineInStagingItems(prev => [...prev, item]);
+  }, []);
+
+  // Handler: Remove item from staging cart
+  const removeFromStagingCart = useCallback((itemId: string) => {
+    console.log('[POSDesktop] 🗑️ Removing item from staging cart:', itemId);
+    setDineInStagingItems(prev => prev.filter(item => item.id !== itemId));
+  }, []);
+
+  // Handler: Clear staging cart (after save or cancel)
+  const clearStagingCart = useCallback(() => {
+    console.log('[POSDesktop] 🧹 Clearing staging cart');
+    setDineInStagingItems([]);
+  }, []);
+
+  // Handler: Persist staging items to database
+  const persistStagingCart = useCallback(async () => {
+    console.log('[POSDesktop] 💾 PERSIST STAGING CART CALLED:', {
+      timestamp: new Date().toISOString(),
+      stagingItemsCount: dineInStagingItems.length,
+      selectedTableUuid,
+      selectedTableNumber: orderStore.selectedTableNumber,
+      orderType: orderStore.orderType,
+      restaurantTablesCount: restaurantTables.length,
+      hasOrder: !!dineInOrderRef.current,
+      orderId: dineInOrderRef.current?.id,
+      CRITICAL_CHECK: {
+        hasUUID: !!selectedTableUuid,
+        hasTableNumber: !!orderStore.selectedTableNumber,
+        hasRestaurantTables: restaurantTables.length > 0,
+        hasOrder: !!dineInOrderRef.current,
+        WARNING: !selectedTableUuid ? '⚠️ PERSIST CALLED WITH NULL UUID!' : null
+      }
+    });
+
+    if (dineInStagingItems.length === 0) {
+      console.log('[POSDesktop] ⚠️ No staging items to persist');
+      return false;
+    }
+
+    // ✅ FIX: Wait for order to exist (handles real-time subscription lag)
+    // Use ref.current to access latest order state, not stale closure variable
+    if (!dineInOrderRef.current) {
+      console.log('[POSDesktop] ⏳ Order not loaded yet, waiting for real-time subscription...');
+      
+      const maxWait = 3000; // 3 seconds timeout
+      const startTime = Date.now();
+      const pollInterval = 100; // Check every 100ms
+      
+      // ✅ DIAGNOSTIC: Track polling attempts
+      let pollAttempts = 0;
+      
+      // ✅ FIX: Poll ref.current instead of closure variable dineInOrder
+      while (!dineInOrderRef.current && (Date.now() - startTime < maxWait)) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        pollAttempts++;
+        console.log('[POSDesktop] ⏳ Still waiting for order...', {
+          pollAttempt: pollAttempts,
+          elapsed: Date.now() - startTime,
+          hasOrder: !!dineInOrderRef.current,
+          refValue: dineInOrderRef.current ? 'EXISTS' : 'NULL'
+        });
+      }
+      
+      // Check if order loaded
+      if (!dineInOrderRef.current) {
+        console.error('[POSDesktop] ❌ Timeout: Order not loaded after', maxWait, 'ms', {
+          totalPollAttempts: pollAttempts,
+          expectedPolls: maxWait / pollInterval
+        });
+        toast.error('Order not ready. Please wait a moment and try again.');
+        return false;
+      }
+      
+      console.log('[POSDesktop] ✅ Order loaded successfully:', {
+        orderId: dineInOrderRef.current.id,
+        waitTime: Date.now() - startTime,
+        pollAttempts,
+        orderStatus: dineInOrderRef.current.status,
+        itemsInOrder: dineInOrderRef.current.items?.length || 0
+      });
+    }
+
+    console.log('[POSDesktop] 💾 Persisting staging cart:', {
+      itemCount: dineInStagingItems.length,
+      items: dineInStagingItems.map(i => i.name),
+      orderId: dineInOrderRef.current.id,
+      orderStatus: dineInOrderRef.current.status
+    });
+
+    try {
+      // ✅ DIAGNOSTIC: Track persistence progress
+      const persistStartTime = Date.now();
+      let successCount = 0;
+      let failCount = 0;
+      
+      // Persist each staging item to database via addItemToDineIn
+      for (const item of dineInStagingItems) {
+        console.log('[POSDesktop] 📤 Calling addItemToDineIn with:', {
+          itemName: item.name,
+          selectedTableUuid,
+          hasUUID: !!selectedTableUuid,
+          orderId: dineInOrderRef.current.id,
+          itemNumber: successCount + failCount + 1,
+          totalItems: dineInStagingItems.length
+        });
+        
+        try {
+          await addItemToDineIn(item);
+          successCount++;
+          console.log('[POSDesktop] ✅ Item persisted:', item.name, `(${successCount}/${dineInStagingItems.length})`);
+        } catch (itemError) {
+          failCount++;
+          console.error('[POSDesktop] ❌ Failed to persist item:', item.name, itemError);
+          throw itemError; // Re-throw to trigger outer catch
+        }
+      }
+
+      const persistDuration = Date.now() - persistStartTime;
+      console.log('[POSDesktop] ✅ ALL ITEMS PERSISTED:', {
+        successCount,
+        failCount,
+        totalDuration: persistDuration,
+        avgTimePerItem: persistDuration / dineInStagingItems.length,
+        itemsPersisted: dineInStagingItems.map(i => i.name)
+      });
+
+      toast.success(`Saved ${dineInStagingItems.length} item(s) to order`);
+      
+      // Clear staging after successful save
+      setDineInStagingItems([]);
+      
+      console.log('[POSDesktop] ✅ Staging cart cleared - ready for next batch');
+      return true;
+    } catch (error) {
+      console.error('[POSDesktop] ❌ Failed to persist staging cart:', error);
+      toast.error('Failed to save items to order');
+      return false;
+    }
+  }, [dineInStagingItems, addItemToDineIn, selectedTableUuid, orderStore.selectedTableNumber, orderStore.orderType, restaurantTables.length]);
+  // ✅ FIX APPLIED: Removed dineInOrderRef.current from dependency array
+  // Refs should NEVER have .current in dependencies - they don't trigger re-renders
+  // The ref will always have the latest value when accessed inside the function
+  // ============================================================================
+  // LEGACY STORES (PRESERVED FOR WAITING/COLLECTION/DELIVERY MODES)
+  // ============================================================================
+
+  // ✅ PRESERVED: Store subscriptions still needed for WAITING/COLLECTION/DELIVERY modes
   const updateCustomer = usePOSCustomerStore(state => state.updateCustomer);
   const clearCustomer = usePOSCustomerStore(state => state.clearCustomer);
   const customerData = usePOSCustomerStore(state => state.customerData, shallow);
   
-  // For customerDataStore, only subscribe to methods we actually use
   const setCustomerData = useCustomerDataStore(state => state.setCustomerData);
   const clearCustomerData = useCustomerDataStore(state => state.clearCustomerData);
   const hasRequiredCustomerData = useCustomerDataStore(state => state.hasRequiredCustomerData);
   const setShowCustomerModal = useCustomerDataStore(state => state.setShowCustomerModal);
   const customerDataStoreData = useCustomerDataStore(state => state.customerData, shallow);
   
-  // Table orders from persistent store
+  // Table orders from persistent store (PRESERVED for other modes)
   const { 
     tableOrders: persistentTableOrders, 
     hasExistingOrders, 
@@ -247,7 +528,7 @@ export default function POSDesktop() {
     addItemsToTable,
     completeTableOrder
   } = tableOrdersStore;
-  
+
   // ============================================================================
   // SECTION & CATEGORY NAVIGATION STATE
   // ============================================================================
@@ -357,14 +638,44 @@ export default function POSDesktop() {
   
   // TABLE MANAGEMENT HANDLERS
   const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
-    if (isDev) console.log(`🍽️ [POSDesktop] handleTableSelect called: Table ${tableNumber}, Status: ${tableStatus}`);
+    console.log(`🍽️ [POSDesktop] handleTableSelect called: Table ${tableNumber}, Status: ${tableStatus}`);
+    console.log(`🔍 [POSDesktop] restaurantTables data:`, restaurantTables);
+    console.log(`🔍 [POSDesktop] restaurantTables count:`, restaurantTables.length);
     
-    if (tableStatus && tableStatus !== 'AVAILABLE') {
-      if (isDev) console.log(`🍽️ [POSDesktop] Table ${tableNumber} is ${tableStatus} - opening dine-in modal`);
+    // ✅ PHASE 7.1: Check if table is part of a linked group
+    const clickedTable = restaurantTables.find(t => parseInt(t.table_number) === tableNumber);
+    console.log(`🔍 [POSDesktop] clickedTable lookup result:`, clickedTable);
+    
+    const isLinkedTable = clickedTable?.is_linked_table || clickedTable?.is_linked_primary;
+    
+    console.log(`🔗 [POSDesktop] Linked table check:`, {
+      tableNumber,
+      isLinkedTable,
+      is_linked_table: clickedTable?.is_linked_table,
+      is_linked_primary: clickedTable?.is_linked_primary,
+      current_order_id: clickedTable?.current_order_id,
+      linked_with_tables: clickedTable?.linked_with_tables,
+      linked_table_group_id: clickedTable?.linked_table_group_id,
+      clickedTableFound: !!clickedTable
+    });
+    
+    // ✅ ARCHITECTURAL FIX: Linked tables ALWAYS open DineInOrderModal
+    if (isLinkedTable) {
+      // Linked table (with or without order) → Always open DineInOrderModal
+      console.log(`🔗 [POSDesktop] Linked table ${tableNumber} - opening dine-in modal (hasOrder: ${!!clickedTable?.current_order_id})`);
+      orderStore.setOrderType('DINE-IN');
+      orderStore.setSelectedTableNumber(tableNumber);
+      uiStore.setModal('showDineInModal', true);
+    } else if (tableStatus && tableStatus !== 'AVAILABLE') {
+      // ✅ Regular occupied table → Open DineInOrderModal
+      console.log(`🍽️ [POSDesktop] Table ${tableNumber} is ${tableStatus} - opening dine-in modal`);
+      orderStore.setOrderType('DINE-IN');
       orderStore.setSelectedTableNumber(tableNumber);
       uiStore.setModal('showDineInModal', true);
     } else {
-      if (isDev) console.log(`🍽️ [POSDesktop] Table ${tableNumber} selected (AVAILABLE) - opening guest count modal`);
+      // ✅ Regular available table → Open guest count modal
+      console.log(`🍽️ [POSDesktop] Table ${tableNumber} selected (AVAILABLE) - opening guest count modal`);
+      orderStore.setOrderType('DINE-IN');
       orderStore.setSelectedTableNumber(tableNumber);
       uiStore.setModal('showGuestCountModal', true);
     }
@@ -376,19 +687,74 @@ export default function POSDesktop() {
     };
 
     customerStore.updateCustomer(updatedCustomerData);
-  }, []);
+  }, [restaurantTables, orderStore, uiStore, customerStore, customerDataStoreData]);
   
   const handleGuestCountSave = useCallback(async (guestCount: number, action: 'normal' | 'link' | 'continue_anyway', linkedTables?: number[]) => {
     const tableNumber = orderStore.selectedTableNumber;
     if (!tableNumber) return;
     
+    console.log('[POSDesktop] 🔍 DEBUG handleGuestCountSave START:', {
+      tableNumber,
+      guestCount,
+      action,
+      linkedTables,
+      currentOrderType: orderStore.orderType,
+      currentSelectedTableNumber: orderStore.selectedTableNumber,
+      restaurantTablesCount: restaurantTables.length,
+      restaurantTables: restaurantTables.map(t => ({ id: t.id, table_number: t.table_number }))
+    });
+    
     const hasExistingOrder = orderStore.orderItems.length > 0;
     
-    const success = await createTableOrder(tableNumber, guestCount, linkedTables || []);
+    // ✅ Event-driven: Create order in orders table + update pos_tables.status to OCCUPIED
+    console.log('[POSDesktop] 🔍 Calling createOrder with guestCount:', guestCount);
+    const orderId = await createOrder(guestCount);  // ✅ Now returns order_id instead of boolean
     
-    if (success) {
+    console.log('[POSDesktop] 🔍 createOrder returned order_id:', orderId);
+    
+    if (orderId) {
+      console.log('[POSDesktop] ✅ Order created successfully, proceeding with table linking and modal transition');
+      
+      // ✅ NEW: If action === 'link' and linkedTables provided, call link_tables command
+      if (action === 'link' && linkedTables && linkedTables.length > 0) {
+        console.log('[POSDesktop] 🔗 Linking additional tables:', linkedTables);
+        try {
+          const linkResponse = await apiClient.link_tables({
+            order_id: orderId,
+            tables_to_link: linkedTables
+          });
+          
+          if (linkResponse.status === 200) {
+            const linkData = await linkResponse.json();
+            console.log('[POSDesktop] ✅ Tables linked successfully:', linkData);
+            toast.success(`Table ${tableNumber} linked with ${linkedTables.join(', ')}`);
+            
+            // ✅ PHASE 7.3 FIX: Refetch table data to ensure linkedTableContext has fresh data
+            console.log('[POSDesktop] 🔄 Refetching table data after linking...');
+            await refetchTables();
+            console.log('[POSDesktop] ✅ Table data refreshed');
+          } else {
+            console.error('[POSDesktop] ❌ Failed to link tables, status:', linkResponse.status);
+            toast.error('Failed to link tables');
+          }
+        } catch (linkError) {
+          console.error('[POSDesktop] ❌ Error linking tables:', linkError);
+          toast.error('Failed to link tables');
+        }
+      }
+      
       orderStore.setGuestCount(guestCount);
       uiStore.setModal('showGuestCountModal', false);
+      
+      console.log('[POSDesktop] 🔍 Setting showDineInModal to true');
+      // ✅ NEW: Seamless transition - auto-open DineInOrderModal immediately
+      uiStore.setModal('showDineInModal', true);
+      
+      console.log('[POSDesktop] 🔍 Modal state after setting:', {
+        showGuestCountModal: uiStore.showGuestCountModal,
+        showDineInModal: uiStore.showDineInModal
+      });
+      
       // Keep existing order items if any
       
       if (hasExistingOrder) {
@@ -402,9 +768,11 @@ export default function POSDesktop() {
       } else {
         toast.success(`Table ${tableNumber} seated with ${guestCount} guests - ready for ordering`);
       }
+    } else {
+      console.error('[POSDesktop] ❌ createOrder FAILED - modal will not open');
     }
-  }, [createTableOrder]);
-  
+  }, [createOrder, orderStore, uiStore, isDev, restaurantTables]);
+
   // CUSTOMER DATA MANAGEMENT
   const handleCustomerDetailsClick = useCallback(() => {
     uiStore.setModal('showCustomerModal', true);
@@ -469,9 +837,8 @@ export default function POSDesktop() {
         }
       }
       
-      // Fetch full order items from new endpoint
-      const response = await brain.get_order_items({ orderId: order.order_id });
-      const data = await response.json();
+      // ✅ Fetch full order items using standalone Supabase helper (no backend dependency)
+      const data = await getOrderItems(order.order_id);
       
       if (!data.success || !data.items || data.items.length === 0) {
         toast.error('Cannot load order - no items found');
@@ -595,9 +962,34 @@ export default function POSDesktop() {
 
   // DELEGATED HANDLERS - Use hooks instead of inline logic
   
-  const handleAddToOrder = orderManagement.handleAddToOrder;
+  const handleAddToOrder = useCallback((item: OrderItem) => {
+    if (orderStore.orderType === 'DINE-IN') {
+      // Event-driven command for DINE-IN
+      addItemToDineIn(item);
+    } else {
+      // Legacy flow for other modes
+      orderManagement.handleAddToOrder(item);
+    }
+  }, [orderStore.orderType, addItemToDineIn, orderManagement.handleAddToOrder]);
   const handleRemoveItem = orderManagement.handleRemoveItem;
-  const handleUpdateQuantity = orderManagement.handleUpdateQuantity;
+  
+  // ✅ NEW: Wrapper handler to route quantity updates based on mode
+  const handleUpdateQuantity = useCallback((itemId: string, quantity: number) => {
+    if (orderStore.orderType === 'DINE-IN') {
+      // Event-driven command for DINE-IN
+      updateItemQuantity(itemId, quantity);
+    } else {
+      // Legacy flow for other modes - convert itemId to index
+      const itemIndex = orderStore.orderItems.findIndex(item => item.id === itemId);
+      if (itemIndex === -1) {
+        console.warn(`[POSDesktop] Item with id ${itemId} not found in order`);
+        toast.error('Item not found in order');
+        return;
+      }
+      orderManagement.handleUpdateQuantity(itemIndex, quantity);
+    }
+  }, [orderStore.orderType, orderStore.orderItems, updateItemQuantity, orderManagement.handleUpdateQuantity]);
+  
   const handleClearOrder = useCallback(() => {
     orderManagement.handleClearOrder();
     orderStore.clearOrder();
@@ -608,7 +1000,8 @@ export default function POSDesktop() {
   const handleCustomizeItem = orderManagement.handleCustomizeItem;
   const handleCustomizeItemFromMenu = useCallback((item: OrderItem) => {
     if (isDev) console.log('Customize item from menu:', item);
-  }, []);
+    handleAddToOrder(item); // ✅ Actually add the item!
+  }, [handleAddToOrder, isDev]);
 
   // Customer flow handlers
   const saveCustomerDetails = customerFlow.saveCustomerDetails;
@@ -696,7 +1089,7 @@ export default function POSDesktop() {
       toast.success('✅ Starting fresh order');
     } catch (error) {
       console.error('❌ [POSDesktop] Failed to discard session:', error);
-      toast.error('Failed to clear saved session');
+      toast.error('Failed to restore saved order');
     }
   }, [pendingSession]);
   
@@ -755,27 +1148,8 @@ export default function POSDesktop() {
       
       await orderProcessing.persistPayment(paymentData);
       
-      // Print customer receipt using hook
-      const receiptData = {
-        order_number: `${orderStore.orderType.charAt(0)}${Date.now().toString().slice(-6)}`,
-        order_type: orderStore.orderType,
-        table_number: orderStore.selectedTableNumber,
-        guest_count: orderStore.guestCount,
-        customer_name: `${customerStore.customerData.firstName} ${customerStore.customerData.lastName}`.trim() || 'Walk-in Customer',
-        items: orderStore.orderItems.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.variant?.price || item.price,
-          total: (item.variant?.price || item.price) * item.quantity
-        })),
-        subtotal,
-        vat_amount: vatAmount,
-        tip_amount: tipSelection.amount,
-        total_amount: finalTotal,
-        payment_method: paymentResult?.method || 'CASH',
-        timestamp: new Date().toISOString()
-      };
-      
+      // Auto-print BOTH kitchen ticket and customer receipt after successful payment
+      await printing.handlePrintKitchen();
       await printing.handlePrintReceipt(finalTotal);
       
       // Clear saved session from IndexedDB (order complete, no need to restore)
@@ -797,18 +1171,291 @@ export default function POSDesktop() {
   const handleSendToKitchen = useCallback(async () => {
     if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
       toast.error('No items to send to kitchen');
+      return false;
+    }
+
+    if (!orderStore.selectedTableNumber) {
+      toast.error('Please select a table number');
+      return false;
+    }
+
+    try {
+      // Calculate order totals
+      const subtotal = orderStore.orderItems.reduce((total, item) => {
+        const itemPrice = item.variant?.price || item.price;
+        return total + (itemPrice * item.quantity);
+      }, 0);
+      
+      const vatAmount = subtotal * 0.20;
+      const totalAmount = subtotal + vatAmount;
+
+      // Prepare order data for database
+      const orderData = {
+        order_type: orderStore.orderType,
+        table_number: orderStore.selectedTableNumber,
+        guest_count: orderStore.guestCount || 1,
+        items: orderStore.orderItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.variant?.price || item.price,
+          variant: item.variant ? {
+            id: item.variant.id,
+            name: item.variant.name,
+            price: item.variant.price
+          } : null,
+          customizations: item.customizations || [],
+          notes: item.notes || ''
+        })),
+        subtotal: subtotal,
+        vat_amount: vatAmount,
+        total_amount: totalAmount,
+        status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
+        customer_name: customerStore.customerData.name || null,
+        customer_phone: customerStore.customerData.phone || null,
+        created_at: new Date().toISOString()
+      };
+
+      // 1. Save order to database
+      const { data, error } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [POSDesktop] Failed to save order:', error);
+        throw error;
+      }
+
+      console.log('✅ [POSDesktop] Order saved successfully (no print):', data);
+      
+      // Close modal
+      setShowKitchenPreviewModal(false);
+      
+      // Clear saved session from IndexedDB
+      await clearCurrentSession();
+      
+      toast.success('💾 Order saved successfully (not sent to kitchen)');
+    } catch (error) {
+      console.error('❌ [POSDesktop] Save order failed:', error);
+      toast.error('Failed to save order. Please try again.');
+    }
+  }, [orderStore, customerStore, clearCurrentSession, orderStore.orderType, sendDineInToKitchen, isDev]);
+
+  const handleSaveOrderOnly = useCallback(async () => {
+    if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
+      toast.error('No items to save');
       return;
     }
-    
-    // For DINE-IN: Open kitchen preview modal instead of direct print
-    if (orderStore.orderType === 'DINE-IN') {
-      setShowKitchenPreviewModal(true);
+
+    if (!orderStore.selectedTableNumber) {
+      toast.error('Please select a table number');
       return;
     }
-    
-    // For other order types: Direct print (existing flow)
-    await printing.handleSendToKitchen();
-  }, [orderStore.orderItems, orderStore.orderType, printing]);
+
+    try {
+      // Calculate order totals
+      const subtotal = orderStore.orderItems.reduce((total, item) => {
+        const itemPrice = item.variant?.price || item.price;
+        return total + (itemPrice * item.quantity);
+      }, 0);
+      
+      const vatAmount = subtotal * 0.20;
+      const totalAmount = subtotal + vatAmount;
+
+      // Prepare order data for database
+      const orderData = {
+        order_type: orderStore.orderType,
+        table_number: orderStore.selectedTableNumber,
+        guest_count: orderStore.guestCount || 1,
+        items: orderStore.orderItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.variant?.price || item.price,
+          variant: item.variant ? {
+            id: item.variant.id,
+            name: item.variant.name,
+            price: item.variant.price
+          } : null,
+          customizations: item.customizations || [],
+          notes: item.notes || ''
+        })),
+        subtotal: subtotal,
+        vat_amount: vatAmount,
+        total_amount: totalAmount,
+        status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
+        customer_name: customerStore.customerData.name || null,
+        customer_phone: customerStore.customerData.phone || null,
+        created_at: new Date().toISOString()
+      };
+
+      // 1. Save order to database
+      const { data: savedOrder, error: saveError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error('❌ [POSDesktop] Failed to save order:', saveError);
+        throw saveError;
+      }
+
+      console.log('✅ [POSDesktop] Order saved to database:', savedOrder);
+
+      // 2. Create kitchen ticket print job in print_queue
+      const printData = {
+        orderNumber: savedOrder.id,
+        orderType: 'DINE-IN',
+        tableNumber: `Table ${orderStore.selectedTableNumber}`,
+        guestCount: orderStore.guestCount || 1,
+        items: orderStore.orderItems.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          variant: item.variant?.name || null,
+          customizations: item.customizations?.map(c => c.name).join(', ') || null,
+          notes: item.notes || null
+        })),
+        timestamp: new Date().toISOString()
+      };
+
+      const { data: jobId, error: printError } = await supabase.rpc('create_print_job', {
+        p_job_type: 'KITCHEN_TICKET',
+        p_print_data: printData,
+        p_priority: 3, // High priority for dine-in
+        p_printer_id: null // Auto-select printer
+      });
+
+      if (printError) {
+        console.error('❌ [POSDesktop] Failed to create print job:', printError);
+        throw printError;
+      }
+
+      console.log('✅ [POSDesktop] Kitchen ticket print job created:', jobId);
+      
+      // Close modal
+      setShowKitchenPreviewModal(false);
+      
+      // Clear saved session from IndexedDB
+      await clearCurrentSession();
+      
+      toast.success('🍽️ Order sent to kitchen!');
+      return true;
+    } catch (error) {
+      console.error('❌ [POSDesktop] Save and print failed:', error);
+      toast.error('Failed to send order to kitchen. Please try again.');
+      return false;
+    }
+  }, [orderStore, customerStore, clearCurrentSession, orderStore.orderType, sendDineInToKitchen, isDev]);
+
+  const handleSaveAndPrint = useCallback(async () => {
+    if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
+      toast.error('No items to send to kitchen');
+      return false;
+    }
+
+    if (!orderStore.selectedTableNumber) {
+      toast.error('Please select a table number');
+      return false;
+    }
+
+    try {
+      // Calculate order totals
+      const subtotal = orderStore.orderItems.reduce((total, item) => {
+        const itemPrice = item.variant?.price || item.price;
+        return total + (itemPrice * item.quantity);
+      }, 0);
+      
+      const vatAmount = subtotal * 0.20;
+      const totalAmount = subtotal + vatAmount;
+
+      // Prepare order data for database
+      const orderData = {
+        order_type: orderStore.orderType,
+        table_number: orderStore.selectedTableNumber,
+        guest_count: orderStore.guestCount || 1,
+        items: orderStore.orderItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.variant?.price || item.price,
+          variant: item.variant ? {
+            id: item.variant.id,
+            name: item.variant.name,
+            price: item.variant.price
+          } : null,
+          customizations: item.customizations || [],
+          notes: item.notes || ''
+        })),
+        subtotal: subtotal,
+        vat_amount: vatAmount,
+        total_amount: totalAmount,
+        status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
+        customer_name: customerStore.customerData.name || null,
+        customer_phone: customerStore.customerData.phone || null,
+        created_at: new Date().toISOString()
+      };
+
+      // 1. Save order to database
+      const { data: savedOrder, error: saveError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error('❌ [POSDesktop] Failed to save order:', saveError);
+        throw saveError;
+      }
+
+      console.log('✅ [POSDesktop] Order saved to database:', savedOrder);
+
+      // 2. Create kitchen ticket print job in print_queue
+      const printData = {
+        orderNumber: savedOrder.id,
+        orderType: 'DINE-IN',
+        tableNumber: `Table ${orderStore.selectedTableNumber}`,
+        guestCount: orderStore.guestCount || 1,
+        items: orderStore.orderItems.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          variant: item.variant?.name || null,
+          customizations: item.customizations?.map(c => c.name).join(', ') || null,
+          notes: item.notes || null
+        })),
+        timestamp: new Date().toISOString()
+      };
+
+      const { data: jobId, error: printError } = await supabase.rpc('create_print_job', {
+        p_job_type: 'KITCHEN_TICKET',
+        p_print_data: printData,
+        p_priority: 3, // High priority for dine-in
+        p_printer_id: null // Auto-select printer
+      });
+
+      if (printError) {
+        console.error('❌ [POSDesktop] Failed to create print job:', printError);
+        throw printError;
+      }
+
+      console.log('✅ [POSDesktop] Kitchen ticket print job created:', jobId);
+      
+      // Close modal
+      setShowKitchenPreviewModal(false);
+      
+      // Clear saved session from IndexedDB
+      await clearCurrentSession();
+      
+      toast.success('🍽️ Order sent to kitchen!');
+      return true;
+    } catch (error) {
+      console.error('❌ [POSDesktop] Save and print failed:', error);
+      toast.error('Failed to send order to kitchen. Please try again.');
+      return false;
+    }
+  }, [orderStore, customerStore, clearCurrentSession, orderStore.orderType, sendDineInToKitchen, isDev]);
 
   const handlePrintBill = useCallback(async () => {
     if (!orderStore.orderItems || orderStore.orderItems.length === 0) {
@@ -888,16 +1535,11 @@ export default function POSDesktop() {
       
       try {
         // Print bill to thermal printer
-        await printing.handlePrintBill(orderTotal);
-        
-        // Clear saved session from IndexedDB (order complete, no need to restore)
-        await clearCurrentSession();
-        
-        // Reset order state
-        orderStore.clearOrder();
-        customerStore.clearCustomer();
-        
-        toast.success('✅ Bill printed successfully!');
+        const success = await printing.handlePrintBill(orderTotal);
+        if (success) {
+          toast.success('Bill printed successfully');
+        }
+        return success;
       } catch (error) {
         console.error('❌ [POSDesktop] Bill printing failed:', error);
         toast.error('Failed to print bill. Please try again.');
@@ -908,7 +1550,7 @@ export default function POSDesktop() {
     // For WAITING, COLLECTION, DELIVERY orders → Show payment choice modal
     if (isDev) console.log(`💳 [POSDesktop] ${orderStore.orderType} order - showing payment choice modal`);
     setShowPaymentChoiceModal(true);
-  }, [orderStore.orderType, printing, orderTotal, clearCurrentSession]);
+  }, [orderStore.orderType, printing, orderTotal]);
 
   // NEW: Handle payment mode selection from PaymentChoiceModal
   const handleSelectPaymentMode = useCallback((mode: PaymentFlowMode) => {
@@ -929,7 +1571,10 @@ export default function POSDesktop() {
     }
     
     try {
-      // Print receipt
+      // Auto-print kitchen ticket
+      await printing.handlePrintKitchen();
+      
+      // Auto-print customer receipt
       await printing.handlePrintReceipt(result.orderTotal);
       
       // Clear saved session from IndexedDB (order complete, no need to restore)
@@ -1018,12 +1663,11 @@ export default function POSDesktop() {
     try {
       toast.info('🔄 Processing print queue...');
       
-      const processResponse = await brain.process_print_queue({
+      // ✅ Process print queue using standalone Supabase helper (no backend dependency)
+      const processResult = await processPrintQueue({
         max_jobs: 20,
         force_retry_failed: true
       });
-      
-      const processResult = await processResponse.json();
       
       if (processResult.success) {
         toast.success(`✅ Processed ${processResult.processed_count} print jobs`, {
@@ -1086,100 +1730,102 @@ export default function POSDesktop() {
     let isActive = true;
     let cleanupFunctions: (() => void)[] = [];
     
-    // Use initialization guard to prevent multiple concurrent starts
-    posPerf.startInitialization('pos_desktop', async () => {
-      // Check if effect is still active (not unmounted)
-      if (!isActive) {
-        return;
-      }
-      
-      try {
-        // Mark startup beginning
-        posPerf.mark(POSPerfMarks.STARTUP);
-        posPerf.mark(POSPerfMarks.BUNDLE_LOAD);
-        
-        // Only log in development
-        const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-        if (isDevelopment) {
-          if (isDev) console.log('🚀 [POSDesktop] Starting fast initialization with POS bundle...');
-        }
-        
-        // Try fast bundle loading first
-        const bundleSuccess = await loadPOSBundle();
-        
-        // Check if effect is still active after async operation
+    // ✅ FIX: Properly await async initialization in IIFE
+    (async () => {
+      // Use initialization guard - prevents double initialization
+      await posPerf.startInitialization('pos_desktop', async () => {
+        // Check if effect is still active (not unmounted)
         if (!isActive) {
           return;
         }
         
-        posPerf.measure(POSPerfMarks.BUNDLE_LOAD, { success: bundleSuccess });
-        
-        if (bundleSuccess) {
+        try {
+          // Mark startup beginning
+          posPerf.mark(POSPerfMarks.STARTUP);
+          posPerf.mark(POSPerfMarks.BUNDLE_LOAD);
+          
+          // Only log in development
+          const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
           if (isDevelopment) {
-            if (isDev) console.log('✅ [POSDesktop] Fast bundle loaded successfully');
+            if (isDev) console.log('🚀 [POSDesktop] Starting fast initialization with POS bundle...');
           }
           
-          // ✅ FIX: Don't auto-select section - let it default to null to show ALL items
-          // The categories array contains real DB categories (UUIDs), not synthetic section IDs
-          // When selectedMenuCategory is null, updateFilteredItems shows all items (correct behavior)
-          if (isDevelopment) {
-            if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
-          }
+          // Try fast bundle loading first
+          const bundleSuccess = await loadPOSBundle();
           
-          // Mark first interactive
-          posPerf.mark(POSPerfMarks.FIRST_INTERACTIVE);
-          
-        } else {
-          // Fallback to full initialization if bundle fails
-          if (isDevelopment) {
-            if (isDev) console.log('⚠️ [POSDesktop] Bundle loading failed, falling back to full initialization');
-          }
-          
-          if (isActive) {
-            await useRealtimeMenuStore.getState().initialize();
-          }
-          
-          // Check again after async operation
+          // Check if effect is still active after async operation
           if (!isActive) {
             return;
           }
           
-          // ✅ FIX: Don't auto-select section here either
-          if (isDevelopment) {
-            if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
-          }
-        }
-        
-        if (isActive) {
-          posPerf.measure(POSPerfMarks.STARTUP);
-        }
-        
-        // Log performance summary only in development
-        if (isDevelopment && isActive) {
-          setTimeout(() => {
-            if (isActive) {
-              const summary = posPerf.getSummary();
-              if (isDev) console.log('📊 [POSDesktop] Performance Summary:', summary);
+          posPerf.measure(POSPerfMarks.BUNDLE_LOAD, { success: bundleSuccess });
+          
+          if (bundleSuccess) {
+            if (isDevelopment) {
+              if (isDev) console.log('✅ [POSDesktop] Fast bundle loaded successfully');
             }
-          }, 100);
+            
+            // ✅ FIX: Don't auto-select section - let it default to null to show ALL items
+            // The categories array contains real DB categories (UUIDs), not synthetic section IDs
+            // When selectedMenuCategory is null, updateFilteredItems shows all items (correct behavior)
+            if (isDevelopment) {
+              if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
+            }
+            
+            // Mark first interactive
+            posPerf.mark(POSPerfMarks.FIRST_INTERACTIVE);
+            
+          } else {
+            // Fallback to full initialization if bundle fails
+            if (isDevelopment) {
+              if (isDev) console.log('⚠️ [POSDesktop] Bundle loading failed, falling back to full initialization');
+            }
+            
+            if (isActive) {
+              await useRealtimeMenuStore.getState().initialize();
+            }
+            
+            // Check again after async operation
+            if (!isActive) {
+              return;
+            }
+            
+            // ✅ FIX: Don't auto-select section here either
+            if (isDevelopment) {
+              if (isDev) console.log('🎯 [POSDesktop] Showing all menu items (no category pre-selected)');
+            }
+          }
+          
+          if (isActive) {
+            posPerf.measure(POSPerfMarks.STARTUP);
+          }
+          
+          // Log performance summary only in development
+          if (isDevelopment && isActive) {
+            setTimeout(() => {
+              if (isActive) {
+                const summary = posPerf.getSummary();
+                if (isDev) console.log('📊 [POSDesktop] Performance Summary:', summary);
+              }
+            }, 100);
+          }
+          
+        } catch (error) {
+          const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+          if (isDevelopment && isActive) {
+            console.error('❌ [POSDesktop] Error during fast initialization:', error);
+          }
+          if (isActive) {
+            posPerf.record('startup_error', 1, { error: error.message });
+          }
+          throw error; // Re-throw so guard can handle it
         }
-        
-      } catch (error) {
-        const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-        if (isDevelopment && isActive) {
-          console.error('❌ [POSDesktop] Error during fast initialization:', error);
+      }).catch((error) => {
+        if (isDev && isActive) {
+          console.error('❌ [POSDesktop] Initialization guard failed:', error);
         }
-        if (isActive) {
-          posPerf.record('startup_error', 1, { error: error.message });
-        }
-        throw error; // Re-throw so guard can handle it
-      }
-    }).catch((error) => {
-      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-      if (isDevelopment && isActive) {
-        console.error('❌ [POSDesktop] Initialization guard failed:', error);
-      }
-    });
+      });
+    })();
     
     // Cleanup function for React StrictMode and component unmounting
     return () => {
@@ -1263,7 +1909,7 @@ export default function POSDesktop() {
   }, []);
 
   // ============================================================================
-  // EVENT HANDLERS - Must be defined BEFORE conditional returns (React Rules of Hooks)
+  // EVENT HANDLERS - Must be defined BEFORE conditional logic (React Rules of Hooks)
   // ============================================================================
 
   // Handle category selection
@@ -1392,7 +2038,7 @@ export default function POSDesktop() {
   const renderMainPOSView = () => {
     // Define zones once to reuse in both legacy and responsive shells
     const zoneCustomer = (
-      <POSZoneErrorBoundary zoneName="Order Type & Customer Selection" onReset={() => orderStore.setOrderType('COLLECTION')}>
+      <POSZoneErrorBoundary zoneName="Order Type & Customer Selection" onReset={() => orderStore.setOrderType('COLLECTION')} showHomeButton>
         <div 
           className="flex flex-col min-w-0 flex-1 min-h-0"
           style={{
@@ -1423,6 +2069,8 @@ export default function POSDesktop() {
                 selectedTable={orderStore.selectedTableNumber}
                 onTableSelect={handleTableSelect}
                 tableOrders={persistentTableOrders}
+                tables={restaurantTables} // ✅ NEW: Event-driven tables from hook
+                isLoading={tablesLoading} // ✅ NEW: Loading state from hook
                 className="w-full"
               />
             )}
@@ -1494,9 +2142,29 @@ export default function POSDesktop() {
         <div className="min-w-0" style={{ minHeight: 0, overflow: 'hidden', height: '100%' }}>
           {initialization.initialLoad ? (
             <OrderSummarySkeleton />
+          ) : uiStore.showDineInModal ? (
+            // ✅ OPTION C: Hide OrderSummaryPanel when DINE-IN modal is open
+            // Prevents UX blending - DINE-IN uses modal order summary, Takeaway uses panel
+            <div 
+              className="flex items-center justify-center h-full"
+              style={{
+                background: `linear-gradient(135deg, ${QSAITheme.background.secondary} 0%, ${QSAITheme.background.dark} 100%)`,
+                borderRadius: '8px',
+                border: `1px solid rgba(124, 93, 250, 0.1)`
+              }}
+            >
+              <div className="text-center space-y-2 px-4">
+                <p className="text-sm" style={{ color: QSAITheme.text.secondary }}>
+                  DINE-IN order in progress
+                </p>
+                <p className="text-xs" style={{ color: QSAITheme.text.muted }}>
+                  View order details in the table modal
+                </p>
+              </div>
+            </div>
           ) : (
             <OrderSummaryPanel
-              orderItems={orderStore.orderItems}
+              orderItems={orderStore.orderType === 'DINE-IN' ? [] : orderStore.orderItems}
               orderType={orderStore.orderType}
               tableNumber={orderStore.selectedTableNumber}
               guestCount={orderStore.guestCount}
@@ -1511,7 +2179,7 @@ export default function POSDesktop() {
                 orderStore.setOrderItems([...orderStore.orderItems, item]);
               }}
               onRemoveItem={orderManagement.handleRemoveItem}
-              onUpdateQuantity={orderManagement.handleQuantityChange}
+              onUpdateQuantity={orderManagement.handleUpdateQuantity}
               onClearOrder={handleClearOrder}
               onProcessPayment={handleCompleteOrder}
               onPaymentSuccess={handlePaymentSuccess}
@@ -1560,6 +2228,42 @@ export default function POSDesktop() {
           <div className="flex-1 min-h-0 overflow-hidden">
             {renderViewContent()}
           </div>
+
+          <DineInOrderModal
+            isOpen={uiStore.showDineInModal}
+            onClose={() => uiStore.setModal('showDineInModal', false)}
+            tableId={selectedTableUuid}
+            tableNumber={orderStore.selectedTableNumber || undefined}
+            tableCapacity={restaurantTables.find(t => t.table_number === orderStore.selectedTableNumber?.toString())?.capacity || 4}
+            restaurantTables={restaurantTables}
+            linkedTables={linkedTableContext.linkedTableNumbers}
+            isPrimaryTable={linkedTableContext.isPrimaryTable}
+            totalLinkedCapacity={linkedTableContext.totalLinkedCapacity}
+            eventDrivenOrder={orderStore.orderType === 'DINE-IN' ? dineInOrder : null}
+            eventDrivenCustomerTabs={orderStore.orderType === 'DINE-IN' ? customerTabsData : []}
+            eventDrivenActiveTabId={orderStore.orderType === 'DINE-IN' ? activeTabId : null}
+            onEventDrivenSetActiveTabId={orderStore.orderType === 'DINE-IN' ? setActiveTabId : undefined}
+            onEventDrivenAddItem={orderStore.orderType === 'DINE-IN' ? addItemToDineIn : undefined}
+            onEventDrivenRemoveItem={orderStore.orderType === 'DINE-IN' ? removeItemFromDineIn : undefined}
+            onEventDrivenUpdateItemQuantity={orderStore.orderType === 'DINE-IN' ? updateItemQuantity : undefined}
+            onEventDrivenUpdateGuestCount={orderStore.orderType === 'DINE-IN' ? updateGuestCount : undefined}
+            onEventDrivenSendToKitchen={orderStore.orderType === 'DINE-IN' ? sendDineInToKitchen : undefined}
+            onEventDrivenCreateTab={orderStore.orderType === 'DINE-IN' ? createTab : undefined}
+            onEventDrivenAddItemsToTab={orderStore.orderType === 'DINE-IN' ? addItemsToTab : undefined}
+            onEventDrivenRenameTab={orderStore.orderType === 'DINE-IN' ? renameTab : undefined}
+            onEventDrivenCloseTab={orderStore.orderType === 'DINE-IN' ? closeTab : undefined}
+            onEventDrivenSplitTab={orderStore.orderType === 'DINE-IN' ? splitTab : undefined}
+            onEventDrivenMergeTabs={orderStore.orderType === 'DINE-IN' ? mergeTabs : undefined}
+            onEventDrivenMoveItemsBetweenTabs={orderStore.orderType === 'DINE-IN' ? moveItemsBetweenTabs : undefined}
+            stagingItems={dineInStagingItems}
+            onAddToStaging={addToStagingCart}
+            onRemoveFromStaging={removeFromStagingCart}
+            onClearStaging={clearStagingCart}
+            onPersistStaging={persistStagingCart}
+            enrichedItems={dineInEnrichedItems}
+            enrichedLoading={dineInEnrichedLoading}
+            enrichedError={dineInEnrichedError}
+          />
         </div>
 
         {/* Row 2: Professional Footer - Always at bottom, never overlaps */}
@@ -1572,20 +2276,15 @@ export default function POSDesktop() {
 
         {/* Guest Count Modal for Table Selection */}
         {uiStore.showGuestCountModal && (
-          <POSGuestCountModalClean 
+          <POSGuestCountModal 
             isOpen={uiStore.showGuestCountModal}
             onClose={() => uiStore.setModal('showGuestCountModal', false)}
+            onSave={handleGuestCountSave}
             tableNumber={orderStore.selectedTableNumber || 0}
-            onConfirm={(guestCount) => orderStore.setGuestCount(guestCount)}
-          />
-        )}
-
-        {/* Dine-In Modal when table already seated */}
-        {uiStore.showDineInModal && (
-          <DineInOrderModal 
-            isOpen={uiStore.showDineInModal}
-            onClose={() => uiStore.setModal('showDineInModal', false)}
-            tableNumber={orderStore.selectedTableNumber || 0}
+            tableCapacity={restaurantTables.find(t => t.table_number === orderStore.selectedTableNumber?.toString())?.capacity || 4}
+            initialGuestCount={1}
+            restaurantTables={restaurantTables}
+            tablesLoading={tablesLoading}
           />
         )}
 
@@ -1689,13 +2388,8 @@ export default function POSDesktop() {
           orderItems={orderStore.orderItems}
           tableNumber={orderStore.selectedTableNumber}
           guestCount={orderStore.guestCount}
-          onPrintKitchen={async () => {
-            const success = await printing.handleSendToKitchen();
-            if (success) {
-              toast.success('Kitchen ticket printed successfully');
-            }
-            return success;
-          }}
+          onSaveOnly={handleSaveOrderOnly}
+          onSaveAndPrint={handleSaveAndPrint}
         />
 
         {/* NEW: DINE-IN Bill Preview Modal */}
@@ -1713,15 +2407,6 @@ export default function POSDesktop() {
             }
             return success;
           }}
-        />
-
-        {/* Payment Choice Modal - for WAITING/COLLECTION/DELIVERY */}
-        <PaymentChoiceModal
-          isOpen={showPaymentChoiceModal}
-          onClose={() => setShowPaymentChoiceModal(false)}
-          onSelectMode={handleSelectPaymentMode}
-          orderTotal={orderTotal}
-          orderType={orderStore.orderType as 'WAITING' | 'COLLECTION' | 'DELIVERY'}
         />
       </div>
     </CustomizeOrchestratorProvider>
