@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +24,7 @@ import {
 } from "lucide-react";
 import { DeliverySettings as DeliverySettingsType, useRestaurantSettings } from "../utils/useRestaurantSettings";
 import { GoogleMap, Circle, Marker } from '@react-google-maps/api';
-import brain from "brain";
+import { apiClient } from 'app';
 import { globalColors, styles } from "../utils/QSAIDesign";
 
 // Constants for delivery calculations
@@ -172,7 +169,7 @@ const DeliverySettings: React.FC = () => {
   useEffect(() => {
     const fetchMapsConfig = async () => {
       try {
-        const response = await brain.get_maps_config();
+        const response = await apiClient.get_maps_config();
         const data = await response.json();
         if (data && data.apiKey) {
           setGoogleMapsApiKey(data.apiKey);
@@ -301,7 +298,7 @@ const DeliverySettings: React.FC = () => {
     
     try {
       setIsLoading(true);
-      const response = await brain.geocode({ postcode: newExclusion.postcode });
+      const response = await apiClient.geocode({ postcode: newExclusion.postcode });
       const data = await response.json();
       
       if (data.success) {
@@ -332,7 +329,7 @@ const DeliverySettings: React.FC = () => {
     
     try {
       setIsLoading(true);
-      const response = await brain.geocode({ locationName: newExclusion.locationName });
+      const response = await apiClient.geocode({ locationName: newExclusion.locationName });
       const data = await response.json();
       
       if (data.success) {
@@ -425,7 +422,7 @@ const DeliverySettings: React.FC = () => {
       // Get coordinates for the postcode to show on map
       let coordinates = null;
       try {
-        const geocodeResponse = await brain.geocode({ postcode: postcodeCheck.postcode });
+        const geocodeResponse = await apiClient.geocode({ postcode: postcodeCheck.postcode });
         const geocodeData = await geocodeResponse.json();
         if (geocodeData.success) {
           coordinates = geocodeData.coordinates;
@@ -550,7 +547,7 @@ const DeliverySettings: React.FC = () => {
             
             try {
               setIsLoading(true);
-              const response = await brain.geocode({ lat, lng });
+              const response = await apiClient.geocode({ lat, lng });
               const data = await response.json();
               
               if (data.success) {
