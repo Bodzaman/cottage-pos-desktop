@@ -240,9 +240,9 @@ export function StaffCustomizationModal({
     );
 
     // Show success toast
-    const variantName = variant ? " (" + variant.name + ")" : '';
-    toast.success(item.name + variantName + " added to order", {
-      description: "Quantity: " + quantity + " • £" + totalPrice.toFixed(2)
+    const variantName = variant ? ` (${variant.name})` : '';
+    toast.success(`${item.name}${variantName} added to order`, {
+      description: `Quantity: ${quantity} • £${totalPrice.toFixed(2)}`
     });
 
     // Reset and close
@@ -315,7 +315,7 @@ export function StaffCustomizationModal({
       <DialogContent 
         className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
         style={{
-          background: "linear-gradient(135deg, " + POS_THEME.background + " 0%, " + POS_THEME.backgroundLight + " 100%)",
+          background: `linear-gradient(135deg, ${POS_THEME.background} 0%, ${POS_THEME.backgroundLight} 100%)`,
           borderColor: POS_THEME.primary,
           borderWidth: '2px'
         }}
@@ -502,7 +502,7 @@ export function StaffCustomizationModal({
                                 )}
                                 style={{
                                   background: isSelected 
-                                    ? "linear-gradient(135deg, " + POS_THEME.primary + "40 0%, " + POS_THEME.background + " 100%)"
+                                    ? `linear-gradient(135deg, ${POS_THEME.primary}40 0%, ${POS_THEME.background} 100%)`
                                     : POS_THEME.backgroundLight,
                                   borderColor: isSelected 
                                     ? POS_THEME.primary
@@ -568,7 +568,7 @@ export function StaffCustomizationModal({
                                 )}
                                 style={{
                                   background: isSelected 
-                                    ? "linear-gradient(135deg, " + POS_THEME.primary + "40 0%, " + POS_THEME.background + " 100%)"
+                                    ? `linear-gradient(135deg, ${POS_THEME.primary}40 0%, ${POS_THEME.background} 100%)`
                                     : POS_THEME.backgroundLight,
                                   borderColor: isSelected 
                                     ? POS_THEME.primary
@@ -796,7 +796,7 @@ export function StaffCustomizationModal({
                   onClick={handleConfirm}
                   className="w-full text-lg font-semibold py-6"
                   style={{
-                    background: "linear-gradient(135deg, " + POS_THEME.primary + " 0%, " + POS_THEME.primaryHover + " 100%)",
+                    background: `linear-gradient(135deg, ${POS_THEME.primary} 0%, ${POS_THEME.primaryHover} 100%)`,
                     color: POS_THEME.text,
                     minHeight: '56px'
                   }}
