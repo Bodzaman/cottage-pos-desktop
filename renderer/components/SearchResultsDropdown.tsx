@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { AppApisOrdersOrderModel } from 'brain/data-contracts';
+import { OrderModel } from 'types';
 import { globalColors } from '../utils/QSAIDesign';
 import { Clock, Phone, DollarSign, ChevronRight } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
 interface SearchResultsDropdownProps {
-  results: AppApisOrdersOrderModel[];
+  results: OrderModel[];
   isVisible: boolean;
   isLoading: boolean;
-  onSelectOrder: (order: AppApisOrdersOrderModel) => void;
+  onSelectOrder: (order: OrderModel) => void;
   onShowAllResults: () => void;
   searchQuery: string;
 }
