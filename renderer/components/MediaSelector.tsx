@@ -7,7 +7,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { ImagePlus, Upload, Search, X, ImageIcon, FileVideo, FileIcon, Play, Film, Info, Tag } from 'lucide-react';
 import { toast } from 'sonner';
-import { Grid, GridItem } from '@/components/ui/grid';
 import { fetchMediaLibrary, MediaItem, uploadMedia, getMediaDisplayName, isImageFile, isVideoFile, formatFileSize, formatDate, cleanTags } from '../utils/mediaLibraryUtils';
 import { format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
