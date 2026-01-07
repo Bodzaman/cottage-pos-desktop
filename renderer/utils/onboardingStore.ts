@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 interface OnboardingStatus {
@@ -65,7 +65,7 @@ export const useOnboardingStore = create<OnboardingStore>()(persist(
           setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
         );
         
-        const fetchPromise = brain.get_onboarding_status({ customerId: customerId });
+        const fetchPromise = apiClient.get_onboarding_progress();
         
         const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
         
@@ -112,7 +112,10 @@ export const useOnboardingStore = create<OnboardingStore>()(persist(
     // Mark tour as completed
     markTourComplete: async (customerId: string) => {
       try {
-        const response = await brain.mark_tour_complete({ customer_id: customerId });
+        const response = await apiClient.update_onboarding_progress({
+          customer_id: customerId,
+          tour_completed: true
+        });
         
         if (response.ok) {
           // Optimistic update
@@ -134,7 +137,10 @@ export const useOnboardingStore = create<OnboardingStore>()(persist(
     // Mark wizard as completed
     markWizardComplete: async (customerId: string) => {
       try {
-        const response = await brain.mark_wizard_complete({ customer_id: customerId });
+        const response = await apiClient.update_onboarding_progress({
+          customer_id: customerId,
+          wizard_completed: true
+        });
         
         if (response.ok) {
           // Optimistic update
