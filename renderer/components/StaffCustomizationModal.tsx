@@ -12,10 +12,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, CustomizationBase, SelectedCustomization } from '../utils/menuTypes';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
+import { globalColors } from '../utils/QSAIDesign';
+import { apiClient } from 'app';
+import type { OrderItem } from 'utils/menuTypes';
 
 interface StaffCustomizationModalProps {
   item: MenuItem;
@@ -25,13 +28,8 @@ interface StaffCustomizationModalProps {
   onConfirm: (item: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string) => void;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   initialQuantity?: number;
-}
-
-export interface SelectedCustomization {
-  id: string;
-  name: string;
-  price: number;
-  group?: string;
+  existingCustomizations?: SelectedCustomization[];
+  existingNotes?: string;
 }
 
 // 🎨 POS Purple Theme Colors
@@ -54,14 +52,38 @@ export function StaffCustomizationModal({
   onClose,
   onConfirm,
   orderType,
-  initialQuantity = 1
+  initialQuantity = 1,
+  existingCustomizations = [],
+  existingNotes = ''
 }: StaffCustomizationModalProps) {
   const { customizations } = useRealtimeMenuStore();
   
+  // ✅ DETECT EDIT MODE: If existing customizations or notes provided, we're editing
+  const isEditMode = existingCustomizations.length > 0 || existingNotes !== '';
+  
+  // ✅ PRICE ENRICHMENT: Cross-reference existing customizations with menu data to populate prices
+  // This runs once when props change, doesn't cause re-renders during editing
+  const enrichedExistingCustomizations = useMemo(() => {
+    if (!existingCustomizations || existingCustomizations.length === 0) {
+      return [];
+    }
+    
+    return existingCustomizations.map(existing => {
+      // Find matching customization in menu data
+      const menuCustomization = customizations.find(c => c.id === existing.id);
+      
+      // If found and has price, use it; otherwise keep existing price
+      return {
+        ...existing,
+        price: menuCustomization?.price ?? existing.price
+      };
+    });
+  }, [existingCustomizations, customizations]);
+  
   // State
   const [quantity, setQuantity] = useState(initialQuantity);
-  const [selectedCustomizations, setSelectedCustomizations] = useState<SelectedCustomization[]>([]);
-  const [specialInstructions, setSpecialInstructions] = useState('');
+  const [selectedCustomizations, setSelectedCustomizations] = useState<SelectedCustomization[]>(enrichedExistingCustomizations);
+  const [specialInstructions, setSpecialInstructions] = useState(existingNotes);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
@@ -73,14 +95,15 @@ export function StaffCustomizationModal({
     setQuantity(initialQuantity);
   }, [initialQuantity]);
 
-  // Reset state when modal opens
+  // ✅ SINGLE INITIALIZATION: Load existing data ONCE when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSearchQuery('');
-      setSelectedCustomizations([]);
-      setSpecialInstructions('');
+      setSearchQuery('');  // Always reset search
+      // Initialize from enriched data (has prices from menu)
+      setSelectedCustomizations(enrichedExistingCustomizations);
+      setSpecialInstructions(existingNotes || '');
     }
-  }, [isOpen]);
+  }, [isOpen]); // ✅ ONLY watch isOpen - prevents re-initialization during editing
 
   // Filter customizations for POS display (show_on_pos = true)
   const posCustomizations = useMemo(() => {
@@ -178,19 +201,22 @@ export function StaffCustomizationModal({
   // Handle customization toggle
   const handleCustomizationToggle = (customization: CustomizationBase, checked: boolean) => {
     if (checked) {
-      setSelectedCustomizations(prev => [
-        ...prev,
-        {
-          id: customization.id,
-          name: customization.name,
-          price: customization.price ?? 0,
-          group: customization.customization_group ?? undefined
-        }
-      ]);
+      const newItem = {
+        id: customization.id,
+        name: customization.name,
+        price: customization.price ?? 0,
+        group: customization.customization_group ?? undefined
+      };
+      
+      setSelectedCustomizations(prev => {
+        const updated = [...prev, newItem];
+        return updated;
+      });
     } else {
-      setSelectedCustomizations(prev => 
-        prev.filter(c => c.id !== customization.id)
-      );
+      setSelectedCustomizations(prev => {
+        const updated = prev.filter(c => c.id !== customization.id);
+        return updated;
+      });
     }
   };
 
@@ -557,9 +583,9 @@ export function StaffCustomizationModal({
                                   <Checkbox
                                     id={customization.id}
                                     checked={isSelected}
-                                    onCheckedChange={(checked) => 
-                                      handleCustomizationToggle(customization, checked as boolean)
-                                    }
+                                    onCheckedChange={(checked) => {
+                                      handleCustomizationToggle(customization, checked as boolean);
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
                                     className="data-[state=checked]:bg-[#7C5DFA] data-[state=checked]:border-[#7C5DFA]"
                                   />
@@ -777,7 +803,7 @@ export function StaffCustomizationModal({
                   aria-label="Add item to order"
                 >
                   <Check className="h-5 w-5 mr-2" />
-                  Add to Order • £{totalPrice.toFixed(2)}
+                  {isEditMode ? 'Update' : 'Add to Order'} • £{totalPrice.toFixed(2)}
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-gray-900 text-white border-gray-700">
