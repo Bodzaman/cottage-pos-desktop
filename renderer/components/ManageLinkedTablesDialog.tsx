@@ -61,7 +61,7 @@ export function ManageLinkedTablesDialog({
   const handleAddTable = (tableNumber: number) => {
     if (!editedLinkedTables.includes(tableNumber)) {
       setEditedLinkedTables([...editedLinkedTables, tableNumber]);
-      toast.success("Table " + tableNumber + " added to linked group");
+      toast.success(`Table ${tableNumber} added to linked group`);
     }
   };
 
@@ -73,7 +73,7 @@ export function ManageLinkedTablesDialog({
     }
 
     setEditedLinkedTables(editedLinkedTables.filter(t => t !== tableNumber));
-    toast.success("Table " + tableNumber + " removed from linked group");
+    toast.success(`Table ${tableNumber} removed from linked group`);
   };
 
   const handleSave = async () => {
@@ -106,8 +106,8 @@ export function ManageLinkedTablesDialog({
       <DialogContent 
         className="max-w-2xl border-0 border-b-2"
         style={{
-          background: "linear-gradient(135deg, " + QSAITheme.purple.dark + " 0%, " + QSAITheme.background.darker + " 100%)",
-          borderBottom: "2px solid " + QSAITheme.purple.primary
+          background: `linear-gradient(135deg, ${QSAITheme.purple.dark} 0%, ${QSAITheme.background.darker} 100%)`,
+          borderBottom: `2px solid ${QSAITheme.purple.primary}`
         }}
       >
         <DialogHeader>
@@ -220,7 +220,7 @@ export function ManageLinkedTablesDialog({
             className="bg-purple-600 hover:bg-purple-700 text-white"
             style={{
               background: hasChanges 
-                ? "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)"
+                ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`
                 : undefined
             }}
           >
