@@ -50,14 +50,14 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { globalColors as QSAITheme, styles, effects } from '../utils/QSAIDesign';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 import {
   RefundRequest,
   RefundResponse,
   RefundListResponse,
   RefundInfo
-} from 'brain/data-contracts';
+} from 'utils/refundTypes';
 
 interface RefundManagementPanelProps {
   className?: string;
@@ -103,7 +103,7 @@ export function RefundManagementPanel({ className }: RefundManagementPanelProps)
         params.status = statusFilter;
       }
       
-      const response = await brain.list_refunds(params);
+      const response = await apiClient.list_refunds(params);
       const data: RefundListResponse = await response.json();
       
       if (data.success) {
@@ -134,7 +134,7 @@ export function RefundManagementPanel({ className }: RefundManagementPanelProps)
         admin_user_id: newRefund.admin_user_id
       };
       
-      const response = await brain.create_refund(refundData);
+      const response = await apiClient.create_refund(refundData);
       const result: RefundResponse = await response.json();
       
       if (result.success) {
