@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Minus, Sliders, Settings, Settings2, ShoppingCart, ChevronRight, Info } from 'lucide-react';
@@ -12,15 +6,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePOSStore } from 'utils/posStore';
-import type { MenuItem, MenuItemVariant, ProteinType } from 'types';
+import type { MenuItem, ProteinType } from 'utils/menuTypes';
+import type { ItemVariant } from 'utils/menuTypes';
 import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
 import { CardDesignTokens } from 'utils/cardDesignTokens';
 import { DescriptionPopover } from 'components/DescriptionPopover';
 import { CompactProteinChips } from 'components/CompactProteinChips';
-import { StaffCustomizationModal, SelectedCustomization } from 'components/StaffCustomizationModal';
+import { StaffCustomizationModal } from 'components/StaffCustomizationModal';
+import { SelectedCustomization } from 'utils/menuTypes';
 import { CustomerCustomizationModal } from 'components/CustomerCustomizationModal';
 import { CustomerVariantSelector } from 'components/CustomerVariantSelector';
-import { StaffVariantSelector } from 'components/StaffVariantSelector';
+import { POSVariantSelector } from 'components/POSVariantSelector';
 import { VariantPopover } from 'components/VariantPopover';
 import { colors } from 'utils/designSystem';
 import { toast } from 'sonner';
@@ -185,6 +181,26 @@ export function PremiumMenuCard({
     setSelectedVariant(variant);
   }
 
+  // Handle Customise button click
+  const handleCustomise = () => {
+    if (isMultiVariant) {
+      // For variant items, open the protein selection modal
+      setIsVariantSelectorOpen(true);
+    } else {
+      // For single items, open customization modal directly
+      setIsCustomizationModalOpen(true);
+    }
+  };
+
+  // Handle variant selection from POSVariantSelector → Open customization modal
+  const handleVariantSelectedForCustomization = (orderItem: OrderItem) => {
+    // Close the variant selector
+    setIsVariantSelectorOpen(false);
+    // Open customization modal with the selected variant
+    setCustomizeVariantId(orderItem.variant_id || null);
+    setIsCustomizationModalOpen(true);
+  };
+
   // NEW: Handle one-click protein chip ordering
   const handleAddFromChip = (variant: ItemVariant, qty: number) => {
     if (!onAddToOrder) return;
@@ -246,16 +262,6 @@ export function PremiumMenuCard({
     setQuantity(quantity + 1);
   };
 
-  // 🔍 DIAGNOSTIC LOGGING: Track variant detection logic
-  console.log('🔍 [PremiumMenuCard] Variant Detection:', {
-    itemName: item.name,
-    itemId: item.id,
-    hasVariantsFlag: item.has_variants,
-    variantsArrayLength: variants.length,
-    isMultiVariant,
-    variantData: variants.map(v => ({ id: v.id, name: v.name, price: v.price, protein_type_id: v.protein_type_id }))
-  });
-  
   // Fallback image for premium experience
   const fallbackImage = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80';
   
@@ -388,16 +394,6 @@ export function PremiumMenuCard({
   const optimizedCardImage = getOptimizedImagePreset(displayImage, 'CARD') || displayImage;
   const optimizedThumbnail = getOptimizedImagePreset(displayImage, 'THUMBNAIL') || displayImage;
   
-  // 🔍 DEBUG: Log image URLs
-  console.log('🔍 [PremiumMenuCard] Image URLs for:', item.name, {
-    displayImage,
-    optimizedCardImage,
-    optimizedThumbnail,
-    fallbackImage,
-    itemImageUrl: item.image_url,
-    selectedVariantImageUrl: selectedVariant?.image_url
-  });
-  
   // Spice level indicators
   const spiceLevel = item.spice_indicators ? parseInt(item.spice_indicators) || 0 : 0;
   const spiceColor = getSpiceColor(spiceLevel);
@@ -415,7 +411,7 @@ export function PremiumMenuCard({
       // Prioritize variant.name which has the Generated Name format
       variantName = selectedVariant.name || (() => {
         const proteinType = effectiveProteinTypes.find(pt => pt.id === selectedVariant.protein_type_id);
-        return proteinType?.name || selectedVariant.variant_name || selectedVariant.protein_type_name || 'Standard';
+        return proteinType?.name || selectedVariant.protein_type_name || 'Standard';
       })();
     }
     
@@ -460,7 +456,7 @@ export function PremiumMenuCard({
       // For single items
       const singleVariant = {
         id: `single-${item.id}`,
-        name: 'Standard',
+        name: item.name,
         price: price
       };
       
@@ -558,16 +554,6 @@ export function PremiumMenuCard({
   const handleCustomizeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCustomizationModalOpen(true);
-  };
-
-  const handleCustomise = () => {
-    if (isMultiVariant) {
-      // For variant items, open the protein selection modal
-      setIsVariantSelectorOpen(true);
-    } else {
-      // For single items, open customization modal directly
-      setIsCustomizationModalOpen(true);
-    }
   };
 
   // Handle info click to show details/modal
@@ -965,10 +951,10 @@ export function PremiumMenuCard({
         {orderType ? (
           // POS Context: Use StaffCustomizationModal
           <StaffCustomizationModal
-            item={item}
-            variant={selectedVariant || undefined}
             isOpen={isCustomizationModalOpen}
             onClose={() => setIsCustomizationModalOpen(false)}
+            item={item}
+            variant={customizeVariantId ? itemVariants.find(v => v.id === customizeVariantId) : (selectedVariant || undefined)}
             onConfirm={(item, quantity, variant, customizations, notes) => {
               // Convert to POS order item format and call onAddToOrder
               if (onAddToOrder) {
@@ -1019,16 +1005,12 @@ export function PremiumMenuCard({
           />
         )}
         {orderType ? (
-          <StaffVariantSelector
+          <POSVariantSelector
             isOpen={isVariantSelectorOpen}
             onClose={() => setIsVariantSelectorOpen(false)}
-            item={item}
-            itemVariants={itemVariants}
+            menuItem={item}
+            onAddToOrder={handleVariantSelectedForCustomization}
             orderType={orderType}
-            onAddToOrder={(orderItem) => {
-              onAddToOrder(orderItem);
-              setIsVariantSelectorOpen(false);
-            }}
           />
         ) : (
           <CustomerVariantSelector
@@ -1537,7 +1519,7 @@ export function PremiumMenuCard({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleCustomizeClick(e);
+                            handleCustomise();
                           }}
                           className="h-9 px-3 flex items-center gap-1.5 rounded border transition-all duration-200 flex-shrink-0 min-w-[44px]"
                           style={{
@@ -1570,14 +1552,15 @@ export function PremiumMenuCard({
         )}
       </div>
       
+      {/* Modals - Shared between List and Card Views */}
       {/* Customization Modal - Conditionally render based on context */}
       {orderType ? (
         // POS Context: Use StaffCustomizationModal
         <StaffCustomizationModal
-          item={item}
-          variant={isMultiVariant ? selectedVariant : null}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
+          item={item}
+          variant={customizeVariantId ? itemVariants.find(v => v.id === customizeVariantId) : (selectedVariant || undefined)}
           onConfirm={(item, quantity, variant, customizations, notes) => {
             // Convert to POS order item format and call onAddToOrder
             if (onAddToOrder) {
@@ -1617,7 +1600,7 @@ export function PremiumMenuCard({
         // OnlineOrders Context: Use CustomerCustomizationModal
         <CustomerCustomizationModal
           item={item}
-          variant={isMultiVariant ? selectedVariant : null}
+          variant={selectedVariant || undefined}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
           addToCart={(item, quantity, variant, customizations, notes) => {
@@ -1631,15 +1614,11 @@ export function PremiumMenuCard({
       {/* Variant Selector Modal */}
       {isMultiVariant && (
         orderType ? (
-          <StaffVariantSelector
-            item={item}
-            itemVariants={itemVariants}
+          <POSVariantSelector
+            menuItem={item}
             isOpen={isVariantSelectorOpen}
             onClose={() => setIsVariantSelectorOpen(false)}
-            onAddToOrder={(orderItem) => {
-              onAddToOrder(orderItem);
-              setIsVariantSelectorOpen(false);
-            }}
+            onAddToOrder={handleVariantSelectedForCustomization}
             orderType={orderType}
           />
         ) : (
