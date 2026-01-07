@@ -191,7 +191,7 @@ function cleanupSubscriptions() {
     try {
       supabase.removeChannel(subscription);
     } catch (error) {
-      console.warn(`⚠️ Error cleaning up subscription ${channelName}:`, error);
+      console.warn("⚠️ Error cleaning up subscription " + channelName + ":", error);
     }
   });
   
@@ -413,10 +413,10 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           supabase.from('menu_items').select('*').eq('is_active', true).order('display_print_order'),
           supabase.from('menu_protein_types').select('*').order('name'),
           supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
-          supabase.from('item_variants').select(`
+          supabase.from('item_variants').select("
             *,
             menu_protein_types:protein_type_id(id, name)
-          `).order('menu_item_id')
+          ").order('menu_item_id')
         ];
         
         const results = await Promise.allSettled(dataPromises);
@@ -501,7 +501,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               }));
               
               get().setMenuItems(enrichedItems);
-              console.log(`✅ [RealtimeMenuStore] Loaded ${enrichedItems.length} menu items with attached variants`);
+              console.log("✅ [RealtimeMenuStore] Loaded " + enrichedItems.length + " menu items with attached variants");
             }
             
             // ✅ BACKWARD COMPATIBILITY: Also extract variants into separate array for components still using itemVariants
@@ -524,7 +524,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             // Set the enriched variants (includes image_url and image_variants)
             if (allVariants.length > 0) {
               get().setItemVariants(allVariants);
-              console.log(`✅ [RealtimeMenuStore] Also extracted ${allVariants.length} variants for backward compatibility`);
+              console.log("✅ [RealtimeMenuStore] Also extracted " + allVariants.length + " variants for backward compatibility");
             }
             
             // ✅ Fetch other supplementary data that's NOT in the main API
@@ -912,7 +912,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               score = 800;
             }
             // Priority 3: Name contains query (word boundary)
-            else if (itemName.includes(` ${query}`) || itemName.includes(query)) {
+            else if (itemName.includes(" " + query) || itemName.includes(query)) {
               score = 600;
             }
             // Priority 4: Category name contains query
@@ -1255,7 +1255,7 @@ function handleCategoriesChange(payload: any) {
     } as Category;
     
     store.setCategories([...store.categories, newCategory]);
-    toast.success(`Category "${newCategory.name}" added`);
+    toast.success("Category "" + newCategory.name + "" added");
   } else if (payload.eventType === 'UPDATE') {
     const updatedCategory = {
       ...payload.new,
@@ -1267,12 +1267,12 @@ function handleCategoriesChange(payload: any) {
       cat.id === updatedCategory.id ? updatedCategory : cat
     );
     store.setCategories(categories);
-    toast.success(`Category "${updatedCategory.name}" updated`);
+    toast.success("Category "" + updatedCategory.name + "" updated");
   } else if (payload.eventType === 'DELETE') {
     const deletedCategory = payload.old as Category;
     const categories = store.categories.filter(cat => cat.id !== deletedCategory.id);
     store.setCategories(categories);
-    toast.success(`Category "${deletedCategory.name}" removed`);
+    toast.success("Category "" + deletedCategory.name + "" removed");
   }
   
   // Trigger corpus sync after category changes
@@ -1289,7 +1289,7 @@ function handleMenuItemsChange(payload: any) {
       active: payload.new.is_active ?? payload.new.active ?? true
     } as MenuItem;
     store.setMenuItems([...store.menuItems, newItem]);
-    toast.success(`Menu item "${newItem.name}" added`);
+    toast.success("Menu item "" + newItem.name + "" added");
   } else if (payload.eventType === 'UPDATE') {
     // ✅ FIX (MYA-1446): Map is_active → active for consistency with backend
     const updatedItem = {
@@ -1300,12 +1300,12 @@ function handleMenuItemsChange(payload: any) {
       item.id === updatedItem.id ? updatedItem : item
     );
     store.setMenuItems(menuItems);
-    toast.success(`Menu item "${updatedItem.name}" updated`);
+    toast.success("Menu item "" + updatedItem.name + "" updated");
   } else if (payload.eventType === 'DELETE') {
     const deletedItem = payload.old as MenuItem;
     const menuItems = store.menuItems.filter(item => item.id !== deletedItem.id);
     store.setMenuItems(menuItems);
-    toast.success(`Menu item "${deletedItem.name}" removed`);
+    toast.success("Menu item "" + deletedItem.name + "" removed");
   }
   
   // Trigger corpus sync after menu item changes
@@ -1466,7 +1466,7 @@ export const loadItemDetails = async (itemId: string) => {
       return detailsData.data;
     }
   } catch (error) {
-    console.error(`❌ [POS Bundle] Failed to load item details for ${itemId}:`, error);
+    console.error("❌ [POS Bundle] Failed to load item details for " + itemId + ":", error);
     return null;
   }
 };
@@ -1506,7 +1506,7 @@ export const loadCategoryItems = async (categoryId: string) => {
       return categoryData.data;
     }
   } catch (error) {
-    console.error(`❌ [POS Bundle] Failed to load category items for ${categoryId}:`, error);
+    console.error("❌ [POS Bundle] Failed to load category items for " + categoryId + ":", error);
     return null;
   }
 };
@@ -1545,14 +1545,14 @@ export const startRealtimeSubscriptionsIfNeeded = () => {
  * 3. Cleans up internal subscription tracking
  * 
  * USAGE:
- * ```tsx
+ * """tsx
  * useEffect(() => {
  *   // Component mount logic
  *   return () => {
  *     cleanupRealtimeMenuStore(); // Cleanup on unmount
  *   };
  * }, []);
- * ```
+ * """
  * 
  * @see startRealtimeSubscriptionsIfNeeded
  */
