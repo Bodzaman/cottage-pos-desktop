@@ -6,10 +6,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { colors } from 'utils/designSystem';
 import { getSpiceEmoji } from 'utils/premiumTheme';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
-import type { MenuItem, ItemVariant, OrderItem } from 'types';
+import type { MenuItem, OrderItem, SelectedCustomization } from 'utils/menuTypes';
+import type { ItemVariant } from 'utils/menuTypes';
 import { shallow } from 'zustand/shallow';
 import { StaffCustomizationModal } from 'components/StaffCustomizationModal';
-import type { SelectedCustomization } from 'components/StaffCustomizationModal';
+import { POSVariantSelector } from 'components/POSVariantSelector';
 import { OptimizedImage } from 'components/OptimizedImage';
 import { useVariantImageCarousel } from 'utils/useVariantImageCarousel';
 
@@ -54,6 +55,7 @@ export function POSMenuItemCard({
   const [showVariantInfoPopover, setShowVariantInfoPopover] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
   const [selectedVariantForCustomization, setSelectedVariantForCustomization] = useState<ItemVariant | null>(null);
   const [previewedVariant, setPreviewedVariant] = useState<ItemVariant | null>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
@@ -87,23 +89,8 @@ export function POSMenuItemCard({
     return activeVariants.filter(variantHasFoodDetails);
   }, [activeVariants]);
 
-  // 🐛 DEBUG: Log variant food details for TIKKA item
-  useEffect(() => {
-    if (item.name?.includes('TIKKA')) {
-      console.log('🔍 TIKKA Variant Details Check:', {
-        itemName: item.name,
-        isMultiVariant,
-        activeVariantsCount: activeVariants.length,
-        variantsWithFoodDetailsCount: variantsWithFoodDetails.length,
-        variantsWithFoodDetails: variantsWithFoodDetails.map(v => ({
-          name: v.variant_name || v.name,
-          spice_level: v.spice_level,
-          allergens: v.allergens,
-          is_nut_free: v.is_nut_free
-        }))
-      });
-    }
-  }, [item.name, isMultiVariant, activeVariants.length, variantsWithFoodDetails]);
+  // State for food detail popover
+  const [showFoodDetails, setShowFoodDetails] = useState(false);
 
   // ✅ FIX (MYA-1479): Extract variant image URLs for carousel (string array)
   // 🎯 CRITICAL: Use useMemo to prevent array recreation on every render
@@ -194,8 +181,8 @@ export function POSMenuItemCard({
     const variantName = getVariantName(variant);
 
     // For single-variant items, don't show variant name
-    // For multi-variant items, show variant name to distinguish
-    const displayName = isMultiVariant ? `${item.name} (${variantName})` : item.name;
+    // For multi-variant items, prefix with variant name (protein type first)
+    const displayName = isMultiVariant ? `${variantName} ${item.name}` : item.name;
 
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -277,12 +264,26 @@ export function POSMenuItemCard({
 
   // Handle customize button
   const handleCustomize = () => {
-    // For multi-variant items, use cheapest variant as default
-    const defaultVariant = activeVariants[0];
-    if (!defaultVariant) return;
+    // For multi-variant items, open variant selector first
+    if (isMultiVariant && activeVariants.length > 1) {
+      setIsVariantSelectorOpen(true);
+      return;
+    }
 
-    // Set the variant and open the customization modal
-    setSelectedVariantForCustomization(defaultVariant);
+    // For single-variant items, use that variant and open customization modal directly
+    const defaultVariant = activeVariants[0];
+    setSelectedVariantForCustomization(defaultVariant || null);
+    setIsCustomizationModalOpen(true);
+  };
+
+  // Handle variant selection from POSVariantSelector → Open customization modal
+  const handleVariantSelectedForCustomization = (orderItem: OrderItem) => {
+    // Find the variant by variant_id from the orderItem
+    const variant = variants.find(v => v.id === orderItem.variant_id);
+    
+    // Set the selected variant and open customization modal
+    setSelectedVariantForCustomization(variant || null);
+    setIsVariantSelectorOpen(false);
     setIsCustomizationModalOpen(true);
   };
 
@@ -309,7 +310,7 @@ export function POSMenuItemCard({
         quantity: quantity,
         price: price,
         protein_type: variant.protein_type_name,
-        image_url: item.image_url || '',
+        image_url: variant.display_image_url || variant.image_url || item.image_url || '',
         notes: notes || '',
         customizations: customizations?.map(c => ({
           id: c.id,
@@ -341,7 +342,7 @@ export function POSMenuItemCard({
         quantity: quantity,
         price: totalPrice,
         protein_type: variant?.protein_type_name,
-        image_url: item.image_url || '',
+        image_url: variant ? (variant.display_image_url || variant.image_url || item.image_url || '') : (item.image_url || ''),
         notes: notes || '',
         customizations: customizations?.map(c => ({
           id: c.id,
@@ -824,6 +825,15 @@ export function POSMenuItemCard({
         onConfirm={handleCustomizationConfirm}
         orderType={orderType}
         initialQuantity={quantity}
+      />
+
+      {/* Variant Selector Modal - For choosing protein before customization */}
+      <POSVariantSelector
+        menuItem={item}
+        isOpen={isVariantSelectorOpen}
+        onClose={() => setIsVariantSelectorOpen(false)}
+        onAddToOrder={handleVariantSelectedForCustomization}
+        orderType={orderType}
       />
     </motion.div>
   );
