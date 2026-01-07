@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { Separator } from '@/components/ui/separator';
 
 // Lazy load heavy tab components for better initial load performance
 const AdminDashboardContent = lazy(() => import("../components/AdminDashboardContent"));
@@ -16,6 +17,7 @@ const AdminPortalMenuContent = lazy(() => import("../components/AdminPortalMenuC
 const MediaLibraryContent = lazy(() => import("../components/MediaLibraryContent").then(module => ({ default: module.MediaLibraryContent })));
 const AIStaffManagementHub = lazy(() => import("../pages/AIStaffManagementHub"));
 const RestaurantSettingsManager = lazy(() => import("../components/RestaurantSettingsManager"));
+const StaffManagement = lazy(() => import("../components/StaffManagement").then(module => ({ default: module.StaffManagement })));
 
 // Define the tab types
 type TabType = "dashboard" | "menu" | "media" | "ai-management" | "settings";
@@ -273,6 +275,12 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
           >
             <ErrorBoundary fallbackMessage="Failed to load settings. Please refresh the page.">
               <Suspense fallback={<TabLoadingFallback />}>
+                {/* Staff Management Section */}
+                <StaffManagement />
+                
+                <Separator className="my-8 bg-purple-600/20" />
+                
+                {/* Restaurant Settings Section */}
                 <RestaurantSettingsManager />
               </Suspense>
             </ErrorBoundary>
