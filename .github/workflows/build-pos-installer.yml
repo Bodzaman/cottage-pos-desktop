@@ -27,7 +27,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build React frontend with Vite
         run: npm run build:renderer
@@ -70,13 +70,13 @@ jobs:
         with:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
-          asset_name: Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
+          asset_name: Cottage-Tandoori-POS-Setup-${{ steps.package-version.outputs.VERSION }}.exe
           asset_content_type: application/octet-stream
 
       - name: Upload installer as artifact (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: pos-installer
-          path: ./release/*.exe
+          name: cottage-tandoori-pos-installer
+          path: ./release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
           retention-days: 30
