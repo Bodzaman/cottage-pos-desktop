@@ -46,7 +46,7 @@ export default function ConfirmationDialog({
         className="border-0 border-b-2"
         style={{
           backgroundColor: QSAITheme.background.primary,
-          border: "1px solid " + QSAITheme.border.medium,
+          border: `1px solid ${QSAITheme.border.medium}`,
           borderBottomColor: QSAITheme.purple.primary
         }}
       >
@@ -70,7 +70,7 @@ export default function ConfirmationDialog({
               backgroundColor: 'transparent',
               borderColor: QSAITheme.border.medium,
               color: QSAITheme.text.secondary,
-              border: "1px solid " + QSAITheme.border.medium
+              border: `1px solid ${QSAITheme.border.medium}`
             }}
           >
             {cancelText}
