@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { CustomerProfile, CustomerProfileResponse, AppApisCustomerProfileApiCustomerAddress, RecentOrder } from 'types';
 import { toast } from 'sonner';
 
@@ -88,7 +88,7 @@ export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set
       }
       
       // Use lookup-customer endpoint
-      const response = await brain.lookup_customer(searchParams);
+      const response = await apiClient.lookup_customer(searchParams);
       const data: CustomerProfileResponse = await response.json();
       
       console.log('📊 [CustomerIntelligence] Search result:', data);
@@ -96,7 +96,7 @@ export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set
       if (data.success && data.customer) {
         // Now fetch comprehensive data (addresses, orders, favorites)
         try {
-          const comprehensiveResponse = await brain.get_customer_profile({ 
+          const comprehensiveResponse = await apiClient.get_customer_profile({ 
             customer_id: data.customer.id,
             comprehensive: true 
           });
