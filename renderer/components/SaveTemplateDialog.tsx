@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { Save } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useSimpleAuth } from 'utils/simple-auth-context';
@@ -41,7 +41,7 @@ export const SaveTemplateDialog: React.FC<Props> = ({
 
     setIsSaving(true);
     try {
-      const response = await brain.create_receipt_template({
+      const response = await apiClient.create_receipt_template({
         user_id: user.id,
         name: templateName.trim(),
         description: description.trim(),
