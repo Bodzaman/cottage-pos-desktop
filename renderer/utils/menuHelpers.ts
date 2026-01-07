@@ -137,13 +137,6 @@ export function groupItemsByHierarchy(
 ): HierarchicalMenu {
   const isDev = import.meta.env?.DEV;
   
-  if (isDev) {
-    console.log('🔨 [groupItemsByHierarchy] Input:', {
-      itemCount: items.length,
-      categoryCount: categories.length
-    });
-  }
-  
   // Build section structure
   const sections: MenuSection[] = [];
   
@@ -224,17 +217,6 @@ export function groupItemsByHierarchy(
       });
     }
   });
-  
-  if (isDev) {
-    console.log('🔨 [groupItemsByHierarchy] Output:', {
-      sectionCount: sections.length,
-      sections: sections.map(s => ({
-        name: s.displayName,
-        categoryCount: s.categories.length,
-        totalItems: s.categories.reduce((sum, cat) => sum + cat.items.length, 0)
-      }))
-    });
-  }
   
   return { sections };
 }
