@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 import { safeCurrency, safeTotalWithTip } from '../utils/numberUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import CardTerminalModal from './CardTerminalModal';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 // Payment Flow State Machine
 enum PaymentStep {
@@ -148,7 +148,7 @@ export function POSUnifiedPaymentModal({
     
     try {
       // Get POS settings for minimum order value
-      const response = await brain.get_pos_settings();
+      const response = await apiClient.get_pos_settings();
       const data = await response.json();
       
       if (data.success && data.settings?.delivery) {
