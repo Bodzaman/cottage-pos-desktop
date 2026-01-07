@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { BellRing, CheckCircle, RefreshCw, XCircle, User } from 'lucide-react';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 interface CustomerPreferencesProps {
   phone_number: string;
@@ -53,7 +53,7 @@ export function CustomerPreferencesPanel({ phone_number, onPreferencesUpdated }:
     
     try {
       setIsLoading(true);
-      const response = await brain.get_customer_preferences({ phone_number });
+      const response = await apiClient.get_customer_preferences({ phone_number });
       const data = await response.json();
       
       if (data.success && data.preferences) {
@@ -75,7 +75,7 @@ export function CustomerPreferencesPanel({ phone_number, onPreferencesUpdated }:
     
     try {
       setIsSaving(true);
-      const response = await brain.update_customer_preferences(
+      const response = await apiClient.update_customer_preferences(
         { phone_number },
         preferences
       );
