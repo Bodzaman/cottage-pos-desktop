@@ -15,9 +15,9 @@ export interface ApiError {
 }
 
 /**
- * Extract meaningful error information from brain HTTP client errors
+ * Extract meaningful error information from API HTTP client errors
  * 
- * The brain HTTP client throws errors with this structure:
+ * The API HTTP client throws errors with this structure:
  * {
  *   status: number,
  *   error: { detail: any },
