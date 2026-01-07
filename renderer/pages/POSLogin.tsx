@@ -4,37 +4,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, AlertTriangle, Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import brain from 'brain';
-import { getDeviceFingerprint } from 'utils/deviceFingerprint';
 import { usePOSAuth } from 'utils/usePOSAuth';
-import { supabase } from 'utils/supabaseClient';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { AnimatedNucleus } from 'components/AnimatedNucleus';
-import { ForgotPasswordModal } from 'components/ForgotPasswordModal';
+import { toast } from 'sonner';
 
 const APP_VERSION = 'v1.0.2';
 
 export default function POSLogin() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [trustDevice, setTrustDevice] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockMessage, setLockMessage] = useState('');
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [shakeError, setShakeError] = useState(false);
-  const [lastLoginInfo, setLastLoginInfo] = useState<{timestamp: string; isNewDevice: boolean} | null>(null);
   
   const navigate = useNavigate();
-  // ✅ Zustand store - all components share this state
-  const { login, isAuthenticated, isLoading: authLoading } = usePOSAuth();
+  const { login, isAuthenticated, isLoading } = usePOSAuth();
   
   // ============================================================================
   // NAVIGATION GUARDS - PREVENT REDIRECT LOOPS
@@ -54,12 +42,12 @@ export default function POSLogin() {
       return;
     }
     
-    if (!authLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       hasRedirectedRef.current = true;
       lastRedirectTimeRef.current = now;
       navigate('/pos-desktop', { replace: true });
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
   
   // ✅ ENABLED: Reset redirect guard
   useEffect(() => {
@@ -68,135 +56,27 @@ export default function POSLogin() {
     }
   }, [isAuthenticated]);
 
-  // Check if device is locked on mount
-  useEffect(() => {
-    checkLockStatus();
-  }, []);
-
-  const checkLockStatus = async () => {
-    try {
-      const deviceFingerprint = getDeviceFingerprint();
-      const response = await brain.get_admin_lock_status({ device_fingerprint: deviceFingerprint });
-      const data = await response.json();
-
-      if (data.is_locked && data.cooldown_until) {
-        const cooldownTime = new Date(data.cooldown_until).getTime();
-        const now = Date.now();
-        const remainingMs = cooldownTime - now;
-
-        if (remainingMs > 0) {
-          setIsLocked(true);
-          const minutes = Math.ceil(remainingMs / 60000);
-          setLockMessage(`Too many failed attempts. Please wait ${minutes} minute${minutes > 1 ? 's' : ''}.`);
-
-          // Auto-unlock when cooldown expires
-          setTimeout(() => {
-            setIsLocked(false);
-            setLockMessage('');
-          }, remainingMs);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check lock status:', err);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (isLocked) {
-      return;
-    }
 
-    setError(null);
     setShakeError(false);
-    setIsLoading(true);
 
     try {
-      const deviceFingerprint = getDeviceFingerprint();
+      await login(username, password);
       
-      // Step 1: Sign in with Supabase (creates frontend session)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (authError || !authData.user) {
-        setError('Invalid email or password');
-        setShakeError(true);
-        setTimeout(() => setShakeError(false), 500);
-        setIsLoading(false);
-        return;
-      }
-
-      // Step 2: Verify user has POS access
-      const accessResponse = await brain.check_pos_access({
-        user_id: authData.user.id,
-      });
-      const accessData = await accessResponse.json();
-
-      if (!accessData.has_access) {
-        await supabase.auth.signOut(); // Clean up session
-        setError('Your account does not have POS access. Please contact an administrator.');
-        setShakeError(true);
-        setTimeout(() => setShakeError(false), 500);
-        setIsLoading(false);
-        return;
-      }
-
-      // Step 3: Get previous last login info BEFORE updating
-      const previousLastLogin = authData.user.user_metadata?.last_login;
-      const previousDevice = authData.user.user_metadata?.last_login_device;
-      const isNewDevice = previousDevice && previousDevice !== deviceFingerprint.substring(0, 20);
-      
-      if (previousLastLogin) {
-        setLastLoginInfo({
-          timestamp: previousLastLogin,
-          isNewDevice: !!isNewDevice
-        });
-      }
-
-      // Step 4: Trust device if requested
-      if (trustDevice) {
-        await brain.trust_device_for_user({
-          user_id: authData.user.id,
-          device_fingerprint: deviceFingerprint,
-          label: 'POS Device',
-        });
-      }
-
-      // Step 5: Update local auth state
-      login(authData.user.email || email, {
-        userId: authData.user.id,
-        role: accessData.role,
-        session: authData.session,
-      });
-
-      // Step 6: Store last login timestamp in user metadata
-      try {
-        await supabase.auth.updateUser({
-          data: {
-            last_login: new Date().toISOString(),
-            last_login_device: deviceFingerprint.substring(0, 20) // Store partial fingerprint for reference
-          }
-        });
-      } catch (metaError) {
-        console.error('Failed to update last login metadata:', metaError);
-        // Non-critical, continue with login
-      }
-
       // Show success animation, then redirect after 1 second
       setLoginSuccess(true);
+      toast.success('Login successful');
+      
       setTimeout(() => {
         navigate('/pos-desktop', { replace: true });
       }, 1000);
     } catch (err) {
       console.error('Login failed:', err);
-      setError('Login failed. Please try again.');
+      toast.error(err instanceof Error ? err.message : 'Invalid username or password');
       setShakeError(true);
       setTimeout(() => setShakeError(false), 500);
-    } finally {
-      setIsLoading(false);
+      setPassword(''); // Clear password on error
     }
   };
 
@@ -320,66 +200,13 @@ export default function POSLogin() {
             
             {/* Helper Text */}
             <p className="text-sm" style={{ color: QSAITheme.text.muted, opacity: 0.7 }}>
-              Sign in with your credentials to access the POS
+              Staff Login - POS Access
             </p>
           </motion.div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Lockout Warning */}
-            <AnimatePresence>
-              {isLocked && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Alert 
-                    style={{
-                      background: `linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)`,
-                      border: `1px solid rgba(124, 93, 250, 0.3)`,
-                      color: QSAITheme.text.primary
-                    }}
-                  >
-                    <AlertTriangle className="h-4 w-4" style={{ color: QSAITheme.purple.light }} />
-                    <AlertDescription style={{ color: QSAITheme.text.secondary }}>{lockMessage}</AlertDescription>
-                  </Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Error Message */}
-            <AnimatePresence>
-              {error && !isLocked && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ 
-                    opacity: 1, 
-                    height: 'auto',
-                    x: shakeError ? [-10, 10, -10, 10, 0] : 0
-                  }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ 
-                    duration: shakeError ? 0.5 : 0.3,
-                    times: shakeError ? [0, 0.25, 0.5, 0.75, 1] : undefined
-                  }}
-                >
-                  <Alert 
-                    style={{
-                      background: `linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)`,
-                      border: `1px solid rgba(124, 93, 250, 0.3)`,
-                      color: QSAITheme.text.primary
-                    }}
-                  >
-                    <AlertTriangle className="h-4 w-4" style={{ color: QSAITheme.purple.light }} />
-                    <AlertDescription style={{ color: QSAITheme.text.secondary }}>{error}</AlertDescription>
-                  </Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Email Field */}
+            {/* Username Field */}
             <motion.div 
               className="space-y-2"
               initial={{ opacity: 0, x: -20 }}
@@ -387,7 +214,7 @@ export default function POSLogin() {
               transition={{ delay: 0.3, duration: 0.4 }}
             >
               <Label 
-                htmlFor="email"
+                htmlFor="username"
                 style={{ 
                   color: QSAITheme.text.secondary,
                   letterSpacing: '0.01em',
@@ -395,16 +222,16 @@ export default function POSLogin() {
                   fontWeight: 500
                 }}
               >
-                Email
+                Username
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading || isLocked}
-                autoComplete="email"
+                id="username"
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
+                autoComplete="username"
                 autoFocus
                 required
                 className="transition-all duration-200 focus:ring-2 focus:ring-offset-0"
@@ -454,7 +281,7 @@ export default function POSLogin() {
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading || isLocked}
+                  disabled={isLoading}
                   autoComplete="current-password"
                   required
                   className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-offset-0"
@@ -490,95 +317,43 @@ export default function POSLogin() {
                     e.currentTarget.style.color = QSAITheme.text.muted;
                     e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                   }}
-                  disabled={isLoading || isLocked}
+                  disabled={isLoading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              
-              {/* Forgot Password Link */}
-              <div className="flex justify-end mt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  disabled={isLoading || isLocked}
-                  className="text-xs transition-all duration-200 hover:underline"
-                  style={{ 
-                    color: QSAITheme.text.muted,
-                    cursor: isLoading || isLocked ? 'not-allowed' : 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading && !isLocked) {
-                      e.currentTarget.style.color = QSAITheme.purple.light;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = QSAITheme.text.muted;
-                  }}
-                >
-                  Forgot password?
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Trust Device Checkbox */}
-            <motion.div 
-              className="flex items-center space-x-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-            >
-              <Checkbox
-                id="trust-device"
-                checked={trustDevice}
-                onCheckedChange={(checked) => setTrustDevice(checked === true)}
-                disabled={isLoading || isLocked}
-                className="transition-all duration-200"
-                style={{
-                  border: `1px solid rgba(124, 93, 250, 0.3)`,
-                }}
-              />
-              <Label
-                htmlFor="trust-device"
-                className="text-sm font-normal cursor-pointer transition-colors duration-200"
-                style={{ color: QSAITheme.text.muted }}
-                onMouseEnter={(e) => e.currentTarget.style.color = QSAITheme.text.secondary}
-                onMouseLeave={(e) => e.currentTarget.style.color = QSAITheme.text.muted}
-              >
-                Trust this device (skip login next time)
-              </Label>
             </motion.div>
 
             {/* Submit Button */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.4 }}
+              transition={{ delay: 0.5, duration: 0.4 }}
             >
               <Button
                 type="submit"
                 className="w-full transition-all duration-300 font-semibold text-base"
-                disabled={isLoading || isLocked || !email || !password || loginSuccess}
+                disabled={isLoading || !username || !password || loginSuccess}
                 style={{
-                  background: isLoading || isLocked || !email || !password || loginSuccess
+                  background: isLoading || !username || !password || loginSuccess
                     ? `linear-gradient(135deg, rgba(124, 93, 250, 0.3) 0%, rgba(124, 93, 250, 0.2) 100%)`
                     : `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
                   border: 'none',
                   color: QSAITheme.text.primary,
                   padding: '0.875rem',
-                  boxShadow: isLoading || isLocked || !email || !password || loginSuccess
+                  boxShadow: isLoading || !username || !password || loginSuccess
                     ? 'none'
                     : `0 4px 15px ${QSAITheme.purple.glow}`,
-                  cursor: isLoading || isLocked || !email || !password || loginSuccess ? 'not-allowed' : 'pointer'
+                  cursor: isLoading || !username || !password || loginSuccess ? 'not-allowed' : 'pointer'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading && !isLocked && email && password && !loginSuccess) {
+                  if (!isLoading && username && password && !loginSuccess) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = `0 6px 20px ${QSAITheme.purple.glow}, 0 0 30px ${QSAITheme.purple.glow}`;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading && !isLocked && email && password && !loginSuccess) {
+                  if (!isLoading && username && password && !loginSuccess) {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = `0 4px 15px ${QSAITheme.purple.glow}`;
                   }
@@ -605,53 +380,8 @@ export default function POSLogin() {
                 )}
               </Button>
               
-              {/* Last Login & New Device Info - Shows during success state */}
-              <AnimatePresence>
-                {loginSuccess && lastLoginInfo && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ delay: 0.2, duration: 0.3 }}
-                    className="mt-3 space-y-1.5"
-                  >
-                    {/* Last Login Timestamp */}
-                    <div 
-                      className="text-center text-xs"
-                      style={{ color: QSAITheme.text.muted }}
-                    >
-                      Last login: {new Date(lastLoginInfo.timestamp).toLocaleString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                    
-                    {/* New Device Warning */}
-                    {lastLoginInfo.isNewDevice && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3 }}
-                        className="flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded"
-                        style={{
-                          background: 'rgba(251, 191, 36, 0.1)',
-                          border: '1px solid rgba(251, 191, 36, 0.3)',
-                          color: '#fbbf24'
-                        }}
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>Login from new device detected</span>
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
               {/* Press Enter Hint */}
-              {!isLoading && !isLocked && email && password && !loginSuccess && (
+              {!isLoading && username && password && !loginSuccess && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.5 }}
@@ -669,7 +399,7 @@ export default function POSLogin() {
               className="flex items-center justify-center gap-4 mt-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.5 }}
-              transition={{ delay: 0.65, duration: 0.5 }}
+              transition={{ delay: 0.6, duration: 0.5 }}
             >
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-1 rounded-full" style={{ background: QSAITheme.purple.light }} />
@@ -801,12 +531,6 @@ export default function POSLogin() {
           </span>
         </motion.div>
       </div>
-      
-      {/* Forgot Password Modal */}
-      <ForgotPasswordModal 
-        open={showForgotPassword} 
-        onOpenChange={setShowForgotPassword}
-      />
     </div>
   );
 }
