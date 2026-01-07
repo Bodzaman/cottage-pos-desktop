@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentProcessingViewProps } from '../utils/paymentFlowTypes';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
 import { safeCurrency } from '../utils/numberUtils';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 // Payment processing states
@@ -87,7 +87,7 @@ function StripePaymentForm({
 
         // Confirm with backend
         try {
-          const confirmResponse = await brain.confirm_payment({
+          const confirmResponse = await apiClient.confirm_payment({
             payment_intent_id: paymentIntent.id,
             order_id: orderId,
           });
@@ -235,7 +235,7 @@ export function PaymentProcessingView({
       console.log('🔧 [Stripe] Initializing Stripe...');
       
       // 1. Get Stripe publishable key
-      const configResponse = await brain.get_stripe_publishable_key();
+      const configResponse = await apiClient.get_stripe_publishable_key();
       const config = await configResponse.json();
       const publishableKey = config.publishable_key;
       
@@ -249,7 +249,7 @@ export function PaymentProcessingView({
       
       // 2. Create Payment Intent
       console.log('💳 [Stripe] Creating Payment Intent...');
-      const intentResponse = await brain.create_payment_intent({
+      const intentResponse = await apiClient.create_payment_intent({
         amount: Math.round(totalAmount * 100), // Convert to pence
         currency: 'gbp',
         order_id: orderId,
