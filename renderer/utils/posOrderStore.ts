@@ -30,6 +30,12 @@ export interface OrderStore {
   incrementItem: (index: number) => void;
   decrementItem: (index: number) => void;
   updateItemNotes: (index: number, notes: string) => void;
+  updateItem: (index: number, updates: Partial<OrderItem>) => void;
+  updateItemWithCustomizations: (itemId: string, updates: {
+    quantity?: number;
+    customizations?: any[];
+    notes?: string;
+  }) => void;
   clearOrder: () => void;
   
   // Order Type & Table Management
@@ -116,6 +122,41 @@ export const usePOSOrderStore = create<OrderStore>((set, get) => ({
           ? { ...item, notes }
           : item
       )
+    }));
+  },
+  
+  updateItem: (index: number, updates: Partial<OrderItem>) => {
+    set(state => ({
+      orderItems: state.orderItems.map((item, i) => 
+        i === index
+          ? { ...item, ...updates }
+          : item
+      )
+    }));
+  },
+  
+  /**
+   * Update item by ID with customizations, quantity, and notes
+   * Matches DINE-IN pattern for editing existing items via StaffCustomizationModal
+   * Used by Takeaway modes (WAITING/COLLECTION/DELIVERY)
+   */
+  updateItemWithCustomizations: (itemId: string, updates: {
+    quantity?: number;
+    customizations?: any[];
+    notes?: string;
+  }) => {
+    set(state => ({
+      orderItems: state.orderItems.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            ...(updates.quantity !== undefined && { quantity: updates.quantity }),
+            ...(updates.customizations !== undefined && { customizations: updates.customizations }),
+            ...(updates.notes !== undefined && { notes: updates.notes })
+          };
+        }
+        return item;
+      })
     }));
   },
   
