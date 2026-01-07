@@ -99,7 +99,7 @@ export const useDineInOrder = (tableId: string | null) => {
         const data = await response.json();
         
         if (data.success) {
-          console.log('[useDineInOrder] ✅ Loaded ' + data.items.length + ' enriched items');
+          console.log('[useDineInOrder] ✅ Loaded ${data.items.length} enriched items');
           setEnrichedItems(data.items);
         } else {
           console.error('[useDineInOrder] ❌ Failed to fetch enriched items:', data.message);
@@ -206,14 +206,14 @@ export const useDineInOrder = (tableId: string | null) => {
     
     // Channel 1: Watch orders table for status/metadata changes
     const ordersChannel = supabase
-      .channel("order-" + tableId)
+      .channel(`order-${tableId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: "table_id=eq." + tableId
+          filter: `table_id=eq.${tableId}`
         },
         async (payload) => {
           console.log('[useDineInOrder] 🔔 Orders table change:', payload.eventType);
@@ -273,7 +273,7 @@ export const useDineInOrder = (tableId: string | null) => {
     
     // Channel 2: Watch dine_in_order_items for item changes (add/remove/update)
     const itemsChannel = supabase
-      .channel("order-items-" + tableId)
+      .channel(`order-items-${tableId}`)
       .on(
         'postgres_changes',
         {
@@ -437,7 +437,7 @@ export const useDineInOrder = (tableId: string | null) => {
       });
       const result = await response.json();
       console.log('[useDineInOrder] ✅ ADD_ITEM RESPONSE:', result);
-      toast.success("Added " + item.name);
+      toast.success(`Added ${item.name}`);
       // State updates via subscription
     } catch (err: any) {
       console.error('[useDineInOrder] ❌ Add item error:', err);
@@ -578,7 +578,7 @@ export const useDineInOrder = (tableId: string | null) => {
       });
       await response.json();
       console.log('[useDineInOrder] Guest count updated:', guestCount);
-      toast.success("Guest count updated to " + guestCount);
+      toast.success(`Guest count updated to ${guestCount}`);
       // State updates via subscription
     } catch (err: any) {
       console.error('[useDineInOrder] Update guest count error:', err);
