@@ -59,7 +59,7 @@ export function detectConfigurationFromItem(itemData: any): MenuItemConfiguratio
  * Hook for managing menu item configuration state
  * 
  * @example
- * ```tsx
+ * """tsx
  * const {
  *   config,
  *   setItemType,
@@ -79,7 +79,7 @@ export function detectConfigurationFromItem(itemData: any): MenuItemConfiguratio
  * if (isComplete()) {
  *   // Open form with config
  * }
- * ```
+ * """
  */
 export function useMenuItemConfiguration() {
   const [config, setConfig] = useState<MenuItemConfiguration | null>(null);
