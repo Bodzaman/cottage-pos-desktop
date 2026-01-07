@@ -14,7 +14,7 @@
  * - Offline capability: 100% (all menu operations work offline)
  */
 
-import { MenuCategory, MenuItem, ProteinType, Customization, ItemVariant } from './menuTypes';
+import { MenuCategory, Customization, MenuItem, ProteinType, ItemVariant } from './masterTypes';
 
 const DB_NAME = 'cottage_tandoori_pos';
 const DB_VERSION = 1;
