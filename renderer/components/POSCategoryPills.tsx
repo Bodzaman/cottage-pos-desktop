@@ -1,8 +1,8 @@
 import React from 'react';
-import type { MenuCategory } from '../types';
+import type { Category } from 'utils/menuTypes';
 
 interface POSCategoryPillsProps {
-  categories: MenuCategory[];
+  categories: Category[];
   selectedCategoryId: string | null;
   onCategorySelect: (categoryId: string | null) => void;
 }
