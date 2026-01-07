@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { useCustomerDataStore } from './customerDataStore';
-import type { OrderType } from './customerTypes';
+import type { OrderType } from './masterTypes';
 
 /**
  * Customer data structure for POS
