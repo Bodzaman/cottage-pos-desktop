@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 import {
   processThermalImage,
   validateImageFile,
@@ -106,7 +106,7 @@ export default function ThermalLogoUploader({
         { type: 'image/png' }
       );
 
-      // Create upload data object (brain client handles FormData conversion)
+      // Create upload data object (apiClient handles FormData conversion)
       const uploadData = {
         file: processedFile,
         category: 'logos',
@@ -115,7 +115,7 @@ export default function ThermalLogoUploader({
         tags: JSON.stringify(['logo', 'thermal', 'receipt', logoSize, processingMode])
       };
       
-      const response = await brain.upload_general_file(uploadData);
+      const response = await apiClient.upload_general_file(uploadData);
       const data = await response.json();
       
       if (data.success && data.asset_id && data.url) {
