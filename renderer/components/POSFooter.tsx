@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { QSAITheme, styles } from 'utils/QSAIDesign';
-import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { createLogger, quickLog } from 'utils/logger';
 import { useSystemStatus } from 'utils/pollingService';
 // NEW: Import offline status utilities
 import { getOfflineStatus, onOfflineStatusChange } from '../utils/serviceWorkerManager';
 import { outboxSyncManager } from '../utils/outboxSyncManager';
 import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
+// ✅ EVENT-DRIVEN ARCHITECTURE (MYA-1595 Phase 1.5)
+import { useRestaurantTables } from '../utils/useRestaurantTables';
 
 interface POSFooterProps {
   className?: string;
@@ -17,6 +18,11 @@ interface POSFooterProps {
 /**
  * Professional footer for POSDesktop with complete operational status dashboard
  * Four-section layout: System Status | Operational Status | Branding | Date & Time
+ * 
+ * ✅ PHASE 1.5 COMPLETE: 100% EVENT-DRIVEN FOR DINE-IN MODE
+ * - Uses useRestaurantTables hook for real-time table data
+ * - Zero legacy polling or store dependencies
+ * - Active table count from pos_tables.status = 'OCCUPIED'
  */
 export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSFooterProps) {
   const logger = createLogger('POSFooter');
@@ -52,10 +58,10 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     loading: boolean;
   }>({ connected: true, loading: false }); // Assume connected by default
   
-  // Get table orders from store for active table count - SAFE ACCESS
-  const tableOrdersStore = useTableOrdersStore();
-  const persistedTableOrders = tableOrdersStore?.persistedTableOrders ?? {};
-  
+  // ✅ EVENT-DRIVEN: Real-time table data from pos_tables (MYA-1595 Phase 1.5)
+  // Only for DINE-IN mode - other modes don't use this data
+  const { tables: restaurantTables } = useRestaurantTables();
+
   // ============================================================================
   // REAL-TIME UPDATES
   // ============================================================================
@@ -120,23 +126,6 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
-  
-  // Calculate active tables count
-  const getActiveTablesCount = (): number => {
-    if (!persistedTableOrders || typeof persistedTableOrders !== 'object') {
-      return 0;
-    }
-    
-    try {
-      return Object.keys(persistedTableOrders).filter(tableNumber => {
-        const orders = persistedTableOrders[parseInt(tableNumber)];
-        return orders && Array.isArray(orders) && orders.length > 0;
-      }).length;
-    } catch (error) {
-      console.error('POSFooter: Error calculating active tables count:', error);
-      return 0;
-    }
-  };
   
   // Format current time
   const formatDateTime = (date: Date): string => {
@@ -260,7 +249,6 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     );
   };
   
-  const activeTablesCount = getActiveTablesCount();
   const orderTypeConfig = getOrderTypeConfig(currentOrderType);
   
   return (
@@ -285,7 +273,7 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
         <div className="flex items-center gap-1.5">
           <span className="text-sm">🏠</span>
           <span className="text-xs font-bold text-qsai-text-primary bg-qsai-purple/20 px-1.5 py-0.5 rounded text-center min-w-[20px]">
-            {activeTablesCount}
+            {restaurantTables.filter(table => table.status === 'OCCUPIED').length}
           </span>
         </div>
         
