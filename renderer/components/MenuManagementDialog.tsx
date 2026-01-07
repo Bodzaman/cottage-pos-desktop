@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { colors } from '../utils/designSystem';
 import { styles, globalColors, effects } from '../utils/QSAIDesign';
-import brain from '../brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 interface MenuManagementDialogProps {
@@ -100,7 +100,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
   const loadSetMeals = async () => {
     try {
       setLoadingSetMeals(true);
-      const response = await brain.list_set_meals({ active_only: true });
+      const response = await apiClient.list_set_meals({ active_only: true });
       
       if (response.ok) {
         const data = await response.json();
@@ -125,7 +125,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       setPasswordError(null);
       
       // Use the same verification logic as ManagementPasswordDialog
-      const response = await brain.verify_password({ password: passwordInput });
+      const response = await apiClient.verify_password({ password: passwordInput });
       const data = await response.json();
       
       if (data.authenticated) {
@@ -223,7 +223,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       };
       
       // Call the API to update the menu item
-      const response = await brain.update_menu_item({ itemId: editingItemId }, updateData);
+      const response = await apiClient.update_menu_item({ itemId: editingItemId }, updateData);
       
       if (response.ok) {
         // Update local state immediately for better UX
@@ -291,7 +291,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       };
       
       // Call the API to update the menu item
-      const response = await brain.update_menu_item({ itemId: item.id }, updateData);
+      const response = await apiClient.update_menu_item({ itemId: item.id }, updateData);
       
       if (response.ok) {
         // Update local state immediately for better UX
@@ -331,7 +331,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       
       const duplicateName = `${item.name} (Copy)`;
       
-      const response = await brain.create_menu_item({
+      const response = await apiClient.create_menu_item({
         ...item,
         name: duplicateName,
         id: undefined  // Remove ID to create new item
