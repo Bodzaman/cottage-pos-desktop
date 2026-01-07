@@ -103,7 +103,7 @@ export function BillViewModal({
         onPrintReceipt();
       }
 
-      toast.success("Payment processed: £" + paymentAmount.toFixed(2));
+      toast.success(`Payment processed: £${paymentAmount.toFixed(2)}`);
       onClose();
     } catch (error) {
       console.error('Payment failed:', error);
@@ -118,9 +118,9 @@ export function BillViewModal({
       <DialogContent
         className="max-w-2xl border-0 p-0 overflow-hidden max-h-[90vh]"
         style={{
-          background: "linear-gradient(135deg, " + QSAITheme.background.primary + " 0%, " + QSAITheme.background.secondary + " 100%)",
-          border: "1px solid " + QSAITheme.border.medium,
-          borderBottom: "2px solid " + QSAITheme.purple.primary,
+          background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
+          border: `1px solid ${QSAITheme.border.medium}`,
+          borderBottom: `2px solid ${QSAITheme.purple.primary}`,
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
         }}
       >
@@ -129,7 +129,7 @@ export function BillViewModal({
           className="px-6 py-4 border-b"
           style={{
             borderColor: QSAITheme.border.medium,
-            background: "linear-gradient(135deg, " + QSAITheme.background.dark + " 0%, " + QSAITheme.background.primary + " 100%)"
+            background: `linear-gradient(135deg, ${QSAITheme.background.dark} 0%, ${QSAITheme.background.primary} 100%)`
           }}
         >
           <div className="flex items-center justify-between">
@@ -137,8 +137,8 @@ export function BillViewModal({
               <div
                 className="p-2 rounded-lg"
                 style={{
-                  background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
-                  boxShadow: "0 4px 12px " + QSAITheme.purple.glow
+                  background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
+                  boxShadow: `0 4px 12px ${QSAITheme.purple.glow}`
                 }}
               >
                 <Receipt className="w-5 h-5 text-white" />
@@ -166,7 +166,7 @@ export function BillViewModal({
             {/* Customer breakdowns */}
             {billSummary.customerBreakdowns.map((breakdown, index) => (
               <div
-                key={breakdown.customerId || "table-" + index}
+                key={breakdown.customerId || `table-${index}`}
                 className="p-4 rounded-lg border"
                 style={{
                   backgroundColor: QSAITheme.background.card,
@@ -201,7 +201,7 @@ export function BillViewModal({
                 <div className="space-y-2">
                   {breakdown.items.map((item, itemIndex) => (
                     <div
-                      key={item.id + "-" + itemIndex}
+                      key={`${item.id}-${itemIndex}`}
                       className="flex items-center justify-between text-sm py-1"
                     >
                       <div className="flex-1 min-w-0">
@@ -259,7 +259,7 @@ export function BillViewModal({
                     className="text-xl font-bold"
                     style={{
                       color: QSAITheme.purple.light,
-                      textShadow: "0 0 8px " + QSAITheme.purple.glow
+                      textShadow: `0 0 8px ${QSAITheme.purple.glow}`
                     }}
                   >
                     £{billSummary.grandTotal.toFixed(2)}
@@ -286,7 +286,7 @@ export function BillViewModal({
               onClick={() => setPaymentMode('pay-all')}
               className="flex-1"
               style={paymentMode === 'pay-all' ? {
-                background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
+                background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
                 color: 'white'
               } : {}}
             >
@@ -299,7 +299,7 @@ export function BillViewModal({
               onClick={() => setPaymentMode('split-even')}
               className="flex-1"
               style={paymentMode === 'split-even' ? {
-                background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
+                background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
                 color: 'white'
               } : {}}
             >
@@ -312,7 +312,7 @@ export function BillViewModal({
               onClick={() => setPaymentMode('individual')}
               className="flex-1"
               style={paymentMode === 'individual' ? {
-                background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
+                background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
                 color: 'white'
               } : {}}
             >
@@ -325,8 +325,8 @@ export function BillViewModal({
           <div
             className="p-3 rounded-lg text-center"
             style={{
-              background: "linear-gradient(135deg, " + QSAITheme.purple.primary + "20 0%, " + QSAITheme.purple.light + "20 100%)",
-              border: "1px solid " + QSAITheme.purple.primary
+              background: `linear-gradient(135deg, ${QSAITheme.purple.primary}20 0%, ${QSAITheme.purple.light}20 100%)`,
+              border: `1px solid ${QSAITheme.purple.primary}`
             }}
           >
             {paymentMode === 'split-even' && (
@@ -350,13 +350,13 @@ export function BillViewModal({
             disabled={processingPayment || (paymentMode === 'individual' && selectedCustomerIds.size === 0)}
             className="w-full py-6 text-lg font-bold"
             style={{
-              background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.light + " 100%)",
+              background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
               color: 'white',
-              boxShadow: "0 4px 16px " + QSAITheme.purple.glow
+              boxShadow: `0 4px 16px ${QSAITheme.purple.glow}`
             }}
           >
             <CreditCard className="w-5 h-5 mr-2" />
-            {processingPayment ? 'Processing...' : "Process Payment - £" + paymentAmount.toFixed(2)}
+            {processingPayment ? 'Processing...' : `Process Payment - £${paymentAmount.toFixed(2)}`}
           </Button>
         </div>
       </DialogContent>
