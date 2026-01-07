@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -11,7 +8,7 @@ import { globalColors } from 'utils/QSAIDesign';
 import GooglePlacesAutocompleteEnhanced from './GooglePlacesAutocompleteEnhanced';
 import type { ExtractedAddress } from './GooglePlacesAutocompleteEnhanced';
 import RouteVisualization from './RouteVisualization';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 interface CustomerData {
   street?: string;
@@ -55,8 +52,8 @@ export const EnhancedDeliveryAddressForm: React.FC<Props> = ({
     console.log('🔍 [EnhancedDeliveryAddressForm] useEffect triggered - fetching maps config...');
     const fetchMapsConfig = async () => {
       try {
-        console.log('🔍 [EnhancedDeliveryAddressForm] Making brain.get_maps_config() call...');
-        const response = await brain.get_maps_config();
+        console.log('🔍 [EnhancedDeliveryAddressForm] Making apiClient.get_maps_config() call...');
+        const response = await apiClient.get_maps_config();
         console.log('🔍 [EnhancedDeliveryAddressForm] Response received:', response.status);
         const data = await response.json();
         console.log('🔍 [EnhancedDeliveryAddressForm] Data parsed:', data);
