@@ -1,6 +1,3 @@
-
-
-
 /**
  * Order Management Service
  * 
@@ -8,7 +5,7 @@
  * from all channels (DINE-IN, DELIVERY, COLLECTION, WAITING, online).
  */
 
-import brain from "brain";
+import { apiClient } from "app";
 import { TableOrder } from "./tableTypes";
 
 export interface OrderItem {
@@ -219,7 +216,7 @@ export class OrderManagementService {
       const completedOrder = this.convertTableOrderToCompletedOrder(tableOrder, tableNumber, guestCount);
       
       // Store in the backend
-      const response = await brain.store_order(completedOrder);
+      const response = await apiClient.store_order(completedOrder);
       const result = await response.json();
       
       if (result.success) {
@@ -241,7 +238,7 @@ export class OrderManagementService {
       console.log(`Storing online order ${order.order_id}`);
       
       // Store in the backend
-      const response = await brain.store_order(order);
+      const response = await apiClient.store_order(order);
       const result = await response.json();
       
       if (result.success) {
@@ -301,7 +298,7 @@ export class OrderManagementService {
       }
       
       // Fetch orders from the API
-      const response = await brain.get_orders(queryParams);
+      const response = await apiClient.get_orders(queryParams);
       const data = await response.json();
       
       // Validate and clean the orders data to prevent undefined array errors
@@ -340,7 +337,7 @@ export class OrderManagementService {
   public async getOrderById(orderId: string): Promise<CompletedOrder | null> {
     try {
       // Fetch order from the API
-      const response = await brain.get_order_by_id({ orderId });
+      const response = await apiClient.get_order_by_id({ orderId });
       const data = await response.json();
       return data;
     } catch (error) {
@@ -367,7 +364,7 @@ export class OrderManagementService {
       }
       
       // Fetch reconciliation data from the API
-      const response = await brain.get_reconciliation_summary(queryParams);
+      const response = await apiClient.get_reconciliation_summary(queryParams);
       return await response.json();
     } catch (error) {
       console.error('Error fetching reconciliation summary:', error);
@@ -400,7 +397,7 @@ export class OrderManagementService {
       }
       
       // Fetch export data from the API
-      const response = await brain.export_orders(queryParams);
+      const response = await apiClient.export_orders(queryParams);
       return await response.json();
     } catch (error) {
       console.error('Error exporting orders:', error);
