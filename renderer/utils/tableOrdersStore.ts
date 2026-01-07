@@ -10,10 +10,17 @@
 
 
 
-// ... existing code ...
+
+
+
+
+
+
+
+
 
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { TableOrderItem } from './tableTypes';
 import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
@@ -217,7 +224,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   initializeSchema: async () => {
     try {
       set({ isLoading: true });
-      const response = await brain.setup_restaurant_schema();
+      const response = await apiClient.setup_restaurant_schema();
       if (response.ok) {
         const data = await response.json();
         if (isDev) console.log('Schema setup result:', JSON.stringify(data, null, 2));
@@ -533,7 +540,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      const response = await brain.update_customer_tab({ tab_id: tabId }, updates);
+      const response = await apiClient.update_customer_tab({ tab_id: tabId }, updates);
       
       if (response.ok) {
         const data = await response.json();
@@ -839,7 +846,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // NEW: Merge customer tabs
   mergeCustomerTabs: async (sourceTabId: string, targetTabId: string) => {
     try {
-      const response = await brain.merge_tabs({
+      const response = await apiClient.merge_tabs({
         source_tab_id: sourceTabId,
         target_tab_id: targetTabId
       });
@@ -1116,7 +1123,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // Create new table order (seat guests)
   createTableOrder: async (tableNumber: number, guestCount: number, linkedTables = []) => {
     try {
-      const response = await brain.create_table_order({
+      const response = await apiClient.create_table_order({
         table_number: tableNumber,
         guest_count: guestCount,
         linked_tables: linkedTables
@@ -1222,7 +1229,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       }));
       
       // ✅ FIXED: Pass tableNumber as object parameter matching AddItemsToTableParams
-      const response = await brain.add_items_to_table({ tableNumber }, backendItems);
+      const response = await apiClient.add_items_to_table({ tableNumber }, backendItems);
       
       if (response.ok) {
         const data = await response.json();
@@ -1355,10 +1362,15 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
           
           return true;
         }
+      } else {
+        // Only read error data if response is NOT ok
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to complete table order');
+        return false;
       }
       
-      const errorData = await response.json();
-      toast.error(errorData.message || 'Failed to complete table order');
+      // If response.ok but data.success is false
+      toast.error('Failed to complete table order');
       return false;
       
     } catch (error) {
@@ -1367,7 +1379,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       return false;
     }
   },
-
+  
   // Reset table to available (for final bill completion)
   resetTableToAvailable: async (tableNumber: number) => {
     try {
@@ -1698,6 +1710,17 @@ if (typeof window !== 'undefined') {
     // Only sync tables that have active customer tabs and are not currently syncing
     if (!state.syncInProgress) {
       for (const [tableNumber, tabs] of Object.entries(state.customerTabs)) {
+        // ⚠️ SKIP polling for DINE-IN mode tables (they use event-driven architecture)
+        // Only poll for legacy modes: WAITING, COLLECTION, DELIVERY
+        // DINE-IN tables are managed by useCustomerTabs + useDineInOrder hooks with real-time subscriptions
+        const isEventDrivenTable = tabs.length > 0 && tabs.some(tab => tab.status === 'active');
+        
+        // Skip event-driven DINE-IN tables to prevent dual architecture conflict
+        if (isEventDrivenTable) {
+          console.log(`[tableOrdersStore] ⏭️ Skipping legacy polling for DINE-IN table ${tableNumber} (using event-driven architecture)`);
+          continue;
+        }
+        
         if (tabs.length > 0 && state.hasActiveCustomerTabs(parseInt(tableNumber))) {
           await state.syncCustomerTabsFromServer(parseInt(tableNumber));
         }
