@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 import type { OrderItem } from './menuTypes';
-import type { OrderType } from './customerTypes';
+import type { OrderType } from './masterTypes';
 import type { CustomerData } from './useCustomerFlow';
 import { useCustomerDataStore } from './customerDataStore';
 
@@ -172,7 +172,7 @@ export function useOrderProcessing(
       console.log('📤 Submitting POS order:', orderPayload);
 
       // Submit to backend using unified pos_orders API
-      const response = await brain.create_pos_order(orderPayload);
+      const response = await apiClient.create_order(orderPayload);
       const data = await response.json();
 
       if (!data.success) {
