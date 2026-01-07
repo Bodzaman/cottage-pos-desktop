@@ -13,7 +13,7 @@ import { Category, MenuItem, ItemVariant, ProteinType, CustomizationBase, SetMea
 import { OrderItem } from './menuTypes';
 import { TableData } from './tableTypes';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { aiContextManager, invalidateMenuContext } from './aiContextManager';
 import { FIXED_SECTIONS, mapCategoryToSection } from './sectionMapping';
 import { requestCoordinator } from './requestCoordinator';
@@ -333,8 +333,8 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             // Track request
             networkMonitor.requestMade();
             
-            // ✅ CRITICAL FIX: Use brain API that handles image conversion properly
-            const response = await brain.get_menu_with_ordering();
+            // ✅ CRITICAL FIX: Use apiClient API that handles image conversion properly
+            const response = await apiClient.get_menu_with_ordering();
             const result = await response.json();
             
             if (result.success && result.data) {
@@ -475,7 +475,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       // Fetch supplementary data separately
       fetchSupplementaryData: async () => {
         try {
-          const response = await brain.get_menu_with_ordering();
+          const response = await apiClient.get_menu_with_ordering();
           const result = await response.json();
           
           if (result.success && result.data) {
@@ -644,7 +644,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             abortController.abort();
           }, 10000); // 10 second timeout
       
-          const response = await brain.sync_menu_corpus({ force: true });
+          const response = await apiClient.sync_menu_corpus({ force: true });
       
           clearTimeout(timeoutId);
       
@@ -751,7 +751,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             abortController.abort();
           }, 10000); // 10 second timeout
       
-          const response = await brain.refresh_ai_context();
+          const response = await apiClient.refresh_ai_context();
       
           clearTimeout(timeoutId);
       
@@ -781,7 +781,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       
       getAIMenuContext: async (options?: any) => {
         try {
-          const response = await brain.get_ai_menu_context(options);
+          const response = await apiClient.get_ai_menu_context(options);
           const result = await response.json();
       
           if (result.success) {
@@ -798,7 +798,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       
       validateAIMenuItem: async (query: string, categoryFilter?: string) => {
         try {
-          const response = await brain.validate_ai_menu_item(query, categoryFilter);
+          const response = await apiClient.validate_ai_menu_item(query, categoryFilter);
           const result = await response.json();
       
           if (result.success) {
@@ -1082,7 +1082,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
 
       fetchSetMeals: async () => {
         try {
-          const response = await brain.list_set_meals({ active_only: true });
+          const response = await apiClient.list_set_meals({ active_only: true });
           const setMeals = response.json ? await response.json() : response;
           
           if (Array.isArray(setMeals)) {
@@ -1394,9 +1394,8 @@ export const loadPOSBundle = async () => {
   try {
     store.setLoading(true);
     
-    // Import brain dynamically to avoid circular imports
-    const brain = (await import('brain')).default;
-    const response = await brain.get_pos_bundle();
+    // ✅ FIXED: Use apiClient instead of legacy brain import
+    const response = await apiClient.get_pos_bundle();
     const bundleData = await response.json();
     
     if (bundleData.success) {
@@ -1438,8 +1437,8 @@ export const loadPOSBundle = async () => {
 // NEW: Load full item details on-demand
 export const loadItemDetails = async (itemId: string) => {
   try {
-    const brain = (await import('brain')).default;
-    const response = await brain.item_details(itemId);
+    // ✅ FIXED: Use apiClient instead of legacy brain import
+    const response = await apiClient.item_details(itemId);
     const detailsData = await response.json();
     
     if (detailsData.success) {
