@@ -20,6 +20,11 @@ export interface Category {
 }
 
 /**
+ * Type alias for Category - allows components to use MenuCategory naming
+ */
+export type MenuCategory = Category;
+
+/**
  * Protein type definition (e.g., Chicken, Lamb, Prawn)
  */
 export interface ProteinType {
@@ -199,6 +204,16 @@ export interface CustomizationSelection {
 }
 
 /**
+ * Selected customization for staff modal and order management
+ */
+export interface SelectedCustomization {
+  id: string;
+  name: string;
+  price: number;
+  group?: string;
+}
+
+/**
  * Customization definition for menu items
  */
 export interface CustomizationBase {
@@ -315,4 +330,64 @@ export interface PaymentResult {
   reference?: string;
   tipAmount?: number;
   totalWithTip?: number;
+}
+
+/**
+ * Media image preview metadata structure
+ * Contains optimized image variant URLs from media_assets table
+ */
+export interface MediaImagePreviewMetadata {
+  // Direct variant URL fields (legacy format)
+  square_webp_url?: string | null;
+  square_jpeg_url?: string | null;
+  widescreen_webp_url?: string | null;
+  widescreen_jpeg_url?: string | null;
+  thumbnail_webp_url?: string | null;
+  thumbnail_jpeg_url?: string | null;
+  
+  // Nested variants structure (alternate format)
+  variants?: {
+    square?: { webp_url?: string | null; jpeg_url?: string | null };
+    widescreen?: { webp_url?: string | null; jpeg_url?: string | null };
+    thumbnail?: { webp_url?: string | null; jpeg_url?: string | null };
+  };
+  
+  // Variant keys using underscore format (third format)
+  square_variants?: { webp_url?: string | null; jpeg_url?: string | null };
+  widescreen_variants?: { webp_url?: string | null; jpeg_url?: string | null };
+  thumbnail_variants?: { webp_url?: string | null; jpeg_url?: string | null };
+}
+
+/**
+ * Variant information for signature dishes
+ */
+export interface VariantInfo {
+  id: string;
+  variant_name: string;
+  price: number;
+  image_url?: string;
+  description?: string;
+  featured?: boolean;
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  is_halal?: boolean;
+  is_dairy_free?: boolean;
+  is_nut_free?: boolean;
+}
+
+/**
+ * Signature Dish definition for featured menu items on public website
+ */
+export interface SignatureDish {
+  id: string;
+  title: string;
+  description: string;
+  main_image: string;
+  spice_level: number;
+  tags: string[];
+  category: string;
+  price: { [key: string]: string };
+  has_variants: boolean;
+  variants: VariantInfo[];
 }
