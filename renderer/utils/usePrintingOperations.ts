@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import brain from 'brain';
-import type { OrderType } from './menuTypes';
+import { supabase } from './supabaseClient';
+import type { OrderType } from './masterTypes';
 import type { OrderItem } from './menuTypes';
 import type { CustomerData } from './useCustomerFlow';
-import type { CustomerReceiptRequest } from 'types';
 import { useTemplateAssignments } from './useTemplateAssignments';
 import { getElectronHeaders } from './electronDetection';
+import { apiClient } from 'app';
 
 /**
  * Hook: usePrintingOperations
@@ -77,7 +77,7 @@ export function usePrintingOperations(
       // Convert order type to API format (e.g., "DINE-IN" -> "DINE_IN")
       const apiOrderMode = mode.replace(/-/g, '_');
       
-      const response = await brain.get_template_assignment({ 
+      const response = await apiClient.get_template_assignment({ 
         orderMode: apiOrderMode 
       });
       const assignment = await response.json();
@@ -99,7 +99,7 @@ export function usePrintingOperations(
   // ============================================================================
   // PRINT KITCHEN TICKET
   // ============================================================================
-  const handlePrintKitchenTicket = useCallback(async () => {
+  const handlePrintKitchen = useCallback(async () => {
     if (orderItems.length === 0) {
       toast.error('No items to print');
       return false;
@@ -110,42 +110,56 @@ export function usePrintingOperations(
       // Fetch template assignment for this order mode
       const { kitchenTemplateId } = await getTemplateAssignment(orderType);
       
-      const ticketData = {
-        orderType,
-        tableNumber: selectedTableNumber,
-        items: orderItems.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          notes: item.notes || '',
-          modifiers: item.modifiers || [],
-          variant_name: item.variant_name || null
-        })),
-        timestamp: new Date().toISOString(),
-        guestCount: orderType === 'DINE-IN' ? guestCount : undefined,
-        template_data: { template_id: kitchenTemplateId } // ✅ Wrap in template_data object
+      // Generate order number
+      const orderNumber = `${orderType.charAt(0)}${Date.now().toString().slice(-6)}`;
+      
+      // Build print job data
+      const jobData = {
+        p_job_type: 'KITCHEN_TICKET',
+        p_order_data: {
+          orderNumber,
+          orderType,
+          items: orderItems.map(item => ({
+            name: item.name,
+            variant_name: item.variant_name || null,
+            quantity: item.quantity,
+            modifiers: item.modifiers?.map(m => m.option_name) || [],
+            special_instructions: item.special_instructions || null
+          })),
+          table: selectedTableNumber?.toString() || undefined,
+          customerName: orderType !== 'DINE-IN' ? `${customerData.firstName} ${customerData.lastName}`.trim() : undefined,
+          timestamp: new Date().toISOString(),
+          template_id: kitchenTemplateId
+        },
+        p_printer_id: null, // Auto-select based on job type
+        p_priority: 10 // High priority for kitchen tickets
       };
 
-      console.log('🖨️ Printing kitchen ticket with template:', kitchenTemplateId);
+      console.log('🖨️ Creating kitchen ticket print job:', jobData);
 
-      // Call backend print endpoint with Electron mode headers
-      const response = await brain.print_kitchen_ticket(ticketData, getElectronHeaders());
-      const result = await response.json();
+      // Call Supabase RPC to create print job
+      const { data, error } = await supabase.rpc('create_print_job', jobData);
 
-      if (result.success) {
+      if (error) {
+        throw new Error(error.message || 'Failed to create print job');
+      }
+
+      if (data) {
         setLastPrintedAt(new Date());
-        toast.success('Kitchen ticket printed');
+        toast.success('Kitchen ticket queued for printing');
+        console.log('✅ Print job created:', data);
         return true;
       } else {
-        throw new Error(result.error || 'Print failed');
+        throw new Error('No job ID returned');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error printing kitchen ticket:', error);
-      toast.error('Failed to print kitchen ticket');
+      toast.error(`Kitchen print failed: ${error.message}`);
       return false;
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, selectedTableNumber, guestCount, getTemplateAssignment]);
+  }, [orderItems, orderType, selectedTableNumber, customerData, getTemplateAssignment]);
 
   // ============================================================================
   // PRINT CUSTOMER RECEIPT
@@ -164,55 +178,59 @@ export function usePrintingOperations(
       // Generate order number
       const orderNumber = `${orderType.charAt(0)}${Date.now().toString().slice(-6)}`;
       
-      const receiptData = {
-        orderNumber, // ✅ Add orderNumber - REQUIRED FIELD
-        orderType,
-        items: orderItems.map(item => {
-          let itemPrice = item.price;
-          
-          // Add modifier prices
-          if (item.modifiers && item.modifiers.length > 0) {
-            item.modifiers.forEach(mod => {
-              itemPrice += mod.price_adjustment || 0;
-            });
-          }
-          
-          return {
-            name: item.name,
-            variant_name: item.variant_name || null,
-            quantity: item.quantity,
-            unitPrice: itemPrice,
-            total: itemPrice * item.quantity,
-            modifiers: item.modifiers?.map(m => m.option_name) || []
-          };
-        }),
-        tax: orderTotal * 0.20, // ✅ Add tax calculation
-        deliveryFee: orderType === 'DELIVERY' ? 2.50 : 0, // ✅ Add delivery fee
-        table: selectedTableNumber?.toString() || undefined,
-        customerName: orderType !== 'DINE-IN' ? `${customerData.firstName} ${customerData.lastName}`.trim() : undefined,
-        paymentMethod: 'Card',
-        timestamp: new Date().toISOString(),
-        template_data: { template_id: customerTemplateId } // ✅ Wrap in template_data object
+      // Build print job data
+      const jobData = {
+        p_job_type: 'CUSTOMER_RECEIPT',
+        p_order_data: {
+          orderNumber,
+          orderType,
+          items: orderItems.map(item => {
+            let itemPrice = item.price;
+            
+            // Add modifier prices
+            if (item.modifiers && item.modifiers.length > 0) {
+              item.modifiers.forEach(mod => {
+                itemPrice += mod.price_adjustment || 0;
+              });
+            }
+            
+            return {
+              name: item.name,
+              variant_name: item.variant_name || null,
+              quantity: item.quantity,
+              unitPrice: itemPrice,
+              total: itemPrice * item.quantity,
+              modifiers: item.modifiers?.map(m => m.option_name) || []
+            };
+          }),
+          tax: orderTotal * 0.20,
+          deliveryFee: orderType === 'DELIVERY' ? 2.50 : 0,
+          table: selectedTableNumber?.toString() || undefined,
+          customerName: orderType !== 'DINE-IN' ? `${customerData.firstName} ${customerData.lastName}`.trim() : undefined,
+          paymentMethod: 'Card',
+          timestamp: new Date().toISOString(),
+          template_id: customerTemplateId
+        },
+        p_printer_id: null, // Auto-select based on job type
+        p_priority: 5 // Normal priority
       };
 
-      console.log('🖨️ Printing customer receipt with orderNumber:', orderNumber);
+      console.log('🖨️ Creating customer receipt print job:', jobData);
 
-      // Call backend print endpoint with Electron mode headers
-      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
-      const result = await response.json();
+      // Call Supabase RPC to create print job
+      const { data, error } = await supabase.rpc('create_print_job', jobData);
 
-      if (result.success) {
+      if (error) {
+        throw new Error(error.message || 'Failed to create print job');
+      }
+
+      if (data) {
         setLastPrintedAt(new Date());
-        // Check if dev environment (message contains "dev environment")
-        const isDevMode = result.message?.toLowerCase().includes('dev environment');
-        if (isDevMode) {
-          toast.success('Receipt formatted successfully (dev mode)');
-        } else {
-          toast.success('Receipt printed');
-        }
+        toast.success('Receipt queued for printing');
+        console.log('✅ Print job created:', data);
         return true;
       } else {
-        throw new Error(result.error || 'Print failed');
+        throw new Error('No job ID returned');
       }
     } catch (error) {
       console.error('❌ Error printing receipt:', error);
@@ -274,44 +292,50 @@ export function usePrintingOperations(
         };
       });
 
-      // Build CustomerReceiptRequest matching backend model
-      const receiptData: CustomerReceiptRequest = {
-        orderNumber: `TABLE-${selectedTableNumber}-${Date.now()}`,
-        orderType: 'DINE-IN',
-        items: receiptItems,
-        tax,
-        deliveryFee: 0,
-        template_data: {
-          ...(customerTemplateId && { template_id: customerTemplateId }),
+      // Build print job data
+      const jobData = {
+        job_type: 'BILL',
+        order_data: {
+          orderNumber: `TABLE-${selectedTableNumber}-${Date.now()}`,
+          orderType: 'DINE-IN',
+          items: receiptItems,
+          tax,
+          deliveryFee: 0,
           tableNumber: selectedTableNumber,
           guestCount,
           subtotal,
           serviceCharge,
           total,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          template_id: customerTemplateId || 'classic_restaurant',
+          table: `Table ${selectedTableNumber}`,
+          paymentMethod: 'Card'
         },
-        orderSource: 'POS',
-        table: `Table ${selectedTableNumber}`,
-        paymentMethod: 'Card'
+        printer_id: null, // Auto-select based on job type
+        priority: 5 // Normal priority
       };
 
-      console.log('🖨️ Printing dine-in bill for table:', selectedTableNumber);
+      console.log('🖨️ Creating bill print job for table:', selectedTableNumber);
       if (customerTemplateId) {
         console.log(`✅ Using validated template: ${customerTemplateId}`);
       } else {
         console.log('⚠️ No template assigned - using default formatting');
       }
 
-      // Call the thermal printer endpoint with Electron mode headers
-      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
-      const result = await response.json();
+      // Call Supabase RPC to create print job
+      const { data, error } = await supabase.rpc('create_print_job', jobData);
 
-      if (result.success) {
+      if (error) {
+        throw new Error(error.message || 'Failed to create print job');
+      }
+
+      if (data) {
         setLastPrintedAt(new Date());
-        toast.success(`✅ Bill printed for Table ${selectedTableNumber}`);
+        toast.success(`✅ Bill queued for Table ${selectedTableNumber}`);
+        console.log('✅ Print job created:', data);
         return true;
       } else {
-        throw new Error(result.error || 'Print failed');
+        throw new Error('No job ID returned');
       }
     } catch (error) {
       console.error('❌ Error printing bill:', error);
@@ -320,7 +344,7 @@ export function usePrintingOperations(
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, selectedTableNumber, guestCount, getTemplateAssignment]);
+  }, [orderType, orderItems, selectedTableNumber, guestCount, templateAssignments]);
 
   // ============================================================================
   // SEND TO KITCHEN (combines print + status update)
@@ -339,38 +363,48 @@ export function usePrintingOperations(
       // Generate order number
       const orderNumber = `${orderType.charAt(0)}${Date.now().toString().slice(-6)}`;
       
-      const ticketData = {
-        orderNumber, // ✅ Add orderNumber
-        orderType,
-        tableNumber: selectedTableNumber,
-        items: orderItems.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          notes: item.notes || '',
-          modifiers: item.modifiers || [],
-          variant_name: item.variant_name || null
-        })),
-        timestamp: new Date().toISOString(),
-        guestCount: orderType === 'DINE-IN' ? guestCount : undefined,
-        template_data: { template_id: kitchenTemplateId } // ✅ Wrap in template_data object
+      // Build print job data
+      const jobData = {
+        job_type: 'KITCHEN_TICKET',
+        order_data: {
+          orderNumber,
+          orderType,
+          tableNumber: selectedTableNumber,
+          items: orderItems.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            notes: item.notes || '',
+            modifiers: item.modifiers || [],
+            variant_name: item.variant_name || null
+          })),
+          timestamp: new Date().toISOString(),
+          guestCount: orderType === 'DINE-IN' ? guestCount : undefined,
+          template_id: kitchenTemplateId
+        },
+        printer_id: null, // Auto-select based on job type
+        priority: 5 // Normal priority
       };
 
-      console.log('🖨️ Printing kitchen ticket with template:', kitchenTemplateId);
+      console.log('🖨️ Sending to kitchen with template:', kitchenTemplateId);
 
-      // Call backend print endpoint with Electron mode headers
-      const response = await brain.print_kitchen_ticket(ticketData, getElectronHeaders());
-      const result = await response.json();
+      // Call Supabase RPC to create print job
+      const { data, error } = await supabase.rpc('create_print_job', jobData);
 
-      if (result.success) {
+      if (error) {
+        throw new Error(error.message || 'Failed to create print job');
+      }
+
+      if (data) {
         setLastPrintedAt(new Date());
-        toast.success('Kitchen ticket printed');
+        toast.success('Order sent to kitchen');
+        console.log('✅ Kitchen ticket queued:', data);
         return true;
       } else {
-        throw new Error(result.error || 'Print failed');
+        throw new Error('No job ID returned');
       }
     } catch (error) {
-      console.error('❌ Error printing kitchen ticket:', error);
-      toast.error('Failed to print kitchen ticket');
+      console.error('❌ Error sending to kitchen:', error);
+      toast.error('Failed to send to kitchen');
       return false;
     } finally {
       setIsPrinting(false);
@@ -383,7 +417,7 @@ export function usePrintingOperations(
     lastPrintedAt,
     
     // Handlers
-    handlePrintKitchenTicket,
+    handlePrintKitchen,
     handlePrintReceipt,
     handlePrintBill,
     handleSendToKitchen,
