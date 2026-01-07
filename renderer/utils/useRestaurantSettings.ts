@@ -1,7 +1,8 @@
 
 
+
 import { useState, useEffect, useCallback } from 'react';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 // Types for restaurant settings
@@ -133,7 +134,7 @@ export function useRestaurantSettings() {
       // Cache expired or force refresh, fetch from API
       setIsLoading(true);
       
-      const response = await brain.get_restaurant_settings();
+      const response = await apiClient.get_restaurant_settings();
       const data = await response.json();
       
       if (data.success && data.settings) {
@@ -233,7 +234,7 @@ export function useRestaurantSettings() {
         } : {})
       };
       
-      const response = await brain.save_restaurant_settings({
+      const response = await apiClient.save_restaurant_settings({
         settings: mergedSettings
       });
       
@@ -296,7 +297,7 @@ export function useRestaurantSettings() {
       };
       
       // Send profile as separate field, not nested in settings
-      const response = await brain.save_restaurant_settings({
+      const response = await apiClient.save_restaurant_settings({
         profile: updatedProfile
       });
       
@@ -334,7 +335,7 @@ export function useRestaurantSettings() {
         };
 
         // Send delivery data directly to the backend endpoint
-        const response = await brain.save_restaurant_settings({
+        const response = await apiClient.save_restaurant_settings({
           delivery: mergedDelivery
         });
 
