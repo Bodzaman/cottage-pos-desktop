@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { supabase, ensureSupabaseConfigured } from './supabaseClient';
 import { toast } from 'sonner';
 import type { 
@@ -174,7 +174,7 @@ export function useMenuItems(options?: UseQueryOptions<MenuItem[]>) {
     queryFn: async () => {
       console.log('🔄 [React Query] Fetching menu items...');
       
-      const response = await brain.get_menu_items();
+      const response = await apiClient.get_menu_items();
       const raw = await response.json();
       const items = normalizeMenuItemsResponse(raw);
       
@@ -202,7 +202,7 @@ export function useMenuItemsByCategory(
     queryFn: async () => {
       console.log(`🔄 [React Query] Fetching items for category: ${categoryId}`);
       
-      const response = await brain.get_menu_items();
+      const response = await apiClient.get_menu_items();
       const raw = await response.json();
       const allItems = normalizeMenuItemsResponse(raw);
       const filtered = allItems.filter((item: MenuItem) => item.category_id === categoryId);
@@ -287,7 +287,7 @@ export function useCustomizations(options?: UseQueryOptions<CustomizationBase[]>
     queryFn: async () => {
       console.log('🔄 [React Query] Fetching customizations...');
       
-      const response = await brain.get_customizations();
+      const response = await apiClient.get_customizations();
       const data = await response.json();
       
       console.log('✅ [React Query] Customizations fetched:', data?.length || 0);
@@ -323,13 +323,13 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
       // Fetch all data in parallel, using helpers that handle fallbacks
       const [categories, itemsRes, proteinTypes, variantsRes, customizationsRes] = await Promise.all([
         fetchCategoriesOrdered(),
-        brain.get_menu_items(),
+        apiClient.get_menu_items(),
         fetchProteinTypesOrdered(),
         supabase.from('menu_item_variants').select(`
           *,
           protein_type:menu_protein_types(name)
         `),
-        brain.get_customizations(),
+        apiClient.get_customizations(),
       ]);
       
       // Handle variant errors
@@ -394,7 +394,7 @@ export function useCreateMenuItem() {
   return useMutation({
     mutationFn: async (newItem: Partial<MenuItem>) => {
       console.log('➕ [React Query] Creating menu item...');
-      const response = await brain.create_menu_item(newItem as any);
+      const response = await apiClient.create_menu_item(newItem as any);
       return await response.json();
     },
     onSuccess: () => {
@@ -419,7 +419,7 @@ export function useUpdateMenuItem() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<MenuItem> }) => {
       console.log(`🔄 [React Query] Updating menu item: ${id}`);
-      const response = await brain.update_menu_item({ menu_item_id: id, ...data } as any);
+      const response = await apiClient.update_menu_item({ menu_item_id: id, ...data } as any);
       return await response.json();
     },
     onSuccess: (_, variables) => {
@@ -443,7 +443,7 @@ export function useDeleteMenuItem() {
   return useMutation({
     mutationFn: async (id: string) => {
       console.log(`🗑️ [React Query] Deleting menu item: ${id}`);
-      const response = await brain.delete_menu_item({ menu_item_id: id });
+      const response = await apiClient.delete_menu_item({ menu_item_id: id });
       return await response.json();
     },
     onSuccess: () => {
@@ -604,7 +604,7 @@ export function invalidateAllMenuData(queryClient: ReturnType<typeof useQueryCli
  */
 export async function checkForMenuPublishEvents(queryClient: ReturnType<typeof useQueryClient>): Promise<boolean> {
   try {
-    const response = await brain.get_storage_item({ key: 'menu_refresh_event' });
+    const response = await apiClient.get_storage_item({ key: 'menu_refresh_event' });
     const eventData = await response.json();
     
     if (eventData?.data?.event_type === 'menu_published') {
