@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Bell, Check, MessageCircle, Send, RefreshCw, AlertCircle, ClipboardList, BellRing, UserCog, Settings, Cog } from 'lucide-react';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { CustomerPreferencesPanel } from './CustomerPreferencesPanel';
 
 interface NotificationTemplate {
@@ -59,7 +60,7 @@ export function VoiceOrderNotificationPanel({ compact = false }: VoiceOrderNotif
   const fetchTemplates = async () => {
     try {
       setIsLoadingTemplates(true);
-      const response = await brain.list_templates();
+      const response = await apiClient.list_templates();
       const data = await response.json();
       
       if (data.success && data.templates) {
@@ -83,7 +84,7 @@ export function VoiceOrderNotificationPanel({ compact = false }: VoiceOrderNotif
   const fetchHistory = async () => {
     try {
       setIsLoadingHistory(true);
-      const response = await brain.get_notification_history({ limit: compact ? 5 : 20 });
+      const response = await apiClient.get_notification_history({ limit: compact ? 5 : 20 });
       const data = await response.json();
       
       if (data.success && data.history) {
@@ -107,7 +108,7 @@ export function VoiceOrderNotificationPanel({ compact = false }: VoiceOrderNotif
       }
 
       setIsSendingTest(true);
-      const response = await brain.test_template({
+      const response = await apiClient.test_template({
         template_id: selectedTemplateId,
         phone_number: testPhoneNumber,
         variables: testVariables
