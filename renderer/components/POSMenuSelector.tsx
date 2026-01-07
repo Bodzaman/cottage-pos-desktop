@@ -10,8 +10,6 @@ import { POSSectionPills } from './POSSectionPills';
 import { POSCategoryPills } from './POSCategoryPills';
 import { POSMenuCardSkeleton } from './POSMenuCardSkeleton';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
-import { fuzzyMenuSearch } from 'utils/fuzzyMenuSearch';
-import { usePOSMenuInteractionStore } from 'utils/posMenuInteractionStore';
 import { groupItemsByHierarchy, getSectionDisplayName, getDisplayMode, groupItemsBySection } from 'utils/menuHelpers';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QSAITheme } from '../utils/QSAIDesign';
@@ -105,7 +103,6 @@ export function POSMenuSelector({
 
     // We need the viewport element from Radix ScrollArea
     if (!viewportRef.current) {
-      console.warn('⚠️ [SectionTracking] No viewport ref - waiting for mount');
       return;
     }
 
@@ -127,9 +124,6 @@ export function POSMenuSelector({
       });
 
       if (mostVisible && mostVisible !== currentVisibleSection) {
-        if (isDev) {
-          console.log('📍 [SectionTracking] Section changed:', currentVisibleSection, '→', mostVisible);
-        }
         setCurrentVisibleSection(mostVisible);
       }
     };
@@ -152,23 +146,15 @@ export function POSMenuSelector({
       }
     );
 
-    // Observe all section elements
+    // Observe each section element
     sectionRefs.current.forEach((element, sectionName) => {
       observer.observe(element);
     });
-
-    if (isDev) {
-      console.log('✅ [SectionTracking] IntersectionObserver initialized', {
-        sections: sectionRefs.current.size,
-        viewport: viewportRef.current.tagName
-      });
-    }
 
     // Cleanup
     return () => {
       observer.disconnect();
       intersectionMap.clear();
-      if (isDev) console.log('🧹 [SectionTracking] Cleaned up');
     };
   }, [displayMode, filteredMenuItems.length, currentVisibleSection]);
 
