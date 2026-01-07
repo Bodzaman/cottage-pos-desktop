@@ -65,6 +65,7 @@ const allRoutes: NavigationItem[] = [
 ];
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
+  console.log('🟢 NavigationProvider: Component rendering started');
   const location = useLocation();
   const navigate = useNavigate();
   
