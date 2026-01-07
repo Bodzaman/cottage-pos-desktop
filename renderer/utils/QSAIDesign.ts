@@ -9,7 +9,7 @@
 
 // Vignetting effect for focusing attention on content areas
 export const vignette = {
-  background: `radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.6) 100%)`,
+  background: "radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.6) 100%)",
   pointerEvents: 'none',
   position: 'absolute',
   inset: 0,
@@ -127,15 +127,15 @@ export const styles = {
     background: '#1E1E1E', // Soft black for ALL panels
     backdropFilter: 'blur(4px)',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25)',
-    border: `1px solid rgba(255, 255, 255, 0.03)`, // Subtle light border
-    borderBottom: `1px solid rgba(124, 93, 250, 0.2)` // Subtle purple bottom border
+    border: "1px solid rgba(255, 255, 255, 0.03)", // Subtle light border
+    borderBottom: "1px solid rgba(124, 93, 250, 0.2)" // Subtle purple bottom border
   },
   // Frosted glass effect for cards and panels (with purple accent)
   glassCard: {
     background: '#1E1E1E', // Soft black for ALL panels
     backdropFilter: 'blur(4px)',
     boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
-    border: `1px solid rgba(255, 255, 255, 0.03)` // Subtle light border
+    border: "1px solid rgba(255, 255, 255, 0.03)" // Subtle light border
   },
   
   // Premium gradient text (silver to white)
@@ -150,7 +150,7 @@ export const styles = {
     const [color1, color2] = colorMap[intensity];
     
     return {
-      backgroundImage: `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`,
+      backgroundImage: "linear-gradient(135deg, " + color1 + " 0%, " + color2 + " 100%)",
       backgroundClip: 'text',
       WebkitBackgroundClip: 'text',
       WebkitTextFillColor: 'transparent',
@@ -161,7 +161,7 @@ export const styles = {
   
   // Purple gradient text (for headings)
   purpleGradientText: {
-    backgroundImage: `linear-gradient(to right, #FFFFFF, #EDECFF, #C7C2FF)`,
+    backgroundImage: "linear-gradient(to right, #FFFFFF, #EDECFF, #C7C2FF)",
     backgroundClip: 'text',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -181,7 +181,7 @@ export const styles = {
     const [color1, color2] = colorMap[intensity];
     
     return {
-      background: `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`,
+      background: "linear-gradient(135deg, " + color1 + " 0%, " + color2 + " 100%)",
       border: '1px solid rgba(124, 93, 250, 0.2)', // Subtle purple border
       boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
       transition: 'all 0.3s ease'
@@ -190,7 +190,7 @@ export const styles = {
   
   // Purple accent gradient for special items
   purpleAccentGradient: {
-    background: `linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(124, 93, 250, 0.2) 100%)`,
+    background: "linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(124, 93, 250, 0.2) 100%)",
     border: '1px solid rgba(124, 93, 250, 0.3)', // Purple border
     boxShadow: '0 4px 12px rgba(124, 93, 250, 0.15)'
   },
@@ -227,7 +227,7 @@ export const effects = {
     };
     
     // Use purple for glow effects
-    return `inset 0 0 20px rgba(124, 93, 250, ${opacityMap[intensity]})`;
+    return "inset 0 0 20px rgba(124, 93, 250, " + opacityMap[intensity] + ")";
   },
   
   // Outer glow for hover states (purple glow)
@@ -239,7 +239,7 @@ export const effects = {
     };
     
     // Use purple for glow effects
-    return `0 0 15px rgba(124, 93, 250, ${opacityMap[intensity]})`;
+    return "0 0 15px rgba(124, 93, 250, " + opacityMap[intensity] + ")";
   },
   
   // Text shadow for premium typography
@@ -279,9 +279,9 @@ export const effects = {
 
 // Indian-inspired geometric patterns (monochromatic version)
 export const indianPatterns = {
-  rangoli: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M30 30h30v30H30z' fill='white' fill-opacity='0.03'/%3E%3Cpath d='M0 30h30v30H0z' fill='white' fill-opacity='0.02'/%3E%3Cpath d='M30 0h30v30H30z' fill='white' fill-opacity='0.03'/%3E%3Cpath d='M0 0h30v30H0z' fill='white' fill-opacity='0.02'/%3E%3C/g%3E%3C/svg%3E")`,
-  jali: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle cx='20' cy='20' r='10' stroke='white' stroke-opacity='0.04' stroke-width='1'/%3E%3Ccircle cx='20' cy='20' r='5' stroke='white' stroke-opacity='0.03' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E")`,
-  paisley: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 45 C35 35, 20 10, 40 0 C60 10, 45 35, 40 45' stroke='white' stroke-opacity='0.04' fill='none'/%3E%3C/svg%3E")`,
+  rangoli: "url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M30 30h30v30H30z' fill='white' fill-opacity='0.03'/%3E%3Cpath d='M0 30h30v30H0z' fill='white' fill-opacity='0.02'/%3E%3Cpath d='M30 0h30v30H30z' fill='white' fill-opacity='0.03'/%3E%3Cpath d='M0 0h30v30H0z' fill='white' fill-opacity='0.02'/%3E%3C/g%3E%3C/svg%3E")",
+  jali: "url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle cx='20' cy='20' r='10' stroke='white' stroke-opacity='0.04' stroke-width='1'/%3E%3Ccircle cx='20' cy='20' r='5' stroke='white' stroke-opacity='0.03' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E")",
+  paisley: "url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 45 C35 35, 20 10, 40 0 C60 10, 45 35, 40 45' stroke='white' stroke-opacity='0.04' fill='none'/%3E%3C/svg%3E")",
   opacity: 0.05, // Reduced opacity for subtlety
 };
 
@@ -295,5 +295,5 @@ function hexToRgb(hex: string): string {
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
   
-  return `${r}, ${g}, ${b}`;
+  return r + ", " + g + ", " + b;
 }
