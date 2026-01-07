@@ -5,7 +5,7 @@ import { X, Route, Map, Eye, Copy, MapPin, Clock, Thermometer, Car, AlertTriangl
 import { toast } from 'sonner';
 import { globalColors, styles, effects } from 'utils/QSAIDesign';
 import { useGoogleMaps } from 'utils/googleMapsProvider';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 interface DeliveryAddress {
   street: string;
@@ -122,7 +122,7 @@ export const EnhancedRouteModal: React.FC<Props> = ({
   const loadEnhancedRouteData = async () => {
     try {
       console.log('Loading enhanced route data for:', deliveryAddress);
-      const response = await brain.calculate_enhanced_delivery_route({
+      const response = await apiClient.calculate_enhanced_delivery_route({
         destination_lat: deliveryAddress.latitude,
         destination_lng: deliveryAddress.longitude,
         destination_postcode: deliveryAddress.postcode,
