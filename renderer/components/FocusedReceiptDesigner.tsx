@@ -562,7 +562,7 @@ export default function FocusedReceiptDesigner({
     setLoadingImages(prev => new Set(prev).add(logoId));
     
     try {
-      const response = await brain.get_media_asset({ assetId: logoId });
+      const response = await apiClient.get_media_asset({ assetId: logoId });
       const data = await response.json();
       
       if (data.success && data.asset) {
@@ -1411,7 +1411,7 @@ export default function FocusedReceiptDesigner({
                           <Label htmlFor="font-weight" className="text-xs text-gray-400">Weight</Label>
                           <Select 
                             value={selectedElement.style?.fontWeight || 'normal'} 
-                            onValueChange={(value: FontWeight) => updateElementStyle({ fontWeight: value as FontWeight })}
+                            onValueChange={(value) => updateElementStyle({ fontWeight: value as FontWeight })}
                           >
                             <SelectTrigger className="mt-1 h-8 text-sm">
                               <SelectValue />
@@ -1436,7 +1436,7 @@ export default function FocusedReceiptDesigner({
                             </div>
                             <FontSelectorModal 
                               selectedFont={selectedElement.style?.fontFamily || 'Courier'}
-                              onFontChange={(font: FontFamily) => {
+                              onFontChange={(font) => {
                                 console.log('🎯 Font change callback triggered with:', font);
                                 console.log('🎯 Selected element:', selectedElement.id);
                                 console.log('🎯 Current style:', selectedElement.style);
