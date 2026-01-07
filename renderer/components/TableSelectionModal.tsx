@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Clock, Utensils } from 'lucide-react';
@@ -10,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { QSAITheme } from '../utils/QSAIDesign';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { PosTableResponse, TablesResponse } from 'types';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
 
@@ -59,7 +54,7 @@ export function TableSelectionModal({
       setLoading(true);
       setError(null);
       
-      const response = await brain.get_tables();
+      const response = await apiClient.get_tables();
       const data: TablesResponse = await response.json();
       
       if (data.success && data.tables) {
