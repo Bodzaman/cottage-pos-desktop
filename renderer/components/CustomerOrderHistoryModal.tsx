@@ -8,7 +8,7 @@ import { RecentOrder } from 'types';
 import { formatDistanceToNow } from 'date-fns';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { OrderDetailsModal } from './OrderDetailsModal';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { toast } from 'sonner';
 
 interface CustomerOrderHistoryModalProps {
@@ -179,7 +179,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, customer, onReorder }) => 
     
     try {
       // Fetch full order details from backend
-      const response = await brain.get_order_by_id({ orderId: order.order_id });
+      const response = await apiClient.get_order_by_id({ orderId: order.order_id });
       const orderData = await response.json();
       
       // DEBUG: Log the order data to see structure
