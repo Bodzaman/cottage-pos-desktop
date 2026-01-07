@@ -1,3 +1,5 @@
+import type { OrderType } from './masterTypes';
+
 export interface CustomerData {
   // Common fields
   firstName?: string;
@@ -18,8 +20,6 @@ export interface CustomerData {
   deliveryNotes?: string;
   deliveryFee?: number; // Calculated delivery fee from postcode validation
 }
-
-export type OrderType = 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 
 // Helper function to get customer display name
 export const getCustomerDisplayName = (customerData: CustomerData): string => {
