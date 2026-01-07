@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, CustomizationBase, SelectedCustomization } from '../utils/menuTypes';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
@@ -32,13 +32,6 @@ interface CustomerCustomizationModalProps {
   initialInstructions?: string;
   // ✅ NEW: Callback for reopening cart after modal closes
   onModalClose?: () => void;
-}
-
-export interface SelectedCustomization {
-  id: string;
-  name: string;
-  price: number;
-  group?: string;
 }
 
 export function CustomerCustomizationModal({
