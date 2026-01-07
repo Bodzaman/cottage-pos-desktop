@@ -23,13 +23,18 @@ import {
   ArrowRight,
   Star,
   RotateCcw,
-  Save
+  Save,
+  X,
+  Wrench,
+  AlertCircle
 } from 'lucide-react';
-import { OrderItem, ModifierSelection, CustomizationSelection, TipSelection } from '../utils/menuTypes';
+import { OrderItem, ModifierSelection, CustomizationSelection } from '../utils/menuTypes';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
+import POSTipSelector, { TipSelection } from './POSTipSelector';
 import { pendingPaymentService } from '../utils/pendingPaymentService';
 import { colors, globalColors, QSAITheme, effects } from '../utils/QSAIDesign';
-import brain from 'brain';
+import { toast } from 'sonner';
+import { apiClient } from 'app';
 
 export interface POSOrderSummaryProps {
   orderItems: OrderItem[];
@@ -126,7 +131,7 @@ const validateMinimumOrderValue = async (orderType: string, total: number) => {
   
   try {
     // Get POS settings for minimum order value
-    const response = await brain.get_pos_settings();
+    const response = await apiClient.get_pos_settings();
     const data = await response.json();
     
     if (data.success && data.settings?.delivery) {
@@ -880,12 +885,12 @@ export function POSOrderSummary({
           };
           
           // Store the order first
-          const storeResponse = await brain.store_order(orderData);
+          const storeResponse = await apiClient.store_order(orderData);
           const storeResult = await storeResponse.json();
           
           if (storeResult.success) {
             // Then process the cash payment
-            const cashPaymentResponse = await brain.process_cash_payment({
+            const cashPaymentResponse = await apiClient.process_cash_payment({
               order_id: orderData.order_id,
               cash_received: result.cashReceived || 0,
               order_total: total,
@@ -966,7 +971,7 @@ export function POSOrderSummary({
           };
           
           // Store the order in backend first
-          const storeResponse = await brain.store_order(orderData);
+          const storeResponse = await apiClient.store_order(orderData);
           const storeResult = await storeResponse.json();
           
           if (storeResult.success) {
@@ -1102,7 +1107,7 @@ export function POSOrderSummary({
         background: `linear-gradient(145deg, #121212 0%, #1a6a1a 100%)`,
         backdropFilter: 'blur(14px)',
         borderBottom: `1px solid ${globalColors.purple.primaryTransparent}20`,
-        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255,255,255,0.05)'
+        boxShadow: '0 12px 24px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05)'
       }}>
         {/* Order Summary Header with Table Context */}
         <div className="p-4">
@@ -1211,7 +1216,7 @@ export function POSOrderSummary({
                 <span className="font-medium" style={{ 
                   backgroundImage: `linear-gradient(to right, ${colors.text.primary}, ${colors.text.secondary})`,
                   WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
+                  WebkitTextFillColor: 'transparent'
                 }}>Table {tableNumber}</span>
                 {guestCount ? (
                   <span className="text-xs ml-2" style={{ color: colors.text.secondary }}>{guestCount} {guestCount === 1 ? "guest" : "guestguest"}</span>
@@ -1402,7 +1407,6 @@ export function POSOrderSummary({
                                 </div>
                               )}
                               
-                              {/* Special Notes */}
                               {item.notes && (
                                 <div className="mt-2 s-2 rounded text-xs" style={{
                                   background: `${globalColors.purple.primaryTransparent}10`,
@@ -1529,7 +1533,7 @@ export function POSOrderSummary({
                             style={{ 
                               color: colors.text.secondary,
                               borderLeft: `2px solid ${globalColors.purple.primary}`,
-                              background: `${globalColors.background.tertiary}70`,
+                              background: `${globalColors.purple.primaryTransparent}70`,
                               backdropFilter: 'blur(6px)',
                               border: `1px solid ${globalColors.purple.primaryTransparent}30`,
                               boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
@@ -1714,60 +1718,32 @@ export function POSOrderSummary({
         {/* Action Buttons Section */}
         <div className="p-4 space-y-3">
           {orderType === "DINE-IN" && tableNumber ? (
-            /* Dine-In Dual Button Layout */
-            <div className="grid grid-cols-2 gap-3">
-              {/* Add/Update Button - Saves order without sending to kitchen */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={orderItems.length === 0}
-                onClick={handleSaveUpdate}
-                style={{
-                  background: orderItems.length === 0
-                    ? `rgba(18, 18, 18, 0.8)`
-                    : `linear-gradient(135deg, ${QSAITheme.background.tertiary} 0%, ${QSAITheme.background.highlight} 100%)`,
-                  color: orderItems.length === 0 ? colors.text.disabled : QSAITheme.text.primary,
-                  border: `1px solid ${orderItems.length === 0 ? 'rgba(255, 255, 255, 0.05)' : `${QSAITheme.border.accent}`}`,
-                  borderRadius: '0.75rem',
-                  backdropFilter: 'blur(4px)',
-                  padding: '0.875rem',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer',
-                }}
-                className="flex items-center justify-center transition-all duration-300"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Add/Update
-              </motion.button>
-
-              {/* Send to Kitchen Button - Saves and prints */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={orderItems.length === 0}
-                onClick={handleSendToKitchen}
-                style={{
-                  background: orderItems.length === 0
-                    ? `rgba(18, 18, 18, 0.8)`
-                    : `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
-                  color: orderItems.length === 0 ? colors.text.disabled : QSAITheme.text.primary,
-                  boxShadow: orderItems.length === 0 ? 'none' : `0 8px 16px rgba(0,0,0,0.2), 0 0 10px ${QSAITheme.purple.glow}`,
-                  border: `1px solid ${orderItems.length === 0 ? 'rgba(255, 255, 255, 0.05)' : `${QSAITheme.purple.primaryTransparent}30`}`,
-                  borderRadius: '0.75rem',
-                  backdropFilter: 'blur(4px)',
-                  padding: '0.875rem',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  textShadow: orderItems.length === 0 ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.3)',
-                  cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer',
-                }}
-                className="flex items-center justify-center transition-all duration-300"
-              >
-                <ChefHat className="h-4 w-4 mr-2" />
-                Send to Kitchen
-              </motion.button>
-            </div>
+            /* Single Save Order Button - Opens Preview Modal with 3 choices */
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={orderItems.length === 0}
+              onClick={handleSendToKitchen}
+              style={{
+                background: orderItems.length === 0
+                  ? `rgba(18, 18, 18, 0.8)`
+                  : `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
+                color: orderItems.length === 0 ? colors.text.disabled : QSAITheme.text.primary,
+                boxShadow: orderItems.length === 0 ? 'none' : `0 8px 16px rgba(0,0,0,0.2), 0 0 10px ${QSAITheme.purple.glow}`,
+                border: `1px solid ${orderItems.length === 0 ? 'rgba(255, 255, 255, 0.05)' : `${QSAITheme.purple.primaryTransparent}30`}`,
+                borderRadius: '0.75rem',
+                backdropFilter: 'blur(4px)',
+                padding: '0.875rem',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                textShadow: orderItems.length === 0 ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.3)',
+                cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+              className="w-full flex items-center justify-center transition-all duration-300"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Order
+            </motion.button>
           ) : (
             /* Unified Process Order Button for COLLECTION/DELIVERY/WAITING */
             <div className="space-y-3">
