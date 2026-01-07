@@ -37,8 +37,9 @@ import { useRestaurantSettings, BusinessProfile } from "../utils/useRestaurantSe
 import MediaSelector from "./MediaSelector";
 import DeliverySettings from "./DeliverySettings";
 import { MediaItem, uploadMedia } from "../utils/mediaLibraryUtils";
-import brain from "brain";
-import { globalColors, QSAITheme, styles, effects } from "../utils/QSAIDesign";
+import { apiClient } from 'app';
+import { colors } from '../utils/designSystem';
+import { globalColors, styles, effects } from '../utils/QSAIDesign';
 import { Separator } from "@/components/ui/separator";
 
 // Interface for POS settings
@@ -215,7 +216,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   const loadTables = async () => {
     try {
       setIsTablesLoading(true);
-      const response = await brain.get_tables();
+      const response = await apiClient.get_tables();
       const data = await response.json();
       
       if (data.success && data.tables) {
@@ -287,7 +288,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   useEffect(() => {
     const fetchCurrentPassword = async () => {
       try {
-        const response = await brain.get_current_password();
+        const response = await apiClient.get_current_password();
         const data = await response.json();
         setCurrentPassword(data.password || "admin123");
       } catch (error) {
@@ -304,7 +305,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   // Load POS settings from API
   const loadPOSSettings = async () => {
     try {
-      const response = await brain.get_pos_settings();
+      const response = await apiClient.get_pos_settings();
       const data = await response.json();
       
       if (data.success && data.settings) {
@@ -319,7 +320,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   const savePOSSettings = async () => {
     try {
       setIsPOSSaving(true);
-      const response = await brain.save_pos_settings({ settings: posSettings });
+      const response = await apiClient.save_pos_settings({ settings: posSettings });
       const data = await response.json();
       
       if (data.success) {
@@ -416,8 +417,8 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
         dinner_close: day.dinner.close
       }));
       
-      // Call brain API directly to avoid nesting issues with saveSettings wrapper
-      const hoursResponse = await brain.save_restaurant_settings({
+      // Call apiClient API directly to avoid nesting issues with saveSettings wrapper
+      const hoursResponse = await apiClient.save_restaurant_settings({
         opening_hours: backendFormat
       });
       const hoursData = await hoursResponse.json();
@@ -429,7 +430,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
         // Auto-sync to Ultravox corpus
         try {
           console.log('Syncing restaurant details with voice agent...');
-          const ragResponse = await brain.sync_restaurant_details_wrapper({ force: false }, {
+          const ragResponse = await apiClient.sync_restaurant_details_wrapper({ force: false }, {
             headers: {
               'Authorization': 'Bearer qsai-voice-auth-2025'
             }
@@ -473,8 +474,8 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
         dinner_close: day.dinner.close
       }));
       
-      // Call brain API directly to avoid nesting issues with saveSettings wrapper
-      const hoursResponse = await brain.save_restaurant_settings({
+      // Call apiClient API directly to avoid nesting issues with saveSettings wrapper
+      const hoursResponse = await apiClient.save_restaurant_settings({
         opening_hours: backendFormat
       });
       const hoursData = await hoursResponse.json();
@@ -486,7 +487,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
         // Trigger RAG collection update for voice agent
         try {
           console.log('Syncing restaurant details with voice agent...');
-          const ragResponse = await brain.sync_restaurant_details_wrapper({ force: false }, {
+          const ragResponse = await apiClient.sync_restaurant_details_wrapper({ force: false }, {
             headers: {
               'Authorization': 'Bearer qsai-voice-auth-2025'
             }
@@ -573,7 +574,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
 
   const handleEditTable = async () => {
     try {
-      const response = await brain.update_table(editingTable.table_number, tableFormData);
+      const response = await apiClient.update_table(editingTable.table_number, tableFormData);
       const data = await response.json();
       
       if (data.success) {
@@ -592,7 +593,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
 
   const handleAddTableForm = async () => {
     try {
-      const response = await brain.add_table(tableFormData);
+      const response = await apiClient.add_table(tableFormData);
       const data = await response.json();
       
       if (data.success) {
@@ -623,7 +624,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
     if (!deleteTableNumber) return;
     
     try {
-      const response = await brain.delete_pos_table({ tableNumber: deleteTableNumber });
+      const response = await apiClient.delete_pos_table({ tableNumber: deleteTableNumber });
       const data = await response.json();
       
       if (data.success) {
