@@ -61,11 +61,11 @@ export function DineInKitchenPreviewModal({
   // Map order data to receipt format for ThermalReceiptDisplay
   const mapToReceiptOrderData = () => {
     const mappedData = {
-      orderId: "DINE-" + tableNumber + "-" + Date.now(),
-      orderNumber: "T" + tableNumber + "-" + Date.now().toString().slice(-6),
+      orderId: `DINE-${tableNumber}-${Date.now()}`,
+      orderNumber: `T${tableNumber}-${Date.now().toString().slice(-6)}`,
       orderType: 'DINE-IN' as const,
       tableNumber: linkedTables.length > 0 
-        ? tableNumber + " + " + linkedTables.join(', ') 
+        ? `${tableNumber} + ${linkedTables.join(', ')}` 
         : tableNumber?.toString(),
       guestCount: guestCount,
       items: pendingItems.map(item => {
@@ -77,7 +77,7 @@ export function DineInKitchenPreviewModal({
         );
         
         return {
-          id: item.id || item.menu_item_id || "item-" + Date.now(),
+          id: item.id || item.menu_item_id || `item-${Date.now()}`,
           name: displayName,
           price: item.price,
           quantity: item.quantity,
@@ -87,7 +87,7 @@ export function DineInKitchenPreviewModal({
             price_adjustment: 0
           } : undefined,
           customizations: item.modifiers?.map(mod => ({
-            id: mod.id || "mod-" + Date.now(),
+            id: mod.id || `mod-${Date.now()}`,
             name: mod.name,
             price: mod.price || 0
           })) || [],
@@ -119,9 +119,9 @@ export function DineInKitchenPreviewModal({
       <DialogContent 
         className="max-w-3xl max-h-[90vh] flex flex-col"
         style={{
-          background: "linear-gradient(135deg, " + QSAITheme.background.primary + " 0%, " + QSAITheme.background.secondary + " 100%)",
-          border: "1px solid " + QSAITheme.border.accent,
-          boxShadow: "0 0 60px " + QSAITheme.purple.glow
+          background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
+          border: `1px solid ${QSAITheme.border.accent}`,
+          boxShadow: `0 0 60px ${QSAITheme.purple.glow}`
         }}
       >
         {/* Header */}
@@ -131,8 +131,8 @@ export function DineInKitchenPreviewModal({
               <div 
                 className="p-2 rounded-lg"
                 style={{ 
-                  background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.dark + " 100%)",
-                  boxShadow: "0 0 20px " + QSAITheme.purple.glow
+                  background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
+                  boxShadow: `0 0 20px ${QSAITheme.purple.glow}`
                 }}
               >
                 <ChefHat className="h-6 w-6 text-white" />
@@ -149,7 +149,7 @@ export function DineInKitchenPreviewModal({
                   ? QSAITheme.purple.primary 
                   : QSAITheme.background.tertiary,
                 color: 'white',
-                border: "1px solid " + pendingItems.length > 0 ? QSAITheme.purple.light : QSAITheme.border.medium
+                border: `1px solid ${pendingItems.length > 0 ? QSAITheme.purple.light : QSAITheme.border.medium}`
               }}
             >
               <Clock className="w-3 h-3 mr-1.5 inline" />
@@ -167,7 +167,7 @@ export function DineInKitchenPreviewModal({
           className="flex-1 overflow-y-auto py-6"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: QSAITheme.purple.primary + " transparent"
+            scrollbarColor: `${QSAITheme.purple.primary} transparent`
           }}
         >
           {pendingItems.length > 0 ? (
@@ -186,7 +186,7 @@ export function DineInKitchenPreviewModal({
               className="flex flex-col items-center justify-center h-64 rounded-lg"
               style={{
                 backgroundColor: QSAITheme.background.tertiary,
-                border: "1px dashed " + QSAITheme.border.medium
+                border: `1px dashed ${QSAITheme.border.medium}`
               }}
             >
               <ChefHat className="w-16 h-16 mb-4" style={{ color: QSAITheme.text.muted }} />
@@ -226,7 +226,7 @@ export function DineInKitchenPreviewModal({
                   ? QSAITheme.background.highlight 
                   : QSAITheme.background.tertiary,
                 color: pendingItems.length > 0 ? 'white' : QSAITheme.text.muted,
-                border: "1px solid " + pendingItems.length > 0 ? QSAITheme.border.medium : QSAITheme.border.light,
+                border: `1px solid ${pendingItems.length > 0 ? QSAITheme.border.medium : QSAITheme.border.light}`,
               }}
             >
               <Save className="w-4 h-4 mr-2" />
@@ -239,10 +239,10 @@ export function DineInKitchenPreviewModal({
               className="flex-1 h-12 text-base font-bold transition-all"
               style={{
                 background: pendingItems.length > 0
-                  ? "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.dark + " 100%)"
+                  ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`
                   : QSAITheme.background.tertiary,
                 color: 'white',
-                boxShadow: pendingItems.length > 0 ? "0 0 30px " + QSAITheme.purple.glow : 'none',
+                boxShadow: pendingItems.length > 0 ? `0 0 30px ${QSAITheme.purple.glow}` : 'none',
                 opacity: pendingItems.length > 0 ? 1 : 0.5
               }}
             >
