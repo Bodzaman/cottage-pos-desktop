@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { usePOSCustomerIntelligence } from '../utils/usePOSCustomerIntelligence';
 import { POSCustomerSearchForm } from './POSCustomerSearchForm';
 import { POSCustomerProfileCard } from './POSCustomerProfileCard';
-import { RecentOrder } from '../utils/usePOSCustomerIntelligence';
+import { RecentOrder } from 'types';
 import { Loader2 } from 'lucide-react';
 import { QSAITheme } from '../utils/QSAIDesign';
 
