@@ -2,7 +2,7 @@ import React from 'react';
 import { User, Users, MapPin, Phone, Edit3, Mail, FileText, Trash2 } from 'lucide-react';
 import { useCustomerDataStore } from 'utils/customerDataStore';
 import { globalColors } from 'utils/QSAIDesign';
-import { OrderType } from 'utils/customerTypes';
+import type { OrderType } from 'utils/masterTypes';
 
 interface CustomerSummaryBadgeProps {
   orderType: OrderType;
