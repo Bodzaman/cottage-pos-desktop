@@ -36,10 +36,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { apiClient } from 'app';
 import { POSViewProps } from './POSViewContainer';
 import { globalColors } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
-import brain from 'brain';
+import { supabase } from 'utils/supabaseClient';
 import { useSafeTimeout } from 'utils/safeHooks';
 import { format } from 'date-fns';
 
@@ -122,7 +123,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
       setIsLoading(true);
       
       // Fetch orders from the dedicated online orders API
-      const response = await brain.get_online_orders({
+      const response = await apiClient.get_online_orders({
         page: 1,
         page_size: 100
       });
@@ -218,14 +219,14 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
       switch (action) {
         case 'CONFIRM':
           // ========================================================================
-          // 🆕 ONLINE ORDER ACCEPT: Create Kitchen Print Job
+          // 🆕 ONLINE ORDER ACCEPT: Create Kitchen Print Job (Supabase)
           // ========================================================================
           
           console.log('📋 [OnlineOrderManagement] Order confirmed, triggering kitchen print for:', order.orderNumber);
           
           try {
             // Get template assignment for the order type
-            const assignmentResponse = await brain.get_template_assignment({ order_mode: order.orderType });
+            const assignmentResponse = await apiClient.get_template_assignment({ order_mode: order.orderType });
             const templateAssignment = await assignmentResponse.json();
             
             // Prepare kitchen receipt data
@@ -244,24 +245,24 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
               customerName: order.customerName,
               customerPhone: order.customerPhone,
               deliveryAddress: order.deliveryAddress || null,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              template_id: templateAssignment.kitchen_template_id
             };
             
-            // Create kitchen print job
-            const printJobResponse = await brain.create_print_job({
-              template_id: templateAssignment.kitchen_template_id,
-              receipt_type: 'kitchen',
-              order_data: kitchenReceipt,
-              priority: 'high',
-              metadata: {
-                order_mode: order.orderType,
-                order_source: 'online',
-                created_from: 'online_order_accept'
-              }
+            // Create kitchen print job via Supabase RPC
+            const { data: jobId, error: printError } = await supabase.rpc('create_print_job', {
+              p_job_type: 'KITCHEN_TICKET',
+              p_order_data: kitchenReceipt,
+              p_printer_id: null, // Auto-select
+              p_priority: 3 // High priority (1-10 scale)
             });
             
-            const printJob = await printJobResponse.json();
-            console.log('✅ [OnlineOrderManagement] Kitchen print job created:', printJob.job_id);
+            if (printError) {
+              console.error('❌ [OnlineOrderManagement] Failed to create kitchen print job:', printError);
+              // Don't fail the whole operation for print errors
+            } else if (jobId) {
+              console.log('✅ [OnlineOrderManagement] Kitchen print job created:', jobId);
+            }
             
           } catch (printError) {
             console.error('❌ [OnlineOrderManagement] Failed to create kitchen print job:', printError);
@@ -269,7 +270,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           }
           
           // Update order status
-          await brain.update_order_status({
+          await apiClient.update_order_status({
             orderId: order.id,
             status: 'CONFIRMED'
           });
@@ -277,7 +278,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           break;
           
         case 'START_PREPARATION':
-          await brain.update_order_status({
+          await apiClient.update_order_status({
             orderId: order.id,
             status: 'PREPARING'
           });
@@ -285,7 +286,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           break;
           
         case 'SET_READY_TIME':
-          await brain.update_order_status({
+          await apiClient.update_order_status({
             orderId: order.id,
             status: 'READY'
           });
@@ -294,7 +295,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           
         case 'MARK_COMPLETED':
           // ========================================================================
-          // 🆕 ONLINE ORDER COMPLETE: Create Customer Receipt Print Job
+          // 🆕 ONLINE ORDER COMPLETE: Create Customer Receipt Print Job (Supabase)
           // ========================================================================
           
           console.log('🧾 [OnlineOrderManagement] Order completed, triggering customer receipt for:', order.orderNumber);
@@ -302,7 +303,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           try {
             // Get template assignment for the order type (convert format for API)
             const apiOrderMode = order.orderType.replace(/-/g, '_'); // Convert DELIVERY/COLLECTION format
-            const assignmentResponse = await brain.get_template_assignment({ order_mode: apiOrderMode });
+            const assignmentResponse = await apiClient.get_template_assignment({ order_mode: apiOrderMode });
             const templateAssignment = await assignmentResponse.json();
             
             // Calculate totals (basic calculation - should match order.total)
@@ -333,24 +334,24 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
               deliveryAddress: order.orderType === 'DELIVERY' ? {
                 address: order.deliveryAddress || ''
               } : null,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              template_id: templateAssignment.customer_template_id
             };
             
-            // Create customer receipt print job
-            const printJobResponse = await brain.create_print_job({
-              template_id: templateAssignment.customer_template_id,
-              receipt_type: 'customer',
-              order_data: customerReceipt,
-              priority: 'medium',
-              metadata: {
-                order_mode: order.orderType,
-                order_source: 'online',
-                created_from: 'online_order_complete'
-              }
+            // Create customer receipt print job via Supabase RPC
+            const { data: jobId, error: printError } = await supabase.rpc('create_print_job', {
+              p_job_type: 'CUSTOMER_RECEIPT',
+              p_order_data: customerReceipt,
+              p_printer_id: null, // Auto-select
+              p_priority: 5 // Medium priority (1-10 scale)
             });
             
-            const printJob = await printJobResponse.json();
-            console.log('✅ [OnlineOrderManagement] Customer receipt print job created:', printJob.job_id);
+            if (printError) {
+              console.error('❌ [OnlineOrderManagement] Failed to create customer receipt print job:', printError);
+              // Don't fail the whole operation for print errors
+            } else if (jobId) {
+              console.log('✅ [OnlineOrderManagement] Customer receipt print job created:', jobId);
+            }
             
           } catch (printError) {
             console.error('❌ [OnlineOrderManagement] Failed to create customer receipt print job:', printError);
@@ -358,7 +359,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           }
           
           // Update order status
-          await brain.update_order_status({
+          await apiClient.update_order_status({
             orderId: order.id,
             status: 'COMPLETED'
           });
