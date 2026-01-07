@@ -37,6 +37,7 @@ interface StaffVariantSelectorProps {
   onClose: () => void;
   onAddToOrder: (orderItem: OrderItem) => void;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
+  isEditMode?: boolean; // NEW: Detect if editing existing item
 }
 
 export function StaffVariantSelector({
@@ -45,7 +46,8 @@ export function StaffVariantSelector({
   isOpen,
   onClose,
   onAddToOrder,
-  orderType
+  orderType,
+  isEditMode = false // NEW: Default to false (adding new item)
 }: StaffVariantSelectorProps) {
   const { proteinTypes } = useRealtimeMenuStore();
   const [variantQuantities, setVariantQuantities] = useState<VariantQuantities>({});
@@ -66,13 +68,6 @@ export function StaffVariantSelector({
       initialQuantities[v.id] = 1;
     });
     setVariantQuantities(initialQuantities);
-
-    console.log('🟣 StaffVariantSelector loaded:', {
-      itemId: item.id,
-      itemName: item.name,
-      variantCount: filteredVariants.length,
-      orderType
-    });
   }, [item, itemVariants, orderType]);
 
   // Get price based on order type
@@ -322,7 +317,7 @@ export function StaffVariantSelector({
                             }}
                           >
                             <Sliders className="h-4 w-4" />
-                            Customise & Add
+                            {isEditMode ? 'Update' : 'Choose'}
                           </Button>
                         </div>
                       </div>
