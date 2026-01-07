@@ -80,12 +80,12 @@ export function OrderItemCard({
                 const parent = e.currentTarget.parentElement;
                 if (parent) {
                   const itemName = item.name || 'Item';
-                  parent.innerHTML = "
+                  parent.innerHTML = `
                     <div class="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
-                      style="background: linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.dark + " 100%); border-color: " + QSAITheme.border.medium + ";">
-                      " + itemName.charAt(0).toUpperCase() + "
+                      style="background: linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%); border-color: ${QSAITheme.border.medium};">
+                      ${itemName.charAt(0).toUpperCase()}
                     </div>
-                  ";
+                  `;
                 }
               }}
             />
@@ -93,7 +93,7 @@ export function OrderItemCard({
             <div 
               className="w-16 h-16 rounded-lg border flex items-center justify-center font-bold text-white text-2xl"
               style={{ 
-                background: "linear-gradient(135deg, " + QSAITheme.purple.primary + " 0%, " + QSAITheme.purple.dark + " 100%)",
+                background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
                 borderColor: QSAITheme.border.medium
               }}
             >
@@ -183,7 +183,7 @@ export function OrderItemCard({
                       color: QSAITheme.text.muted
                     }}
                   >
-                    {addon.name} {addon.price > 0 && "(+£" + addon.price.toFixed(2) + ")"}
+                    {addon.name} {addon.price > 0 && `(+£${addon.price.toFixed(2)})`}
                   </span>
                 ))}
               </div>
