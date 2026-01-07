@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Lock, Key, AlertCircle, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { colors } from "../utils/designSystem";
-import brain from "brain";
+import { apiClient } from 'app';
 import { verifyManagementPassword } from "../utils/management-auth";
 
 interface ManagementPasswordDialogProps {
@@ -117,7 +117,7 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
       setIsChangingPassword(true);
       setError(null);
       
-      const response = await brain.update_password({ password: newPassword });
+      const response = await apiClient.update_password({ password: newPassword });
       const result = await response.json();
       
       if (result.success) {
