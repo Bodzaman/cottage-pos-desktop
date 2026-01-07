@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 
 // Flag to track connection status
 let supabaseConnectionFailed = false;
@@ -98,7 +98,7 @@ const fetchSupabaseConfig = async (): Promise<{url: string, anon_key: string}> =
         console.log('🧹 Cleared stale Supabase config from localStorage');
       }
       
-      const response = await brain.get_supabase_config();
+      const response = await apiClient.get_supabase_config();
       
       console.log('🔗 Supabase config API response status:', response.status);
       
