@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
-import brain from 'brain';
+import { apiClient } from 'app';
 import type { OptimizedMediaResponse, ImageVariant } from 'types';
 import { extractApiError, isNotFoundError } from './apiErrorHandler';
 
@@ -212,7 +212,7 @@ export const linkMediaToMenuItem = async (
         params.secondary_media_id = mediaId;
       }
       
-      const response = await brain.link_menu_item_media(params);
+      const response = await apiClient.link_menu_item_media(params);
       const data = await response.json();
       
       if (data.success) {
@@ -248,7 +248,7 @@ export const linkMediaToMenuItem = async (
  */
 export const cleanupOrphanedMedia = async (deleteFiles: boolean = false): Promise<{success: boolean, count: number}> => {
   try {
-    const response = await brain.cleanup_orphaned_media({ delete_files: deleteFiles });
+    const response = await apiClient.cleanup_orphaned_media({ delete_files: deleteFiles });
     const data = await response.json();
     
     if (data.success) {
@@ -300,7 +300,7 @@ export const fetchMediaLibrary = async (filterOptions?: MediaFilterOptions): Pro
     console.log('fetchMediaLibrary: Using enhanced API with params:', backendParams);
     
     // Use the enhanced API
-    const response = await brain.get_enhanced_media_library(backendParams);
+    const response = await apiClient.get_enhanced_media_library(backendParams);
     const data = await response.json();
 
     if (!data.success || !data.assets) {
@@ -363,7 +363,7 @@ const fetchMediaLibraryFallback = async (filterOptions?: MediaFilterOptions): Pr
     };
     
     // Use the original media_assets API as fallback
-    const response = await brain.get_media_library(backendParams);
+    const response = await apiClient.get_media_library(backendParams);
     const data = await response.json();
 
     if (!data.success || !data.assets) {
@@ -409,7 +409,7 @@ export const fetchVideoLibrary = async (): Promise<MediaItem[]> => {
 export const fetchMetadata = async (): Promise<MediaMetadata> => {
   try {
     // Use the new enhanced API
-    const response = await brain.get_media_library();
+    const response = await apiClient.get_media_library();
     const data = await response.json();
     
     if (!data.success || !data.assets) {
@@ -448,7 +448,7 @@ export const updateMediaAsset = async (
 ): Promise<MediaItem | null> => {
   try {
     // Get the current asset first
-    const assetResponse = await brain.get_media_asset({ asset_id: assetId });
+    const assetResponse = await apiClient.get_media_asset({ asset_id: assetId });
     const assetData = await assetResponse.json();
     
     if (!assetData.success || !assetData.asset) {
@@ -469,7 +469,7 @@ export const updateMediaAsset = async (
     };
     
     // Update the asset
-    const response = await brain.update_media_asset({ asset_id: assetId }, updatePayload);
+    const response = await apiClient.update_media_asset({ asset_id: assetId }, updatePayload);
     const responseData = await response.json();
     
     if (!responseData.success) {
@@ -543,7 +543,7 @@ export const uploadMedia = async (
       console.log('🖼️ Uploading image via optimized endpoint...');
       
       // Use the new optimized image upload endpoint
-      const response = await brain.upload_optimized_menu_image({ file });
+      const response = await apiClient.upload_optimized_menu_image({ file });
       const data: OptimizedMediaResponse = await response.json();
       
       console.log('✅ Optimized upload response:', data);
@@ -612,7 +612,7 @@ export const uploadMedia = async (
     };
     
     // Use the general file upload endpoint
-    const response = await brain.upload_general_file(uploadData);
+    const response = await apiClient.upload_general_file(uploadData);
     
     // Add debugging
     console.log('Upload response status:', response.status);
@@ -659,7 +659,7 @@ export const uploadMedia = async (
 // Delete a media asset
 export const deleteMedia = async (assetId: string): Promise<void> => {
   try {
-    const response = await brain.delete_media_asset({ assetId });
+    const response = await apiClient.delete_media_asset({ assetId });
     
     // If we get here, the response was OK (2xx status)
     const data = await response.json();
@@ -686,7 +686,7 @@ export const deleteMedia = async (assetId: string): Promise<void> => {
 // Get recently used assets
 export const getRecentAssets = async (limit: number = 10): Promise<MediaItem[]> => {
   try {
-    const response = await brain.get_recent_media_assets({ limit });
+    const response = await apiClient.get_recent_media_assets({ limit });
     const data = await response.json();
     
     if (!data.success || !data.assets) {
@@ -723,7 +723,7 @@ export const getRecentAssets = async (limit: number = 10): Promise<MediaItem[]> 
 // Bulk update tags for multiple assets
 export const bulkUpdateTags = async (assetIds: string[], tags: string[]): Promise<boolean> => {
   try {
-    const response = await brain.bulk_update_tags({ asset_ids: assetIds, tags });
+    const response = await apiClient.bulk_update_tags({ asset_ids: assetIds, tags });
     const data = await response.json();
     
     return data.success;
@@ -736,7 +736,7 @@ export const bulkUpdateTags = async (assetIds: string[], tags: string[]): Promis
 // Bulk delete multiple assets
 export const bulkDeleteAssets = async (assetIds: string[]): Promise<boolean> => {
   try {
-    const response = await brain.bulk_delete_assets({ asset_ids: assetIds });
+    const response = await apiClient.bulk_delete_assets({ asset_ids: assetIds });
     const data = await response.json();
     
     return data.success;
