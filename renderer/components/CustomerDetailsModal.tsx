@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -12,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { globalColors } from 'utils/QSAIDesign';
 import { EnhancedDeliveryAddressForm } from './EnhancedDeliveryAddressForm';
 import { MapPin, X, User, Users } from 'lucide-react';
-import brain from 'brain';
 import { toast } from 'sonner';
+import { useSimpleAuth } from '../utils/simple-auth-context';
+import { apiClient } from 'app';
 
 interface CustomerDetailsModalProps {
   isOpen: boolean;
@@ -121,7 +118,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
         const fullAddress = `${customerData.street}, ${customerData.city || ''}, ${customerData.postcode}`.replace(/, ,/g, ',').trim();
         
         // Use the standardized postcode validation endpoint
-        const validationResponse = await brain.validate_delivery_postcode({
+        const validationResponse = await apiClient.validate_delivery_postcode({
           postcode: customerData.postcode || '',
           order_value: orderValue
         });
