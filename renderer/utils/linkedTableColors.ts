@@ -106,7 +106,7 @@ export function formatLinkedTablesList(
   const sortedTables = otherTables.sort((a, b) => a - b);
   
   // Format as "T2, T3, T4" or just "T2" for single table
-  return sortedTables.map(num => "T" + num).join(', ');
+  return sortedTables.map(num => `T${num}`).join(', ');
 }
 
 /**
@@ -125,8 +125,8 @@ export function getLinkedTableBadgeText(
   }
   
   if (isPrimary) {
-    return "PRIMARY (w/ " + otherTablesText + ")";
+    return `PRIMARY (w/ ${otherTablesText})`;
   } else {
-    return "Linked to " + otherTablesText;
+    return `Linked to ${otherTablesText}`;
   }
 }
