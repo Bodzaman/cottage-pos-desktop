@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { apiClient } from 'app';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,20 +28,24 @@ import {
   Settings,
   Cog
 } from 'lucide-react';
-import { OrderItem, ModifierSelection, CustomizationSelection, TipSelection } from '../utils/menuTypes';
-import { ConfirmationModal } from './ConfirmationModal';
+import { OrderItem, ModifierSelection, CustomizationSelection } from '../utils/menuTypes';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
+import POSTipSelector, { TipSelection } from './POSTipSelector';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
 import { usePOSSettingsWithAutoFetch } from '../utils/posSettingsStore';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
-import brain from 'brain';
 import { createLogger } from 'utils/logger';
 import { colors as designColors } from '@/utils/designSystem';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
-import { StaffCustomizationModal, SelectedCustomization } from './StaffCustomizationModal';
+import { StaffCustomizationModal } from './StaffCustomizationModal';
+import { SelectedCustomization } from '../utils/menuTypes';
+import { usePOSOrderStore } from '../utils/posOrderStore';
+import { MenuItem, ItemVariant } from '../utils/menuTypes';
+import { StaffVariantSelector } from './StaffVariantSelector';
+import { POSVariantSelector } from './POSVariantSelector';
 
 interface Props {
   orderItems: OrderItem[];
@@ -65,6 +70,9 @@ interface Props {
   onCustomerDetailsClick?: () => void;
   onTableSelectionClick?: () => void;
   onCustomizeItem?: (index: number, item: OrderItem) => void;
+  
+  // ✅ NEW: Callback to show kitchen preview modal (DINE-IN mode)
+  onShowKitchenPreview?: () => void;
   
   // Payment Modal props - SIMPLIFIED
   onShowPaymentModal?: () => void;
@@ -119,6 +127,9 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   onTableSelectionClick,
   onCustomizeItem,
   
+  // ✅ NEW: Callback to show kitchen preview modal (DINE-IN mode)
+  onShowKitchenPreview,
+  
   // Payment Modal props - SIMPLIFIED
   onShowPaymentModal,
   onPrintReceipt,
@@ -138,6 +149,9 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   
   // ✅ Get menu items from store for customization modal
   const { menuItems, itemVariants } = useRealtimeMenuStore();
+  
+  // ✅ Get posOrderStore for direct state updates (Takeaway modes)
+  const updateItemWithCustomizations = usePOSOrderStore(state => state.updateItemWithCustomizations);
   
   // ✅ NEW: State for StaffCustomizationModal
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
@@ -160,36 +174,59 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   
   // Get customer data from store
   const { customerData: storeCustomerData } = useCustomerDataStore();
-  
-  // ✅ NEW: Handler to open StaffCustomizationModal for editing order items
+
+  // ✅ SIMPLIFIED: Handler to open StaffCustomizationModal directly (no variant selector)
   const handleOpenCustomization = (index: number, item: OrderItem) => {
+    console.log('🔧 [OrderSummaryPanel] handleOpenCustomization called:', {
+      index,
+      item,
+      menuItemId: item.menu_item_id,
+      variantId: item.variant_id
+    });
+    
     setCustomizingOrderItem(item);
     setCustomizingItemIndex(index);
-    setIsCustomizationModalOpen(true);
+    setIsCustomizationModalOpen(true); // ✅ Direct open, like DineInOrderSummary
   };
   
-  // ✅ NEW: Handler to save customized item from StaffCustomizationModal
+  // ✅ SIMPLIFIED: Handler to save customized item from StaffCustomizationModal
   const handleCustomizationConfirm = (menuItem: MenuItem, quantity: number, variant?: any, customizations?: SelectedCustomization[], notes?: string) => {
     if (customizingItemIndex === -1 || !customizingOrderItem) return;
     
-    // Build updated OrderItem
-    const updatedItem: OrderItem = {
-      ...customizingOrderItem,
-      quantity: quantity,
-      notes: notes || '',
-      customizations: customizations?.map(c => ({
+    console.log('💾 [OrderSummaryPanel] handleCustomizationConfirm called:', {
+      itemId: customizingOrderItem.id,
+      quantity,
+      customizations,
+      notes
+    });
+    
+    // Build updates object
+    const updates: {
+      quantity?: number;
+      customizations?: any[];
+      notes?: string;
+    } = {};
+    
+    if (quantity !== customizingOrderItem.quantity) {
+      updates.quantity = quantity;
+    }
+    
+    if (customizations) {
+      updates.customizations = customizations.map(c => ({
         id: c.id,
         customization_id: c.id,
         name: c.name,
         price_adjustment: c.price,
         group: c.group
-      })) || customizingOrderItem.customizations || []
-    };
-    
-    // Call parent callback if it exists
-    if (onCustomizeItem) {
-      onCustomizeItem(customizingItemIndex, updatedItem);
+      }));
     }
+    
+    if (notes !== undefined) {
+      updates.notes = notes;
+    }
+    
+    // Call posOrderStore update method (direct state update for Takeaway)
+    updateItemWithCustomizations(customizingOrderItem.id, updates);
     
     // Close modal
     setIsCustomizationModalOpen(false);
@@ -830,7 +867,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onUpdateQuantity(index, Math.max(1, item.quantity - 1))}
+                    onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
                     className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
@@ -847,7 +884,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                    onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                     className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
@@ -931,12 +968,12 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
               {orderType === "DINE-IN" ? (
                 /* DINE-IN Mode: Two separate buttons for kitchen and billing */
                 <>
-                  {/* Send to Kitchen Button */}
+                  {/* Save Order Button */}
                   <Button
                     size="sm"
                     onClick={() => {
-                      if (onSendToKitchen) {
-                        onSendToKitchen();
+                      if (onShowKitchenPreview) {
+                        onShowKitchenPreview();
                       }
                     }}
                     disabled={orderItems.length === 0}
@@ -950,8 +987,8 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                       cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <ChefHat className="w-3 h-3 mr-2" />
-                    Send to Kitchen
+                    <Save className="w-3 h-3 mr-2" />
+                    Save Order
                   </Button>
 
                   {/* Print Bill Button */}
@@ -1171,6 +1208,39 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ✅ StaffCustomizationModal - Direct opening for editing order items */}
+      {isCustomizationModalOpen && customizingOrderItem && (() => {
+        const fullMenuItem = menuItems.find(mi => mi.id === customizingOrderItem.menu_item_id);
+        const selectedVariant = customizingOrderItem.variant_id 
+          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id)
+          : null;
+        
+        return fullMenuItem ? (
+          <StaffCustomizationModal
+            item={fullMenuItem}
+            variant={selectedVariant}
+            isOpen={isCustomizationModalOpen}
+            onClose={() => {
+              setIsCustomizationModalOpen(false);
+              setCustomizingOrderItem(null);
+              setCustomizingItemIndex(-1);
+            }}
+            onConfirm={handleCustomizationConfirm}
+            orderType={orderType}
+            initialQuantity={customizingOrderItem.quantity}
+            existingCustomizations={customizingOrderItem.customizations?.map(c => ({
+              id: c.id || c.customization_id,
+              name: c.name,
+              price: c.price_adjustment,
+              group: c.group
+            })) || []}
+            existingNotes={customizingOrderItem.notes || ''}
+          />
+        ) : null;
+      })()}
+      
+      {/* ✅ KEEP: Existing modals (Order Confirmation, Table Selection, etc.) */}
     </div>
   );
 });
