@@ -3,11 +3,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from 'app';
 import ThermalPreview from './ThermalPreview';
 import { ReceiptDesignerService } from 'utils/receiptDesignerService';
 import { Template, FormData } from 'utils/receiptDesignerTypes';
-import brain from 'brain';
+import { OrderItem } from '../utils/menuTypes';
 import { useSimpleAuth } from 'utils/simple-auth-context';
+import { usePOSAuth } from 'utils/usePOSAuth';
 
 // ==================== Types ====================
 
@@ -223,6 +225,7 @@ export default function ThermalReceiptDisplay({
   receiptFormat = 'front_of_house'
 }: ThermalReceiptDisplayProps) {
   const { user } = useSimpleAuth();
+  const { userId } = usePOSAuth();
   const [template, setTemplate] = useState<Template | null>(null);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -231,7 +234,7 @@ export default function ThermalReceiptDisplay({
   // Load template on mount or when props change
   useEffect(() => {
     loadTemplate();
-  }, [templateId, orderMode, user?.id]);
+  }, [templateId, orderMode]);
   
   // Re-map order data when template or orderData changes
   useEffect(() => {
@@ -243,14 +246,9 @@ export default function ThermalReceiptDisplay({
   
   /**
    * Load template by ID or order mode
+   * Templates are shared resources - no auth required for display
    */
   const loadTemplate = async () => {
-    if (!user?.id) {
-      setError('User not authenticated');
-      setIsLoading(false);
-      return;
-    }
-    
     try {
       setIsLoading(true);
       setError(null);
@@ -260,7 +258,7 @@ export default function ThermalReceiptDisplay({
       // Option 1: Load by template ID
       if (templateId) {
         console.log('📡 Loading template by ID:', templateId);
-        const response = await ReceiptDesignerService.fetchTemplate(templateId, user.id);
+        const response = await ReceiptDesignerService.fetchTemplate(templateId);
         
         if (response.success && response.data) {
           loadedTemplate = response.data;
@@ -275,16 +273,15 @@ export default function ThermalReceiptDisplay({
         
         // Get template assignment for this order mode
         const storageKey = orderModeToStorageKey(orderMode);
-        const assignmentResponse = await brain.get_template_assignment({ orderMode: storageKey });
+        const assignmentResponse = await apiClient.get_template_assignment({ orderMode: storageKey });
         const assignmentData = await assignmentResponse.json();
         
         if (assignmentData.customer_template_id) {
           console.log('✅ Found assigned template:', assignmentData.customer_template_id);
           
-          // Load the assigned template
+          // Load the assigned template (no userId needed)
           const templateResponse = await ReceiptDesignerService.fetchTemplate(
-            assignmentData.customer_template_id,
-            user.id
+            assignmentData.customer_template_id
           );
           
           if (templateResponse.success && templateResponse.data) {
