@@ -15,8 +15,8 @@
  * Restoration: Automatic on app startup with user prompt
  */
 
-import { OrderItem } from './menuTypes';
-import { CustomerData } from './customerDataStore';
+import type { OrderItem } from './menuTypes';
+import type { CustomerData } from './customerTypes';
 
 const DB_NAME = 'cottage_tandoori_pos';
 const DB_VERSION = 1;
