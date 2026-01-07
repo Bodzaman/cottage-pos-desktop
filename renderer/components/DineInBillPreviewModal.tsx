@@ -48,8 +48,8 @@ export function DineInBillPreviewModal({
   // Map order data to receipt format for ThermalReceiptDisplay
   const mapToReceiptOrderData = () => {
     const mappedData = {
-      orderId: "BILL-" + tableNumber + "-" + Date.now(),
-      orderNumber: "T" + tableNumber + "-" + Date.now().toString().slice(-6),
+      orderId: `BILL-${tableNumber}-${Date.now()}`,
+      orderNumber: `T${tableNumber}-${Date.now().toString().slice(-6)}`,
       orderType: 'DINE-IN' as const,
       tableNumber: tableNumber?.toString(),
       guestCount: guestCount,
@@ -62,7 +62,7 @@ export function DineInBillPreviewModal({
         );
         
         return {
-          id: item.id || item.menu_item_id || "item-" + Date.now(),
+          id: item.id || item.menu_item_id || `item-${Date.now()}`,
           name: displayName,
           price: item.price,
           quantity: item.quantity,
@@ -72,7 +72,7 @@ export function DineInBillPreviewModal({
             price_adjustment: 0
           } : undefined,
           customizations: item.modifiers?.map(mod => ({
-            id: mod.id || "mod-" + Date.now(),
+            id: mod.id || `mod-${Date.now()}`,
             name: mod.name,
             price: mod.price || 0
           })) || [],
@@ -104,8 +104,8 @@ export function DineInBillPreviewModal({
       <DialogContent 
         className="max-w-2xl max-h-[90vh] flex flex-col"
         style={{
-          background: "linear-gradient(135deg, " + QSAITheme.background.primary + " 0%, " + QSAITheme.background.secondary + " 100%)",
-          border: "1px solid " + QSAITheme.border.accent,
+          background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
+          border: `1px solid ${QSAITheme.border.accent}`,
         }}
       >
         {/* Header */}
