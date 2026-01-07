@@ -1,14 +1,5 @@
-
-
-
-/**
- * Centralized Polling Service
- * OPTIMIZED: Only lightweight health checks, heavy operations moved to on-demand service
- * NO MORE HEAVY API CALLS - Only basic health endpoint
- */
-
 import { create } from 'zustand';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { createLogger } from './logger';
 
 const logger = createLogger('PollingService');
@@ -97,7 +88,7 @@ export const usePollingService = create<PollingState>((set, get) => ({
       );
       
       const healthResponse = await Promise.race([
-        brain.check_health(),
+        apiClient.check_printer_health(),
         timeoutPromise
       ]);
       
