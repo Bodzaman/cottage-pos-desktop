@@ -84,6 +84,7 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
         customizations: [],
         variant_id: 'default',
         variantName: 'Standard',
+        image_url: menuItem.image_url || undefined,
         item_type: 'set_meal'
       };
     }
@@ -103,6 +104,7 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
         protein_type_name: v.protein_type_name,
         is_default: v.is_default,
         price: v.price,
+        image_url: v.image_url,
         all_fields: Object.keys(v)
       }))
     });
@@ -110,6 +112,7 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
     let variantId: string = 'default';
     let variantName: string = 'Standard';
     let basePrice = menuItem.price || 0;
+    let imageUrl: string | undefined = menuItem.image_url || undefined;
 
     if (variants.length > 0) {
       const defaultVariant = variants.find((v: any) => v.is_default) || variants[0];
@@ -117,13 +120,16 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
       // Use database-generated variant_name (e.g., "CHICKEN TIKKA MASALA") instead of manual construction
       variantName = defaultVariant.variant_name || menuItem.name || 'Standard';
       basePrice = defaultVariant.price || menuItem.price || 0;
+      // ✅ FIX: Use variant image_url with fallback to menu item image_url
+      imageUrl = defaultVariant.image_url || menuItem.image_url || undefined;
       
       // 🔍 LOG SELECTED VARIANT
       console.log('✅ [VARIANT SELECTED] Using variant:', {
         variant_id: variantId,
         variant_name: variantName,
         source: defaultVariant.variant_name ? 'variant_name field' : 'fallback to item name',
-        price: basePrice
+        price: basePrice,
+        image_url: imageUrl
       });
     }
 
@@ -133,13 +139,14 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
       category_id: menuItem.category_id,
       category_name: categoryName,
       name: menuItem.name,
+      variantName: variantName,
       quantity: 1,
       price: basePrice,
+      image_url: imageUrl,
       notes: '',
       modifiers: [],
       customizations: [],
       variant_id: variantId,
-      variantName: variantName,
       item_type: (menuItem as any).item_type || 'menu_item'
     };
   };
