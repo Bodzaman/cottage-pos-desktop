@@ -1,4 +1,5 @@
-import { OrderItem, CustomerTab } from 'types';
+import { OrderItem } from 'utils/menuTypes';
+import { CustomerTab } from 'types';
 import { calculateSubtotal } from './orderCalculations';
 
 /**
