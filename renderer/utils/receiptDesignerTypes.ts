@@ -58,6 +58,12 @@ export interface OrderItem {
 export type ReceiptFormat = 'front_of_house' | 'kitchen_customer';
 export type OrderMode = 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
 export type OrderSource = 'POS' | 'ONLINE' | 'AI_VOICE';
+
+/**
+ * OrderType for receipt designer templates (lowercase, database storage format)
+ * NOTE: This is different from the canonical OrderType in masterTypes.ts
+ * Used specifically for template storage and designer UI
+ */
 export type OrderType = 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'online_orders';
 export type DineInTemplateType = 'kitchen_copy' | 'final_bill';
 export type LogoPosition = 'left' | 'center' | 'right';
