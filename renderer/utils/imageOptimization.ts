@@ -1,4 +1,4 @@
-import { API_URL } from 'app';
+import { API_URL } from '../utils/environment';
 
 /**
  * Image optimization utility using Supabase's built-in transformations
