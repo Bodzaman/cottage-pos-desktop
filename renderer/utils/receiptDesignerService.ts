@@ -4,7 +4,7 @@
  * Centralized error handling and response parsing
  */
 
-import brain from 'brain';
+import { apiClient } from 'app';
 import { Template, FormData } from 'utils/receiptDesignerTypes';
 
 // ==================== Type Guards ====================
@@ -24,7 +24,7 @@ export const ReceiptDesignerService = {
   fetchTemplates: async (userId: string): Promise<ApiResponse<Template[]>> => {
     try {
       console.log('📡 Fetching templates for user:', userId);
-      const response = await brain.list_receipt_templates({ user_id: userId });
+      const response = await apiClient.list_receipt_templates({ user_id: userId });
       const data = await response.json();
       
       if (data.templates) {
@@ -62,11 +62,19 @@ export const ReceiptDesignerService = {
 
   /**
    * Fetch a specific template by ID
+   * Templates are shared resources - userId is optional for display purposes
    */
-  fetchTemplate: async (templateId: string, userId: string): Promise<ApiResponse<Template>> => {
+  fetchTemplate: async (templateId: string, userId?: string): Promise<ApiResponse<Template>> => {
     try {
       console.log('📡 Fetching template:', templateId);
-      const response = await brain.get_receipt_template({ templateId: templateId, user_id: userId });
+      
+      // Call API with optional userId (backward compatible)
+      const params: any = { templateId };
+      if (userId) {
+        params.user_id = userId;
+      }
+      
+      const response = await apiClient.get_receipt_template(params);
       const data = await response.json();
       
       if (data.template) {
@@ -125,7 +133,7 @@ export const ReceiptDesignerService = {
       };
       
       console.log('🚀 Sending request to backend...');
-      const response = await brain.create_receipt_template(requestData);
+      const response = await apiClient.create_receipt_template(requestData);
       console.log('📡 Response status:', response.status);
       
       const data = await response.json();
@@ -197,7 +205,7 @@ export const ReceiptDesignerService = {
       if (updates.design_data !== undefined) requestData.design_data = updates.design_data;
       if (updates.paper_width !== undefined) requestData.paper_width = updates.paper_width;
       
-      const response = await brain.update_receipt_template({ templateId: templateId }, requestData);
+      const response = await apiClient.update_receipt_template({ templateId: templateId }, requestData);
       const data = await response.json();
       
       // Backend returns TemplateResponse directly (flat structure)
@@ -241,7 +249,7 @@ export const ReceiptDesignerService = {
   deleteTemplate: async (templateId: string, userId: string): Promise<ApiResponse<void>> => {
     try {
       console.log('🗑️ Deleting template:', templateId);
-      const response = await brain.delete_receipt_template(
+      const response = await apiClient.delete_receipt_template(
         { templateId: templateId },
         { user_id: userId }
       );
@@ -273,7 +281,7 @@ export const ReceiptDesignerService = {
   fetchRestaurantSettings: async (): Promise<ApiResponse<any>> => {
     try {
       console.log('📊 Fetching restaurant settings...');
-      const response = await brain.get_restaurant_settings();
+      const response = await apiClient.get_restaurant_settings();
       const data = await response.json();
       
       if (data.success && data.settings?.business_profile) {
