@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import brain from 'brain';
+import { apiClient } from 'app';
 import type { TemplateAssignment } from 'types';
 
 /**
@@ -46,7 +46,7 @@ async function validateTemplateExists(templateId: string | null | undefined): Pr
   try {
     // Attempt to fetch the template from storage
     // Note: Using a dummy user_id since we're just checking existence
-    const response = await brain.get_receipt_template({ 
+    const response = await apiClient.get_receipt_template({ 
       templateId, 
       user_id: 'system' 
     });
@@ -80,7 +80,7 @@ export function useTemplateAssignments(): UseTemplateAssignmentsReturn {
     setError(null);
     
     try {
-      const response = await brain.get_template_assignments();
+      const response = await apiClient.get_template_assignments();
       const data = await response.json();
       
       if (data.success && data.assignments) {
