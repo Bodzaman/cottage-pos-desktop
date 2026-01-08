@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { API_PREFIX_PATH, API_PATH, API_URL } from '../constants';
 import { useCartStore } from './cartStore';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
@@ -959,7 +959,7 @@ export const useChatStore = create<ChatState>()(
       // Load chatbot configuration from API
       loadChatbotConfig: async () => {
         try {
-          const response = await brain.get_chat_config();
+          const response = await apiClient.get_chat_config();
           const data = await response.json();
           
           if (data) {
@@ -984,7 +984,7 @@ export const useChatStore = create<ChatState>()(
       loadSystemPrompt: async () => {
         set({ isLoadingPrompt: true });
         try {
-          const response = await brain.generate_system_prompt({ channel: 'chat' });
+          const response = await apiClient.generate_system_prompt({ channel: 'chat' });
           const data = await response.json();
           
           set({
