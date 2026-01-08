@@ -1,5 +1,4 @@
-
-import { OrderItem } from 'types';
+import { OrderItem } from 'utils/menuTypes';
 
 /**
  * Shared calculation utilities for order summary components
@@ -16,7 +15,7 @@ export function calculateSubtotal(orderItems: OrderItem[]): number {
     // Add customization costs
     if (item.customizations) {
       const customizationTotal = item.customizations.reduce(
-        (custSum, customization) => custSum + (customization.price * item.quantity),
+        (custSum, customization) => custSum + ((customization.price_adjustment || 0) * item.quantity),
         0
       );
       itemTotal += customizationTotal;
@@ -52,7 +51,7 @@ export function getItemTotal(item: OrderItem): number {
   
   if (item.customizations) {
     const customizationTotal = item.customizations.reduce(
-      (sum, customization) => sum + (customization.price * item.quantity),
+      (sum, customization) => sum + ((customization.price_adjustment || 0) * item.quantity),
       0
     );
     total += customizationTotal;
