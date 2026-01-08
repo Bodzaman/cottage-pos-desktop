@@ -1,21 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Minus, Plus, Trash2, User, Users, Receipt, Utensils } from 'lucide-react';
-import { AppApisTableOrdersOrderItem, CustomerTab } from 'brain/data-contracts';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Minus, Plus, Trash2, User, Users, Receipt, Utensils, Save, FileText, Cog, XCircle } from 'lucide-react';
+import { AppApisTableOrdersOrderItem, CustomerTab } from 'types';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
+import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { MenuItem, ItemVariant, SelectedCustomization } from 'utils/menuTypes';
+import { StaffCustomizationModal } from 'components/StaffCustomizationModal';
+import { DineInActionBar } from 'components/DineInActionBar';
+import { toast } from 'sonner';
+import { apiClient } from 'app';
 
 interface Props {
   orderItems: AppApisTableOrdersOrderItem[];
+  stagingItems?: AppApisTableOrdersOrderItem[]; // ✅ NEW: Cart items not yet saved
   customerTabs?: CustomerTab[]; // NEW: Optional customer tabs for grouping
   activeCustomerTabId?: string | null; // NEW: Currently selected customer tab
+  orderId?: string | null; // ✅ NEW: Order ID for update-item endpoint
+  orderStatus?: string | null; // ✅ NEW: Order status for workflow enforcement
   onUpdateQuantity: (index: number, quantity: number) => void;
   onRemoveItem: (index: number) => void;
   onSave: () => void;
   onSendToKitchen: () => void;
   onFinalBill: () => void;
   onViewBill?: () => void; // NEW: Optional View Bill handler
+  onReviewOrder?: () => void; // ✅ NEW: Handler to open Full Review Modal
+  onCancelOrder?: () => void; // NEW: Handler to refresh after cancel
+  onResetTable?: () => void; // ✅ NEW: Handler to reset table status
   className?: string;
 }
 
@@ -25,32 +38,110 @@ interface Props {
  */
 export function DineInOrderSummary({
   orderItems,
+  stagingItems = [], // ✅ NEW: Cart items not yet saved (with default)
   customerTabs = [],
   activeCustomerTabId = null,
+  orderId = null,
+  orderStatus = null,
   onUpdateQuantity,
   onRemoveItem,
   onSave,
   onSendToKitchen,
   onFinalBill,
   onViewBill,
+  onReviewOrder,
+  onCancelOrder,
+  onResetTable,
   className
 }: Props) {
+  // ✅ Get menu items and variants from store for StaffCustomizationModal
+  const { menuItems, itemVariants } = useRealtimeMenuStore();
+  
+  // ✅ State for StaffCustomizationModal
+  const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  const [customizingOrderItem, setCustomizingOrderItem] = useState<AppApisTableOrdersOrderItem | null>(null);
+  const [customizingItemIndex, setCustomizingItemIndex] = useState<number>(-1);
+  
+  // ✅ NEW: State for Cancel Order password authentication
+  const [showCancelPasswordDialog, setShowCancelPasswordDialog] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // 🔍 PHASE 4: DIAGNOSTIC LOGGING - Verify menu_item_id presence
+  useEffect(() => {
+    console.log('🔍 [PHASE 4 DIAGNOSTIC] DineInOrderSummary received orderItems:', {
+      itemCount: orderItems?.length || 0,
+      rawItems: orderItems,
+      firstItem: orderItems?.[0],
+      firstItemKeys: orderItems?.[0] ? Object.keys(orderItems[0]) : [],
+      menu_item_id_check: {
+        exists: orderItems?.[0]?.menu_item_id !== undefined,
+        value: orderItems?.[0]?.menu_item_id,
+        type: typeof orderItems?.[0]?.menu_item_id
+      },
+      variant_check: {
+        has_variant_object: orderItems?.[0]?.variant !== undefined,
+        has_variant_id: orderItems?.[0]?.variant_id !== undefined,
+        has_variant_name: orderItems?.[0]?.variant_name !== undefined,
+      }
+    });
+  }, [orderItems]);
+
+  // DEBUG: Log when orderItems prop changes
+  useEffect(() => {
+    console.log('[DineInOrderSummary] 📦 ORDER_ITEMS PROP RECEIVED:', {
+      itemCount: orderItems?.length || 0,
+      items: orderItems,
+      customerTabsCount: customerTabs?.length || 0,
+      activeCustomerTabId
+    });
+  }, [orderItems, customerTabs, activeCustomerTabId]);
+
+  // ✅ CLEAN ARCHITECTURE: Combine orderItems and stagingItems for display
+  // 
+  // ARCHITECTURE DECISION (MYA-1615 Phase 2):
+  // This component supports TWO use cases:
+  // 
+  // USE CASE 1: Adding Interface (DineInOrderModal)
+  //   - orderItems: [] (empty - no database items yet)
+  //   - stagingItems: [...] (items being added, not yet saved)
+  //   - allItems = [] + stagingItems = stagingItems ✅
+  //   - Shows ONLY ephemeral cart items
+  //   - After save: stagingItems clears, cart becomes empty
+  // 
+  // USE CASE 2: Management Interface (DineInFullReviewModal - future)
+  //   - orderItems: [...] (all saved database items)
+  //   - stagingItems: [] (no staging in management view)
+  //   - allItems = orderItems + [] = orderItems ✅
+  //   - Shows ONLY persistent saved items
+  //   - Allows editing, tab assignment, payment
+  // 
+  // WHY COMBINE BOTH:
+  // - Single component can handle both adding and management
+  // - Flexible architecture for future enhancements
+  // - Consistent rendering logic regardless of source
+  // 
+  // DATA LIFECYCLE:
+  // Staging (ephemeral) → Persist (save) → Database (persistent) → Review (display)
+  const allItems = React.useMemo(() => {
+    return [...orderItems, ...stagingItems];
+  }, [orderItems, stagingItems]);
+
   // Calculate totals using same logic as POSOrderSummary
-  const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal; // Add tax/discount logic here if needed
 
   // NEW: Group items by customer tab ID
   const groupedItems = React.useMemo(() => {
     const groups: Map<string | null, AppApisTableOrdersOrderItem[]> = new Map();
     
-    orderItems.forEach(item => {
+    allItems.forEach(item => {
       const tabId = (item as any).customer_tab_id || null;
       const existing = groups.get(tabId) || [];
       groups.set(tabId, [...existing, item]);
     });
     
     return groups;
-  }, [orderItems]);
+  }, [allItems]);
 
   // NEW: Get customer tab name by ID
   const getCustomerTabName = (tabId: string | null): string => {
@@ -241,6 +332,41 @@ export function DineInOrderSummary({
                     </Button>
                   </div>
 
+                  {/* ✅ NEW: Kitchen Status Badge (Phase 5.1) */}
+                  <Badge 
+                    variant="outline"
+                    className="text-[10px] px-2 py-0.5 font-medium"
+                    style={{
+                      borderColor: item.sent_to_kitchen 
+                        ? 'rgba(34, 197, 94, 0.5)' 
+                        : 'rgba(249, 115, 22, 0.5)',
+                      backgroundColor: item.sent_to_kitchen
+                        ? 'rgba(34, 197, 94, 0.1)'
+                        : 'rgba(249, 115, 22, 0.1)',
+                      color: item.sent_to_kitchen
+                        ? '#22C55E'
+                        : '#F97316'
+                    }}
+                  >
+                    {item.sent_to_kitchen ? 'Sent' : 'Pending'}
+                  </Badge>
+
+                  {/* ✅ NEW: Customize button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenCustomization(globalIndex, item)}
+                    className="text-xs px-2 py-1 h-6 flex-shrink-0"
+                    style={{
+                      borderColor: QSAITheme.purple.primary,
+                      color: 'white',
+                      backgroundColor: 'transparent'
+                    }}
+                  >
+                    <Cog className="w-3 h-3 mr-1" />
+                    Custom
+                  </Button>
+
                   {/* Item Total */}
                   <div className="text-sm font-medium" style={{ color: QSAITheme.text.primary }}>
                     £{(item.price * item.quantity).toFixed(2)}
@@ -270,6 +396,102 @@ export function DineInOrderSummary({
     );
   };
 
+  // ✅ Handler to open StaffCustomizationModal for editing order items
+  const handleOpenCustomization = (index: number, item: AppApisTableOrdersOrderItem) => {
+    console.log('🔧 [DineInOrderSummary] handleOpenCustomization called:', {
+      index,
+      item,
+      menuItemId: item.menu_item_id,
+      variantId: item.variant_id
+    });
+    
+    setCustomizingOrderItem(item);
+    setCustomizingItemIndex(index);
+    setIsCustomizationModalOpen(true);
+  };
+  
+  // ✅ Handler to save customized item from StaffCustomizationModal
+  const handleCustomizationConfirm = async (
+    menuItem: MenuItem,
+    quantity: number,
+    variant?: ItemVariant | null,
+    customizations?: SelectedCustomization[],
+    notes?: string
+  ) => {
+    if (customizingItemIndex === -1 || !customizingOrderItem) return;
+    
+    console.log('✅ [DineInOrderSummary] Customization confirmed:', {
+      menuItem,
+      quantity,
+      variant,
+      customizations,
+      notes,
+      orderId,
+      itemId: customizingOrderItem.id
+    });
+    
+    // ✅ Phase 4.2.4: Call update-item endpoint
+    try {
+      const response = await apiClient.update_item({
+        order_id: orderId || '',
+        item_id: customizingOrderItem.id,
+        quantity,
+        notes: notes || null,
+        customizations: customizations || []
+      });
+
+      const updatedItem = await response.json();
+      console.log('✅ [DineInOrderSummary] Item updated successfully:', updatedItem);
+      toast.success('Item updated successfully');
+      
+      // Close modal
+      setIsCustomizationModalOpen(false);
+      setCustomizingOrderItem(null);
+      setCustomizingItemIndex(-1);
+    } catch (error) {
+      console.error('❌ Error updating item:', error);
+      toast.error('Failed to update item');
+    }
+  };
+
+  // ✅ Handler to clear staging cart (no password required)
+  const handleCancelOrder = () => {
+    console.log('🔍 [RENDER SOURCE CHECK] Before clear:', {
+      orderItemsProp: orderItems,
+      orderItemsLength: orderItems.length,
+      stagingItems: stagingItems,
+      stagingItemsLength: stagingItems.length,
+      groupedItemsKeys: Array.from(groupedItems.keys()),
+      groupedItemsSize: groupedItems.size
+    });
+    
+    if (stagingItems.length === 0) {
+      toast.info('Cart is already empty');
+      return;
+    }
+    
+    console.log('🗑️ [DineInOrderSummary] Clearing staging cart');
+    
+    // Call parent handler to clear staging state
+    if (onCancelOrder) {
+      onCancelOrder();
+    }
+    
+    toast.success('Cart cleared', {
+      description: 'Unsaved items removed from cart'
+    });
+    
+    // ✅ DEBUG: Check what orderItems is AFTER parent updates state
+    setTimeout(() => {
+      console.log('🔍 [RENDER SOURCE CHECK] After clear (50ms delay):', {
+        orderItemsProp: orderItems,
+        orderItemsLength: orderItems.length,
+        stagingItems: stagingItems,
+        stagingItemsLength: stagingItems.length
+      });
+    }, 50);
+  };
+
   return (
     <div 
       className={cn('flex flex-col h-full', className)}
@@ -281,14 +503,29 @@ export function DineInOrderSummary({
         style={{ borderColor: QSAITheme.border.medium }}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium" style={{ color: QSAITheme.text.primary }}>Order Summary</h3>
-          <span className="text-xs" style={{ color: QSAITheme.text.secondary }}>{orderItems.length} items</span>
+          <h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: QSAITheme.text.primary }}>
+            Order Summary
+            {stagingItems.length > 0 && (
+              <Badge 
+                variant="default" 
+                className="text-xs"
+                style={{
+                  backgroundColor: `${QSAITheme.purple.primary}40`,
+                  color: QSAITheme.purple.light,
+                  border: `1px solid ${QSAITheme.purple.primary}`
+                }}
+              >
+                {stagingItems.length} item{stagingItems.length === 1 ? '' : 's'}
+              </Badge>
+            )}
+          </h3>
+          <span className="text-xs" style={{ color: QSAITheme.text.secondary }}>{allItems.length} items</span>
         </div>
       </div>
 
       {/* Order Items List */}
       <div className="flex-1 overflow-y-auto">
-        {orderItems.length === 0 ? (
+        {allItems.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="text-sm mb-2" style={{ color: QSAITheme.text.muted }}>No items in order</div>
@@ -325,7 +562,7 @@ export function DineInOrderSummary({
       </div>
 
       {/* Totals Section */}
-      {orderItems.length > 0 && (
+      {allItems.length > 0 && (
         <div className="border-t p-3 flex-shrink-0" style={{ borderColor: QSAITheme.border.medium }}>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -340,89 +577,57 @@ export function DineInOrderSummary({
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="p-3 border-t space-y-2 flex-shrink-0" style={{ borderColor: QSAITheme.border.medium }}>
-        {orderItems.length > 0 ? (
-          <>
-            {/* ✅ DATABASE-FIRST: Items are saved immediately when added */}
-            <div className="text-center py-2 mb-2 rounded" style={{ backgroundColor: QSAITheme.background.tertiary }}>
-              <div className="text-xs font-medium" style={{ color: QSAITheme.text.primary }}>
-                Items automatically saved to order
-              </div>
-              <div className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
-                {orderItems.length} item{orderItems.length === 1 ? '' : 's'} in database
-              </div>
-            </div>
-            
-            {/* Save Order Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSave}
-              className="w-full text-xs h-9 font-medium"
-              style={{
-                borderColor: QSAITheme.border.medium,
-                color: QSAITheme.text.primary,
-                backgroundColor: 'transparent'
-              }}
-            >
-              Save Order
-            </Button>
-            
-            {/* Send to Kitchen Button */}
-            <Button
-              size="sm"
-              onClick={onSendToKitchen}
-              className="w-full text-xs h-9 font-medium"
-              style={{
-                backgroundColor: QSAITheme.purple.primary,
-                color: '#FFFFFF'
-              }}
-            >
-              Send to Kitchen
-            </Button>
-            
-            {/* NEW: View Bill Button - Opens customer-grouped bill modal */}
-            {onViewBill && customerTabs.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onViewBill}
-                className="w-full text-xs h-9 font-medium"
-                style={{
-                  borderColor: QSAITheme.purple.light,
-                  color: QSAITheme.purple.light,
-                  backgroundColor: `${QSAITheme.purple.primary}15`
-                }}
-              >
-                <Receipt className="w-3 h-3 mr-1.5" />
-                View Bill (By Customer)
-              </Button>
-            )}
-            
-            {/* Print Final Bill Button - Opens review modal */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onFinalBill}
-              className="w-full text-xs h-9 font-medium"
-              style={{
-                borderColor: QSAITheme.purple.primary,
-                color: QSAITheme.purple.primary,
-                backgroundColor: 'transparent'
-              }}
-            >
-              Print Final Bill
-            </Button>
-          </>
-        ) : (
-          <div className="text-center py-2">
-            <div className="text-xs" style={{ color: QSAITheme.text.muted }}>
-              Add items from menu - they'll save automatically
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Action Buttons - Delegated to DineInActionBar */}
+      <DineInActionBar
+        stagingItemCount={stagingItems.length}
+        savedItemCount={orderItems.length}
+        totalItemCount={allItems.length}
+        orderId={orderId}
+        onSave={onSave}
+        onReviewOrder={onReviewOrder || (() => {})}
+        onCancelOrder={onCancelOrder || (() => {})}
+        onResetTable={onResetTable}
+      />
+
+      {/* ✅ NEW: StaffCustomizationModal for editing order items */}
+      {isCustomizationModalOpen && customizingOrderItem && (() => {
+        // Find the MenuItem and ItemVariant from store
+        const menuItem = menuItems.find(m => m.id === customizingOrderItem.menu_item_id);
+        const variant = customizingOrderItem.variant_id 
+          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id)
+          : null;
+        
+        if (!menuItem) {
+          console.error('❌ MenuItem not found for customization:', customizingOrderItem.menu_item_id);
+          return null;
+        }
+        
+        // Convert customizations to SelectedCustomization format
+        const existingCustomizations: SelectedCustomization[] = (customizingOrderItem.customizations || []).map(c => ({
+          id: c.customization_id || c.id || '',
+          name: c.name || '',
+          price: c.price_adjustment || 0,
+          group: c.group || ''
+        }));
+        
+        return (
+          <StaffCustomizationModal
+            isOpen={isCustomizationModalOpen}
+            onClose={() => {
+              setIsCustomizationModalOpen(false);
+              setCustomizingOrderItem(null);
+              setCustomizingItemIndex(-1);
+            }}
+            onConfirm={handleCustomizationConfirm}
+            item={menuItem}
+            variant={variant}
+            orderType="DINE-IN"
+            initialQuantity={customizingOrderItem.quantity}
+            existingCustomizations={existingCustomizations}
+            existingNotes={customizingOrderItem.notes}
+          />
+        );
+      })()}
     </div>
   );
 }
