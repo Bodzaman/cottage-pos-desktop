@@ -1,4 +1,4 @@
-import brain from 'brain';
+import { apiClient } from 'app';
 
 /**
  * Cart Analytics Utility
@@ -75,7 +75,7 @@ export const trackCartEvent = async (
   }
 
   try {
-    const response = await brain.track_cart_event({
+    const response = await apiClient.track_cart_event({
       session_id: getSessionId(),
       customer_id: getCustomerId(),
       event_type: eventType,
