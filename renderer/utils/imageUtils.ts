@@ -105,7 +105,7 @@ export const getCroppedImg = async (
     );
   } catch (error) {
     console.error('Error during cropping:', error);
-    throw new Error("Cropping failed: " + error.message);
+    throw new Error(`Cropping failed: ${error.message}`);
   }
 
   // Return as a data URL or File based on outputType
@@ -119,7 +119,7 @@ export const getCroppedImg = async (
           }
           const file = new File(
             [blob],
-            fileName || "cropped-image-" + Date.now() + ".jpg",
+            fileName || `cropped-image-${Date.now()}.jpg`,
             { type: 'image/jpeg' }
           );
           console.log('Created cropped image file:', {
@@ -217,14 +217,14 @@ export function getOptimizedImageUrl(url: string, width: number = 800): string {
     // Add width, quality, and auto format parameters if not already present
     const hasParams = url.includes('?');
     const connector = hasParams ? '&' : '?';
-    const params = connector + "w=" + width + "&q=80&auto=format&fit=crop";
+    const params = `${connector}w=${width}&q=80&auto=format&fit=crop`;
     
     // Avoid adding duplicate parameters
     if (url.includes('w=') && url.includes('q=') && url.includes('auto=format')) {
       return url;
     }
     
-    return url + params;
+    return `${url}${params}`;
   }
   
   // Databutton static assets are already optimized
