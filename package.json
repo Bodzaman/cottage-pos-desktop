@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Cottage Tandoori POS Desktop - Point of Sale System with Thermal Printing",
   "main": "main.js",
   "type": "module",
