@@ -1,8 +1,10 @@
-
-
-
 // Core TypeScript interfaces for Visual Canvas Receipt Template Designer
 
+/**
+ * OrderType for visual template designer (lowercase, extended set)
+ * NOTE: This is different from the canonical OrderType in masterTypes.ts
+ * Used specifically for visual template designer with additional types (ai, online)
+ */
 export type OrderType = 'ai' | 'online' | 'dine_in' | 'waiting' | 'collection' | 'delivery';
 export type TemplateType = 'foh' | 'kitchen';
 export type ElementType = 'header' | 'order_info' | 'item_section' | 'customer_info' | 'totals' | 'footer' | 'decorative';
