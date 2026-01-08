@@ -1,4 +1,4 @@
-import { API_URL } from 'app';
+import { API_URL } from '../utils/environment';
 import { ChatRequest } from 'types';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
 import type { MenuItem } from './menuTypes';
