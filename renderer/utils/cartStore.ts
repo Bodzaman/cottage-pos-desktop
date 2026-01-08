@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
-import { MenuItem } from 'types';
+import { MenuItem } from 'utils/menuTypes';
 import { trackItemAdded, trackItemRemoved, trackModeSwitch, trackCartCleared } from './cartAnalytics';
 import { getOrCreateSessionId } from './session-manager';
 import { supabase } from './supabaseClient';
-import brain from 'brain';
+import { apiClient } from 'app';
 import { initCartRealtimeSubscription, cleanupCartSubscription } from './cartRealtimeSubscription';
 
 // ✅ PHASE 5g: Define isDev at module level for reactive subscription
@@ -13,6 +13,19 @@ const isDev = import.meta.env.DEV;
 
 // ✅ Cart schema version - increment when CartItem structure changes
 const CART_SCHEMA_VERSION = 5; // ✅ Incremented from 4 to trigger migration for JSONB parsing
+
+// ✅ Local type definition for cart customization
+// Defined locally to avoid importing from excluded TypeScript files
+export interface CartCustomization {
+  /** Customization ID */
+  id: string;
+  /** Customization name */
+  name: string;
+  /** Customization price */
+  price: number;
+  /** Customization group (optional) */
+  group?: string | null;
+}
 
 // ✅ REMOVED (Phase 2): Obsolete backend sync infrastructure
 // - CartSubscriptionState interface
@@ -224,6 +237,9 @@ export interface CartState {
   // ... existing methods ...
 }
 
+// ✅ Re-export CartCustomization for components that need it
+export type { CartCustomization };
+
 export interface CartItem {
   id: string;
   menuItemId: string;
@@ -405,7 +421,7 @@ export const useCartStore = create<CartState>()(persist(
         console.log('📦 [CART DEBUG] Exact payload being sent to backend:', JSON.stringify(payload, null, 2));
         console.log('🔍 [CART DEBUG] order_mode value:', finalMode, 'type:', typeof finalMode);
         
-        const response = await brain.add_item_to_cart(payload);
+        const response = await apiClient.add_item_to_cart(payload);
         
         const result = await response.json();
         
@@ -459,7 +475,7 @@ export const useCartStore = create<CartState>()(persist(
         console.log('  Payload:', JSON.stringify({ cart_item_id: itemId, session_id: sessionId }, null, 2));
         
         // Call backend to remove from Supabase
-        const response = await brain.remove_item_from_cart({
+        const response = await apiClient.remove_item_from_cart({
           cart_item_id: itemId.toString(), // ✅ FIX #11: Convert to string for backend validation
           session_id: sessionId
         });
@@ -576,7 +592,7 @@ export const useCartStore = create<CartState>()(persist(
       
       // ✅ CRITICAL FIX: Clear from Supabase database first
       try {
-        const response = await brain.clear_cart({ 
+        const response = await apiClient.clear_cart({ 
           // ✅ FIX: Enforce EITHER/OR constraint
           session_id: userId ? undefined : sessionId
         });
@@ -610,7 +626,7 @@ export const useCartStore = create<CartState>()(persist(
       const { userId, sessionId } = get();
       
       try {
-        const response = await brain.get_cart({
+        const response = await apiClient.get_cart({
           // ✅ FIX: Enforce EITHER/OR constraint - send ONLY user_id OR session_id
           user_id: userId || undefined,
           session_id: userId ? undefined : sessionId
