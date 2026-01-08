@@ -1,15 +1,11 @@
-
-
-
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Receipt, Printer, X, CreditCard, Banknote, SplitSquareHorizontal, Users, Calculator } from 'lucide-react';
-import { OrderItem } from 'types';
+import { AppApisTableOrdersOrderItem } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
-import { calculateSubtotal, calculateTax, calculateTotal } from 'utils/orderCalculations';
+import { calculateSubtotal } from 'utils/orderCalculations';
 import { toast } from 'sonner';
 
 interface Props {
