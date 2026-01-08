@@ -1,21 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit2, X, Save, Trash2, User, Users, ChevronDown, ChevronRight, Split, Merge, MoveRight, CheckSquare, Square, Receipt, CreditCard } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
-import { CustomerTab } from 'brain/data-contracts';
-import { useTableOrdersStore } from 'utils/tableOrdersStore';
+import { CustomerTab } from 'types';
+import { useCustomerTabs } from 'utils/useCustomerTabs';
 import BillReviewModal from 'components/BillReviewModal';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface Props {
   tableNumber: number;
-  onCustomerTabCreate: (tabName: string) => Promise<void>;
-  onCustomerTabRename: (tabId: string, newName: string) => Promise<void>;
-  onCustomerTabClose: (tabId: string) => Promise<void>;
+  tableLevelItemCount?: number; // Optional: table-level order items count (from parent)
   className?: string;
 }
 
@@ -23,22 +21,41 @@ interface Props {
  * Compact customer tabs component that merges list and actions into horizontal layout
  * Optimized for space efficiency with collapsible customer tabs section
  * Height: ~40px when collapsed, expands dynamically when customer tabs exist
+ * 
+ * ✅ EVENT-DRIVEN ARCHITECTURE (MYA-1595):
+ * Fully migrated to event-driven pattern using useCustomerTabs hook.
+ * No legacy tableOrdersStore dependencies.
  */
 export function CustomerTabsCompact({
   tableNumber,
-  onCustomerTabCreate,
-  onCustomerTabRename,
-  onCustomerTabClose,
+  tableLevelItemCount = 0,
   className
 }: Props) {
-  // Get customer tabs data from store
-  const { getCustomerTabsForTable, persistedTableOrders, getActiveCustomerTab, setActiveCustomerTab, splitCustomerTab, mergeCustomerTabs, moveItemsBetweenTabs } = useTableOrdersStore();
-  const customerTabs = getCustomerTabsForTable(tableNumber);
-  const activeCustomerTab = getActiveCustomerTab(tableNumber);
+  // ✅ EVENT-DRIVEN: Use hook directly (no legacy store)
+  const {
+    customerTabs,
+    activeTabId,
+    setActiveTabId,
+    createTab,
+    renameTab,
+    closeTab,
+    splitTab,
+    mergeTabs,
+    moveItemsBetweenTabs
+  } = useCustomerTabs(tableNumber);
   
-  // Get table-level order items count
-  const tableOrder = persistedTableOrders[tableNumber];
-  const tableLevelItemCount = tableOrder?.order_items?.length || 0;
+  // DEBUG: Log when customerTabs changes
+  useEffect(() => {
+    console.log('[CustomerTabsCompact] 📋 CUSTOMER_TABS DATA:', {
+      tableNumber,
+      tabCount: customerTabs?.length || 0,
+      tabs: customerTabs,
+      activeTabId
+    });
+  }, [customerTabs, activeTabId, tableNumber]);
+  
+  // Get active customer tab object from array
+  const activeCustomerTab = customerTabs.find(tab => tab.id === activeTabId) || null;
   
   // UI state
   const [isExpanded, setIsExpanded] = useState(customerTabs.length > 0);
@@ -74,7 +91,7 @@ export function CustomerTabsCompact({
   
   // Handle customer tab selection
   const handleCustomerTabSelect = (customerTab: CustomerTab | null) => {
-    setActiveCustomerTab(tableNumber, customerTab?.id || null);
+    setActiveTabId(customerTab?.id || null);
   };
   
   // Handle create customer tab
@@ -86,7 +103,7 @@ export function CustomerTabsCompact({
 
     setIsCreating(true);
     try {
-      await onCustomerTabCreate(newTabName.trim());
+      await createTab(newTabName.trim());
       setNewTabName('');
       setShowCreateModal(false);
       setIsExpanded(true); // Auto-expand when new tab is created
@@ -107,7 +124,7 @@ export function CustomerTabsCompact({
 
     setIsRenaming(true);
     try {
-      await onCustomerTabRename(activeCustomerTab.id!, renameValue.trim());
+      await renameTab(activeCustomerTab.id!, renameValue.trim());
       setRenameValue('');
       setShowRenameModal(false);
       toast.success(`Customer tab renamed to "${renameValue}"`);
@@ -124,7 +141,7 @@ export function CustomerTabsCompact({
 
     setIsClosing(true);
     try {
-      await onCustomerTabClose(activeCustomerTab.id!);
+      await closeTab(activeCustomerTab.id!);
       setShowCloseModal(false);
       toast.success(`Customer tab "${activeCustomerTab.tab_name}" closed`);
     } catch (error) {
@@ -151,7 +168,7 @@ export function CustomerTabsCompact({
 
     setIsSplitting(true);
     try {
-      const result = await splitCustomerTab(activeCustomerTab.id, splitTabName.trim(), selectedItems);
+      const result = await splitTab(activeCustomerTab.id, splitTabName.trim(), selectedItems);
       if (result.success) {
         setSplitTabName('');
         setSelectedItems([]);
@@ -174,7 +191,7 @@ export function CustomerTabsCompact({
 
     setIsMerging(true);
     try {
-      const result = await mergeCustomerTabs(activeCustomerTab.id, targetTabId);
+      const result = await mergeTabs(activeCustomerTab.id, targetTabId);
       if (result.success) {
         setTargetTabId('');
         setShowMergeModal(false);
@@ -241,7 +258,7 @@ export function CustomerTabsCompact({
     
     try {
       // Close the customer tab after payment
-      await onCustomerTabClose(activeCustomerTab.id!);
+      await closeTab(activeCustomerTab.id!);
       
       // Close bill review modal
       setShowBillReview(false);
