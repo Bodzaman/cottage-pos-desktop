@@ -14642,3 +14642,6 @@ export class Apiclient<SecurityDataType = unknown> extends HttpClient<SecurityDa
       ...params,
     });
 }
+
+// Re-export Apiclient as Brain for Electron app compatibility
+export { Apiclient as Brain };
