@@ -86,7 +86,7 @@ class CottageTandooriPOS {
 
         // Load POSII URL
         // Load local bundled frontend
-        const indexPath = path.join(__dirname, 'dist', 'renderer', 'index.html');
+        const indexPath = path.join(__dirname, 'dist', 'index.html');
         
         log.info(`Loading POS from: ${indexPath}`);
         this.mainWindow.loadFile(indexPath);
