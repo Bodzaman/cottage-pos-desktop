@@ -89,7 +89,7 @@ class CottageTandooriPOS {
         const indexPath = path.join(__dirname, 'dist', 'index.html');
         
         log.info(`Loading POS from: ${indexPath}`);
-        this.mainWindow.loadFile(indexPath);
+        this.mainWindow.loadURL(`file://${indexPath}`);
 
         this.mainWindow.once('ready-to-show', () => {
             this.mainWindow.show();
