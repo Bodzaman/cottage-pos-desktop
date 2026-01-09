@@ -17,7 +17,7 @@ export default defineConfig({
 
   // Build configuration for Electron renderer
   build: {
-    outDir: 'dist',
+    outDir: 'dist/renderer',
     emptyOutDir: true,
 
     rollupOptions: {
