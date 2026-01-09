@@ -31,7 +31,7 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient, API_URL } from 'app';
+import { API_CLIENT } from 'app';
 
 import { colors } from 'utils/designSystem';
 import { styles } from 'utils/QSAIDesign';
@@ -345,10 +345,7 @@ const AIStaffManagementHub: React.FC = () => {
         setIsLoading(true);
         
         // Fetch unified_agent_config as single source of truth
-        const agentResponse = await fetch(`${API_URL}/get-unified-agent-config`, {
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const agentResponse = await API_CLIENT.get_unified_agent_config();
         
         if (!agentResponse.ok) {
           throw new Error(`Failed to load agent config: ${agentResponse.statusText}`);
@@ -392,7 +389,7 @@ const AIStaffManagementHub: React.FC = () => {
     // If no prompt in DB, fetch the default
     if (!voicePromptFromDB) {
       try {
-        const response = await apiClient.get_active_voice_prompt();
+        const response = await API_CLIENT.get_active_voice_prompt();
         const data = await response.json();
         if (data.prompt) {
           finalVoicePrompt = data.prompt;
@@ -517,7 +514,7 @@ const AIStaffManagementHub: React.FC = () => {
   // Fetch active voice prompt from database (default template)
   const fetchActivePrompt = async () => {
     try {
-      const response = await apiClient.get_active_voice_prompt();
+      const response = await API_CLIENT.get_active_voice_prompt();
       const data = await response.json();
       if (data.prompt) {
         setWizardState(prev => ({
@@ -556,7 +553,7 @@ const AIStaffManagementHub: React.FC = () => {
       console.log('📤 Publishing configuration:', publishRequest);
 
       // Call publish endpoint
-      const response = await apiClient.publish_wizard_config(publishRequest);  // ✅ FIX
+      const response = await API_CLIENT.publish_wizard_config(publishRequest);  // ✅ FIX
       const data = await response.json();
 
       console.log('✅ Publish successful:', data);
