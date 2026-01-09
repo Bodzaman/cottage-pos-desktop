@@ -31,7 +31,7 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { API_CLIENT } from 'app';
+import { apiClient } from 'app';
 
 import { colors } from 'utils/designSystem';
 import { styles } from 'utils/QSAIDesign';
@@ -345,7 +345,7 @@ const AIStaffManagementHub: React.FC = () => {
         setIsLoading(true);
         
         // Fetch unified_agent_config as single source of truth
-        const agentResponse = await API_CLIENT.get_unified_agent_config();
+        const agentResponse = await apiClient.get_unified_agent_config();
         
         if (!agentResponse.ok) {
           throw new Error(`Failed to load agent config: ${agentResponse.statusText}`);
@@ -389,7 +389,7 @@ const AIStaffManagementHub: React.FC = () => {
     // If no prompt in DB, fetch the default
     if (!voicePromptFromDB) {
       try {
-        const response = await API_CLIENT.get_active_voice_prompt();
+        const response = await apiClient.get_active_voice_prompt();
         const data = await response.json();
         if (data.prompt) {
           finalVoicePrompt = data.prompt;
@@ -514,7 +514,7 @@ const AIStaffManagementHub: React.FC = () => {
   // Fetch active voice prompt from database (default template)
   const fetchActivePrompt = async () => {
     try {
-      const response = await API_CLIENT.get_active_voice_prompt();
+      const response = await apiClient.get_active_voice_prompt();
       const data = await response.json();
       if (data.prompt) {
         setWizardState(prev => ({
@@ -553,7 +553,7 @@ const AIStaffManagementHub: React.FC = () => {
       console.log('📤 Publishing configuration:', publishRequest);
 
       // Call publish endpoint
-      const response = await API_CLIENT.publish_wizard_config(publishRequest);  // ✅ FIX
+      const response = await apiClient.publish_wizard_config(publishRequest);
       const data = await response.json();
 
       console.log('✅ Publish successful:', data);
@@ -710,7 +710,7 @@ const AIStaffManagementHub: React.FC = () => {
         };
       }
       
-      await API_CLIENT.update_unified_agent_config(updates);
+      await apiClient.update_unified_agent_config(updates);
       
       setWizardState(prev => ({
         ...prev,
@@ -756,7 +756,7 @@ const AIStaffManagementHub: React.FC = () => {
     try {
       setIsUploadingAvatar(true);
       // Use new avatar-gallery endpoint that uses actual filename
-      const response = await API_CLIENT.upload_avatar({ file } as any);
+      const response = await apiClient.upload_avatar({ file } as any);
       const result = await response.json();
       
       if (result.url) {
@@ -808,7 +808,7 @@ const AIStaffManagementHub: React.FC = () => {
   const handleRemoveAvatar = async () => {
     try {
       setIsUploadingAvatar(true);
-      await API_CLIENT.update_unified_agent_config({ agent_avatar_url: null });  // ✅ FIX
+      await apiClient.update_unified_agent_config({ agent_avatar_url: null });
       
       setWizardState(prev => ({
         ...prev,
@@ -830,7 +830,7 @@ const AIStaffManagementHub: React.FC = () => {
   const handleGenerateChatPrompt = async () => {
     try {
       setGeneratingChatPrompt(true);
-      const response = await API_CLIENT.generate_system_prompt({ channel: 'chat' });
+      const response = await apiClient.generate_system_prompt({ channel: 'chat' });
       const data = await response.json();
       
       if (data.user_portion && data.complete_prompt) {
@@ -870,7 +870,7 @@ const AIStaffManagementHub: React.FC = () => {
   const handleGenerateVoicePrompt = async () => {
     try {
       setGeneratingVoicePrompt(true);
-      const response = await API_CLIENT.generate_system_prompt({ channel: 'voice' });
+      const response = await apiClient.generate_system_prompt({ channel: 'voice' });
       const data = await response.json();
       
       if (data.user_portion && data.complete_prompt) {
@@ -910,7 +910,7 @@ const AIStaffManagementHub: React.FC = () => {
   const handleRevertToDefaultPrompt = async () => {
     try {
       // Fetch the default hardcoded prompt
-      const response = await API_CLIENT.get_active_voice_prompt();
+      const response = await apiClient.get_active_voice_prompt();
       const data = await response.json();
       
       // Only revert if we actually get the default prompt
