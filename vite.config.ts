@@ -5,6 +5,9 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [react()],
 
+  // Use relative paths for Electron file:// protocol compatibility
+  base: './',
+
   // Development server configuration
   server: {
     port: 5173,
