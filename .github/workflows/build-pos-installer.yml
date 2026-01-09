@@ -9,6 +9,10 @@ on:
         description: 'Version number (will be read from package.json)'
         required: false
 
+# REQUIRED: Grant write permission for uploading release assets
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
