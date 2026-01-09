@@ -33,12 +33,12 @@ jobs:
           echo "Checking dist directory:"
           dir dist
           echo "Checking renderer directory:"
-          dir distenderer
-          if not exist "distenderer\index.html" (
+          dir dist\renderer
+          if not exist "dist\renderer\index.html" (
             echo "ERROR: Frontend build failed - index.html not found!"
             exit /b 1
           )
-          echo "✅ Frontend build successful"
+          echo "Build verification successful"
         shell: cmd
       
       - name: Build Electron app with electron-builder
