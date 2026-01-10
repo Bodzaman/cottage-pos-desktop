@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
-import { apiClient } from 'app';
 
 // Flag to track connection status
 let supabaseConnectionFailed = false;
@@ -83,100 +82,45 @@ export const supabase = new Proxy({} as any, {
   }
 });
 
-// Fetch Supabase configuration from the backend API
+// Fetch Supabase configuration (desktop version - no backend)
 const fetchSupabaseConfig = async (): Promise<{url: string, anon_key: string}> => {
   if (supabaseConfigPromise) {
     return supabaseConfigPromise;
   }
   
   supabaseConfigPromise = (async () => {
-    try {
-      // Clear any stale localStorage data first
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabaseUrl');
-        localStorage.removeItem('supabaseKey');
-        console.log('🧹 Cleared stale Supabase config from localStorage');
-      }
+    // Desktop app: check localStorage first, then fall back to DEFAULT_CONFIG
+    if (typeof window !== 'undefined') {
+      const cachedUrl = localStorage.getItem('supabaseUrl');
+      const cachedKey = localStorage.getItem('supabaseKey');
       
-      const response = await apiClient.get_supabase_config();
-      
-      console.log('🔗 Supabase config API response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Supabase config: ${response.status}`);
-      }
-      
-      const config = await response.json();
-      console.log('✅ Fetched correct Supabase config from backend:', {
-        hasUrl: !!config.url,
-        hasKey: !!config.anon_key,
-        urlPrefix: config.url?.substring(0, 30) + '...' || 'missing'
-      });
-      
-      // The API returns url and anon_key, so we need to map them correctly
-      const mappedConfig = {
-        url: config.url,
-        anon_key: config.anon_key
-      };
-      
-      // Store in localStorage for persistence
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('supabaseUrl', mappedConfig.url);
-        localStorage.setItem('supabaseKey', mappedConfig.anon_key);
-        console.log('💾 Stored correct Supabase config in localStorage');
-      }
-      
-      // If we already have a client instance created with a different (temporary) config, replace it
-      const needsReplacement = !!supabaseInstance && (
-        lastClientConfig.url !== mappedConfig.url || lastClientConfig.anon_key !== mappedConfig.anon_key
-      );
-
-      if (needsReplacement) {
-        try {
-          supabaseInstance = createClient(mappedConfig.url, mappedConfig.anon_key);
-          lastClientConfig = { ...mappedConfig };
-          console.log('✅ Replaced temporary Supabase client with correct config');
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('supabase-reconfigured'));
-          }
-        } catch (e) {
-          console.warn('⚠️ Failed to replace Supabase client, continuing with existing instance', e);
-        }
-      }
-
-      configFetched = true;
-      return mappedConfig;
-    } catch (error) {
-      console.error('❌ Failed to fetch Supabase config from backend:', error);
-      
-      // Check localStorage for cached configuration
-      if (typeof window !== 'undefined') {
-        const cachedUrl = localStorage.getItem('supabaseUrl');
-        const cachedKey = localStorage.getItem('supabaseKey');
+      if (cachedUrl && cachedKey) {
+        console.log('🔄 Using cached Supabase configuration from localStorage');
         
-        if (cachedUrl && cachedKey) {
-          console.log('🔄 Using cached Supabase configuration');
-          
-          // Update client with cached config if different from default and not already created
-          if (!configFetched && (cachedUrl !== DEFAULT_CONFIG.url || cachedKey !== DEFAULT_CONFIG.anon_key)) {
-            if (supabaseInstance) {
-              supabaseInstance = createClient(cachedUrl, cachedKey);
-              lastClientConfig = { url: cachedUrl, anon_key: cachedKey };
-              console.log('🔄 Updated client with cached config');
-            }
+        // Update client with cached config if different from current
+        if (cachedUrl !== lastClientConfig.url || cachedKey !== lastClientConfig.anon_key) {
+          try {
+            supabaseInstance = createClient(cachedUrl, cachedKey);
+            lastClientConfig = { url: cachedUrl, anon_key: cachedKey };
+            console.log('✅ Updated Supabase client with cached config');
+            window.dispatchEvent(new CustomEvent('supabase-reconfigured'));
+          } catch (e) {
+            console.warn('⚠️ Failed to update Supabase client, continuing with existing instance', e);
           }
-          
-          return {
-            url: cachedUrl,
-            anon_key: cachedKey
-          };
         }
+        
+        configFetched = true;
+        return {
+          url: cachedUrl,
+          anon_key: cachedKey
+        };
       }
-      
-      // If no cache available, use default (already initialized)
-      console.log('⚠️ Using default Supabase configuration');
-      return DEFAULT_CONFIG;
     }
+    
+    // No cache available, use default configuration
+    console.log('✅ Using default Supabase configuration');
+    configFetched = true;
+    return DEFAULT_CONFIG;
   })();
   
   return supabaseConfigPromise;

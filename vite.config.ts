@@ -53,8 +53,21 @@ export default defineConfig({
     }
   },
 
-  // Environment variables
+  // Environment variables and constants
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    '__APP_ID__': JSON.stringify('cottage-pos-desktop'),
+    '__API_PATH__': JSON.stringify(''),
+    '__API_URL__': JSON.stringify(''),
+    '__API_HOST__': JSON.stringify(''),
+    '__API_PREFIX_PATH__': JSON.stringify(''),
+    '__WS_API_URL__': JSON.stringify(''),
+    '__APP_BASE_PATH__': JSON.stringify(''),
+    '__APP_TITLE__': JSON.stringify('Cottage POS'),
+    '__APP_FAVICON_LIGHT__': JSON.stringify(''),
+    '__APP_FAVICON_DARK__': JSON.stringify(''),
+    '__APP_DEPLOY_USERNAME__': JSON.stringify(''),
+    '__APP_DEPLOY_APPNAME__': JSON.stringify(''),
+    '__APP_DEPLOY_CUSTOM_DOMAIN__': JSON.stringify('')
   }
 });
