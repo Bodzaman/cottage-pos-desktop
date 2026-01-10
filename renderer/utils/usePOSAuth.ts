@@ -35,6 +35,8 @@ export const usePOSAuth = create<POSAuthStore>()(
         set({ isLoading: true });
         
         try {
+          console.log('🔐 [Auth] Attempting login for username:', username);
+          
           // Call RPC for secure server-side validation with bcrypt
           const { data, error } = await supabase.rpc('pos_staff_login', {
             p_username: username,
@@ -42,7 +44,8 @@ export const usePOSAuth = create<POSAuthStore>()(
           });
 
           if (error) {
-            console.error('Login RPC error:', error);
+            console.error('❌ [Auth] Login RPC error:', error);
+            console.error('❌ [Auth] Error details:', JSON.stringify(error, null, 2));
             throw new Error('Login failed. Please try again.');
           }
 

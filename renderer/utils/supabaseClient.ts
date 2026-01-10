@@ -14,6 +14,18 @@ const DEFAULT_CONFIG = {
   anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cmt0dHZnd3dkaGduZWNxaGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4OTI0NjcsImV4cCI6MjA2MDQ2ODQyN30.G-Hj0Tf5HpkhzfrZpbxsNcr4-XGA20w5-MRLmix9au4'
 };
 
+// Extract project ref from URL for logging
+const getProjectRef = (url: string) => {
+  try {
+    const match = url.match(/https:\/\/([^.]+)\.supabase\.co/);
+    return match ? match[1] : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
+console.log('🔐 [Supabase] DEFAULT_CONFIG project:', getProjectRef(DEFAULT_CONFIG.url));
+
 // Track last client config used so we can decide whether to replace the temporary client
 let lastClientConfig: { url: string; anon_key: string } = { ...DEFAULT_CONFIG };
 
@@ -95,17 +107,17 @@ const fetchSupabaseConfig = async (): Promise<{url: string, anon_key: string}> =
       const cachedKey = localStorage.getItem('supabaseKey');
       
       if (cachedUrl && cachedKey) {
-        console.log('🔄 Using cached Supabase configuration from localStorage');
+        console.log('🔄 [Supabase] Using localStorage override - project:', getProjectRef(cachedUrl));
         
         // Update client with cached config if different from current
         if (cachedUrl !== lastClientConfig.url || cachedKey !== lastClientConfig.anon_key) {
           try {
             supabaseInstance = createClient(cachedUrl, cachedKey);
             lastClientConfig = { url: cachedUrl, anon_key: cachedKey };
-            console.log('✅ Updated Supabase client with cached config');
+            console.log('✅ [Supabase] Updated client with localStorage config');
             window.dispatchEvent(new CustomEvent('supabase-reconfigured'));
           } catch (e) {
-            console.warn('⚠️ Failed to update Supabase client, continuing with existing instance', e);
+            console.warn('⚠️ [Supabase] Failed to update client, continuing with existing instance', e);
           }
         }
         
@@ -118,7 +130,7 @@ const fetchSupabaseConfig = async (): Promise<{url: string, anon_key: string}> =
     }
     
     // No cache available, use default configuration
-    console.log('✅ Using default Supabase configuration');
+    console.log('✅ [Supabase] Using DEFAULT_CONFIG - project:', getProjectRef(DEFAULT_CONFIG.url));
     configFetched = true;
     return DEFAULT_CONFIG;
   })();
