@@ -452,19 +452,19 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           if (variant.image_asset_id) allAssetIds.add(variant.image_asset_id);
         });
 
-        // ✅ FIX v1.8.42: Fetch media assets to resolve image URLs (fixed column names)
+        // ✅ FIX v1.8.42: Fetch media assets to resolve image URLs (verified column names)
         let assetUrlMap = new Map<string, string>();
         if (allAssetIds.size > 0) {
           console.log('🖼️ [Image Enrichment] Fetching', allAssetIds.size, 'media assets...');
           const { data: mediaAssets, error: mediaError } = await supabase
             .from('media_assets')
-            .select('id, url, file_url')
+            .select('id, url, square_webp_url, square_jpeg_url')
             .in('id', Array.from(allAssetIds));
 
           if (!mediaError && mediaAssets) {
             mediaAssets.forEach((asset: any) => {
-              // Priority: url > file_url (actual column names in database)
-              const imageUrl = asset.url || asset.file_url;
+              // Priority: square_webp_url > square_jpeg_url > url (verified from schema)
+              const imageUrl = asset.square_webp_url || asset.square_jpeg_url || asset.url;
               if (imageUrl) {
                 assetUrlMap.set(asset.id, imageUrl);
               }
@@ -1263,7 +1263,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
     }),
     {
       name: 'cottage-tandoori-menu-cache',
-      version: 3, // 🔧 BUMPED: v3 fixes media_assets query column names (url, file_url)
+      version: 4, // 🔧 BUMPED: v4 uses square_webp_url/square_jpeg_url (verified from schema)
       
       // ✅ Partialize: Only persist menu data, exclude transient state
       partialize: (state) => ({
