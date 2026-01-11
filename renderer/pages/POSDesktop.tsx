@@ -269,10 +269,6 @@ export default function POSDesktop() {
   const orderProcessing = useOrderProcessing(orderStore.orderType as any, orderStore.orderItems, customerStore.customerData as any, orderStore.selectedTableNumber, orderStore.guestCount);
   const printing = usePrintingOperations(orderStore.orderType as any, orderStore.orderItems, customerStore.customerData as any, orderStore.selectedTableNumber, orderStore.guestCount);
 
-  (posPerf as any).startInitialization('pos_desktop' as any, (async () => {
-    const bundleSuccess = await loadPOSBundle();
-    if (!bundleSuccess) await useRealtimeMenuStore.getState().initialize();
-  }) as any);
 
   const handleAddToOrder = useCallback((item: OrderItem) => {
     if (orderStore.orderType === 'DINE-IN') addItemToDineIn(item);

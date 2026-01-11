@@ -160,9 +160,9 @@ export function usePOSInitialization({ onViewChange }: UsePOSInitializationProps
         }));
         
         // Start real-time subscriptions after 15 seconds if no user interaction
-        setTimeout(() => {
+        setTimeout(async () => {
           if (isDev) console.log('⏰ [POSDesktop] 15s elapsed, starting real-time subscriptions...');
-          const { startRealtimeSubscriptionsIfNeeded } = require('./realtimeMenuStore');
+          const { startRealtimeSubscriptionsIfNeeded } = await import('./realtimeMenuStore');
           startRealtimeSubscriptionsIfNeeded();
         }, 15000);
       } catch (error) {
