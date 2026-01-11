@@ -60,24 +60,18 @@ export const apiClient = {
   save_pos_settings: async (data: any) => mockResponse({ success: true }),
 
   // ============================================================================
-  // CRITICAL: Menu/POS Bundle - return empty (Supabase realtime handles this)
+  // CRITICAL: Menu/POS Bundle - return failure to trigger Supabase fallback
+  // The fallbackRefreshData() in realtimeMenuStore queries Supabase directly
   // ============================================================================
-  get_pos_bundle: async () => mockResponse({
-    categories: [],
-    menuItems: [],
-    proteinTypes: [],
-    customizations: [],
-    itemVariants: [],
-    setMeals: []
-  }),
+  get_pos_bundle: async () => {
+    console.log('⚠️ [app-compat] get_pos_bundle stub - triggering fallback to Supabase');
+    return mockResponse({ success: false, message: 'Stub - use Supabase fallback' });
+  },
 
-  get_menu_with_ordering: async () => mockResponse({
-    categories: [],
-    menuItems: [],
-    proteinTypes: [],
-    customizations: [],
-    itemVariants: []
-  }),
+  get_menu_with_ordering: async () => {
+    console.log('⚠️ [app-compat] get_menu_with_ordering stub - triggering fallback to Supabase');
+    return mockResponse({ success: false, message: 'Stub - use Supabase fallback' });
+  },
 
   get_menu_items: async () => mockResponse({ items: [] }),
 
