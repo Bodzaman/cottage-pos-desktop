@@ -98,7 +98,7 @@ export function ActiveFiltersBar({ sections, onFilterChange }: ActiveFiltersBarP
     sections.forEach(section => {
       const category = section.categories.find(c => c.id === unifiedFilters.selectedCategoryId);
       if (category) {
-        categoryName = category.display_name;
+        categoryName = (category as any).display_name || category.name;
       }
     });
 

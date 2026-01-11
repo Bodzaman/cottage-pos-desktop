@@ -256,5 +256,9 @@ export function useOrderProcessing(
     // Handlers
     handleSubmitOrder,
     handlePayment,
+    persistPayment: async (paymentData: any) => {
+      console.log('💰 Persisting payment:', paymentData);
+      return await apiClient.process_cash_payment(paymentData);
+    }
   };
 }

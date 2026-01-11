@@ -10,12 +10,12 @@ import { PlusCircle, Home, Check, MapPin, AlertCircle } from 'lucide-react';
 interface DeliveryAddress {
   id: string;
   label: string;
-  line1: string;
-  line2?: string;
+  address_line1: string;
+  address_line2?: string;
   city: string;
-  postcode: string;
+  postal_code: string;
   instructions?: string;
-  isDefault: boolean;
+  is_default: boolean;
 }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';

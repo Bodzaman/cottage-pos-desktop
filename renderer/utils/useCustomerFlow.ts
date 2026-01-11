@@ -63,7 +63,7 @@ export interface CustomerData {
  * @returns Customer flow handlers, modal state, and validation functions
  */
 export function useCustomerFlow(
-  orderType: OrderType,
+  orderType: OrderType | string,
   customerData: CustomerData,
   setCustomerData: (data: CustomerData | ((prev: CustomerData) => CustomerData)) => void,
   selectedTableNumber: number | null,

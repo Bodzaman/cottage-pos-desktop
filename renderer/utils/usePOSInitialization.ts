@@ -18,7 +18,7 @@ interface InitializationState {
 }
 
 interface UsePOSInitializationProps {
-  onViewChange?: (view: 'pos' | 'reservations') => void;
+  onViewChange?: (view: 'pos' | 'reservations' | 'online-orders' | 'ai-orders') => void;
 }
 
 /**
@@ -205,16 +205,19 @@ export function usePOSInitialization({ onViewChange }: UsePOSInitializationProps
   useEffect(() => {
     if (!onViewChange) return;
     
-    const cleanup = useHeaderViewChange((event) => {
-      switch (event.view) {
+    const cleanup = useHeaderViewChange((view) => {
+      switch (view) {
         case 'pos':
           onViewChange('pos');
           break;
         case 'reservations':
           onViewChange('reservations');
           break;
+        case 'online-orders':
+          onViewChange('online-orders');
+          break;
         default:
-          console.warn('[POSDesktop] Unknown view:', event.view);
+          console.warn('[POSDesktop] Unknown view:', view);
       }
     })();
     

@@ -1001,6 +1001,8 @@ export const apiClient = {
 
   bulk_delete_items_safe: async (params: any) => mockResponse({ success: true }),
 
+  process_print_queue: async (params: any) => mockResponse({ success: true, processed_count: 0 }),
+
   place_order: async (data: any) => mockResponse({ success: true, order_id: `ORD-${Date.now()}` }),
 
   place_order_example: async (data: any) => mockResponse({ success: true }),

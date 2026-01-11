@@ -297,6 +297,11 @@ export interface OrderItem {
   image_url?: string; // Add image URL for thumbnails in order summary
   modifiers: ModifierSelection[];
   customizations?: CustomizationSelection[];
+  variant?: {
+    id: string;
+    name: string;
+    price: number;
+  } | null;
   // Category tracking for receipt section organization
   category_id?: string;
   category_name?: string;

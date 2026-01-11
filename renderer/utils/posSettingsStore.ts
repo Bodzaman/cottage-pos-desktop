@@ -23,6 +23,7 @@ interface POSSettings {
   service_charge: POSServiceChargeSettings;
   delivery_charge: POSDeliveryChargeSettings;
   delivery: POSDeliverySettings;
+  variant_carousel_enabled?: boolean;
 }
 
 interface POSSettingsStore {
