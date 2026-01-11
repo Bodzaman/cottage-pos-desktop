@@ -499,7 +499,7 @@ function CustomerTabGroup({
               <div className="py-8 text-center">
                 <User className="h-10 w-10 mx-auto mb-3" style={{ color: QSAITheme.purple.primary + '40' }} />
                 <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
-                  No items assigned to {tab.customer_name}
+                  No items assigned to {tab.tab_name}
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.3)' }}>
                   Use the "Assign to Customer" dropdown on items to add them here
@@ -612,44 +612,6 @@ function CustomerTabGroup({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Customer Tab Confirmation Dialog */}
-      <AlertDialog open={!!tabToDelete} onOpenChange={(open) => !open && setTabToDelete(null)}>
-        <AlertDialogContent
-          style={{
-            background: QSAITheme.background.panel,
-            border: `1px solid ${QSAITheme.border.accent}`,
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle style={{ color: QSAITheme.text.primary }}>
-              Delete Empty Tab?
-            </AlertDialogTitle>
-            <AlertDialogDescription style={{ color: QSAITheme.text.muted }}>
-              This will permanently delete this customer tab. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              style={{
-                border: `1px solid ${QSAITheme.border.medium}`,
-                color: QSAITheme.text.secondary,
-              }}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => tabToDelete && handleDeleteTab(tabToDelete)}
-              style={{
-                background: '#EF4444',
-                color: '#FFFFFF',
-              }}
-              className="hover:bg-red-600"
-            >
-              Delete Tab
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

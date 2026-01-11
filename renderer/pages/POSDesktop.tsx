@@ -110,9 +110,20 @@ export default function POSDesktop() {
   const isConnected = useRealtimeMenuStore(state => state.isConnected);
   const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
   
-  const orderStore = usePOSOrderStore();
-  const customerStore = usePOSCustomerStore();
-  const uiStore = usePOSUIStore();
+  // ✅ FIX: Access store state via getState() to prevent subscription re-render loops
+  const orderStore = useMemo(() => usePOSOrderStore.getState(), []);
+  const customerStore = useMemo(() => usePOSCustomerStore.getState(), []);
+  const uiStore = useMemo(() => usePOSUIStore.getState(), []);
+  
+  // Subscribe only to specific fields that should trigger re-renders
+  const orderType = usePOSOrderStore(state => state.orderType);
+  const orderItemsFromStore = usePOSOrderStore(state => state.orderItems, shallow);
+  const selectedTableNumber = usePOSOrderStore(state => state.selectedTableNumber);
+  const activeView = usePOSUIStore(state => state.activeView);
+  const showDineInModal = usePOSUIStore(state => state.showDineInModal);
+  const showGuestCountModal = usePOSUIStore(state => state.showGuestCountModal);
+  const showCustomerModal = usePOSUIStore(state => state.showCustomerModal);
+  const showPaymentFlow = usePOSUIStore(state => state.showPaymentFlow);
   const persistedTableOrders = useTableOrdersStore((state) => state.persistedTableOrders);
 
   const { tables: restaurantTables, loading: tablesLoading, refetch: refetchTables } = useRestaurantTables();
