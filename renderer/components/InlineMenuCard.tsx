@@ -52,8 +52,9 @@ export function InlineMenuCard({ itemId, className, animationDelay = 0 }: Inline
   const menuItem = menuItems?.find(item => item.id === itemId);
 
   // Get variants for this item (may be empty for single items)
-  const variants = itemVariants?.filter(variant => variant.menu_item_id === itemId && variant.active) || [];
-  const activeVariants = variants.filter(v => v.is_active).sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
+  // ✅ FIX v1.8.41: Handle both is_active and active fields
+  const variants = itemVariants?.filter(variant => variant.menu_item_id === itemId && (variant.is_active ?? variant.active ?? true)) || [];
+  const activeVariants = variants.filter(v => v.is_active ?? v.active ?? true).sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
   const isVariantBased = activeVariants.length > 0;
   const defaultVariant = activeVariants.find(v => v.is_default) || activeVariants[0];
 

@@ -72,28 +72,40 @@ export interface SetMeal {
 
 /**
  * MenuItem variant (different protein types, sizes, or preparations of a menu item)
+ *
+ * Database Schema (item_variants table):
+ * - image_url: EXISTS but often NULL (legacy field)
+ * - image_asset_id: UUID linking to media_assets table (preferred)
+ * - is_active and active: Both exist in DB (use is_active primarily)
  */
 export interface ItemVariant {
   id?: string;
+  menu_item_id: string;           // ✅ Required for variant lookup (FK to menu_items)
   protein_type_id: string;
+  protein_type_name?: string;     // ✅ Enriched from JOIN with menu_protein_types
   name: string;
+  variant_name?: string;          // ✅ Alternative name field from DB
   description?: string;
   description_state?: 'inherited' | 'custom';
   price: number;
   price_dine_in?: number;
   price_delivery?: number;
   is_default?: boolean;
-  image_url?: string;
-  image_asset_id?: string;
+  is_active?: boolean;            // ✅ Required for filtering active variants
+  active?: boolean;               // ✅ DB has both is_active and active
+  image_url?: string;             // May be NULL - check display_image_url
+  image_asset_id?: string;        // UUID to media_assets table
+  display_image_url?: string;     // ✅ Resolved URL from media_assets
   image_state?: 'inherited' | 'custom';
   display_order?: number;
-  
+  variant_code?: string;          // ✅ Variant code from DB
+
   // Food-specific variant fields
   spice_level?: number;
   allergens?: string[];
   allergen_notes?: string;
   dietary_tags_override?: string[];
-  
+
   // Dietary flags (variant-specific overrides)
   is_vegetarian?: boolean;
   is_vegan?: boolean;
@@ -101,12 +113,17 @@ export interface ItemVariant {
   is_halal?: boolean;
   is_dairy_free?: boolean;
   is_nut_free?: boolean;
-  
+
   featured?: boolean;
 }
 
 /**
  * Menu item definition
+ *
+ * Database Schema (menu_items table):
+ * - base_price: Primary price field (NOT "price")
+ * - image_asset_id: UUID linking to media_assets (NOT direct image_url)
+ * - is_active: Active status field
  */
 export interface MenuItem {
   id: string;
@@ -114,7 +131,8 @@ export interface MenuItem {
   kitchen_display_name?: string | null; // Optional optimized name for thermal receipt printing
   // Unified description field from database migration
   description: string | null;
-  image_url: string | null;
+  image_url: string | null;             // Enriched from media_assets via image_asset_id
+  image_asset_id?: string | null;       // ✅ UUID linking to media_assets table
   // ✅ NEW: Optimized image variants from media_assets table
   image_variants?: {
     square?: { webp?: string | null; jpeg?: string | null };
@@ -129,12 +147,15 @@ export interface MenuItem {
   item_code?: string | null;
   display_order: number;
   active: boolean;
+  is_active?: boolean;                  // ✅ DB uses is_active (mapped to active)
+  has_variants?: boolean;               // ✅ Whether item has multiple variants
   inherit_category_print_settings?: boolean;
-  // Add missing pricing fields from database
-  price?: number; // Base price
-  price_dine_in?: number; // Dine-in price
-  price_takeaway?: number; // Takeaway/collection price
-  price_delivery?: number; // Delivery price
+  // Pricing fields from database
+  base_price?: number;                  // ✅ Primary price field from DB
+  price?: number;                       // Alias for backward compatibility
+  price_dine_in?: number;               // Dine-in price
+  price_takeaway?: number;              // Takeaway/collection price
+  price_delivery?: number;              // Delivery price
   // Set meal fields
   is_set_meal?: boolean;
   set_meal_id?: string | null;

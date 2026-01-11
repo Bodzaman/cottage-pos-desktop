@@ -54,10 +54,11 @@ export function CompactMenuList({
   }>>({});
 
   // Helper to get item state
+  // ✅ FIX v1.8.41: Handle both is_active and active fields
   const getItemState = (itemId: string) => {
     if (!itemStates[itemId]) {
       const variants = getItemVariants(itemId);
-      const activeVariants = variants.filter(v => v.is_active).sort((a, b) => a.price - b.price);
+      const activeVariants = variants.filter(v => v.is_active ?? v.active ?? true).sort((a, b) => a.price - b.price);
       const isMultiVariant = variants.length > 0;
       
       setItemStates(prev => ({
@@ -304,7 +305,8 @@ export function CompactMenuList({
       <div aria-live="polite" className="sr-only">{ariaLiveMessage}</div>
       {menuItems.map((item, index) => {
         const variants = variantsByMenuItem[item.id] || [];
-        const activeVariants = variants.filter(v => v.is_active).sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
+        // ✅ FIX v1.8.41: Handle both is_active and active fields
+        const activeVariants = variants.filter(v => v.is_active ?? v.active ?? true).sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
         const isMultiVariant = activeVariants.length > 0;
         const state = getItemState(item.id);
         

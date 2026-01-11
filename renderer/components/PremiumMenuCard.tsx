@@ -165,7 +165,8 @@ export function PremiumMenuCard({
   const isMultiVariant = (item.has_variants === true) || (variants.length > 1);
   
   // NEW: Track selected variant for multi-variant items (default to cheapest)
-  const activeVariants = variants.filter(v => v.is_active).sort((a, b) => a.price - b.price);
+  // ✅ FIX v1.8.41: Handle both is_active and active fields
+  const activeVariants = variants.filter(v => v.is_active ?? v.active ?? true).sort((a, b) => a.price - b.price);
   
   // Filter variants that have food details configured
   const variantsWithFoodDetails = useMemo(() => {

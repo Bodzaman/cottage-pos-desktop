@@ -70,8 +70,9 @@ export function POSMenuItemCard({
   }, [item.description]);
 
   // Get variants for this item
+  // ✅ FIX v1.8.41: Handle both is_active and active fields from database
   const variants = variantsByMenuItem[item.id] || [];
-  const activeVariants = variants.filter(v => v.is_active).sort((a, b) => a.price - b.price);
+  const activeVariants = variants.filter(v => v.is_active ?? v.active ?? true).sort((a, b) => a.price - b.price);
   const isMultiVariant = variants.length > 1;
 
   // Helper function to check if a variant has any food details configured

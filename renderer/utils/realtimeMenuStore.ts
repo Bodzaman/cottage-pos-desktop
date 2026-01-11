@@ -403,10 +403,11 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       },
       
       // Fallback method using direct database queries
+      // ✅ FIX v1.8.41: Added image enrichment from media_assets table
       fallbackRefreshData: async () => {
         // Ensure Supabase client is properly configured first
         await ensureSupabaseConfigured();
-        
+
         // Fetch all data in parallel with proper error handling
         const dataPromises = [
           supabase.from('menu_categories').select('*').order('display_print_order'),
@@ -418,12 +419,12 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             menu_protein_types:protein_type_id(id, name)
           `).order('menu_item_id')
         ];
-        
+
         const results = await Promise.allSettled(dataPromises);
-        
+
         // Process results safely
         const [categoriesResult, itemsResult, proteinResult, customizationResult, variantsResult] = results;
-        
+
         // Process categories
         if (categoriesResult.status === 'fulfilled' && !categoriesResult.value.error) {
           if (categoriesResult.value.data) {
@@ -437,76 +438,99 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         } else {
           console.error('❌ Error fetching categories:', categoriesResult.status === 'fulfilled' ? categoriesResult.value.error : categoriesResult.reason);
         }
-        
-        // Process menu items
-        if (itemsResult.status === 'fulfilled' && !itemsResult.value.error) {
-          if (itemsResult.value.data) {
-            // 🔍 DEBUG: Log image URLs from Supabase
-            const rawItems = itemsResult.value.data;
-            console.log('🖼️ [Menu Debug] Raw items from Supabase:', rawItems.length);
-            console.log('🖼️ [Menu Debug] Sample items with image_url:',
-              rawItems.slice(0, 5).map((i: any) => ({
-                name: i.name,
-                image_url: i.image_url,
-                has_image: !!i.image_url
-              }))
-            );
-            
-            // 🔧 VERIFICATION LOG: Check all fields loaded from DB
-            if (rawItems.length > 0) {
-              const sampleItem = rawItems[0];
-              console.log('✅ [Menu Verification] Sample item fields from Supabase:', {
-                name: sampleItem.name,
-                image_url: sampleItem.image_url,
-                image_variants: sampleItem.image_variants,
-                description: sampleItem.description,
-                menu_item_description: sampleItem.menu_item_description,
-                kitchen_display_name: sampleItem.kitchen_display_name,
-                price: sampleItem.price,
-                price_dine_in: sampleItem.price_dine_in,
-                active: sampleItem.active,
-                is_active: sampleItem.is_active
-              });
-            }
 
-            // ✅ FIX (MYA-1446): Map is_active → active for consistency
-            const mappedItems = rawItems.map((item: any) => ({
-              ...item,
-              active: item.is_active ?? item.active ?? true
-            }));
-            get().setMenuItems(mappedItems);
-            
-            // 🔧 VERIFICATION LOG: Check mapped items
-            console.log('✅ [Menu Verification] Items after mapping - sample:', {
-              count: mappedItems.length,
-              sampleItem: mappedItems[0] ? {
-                name: mappedItems[0].name,
-                image_url: mappedItems[0].image_url,
-                has_image: !!mappedItems[0].image_url
-              } : null
+        // ✅ FIX v1.8.41: Collect all image_asset_ids from menu items AND variants for batch lookup
+        const rawItems = itemsResult.status === 'fulfilled' && !itemsResult.value.error ? itemsResult.value.data || [] : [];
+        const rawVariants = variantsResult.status === 'fulfilled' && !variantsResult.value.error ? variantsResult.value.data || [] : [];
+
+        // Collect unique image_asset_ids from both items and variants
+        const allAssetIds = new Set<string>();
+        rawItems.forEach((item: any) => {
+          if (item.image_asset_id) allAssetIds.add(item.image_asset_id);
+        });
+        rawVariants.forEach((variant: any) => {
+          if (variant.image_asset_id) allAssetIds.add(variant.image_asset_id);
+        });
+
+        // ✅ FIX v1.8.41: Fetch media assets to resolve image URLs
+        let assetUrlMap = new Map<string, string>();
+        if (allAssetIds.size > 0) {
+          console.log('🖼️ [Image Enrichment] Fetching', allAssetIds.size, 'media assets...');
+          const { data: mediaAssets, error: mediaError } = await supabase
+            .from('media_assets')
+            .select('id, square_webp_url, square_jpeg_url, original_url')
+            .in('id', Array.from(allAssetIds));
+
+          if (!mediaError && mediaAssets) {
+            mediaAssets.forEach((asset: any) => {
+              // Priority: square_webp_url > square_jpeg_url > original_url
+              const imageUrl = asset.square_webp_url || asset.square_jpeg_url || asset.original_url;
+              if (imageUrl) {
+                assetUrlMap.set(asset.id, imageUrl);
+              }
             });
+            console.log('🖼️ [Image Enrichment] Resolved', assetUrlMap.size, 'image URLs');
+          } else if (mediaError) {
+            console.error('❌ Error fetching media assets:', mediaError);
           }
-        } else {
+        }
+
+        // Process menu items with image enrichment
+        if (rawItems.length > 0) {
+          console.log('🖼️ [Menu Debug] Raw items from Supabase:', rawItems.length);
+
+          // ✅ FIX v1.8.41: Enrich items with resolved image URLs from media_assets
+          const enrichedItems = rawItems.map((item: any) => {
+            const resolvedImageUrl = item.image_asset_id ? assetUrlMap.get(item.image_asset_id) : null;
+            return {
+              ...item,
+              active: item.is_active ?? item.active ?? true,
+              // ✅ Enrich with resolved image URL
+              image_url: resolvedImageUrl || item.image_url || null,
+              // ✅ Map base_price to price for backward compatibility
+              price: item.base_price ?? item.price ?? 0
+            };
+          });
+
+          get().setMenuItems(enrichedItems);
+
+          // Log enrichment results
+          const itemsWithImages = enrichedItems.filter((i: any) => i.image_url).length;
+          console.log('✅ [Image Enrichment] Menu items:', enrichedItems.length, 'total,', itemsWithImages, 'with images');
+        } else if (itemsResult.status !== 'fulfilled' || itemsResult.value.error) {
           console.error('❌ Error fetching menu items:', itemsResult.status === 'fulfilled' ? itemsResult.value.error : itemsResult.reason);
         }
-        
+
         // Process protein types
         if (proteinResult.status === 'fulfilled' && !proteinResult.value.error && proteinResult.value.data) {
           get().setProteinTypes(proteinResult.value.data);
         }
-        
+
         // Process customizations
         if (customizationResult.status === 'fulfilled' && !customizationResult.value.error && customizationResult.value.data) {
           get().setCustomizations(customizationResult.value.data);
         }
-        
-        // Process variants
-        if (variantsResult.status === 'fulfilled' && !variantsResult.value.error && variantsResult.value.data) {
-          const enhancedVariants = variantsResult.value.data.map(variant => ({
-            ...variant,
-            protein_type_name: variant.menu_protein_types?.name || null
-          }));
-          get().setItemVariants(enhancedVariants);
+
+        // ✅ FIX v1.8.41: Process variants with image enrichment
+        if (rawVariants.length > 0) {
+          const enrichedVariants = rawVariants.map((variant: any) => {
+            const resolvedImageUrl = variant.image_asset_id ? assetUrlMap.get(variant.image_asset_id) : null;
+            return {
+              ...variant,
+              protein_type_name: variant.menu_protein_types?.name || null,
+              // ✅ Enrich with resolved image URL
+              image_url: resolvedImageUrl || variant.image_url || null,
+              display_image_url: resolvedImageUrl || variant.image_url || null
+            };
+          });
+
+          get().setItemVariants(enrichedVariants);
+
+          // Log enrichment results
+          const variantsWithImages = enrichedVariants.filter((v: any) => v.image_url).length;
+          console.log('✅ [Image Enrichment] Variants:', enrichedVariants.length, 'total,', variantsWithImages, 'with images');
+        } else if (variantsResult.status !== 'fulfilled' || variantsResult.value.error) {
+          console.error('❌ Error fetching variants:', variantsResult.status === 'fulfilled' ? variantsResult.value.error : variantsResult.reason);
         }
       },
       
