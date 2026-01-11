@@ -438,11 +438,22 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           console.error('❌ Error fetching categories:', categoriesResult.status === 'fulfilled' ? categoriesResult.value.error : categoriesResult.reason);
         }
         
-        // Process menu items  
+        // Process menu items
         if (itemsResult.status === 'fulfilled' && !itemsResult.value.error) {
           if (itemsResult.value.data) {
+            // 🔍 DEBUG: Log image URLs from Supabase
+            const rawItems = itemsResult.value.data;
+            console.log('🖼️ [Menu Debug] Raw items from Supabase:', rawItems.length);
+            console.log('🖼️ [Menu Debug] Sample items with image_url:',
+              rawItems.slice(0, 5).map((i: any) => ({
+                name: i.name,
+                image_url: i.image_url,
+                has_image: !!i.image_url
+              }))
+            );
+
             // ✅ FIX (MYA-1446): Map is_active → active for consistency
-            const mappedItems = itemsResult.value.data.map((item: any) => ({
+            const mappedItems = rawItems.map((item: any) => ({
               ...item,
               active: item.is_active ?? item.active ?? true
             }));
@@ -1474,8 +1485,7 @@ export const loadItemDetails = async (itemId: string) => {
 // NEW: Load full category items when category is opened
 export const loadCategoryItems = async (categoryId: string) => {
   try {
-    const brain = (await import('brain')).default;
-    const response = await brain.category_items(categoryId);
+    const response = await apiClient.category_items(categoryId);
     const categoryData = await response.json();
     
     if (categoryData.success) {

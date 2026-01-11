@@ -110,9 +110,14 @@ export function POSMenuItemCard({
   // 2. Carousel enabled + variants → auto-cycle
   // 3. Carousel disabled + variants → first variant static
   // 4. No images → placeholder
-  const displayImage = item.image_url 
-    || currentImage 
+  const displayImage = item.image_url
+    || currentImage
     || (!variantCarouselEnabled && variantImages.length > 0 ? variantImages[0] : null);
+
+  // 🔍 DEBUG: Log image URL for each item
+  if (!displayImage) {
+    console.log('🖼️ [POSMenuItemCard] No image for:', item.name, '| item.image_url:', item.image_url, '| variantImages:', variantImages.length);
+  }
 
   // Spice indicators
   const spiceLevel = item.spice_indicators ? parseInt(item.spice_indicators) || 0 : 0;

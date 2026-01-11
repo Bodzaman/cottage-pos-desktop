@@ -81,6 +81,8 @@ export const apiClient = {
 
   item_details: async (itemId: string) => mockResponse({ item: null }),
 
+  category_items: async (categoryId: string) => mockResponse({ success: true, data: { items: [] } }),
+
   // ============================================================================
   // CRITICAL: Tables - return empty array
   // ============================================================================
