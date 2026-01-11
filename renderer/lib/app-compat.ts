@@ -256,10 +256,20 @@ export const apiClient = {
   // ============================================================================
   setup_restaurant_schema: async () => mockResponse({ success: true }),
 
+  setup_customer_tabs_schema: async () => mockResponse({ success: true }),
+
+  list_table_orders: async (params: any) => mockResponse({ table_orders: [] }),
+
   create_table_order: async (data: any) => mockResponse({
     success: true,
     order_id: `TBL-${Date.now()}`
   }),
+
+  update_table_order: async (params: any, data?: any) => mockResponse({ success: true }),
+
+  complete_table_order: async (params: any) => mockResponse({ success: true }),
+
+  reset_table_to_available: async (params: any) => mockResponse({ success: true }),
 
   add_items_to_table: async (params: any, items: any) => mockResponse({ success: true }),
 
@@ -296,7 +306,9 @@ export const apiClient = {
   // ============================================================================
   create_customer_tab: async (data: any) => mockResponse({ success: true, tab_id: `TAB-${Date.now()}` }),
 
-  add_items_to_customer_tab: async (tabId: string, items: any) => mockResponse({ success: true }),
+  list_customer_tabs_for_table: async (params: any) => mockResponse({ tabs: [] }),
+
+  add_items_to_customer_tab: async (params: any, items?: any) => mockResponse({ success: true }),
 
   update_customer_tab: async (params: any, updates?: any) => mockResponse({ success: true }),
 
@@ -304,11 +316,17 @@ export const apiClient = {
 
   split_customer_tab: async (params: any) => mockResponse({ success: true }),
 
+  split_tab: async (params: any) => mockResponse({ success: true, tabs: [] }),
+
   merge_customer_tabs: async (params: any) => mockResponse({ success: true }),
 
   merge_tabs: async (params: any) => mockResponse({ success: true }),
 
   move_items_between_customer_tabs: async (params: any) => mockResponse({ success: true }),
+
+  move_items_between_tabs: async (params: any) => mockResponse({ success: true }),
+
+  delete_customer_tab: async (params: any) => mockResponse({ success: true }),
 
   // ============================================================================
   // RECEIPT TEMPLATES

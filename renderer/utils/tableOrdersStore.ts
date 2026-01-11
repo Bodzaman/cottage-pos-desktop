@@ -247,7 +247,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   initializeCustomerTabsSchema: async () => {
     try {
       if (isDev) console.log('🔧 Initializing customer tabs schema...');
-      const response = await brain.setup_customer_tabs_schema();
+      const response = await apiClient.setup_customer_tabs_schema();
       if (response.ok) {
         if (isDev) console.log('✅ Customer tabs schema initialized successfully');
       } else {
@@ -284,7 +284,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
 
     try {
       if (isDev) console.log('📡 [tableOrdersStore] Fetching table orders from API...');
-      const response = await brain.list_table_orders({});
+      const response = await apiClient.list_table_orders({});
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -383,7 +383,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // ENHANCED: Load customer tabs for specific table with optimistic support
   loadCustomerTabsForTable: async (tableNumber: number) => {
     try {
-      const response = await brain.list_customer_tabs_for_table({ tableNumber });
+      const response = await apiClient.list_customer_tabs_for_table({ tableNumber });
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.customer_tabs)) {
@@ -443,7 +443,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      const response = await brain.create_customer_tab({
+      const response = await apiClient.create_customer_tab({
         table_number: tableNumber,
         tab_name: tabName,
         guest_id: guestId
@@ -626,7 +626,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      const response = await brain.add_items_to_customer_tab({ tab_id: tabId }, { items });
+      const response = await apiClient.add_items_to_customer_tab({ tab_id: tabId }, { items });
       
       if (response.ok) {
         const data = await response.json();
@@ -716,7 +716,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      const response = await brain.close_customer_tab({ tabId: tabId });
+      const response = await apiClient.close_customer_tab({ tabId: tabId });
       
       if (response.ok) {
         const data = await response.json();
@@ -782,7 +782,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // NEW: Split customer tab
   splitCustomerTab: async (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => {
     try {
-      const response = await brain.split_tab({
+      const response = await apiClient.split_tab({
         source_tab_id: sourceTabId,
         new_tab_name: newTabName,
         item_indices: itemIndices,
@@ -913,7 +913,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // NEW: Move items between customer tabs
   moveItemsBetweenTabs: async (sourceTabId: string, targetTabId: string, itemIndices: number[]) => {
     try {
-      const response = await brain.move_items_between_tabs({
+      const response = await apiClient.move_items_between_tabs({
         source_tab_id: sourceTabId,
         target_tab_id: targetTabId,
         item_indices: itemIndices
@@ -1015,7 +1015,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      const response = await brain.delete_customer_tab({ tab_id: tabId });
+      const response = await apiClient.delete_customer_tab({ tab_id: tabId });
       
       if (response.ok) {
         const data = await response.json();
@@ -1169,7 +1169,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         }
       }));
       
-      const response = await brain.update_table_order({ tableNumber }, {
+      const response = await apiClient.update_table_order({ tableNumber }, {
         order_items: items
       });
       
@@ -1300,7 +1300,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       }));
       
       // Update in Supabase
-      const response = await brain.update_table_order({ tableNumber }, {
+      const response = await apiClient.update_table_order({ tableNumber }, {
         order_items: backendItems
       });
       
@@ -1341,7 +1341,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // Complete table order (final bill paid)
   completeTableOrder: async (tableNumber: number) => {
     try {
-      const response = await brain.complete_table_order({ tableNumber });
+      const response = await apiClient.complete_table_order({ tableNumber });
       
       if (response.ok) {
         const data = await response.json();
@@ -1383,7 +1383,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // Reset table to available (for final bill completion)
   resetTableToAvailable: async (tableNumber: number) => {
     try {
-      const response = await brain.reset_table_to_available({ tableNumber });
+      const response = await apiClient.reset_table_to_available({ tableNumber });
       if (response.ok) {
         // Remove from local state
         const { persistedTableOrders } = get();
@@ -1617,7 +1617,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     try {
       set(state => ({ syncInProgress: true }));
       
-      const response = await brain.list_customer_tabs_for_table({ tableNumber });
+      const response = await apiClient.list_customer_tabs_for_table({ tableNumber });
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.customer_tabs)) {
