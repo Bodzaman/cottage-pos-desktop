@@ -451,6 +451,23 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
                 has_image: !!i.image_url
               }))
             );
+            
+            // 🔧 VERIFICATION LOG: Check all fields loaded from DB
+            if (rawItems.length > 0) {
+              const sampleItem = rawItems[0];
+              console.log('✅ [Menu Verification] Sample item fields from Supabase:', {
+                name: sampleItem.name,
+                image_url: sampleItem.image_url,
+                image_variants: sampleItem.image_variants,
+                description: sampleItem.description,
+                menu_item_description: sampleItem.menu_item_description,
+                kitchen_display_name: sampleItem.kitchen_display_name,
+                price: sampleItem.price,
+                price_dine_in: sampleItem.price_dine_in,
+                active: sampleItem.active,
+                is_active: sampleItem.is_active
+              });
+            }
 
             // ✅ FIX (MYA-1446): Map is_active → active for consistency
             const mappedItems = rawItems.map((item: any) => ({
@@ -458,6 +475,16 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               active: item.is_active ?? item.active ?? true
             }));
             get().setMenuItems(mappedItems);
+            
+            // 🔧 VERIFICATION LOG: Check mapped items
+            console.log('✅ [Menu Verification] Items after mapping - sample:', {
+              count: mappedItems.length,
+              sampleItem: mappedItems[0] ? {
+                name: mappedItems[0].name,
+                image_url: mappedItems[0].image_url,
+                has_image: !!mappedItems[0].image_url
+              } : null
+            });
           }
         } else {
           console.error('❌ Error fetching menu items:', itemsResult.status === 'fulfilled' ? itemsResult.value.error : itemsResult.reason);
@@ -1212,7 +1239,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
     }),
     {
       name: 'cottage-tandoori-menu-cache',
-      version: 1,
+      version: 2, // 🔧 BUMPED: v2 clears old cache missing image_url/templates
       
       // ✅ Partialize: Only persist menu data, exclude transient state
       partialize: (state) => ({

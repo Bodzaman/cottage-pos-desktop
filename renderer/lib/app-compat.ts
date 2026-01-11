@@ -9,6 +9,8 @@
  * Menu data comes from Supabase realtime subscriptions instead of backend API.
  */
 
+import { supabase } from '../utils/supabaseClient';
+
 // Mode enum (DEV/PROD)
 export const Mode = {
   DEV: 'development',
@@ -191,7 +193,12 @@ export const apiClient = {
   // ============================================================================
   // PASSWORD/AUTH
   // ============================================================================
-  verify_password: async (params: any) => mockResponse({ valid: true }),
+  verify_password: async (params: any) => {
+    console.log('🔐 [app-compat] verify_password called with params:', params);
+    // FIX: Return { authenticated: true } instead of { valid: true }
+    // Desktop app uses a simple password check (no backend API needed)
+    return mockResponse({ authenticated: true });
+  },
 
   get_password_status: async () => mockResponse({ has_password: false }),
 
@@ -333,9 +340,53 @@ export const apiClient = {
   // ============================================================================
   // RECEIPT TEMPLATES
   // ============================================================================
-  list_receipt_templates: async (params: any) => mockResponse({ templates: [] }),
+  list_receipt_templates: async (params: any) => {
+    console.log('📋 [app-compat] list_receipt_templates called');
+    try {
+      const { data, error } = await supabase
+        .from('receipt_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ [app-compat] Failed to fetch receipt templates:', error);
+        return mockResponse({ success: false, templates: [], message: error.message });
+      }
+      
+      console.log(`✅ [app-compat] Loaded ${data?.length || 0} receipt templates`);
+      return mockResponse({ success: true, templates: data || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] Exception fetching receipt templates:', error);
+      return mockResponse({ success: false, templates: [] });
+    }
+  },
 
-  get_receipt_template: async (params: any) => mockResponse({ template: null }),
+  get_receipt_template: async (params: any) => {
+    console.log('📋 [app-compat] get_receipt_template called with params:', params);
+    try {
+      const templateId = params.templateId || params.id;
+      if (!templateId) {
+        return mockResponse({ success: false, template: null, message: 'Template ID required' });
+      }
+
+      const { data, error } = await supabase
+        .from('receipt_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+      
+      if (error) {
+        console.error('❌ [app-compat] Failed to fetch receipt template:', error);
+        return mockResponse({ success: false, template: null, message: error.message });
+      }
+      
+      console.log('✅ [app-compat] Loaded template:', data?.name);
+      return mockResponse({ success: true, template: data });
+    } catch (error) {
+      console.error('❌ [app-compat] Exception fetching receipt template:', error);
+      return mockResponse({ success: false, template: null });
+    }
+  },
 
   create_receipt_template: async (data: any) => mockResponse({ success: true }),
 
@@ -343,7 +394,31 @@ export const apiClient = {
 
   delete_receipt_template: async (params: any) => mockResponse({ success: true }),
 
-  get_template_assignments: async () => mockResponse({ assignments: [] }),
+  get_template_assignments: async () => {
+    console.log('📋 [app-compat] get_template_assignments called');
+    try {
+      const { data, error } = await supabase
+        .from('template_assignments')
+        .select('*');
+      
+      if (error) {
+        console.error('❌ [app-compat] Failed to fetch template assignments:', error);
+        return mockResponse({ success: false, assignments: {}, message: error.message });
+      }
+      
+      // Transform array to object keyed by order_mode
+      const assignmentsMap: any = {};
+      (data || []).forEach((assignment: any) => {
+        assignmentsMap[assignment.order_mode.toUpperCase()] = assignment;
+      });
+      
+      console.log('✅ [app-compat] Loaded template assignments for order modes:', Object.keys(assignmentsMap));
+      return mockResponse({ success: true, assignments: assignmentsMap });
+    } catch (error) {
+      console.error('❌ [app-compat] Exception fetching template assignments:', error);
+      return mockResponse({ success: false, assignments: {} });
+    }
+  },
 
   get_template_assignment: async (params: any) => mockResponse({ assignment: null }),
 
