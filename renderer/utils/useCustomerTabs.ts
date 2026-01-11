@@ -12,6 +12,7 @@ interface UseCustomerTabsReturn {
   
   // Commands
   createTab: (tabName: string, guestId?: string) => Promise<string | null>;
+  addItemsToTab: (tabId: string, items: any[]) => Promise<boolean>;
   renameTab: (tabId: string, newName: string) => Promise<boolean>;
   closeTab: (tabId: string) => Promise<boolean>;
   splitTab: (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => Promise<any>;
@@ -136,7 +137,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
           table: 'dine_in_order_items',
           filter: `table_number=eq.${tableNumber}`
         },
-        (payload) => {
+        (payload: any) => {
           console.log('[useCustomerTabs] 🔔 ITEMS Real-time callback triggered!', payload);
           
           if (payload.eventType === 'INSERT') {
@@ -153,7 +154,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         console.log(`[useCustomerTabs] 📡 Items subscription status: ${status}`);
       });
 
@@ -176,6 +177,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
             id: item.id,
             menu_item_id: item.menu_item_id,
             variant_id: item.variant_id,
+            name: item.item_name, // Required by AppApisCustomerTabsOrderItem
             item_name: item.item_name,
             variant_name: item.variant_name,
             quantity: item.quantity,
@@ -259,7 +261,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
           table: 'customer_tabs',
           filter: `table_number=eq.${tableNumber}`
         },
-        (payload) => {
+        (payload: any) => {
           console.log('[useCustomerTabs] 🔔 Real-time callback triggered!', payload);
           
           if (payload.eventType === 'INSERT') {
@@ -290,7 +292,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         console.log(`[useCustomerTabs] 📡 Subscription status changed: ${status}`);
         if (status === 'SUBSCRIBED') {
           console.log(`[useCustomerTabs] ✅ Successfully subscribed to table ${tableNumber}`);

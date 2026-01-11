@@ -6,8 +6,8 @@
  * data structure for all menu-related components.
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
 import { supabase, ensureSupabaseConfigured } from './supabaseClient';
 import { Category, MenuItem, ItemVariant, ProteinType, CustomizationBase, SetMeal } from './menuTypes';
 import { OrderItem } from './menuTypes';
@@ -219,8 +219,8 @@ function isCacheFresh(lastFetched?: number): boolean {
   return age < CACHE_TTL;
 }
 
-export const useRealtimeMenuStore = create<MenuStoreState>(
-  persist(
+export const useRealtimeMenuStore = create<MenuStoreState>()(
+  persist<MenuStoreState>(
     (set, get) => ({
       // Initial state
       categories: [],
@@ -650,7 +650,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           // Subscribe to menu_categories changes
           const categoriesChannel = supabase
             .channel('menu_categories_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, (payload: any) => {
               handleCategoriesChange(payload);
             })
             .subscribe();
@@ -660,7 +660,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           // Subscribe to menu items changes
           const itemsChannel = supabase
             .channel('menu_items_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, (payload: any) => {
               handleMenuItemsChange(payload);
             })
             .subscribe();
@@ -670,7 +670,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           // Subscribe to menu_customizations changes
           const customizationsChannel = supabase
             .channel('menu_customizations_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'customizations' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'customizations' }, (payload: any) => {
               handleCustomizationsChange(payload);
             })
             .subscribe();
@@ -680,7 +680,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           // Subscribe to menu_item_variants changes
           const variantsChannel = supabase
             .channel('menu_item_variants_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, (payload: any) => {
               handleVariantsChange(payload);
             })
             .subscribe();
@@ -1285,7 +1285,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       version: 4, // 🔧 BUMPED: v4 uses square_webp_url/square_jpeg_url (verified from schema)
       
       // ✅ Partialize: Only persist menu data, exclude transient state
-      partialize: (state) => ({
+      partialize: ((state: MenuStoreState) => ({
         menuItems: state.menuItems,
         categories: state.categories,
         itemVariants: state.itemVariants,
@@ -1293,11 +1293,11 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         setMeals: state.setMeals,
         customizations: state.customizations,
         lastFetched: state.lastFetched,
-        
+
         // Also persist computed lookups for faster hydration
         variantsByMenuItem: state.variantsByMenuItem,
         proteinTypesById: state.proteinTypesById,
-      }),
+      })) as any,
       
       // ✅ Smart hydration: Set isLoading based on cache freshness
       onRehydrateStorage: () => (state) => {
@@ -1325,7 +1325,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
 );
 
 // Real-time event handlers
-function handleCategoriesChange(payload: any) {
+function handleCategoriesChange(payload: { eventType: string; new: any; old: any }) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
@@ -1360,7 +1360,7 @@ function handleCategoriesChange(payload: any) {
   store.triggerCorpusSync();
 }
 
-function handleMenuItemsChange(payload: any) {
+function handleMenuItemsChange(payload: { eventType: string; new: any; old: any }) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
@@ -1393,7 +1393,7 @@ function handleMenuItemsChange(payload: any) {
   store.triggerCorpusSync();
 }
 
-function handleCustomizationsChange(payload: any) {
+function handleCustomizationsChange(payload: { eventType: string; new: any; old: any }) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
@@ -1412,7 +1412,7 @@ function handleCustomizationsChange(payload: any) {
   }
 }
 
-function handleVariantsChange(payload: any) {
+function handleVariantsChange(payload: { eventType: string; new: any; old: any }) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
@@ -1506,7 +1506,7 @@ export const loadPOSBundle = async () => {
     }
   } catch (error) {
     console.error('❌ [POS Bundle] Failed to load bundle:', error);
-    store.setError(error as Error);
+    store.setError(error instanceof Error ? error.message : 'Failed to load POS bundle');
     store.setLoading(false);
     return false;
   } finally {

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "ESNext",
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "esModuleInterop": true,
@@ -12,14 +12,28 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["renderer/*"],
+      "app": ["renderer/lib/app-compat.ts"],
+      "brain/*": ["renderer/brain/*"],
+      "constants/*": ["renderer/constants/*"],
+      "components/*": ["renderer/components/*"],
+      "pages/*": ["renderer/pages/*"],
+      "utils/*": ["renderer/utils/*"],
+      "types": ["renderer/types/index.ts"],
+      "types/*": ["renderer/types/*"]
+    }
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "renderer/**/*"
   ],
   "exclude": [
     "node_modules",

@@ -263,7 +263,7 @@ export function useItemVariants(options?: UseQueryOptions<ItemVariant[]>) {
       }
       
       // Map protein_type.name to protein_type_name for backward compatibility
-      const mapped = data?.map(variant => ({
+      const mapped = data?.map((variant: any) => ({
         ...variant,
         protein_type_name: variant.protein_type?.name || null,
       })) || [];
@@ -343,7 +343,7 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
       const menuItems = normalizeMenuItemsResponse(menuItemsRaw);
       
       // Map variants
-      const itemVariants = variantsRes.data?.map(variant => ({
+      const itemVariants = variantsRes.data?.map((variant: any) => ({
         ...variant,
         protein_type_name: variant.protein_type?.name || null,
       })) || [];
