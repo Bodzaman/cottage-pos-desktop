@@ -1,9 +1,9 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './components/AppProvider';
 import POSDesktop from './pages/POSDesktop';
 import POSLogin from './pages/POSLogin';
+import './globals.css';
 import './styles.css';
 
 // Mount the POS Desktop application

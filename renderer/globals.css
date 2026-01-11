@@ -1,0 +1,272 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+  }
+
+  /* Dark mode - this is the default for POS Desktop */
+  .dark,
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(0 0% 10%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 25%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 35%);
+}
+
+/* Sonner toast styling for dark theme */
+[data-sonner-toaster] {
+  --normal-bg: hsl(0 0% 12%);
+  --normal-border: hsl(0 0% 20%);
+  --normal-text: hsl(0 0% 95%);
+  --success-bg: hsl(142 76% 15%);
+  --success-border: hsl(142 76% 30%);
+  --success-text: hsl(142 76% 85%);
+  --error-bg: hsl(0 62% 15%);
+  --error-border: hsl(0 62% 30%);
+  --error-text: hsl(0 62% 85%);
+  --warning-bg: hsl(48 96% 15%);
+  --warning-border: hsl(48 96% 30%);
+  --warning-text: hsl(48 96% 85%);
+  --info-bg: hsl(221 83% 15%);
+  --info-border: hsl(221 83% 30%);
+  --info-text: hsl(221 83% 85%);
+}
+
+/* POS Desktop specific styles */
+.pos-container {
+  @apply min-h-screen bg-background text-foreground;
+}
+
+/* Frosted glass effect */
+.frosted-glass {
+  @apply bg-card/60 backdrop-blur-md border border-border/50 rounded-lg;
+}
+
+/* Purple gradient for buttons */
+.btn-purple-gradient {
+  background: linear-gradient(135deg, hsl(262 83% 48%) 0%, hsl(262 83% 58%) 100%);
+}
+
+/* Premium card styling */
+.premium-card {
+  @apply bg-card border border-border/30 rounded-lg shadow-lg;
+  backdrop-filter: blur(12px);
+}
+
+/* Active/selected state */
+.active-state {
+  @apply bg-primary/10 border-primary/30;
+}
+
+/* Menu item card hover effect */
+.menu-item-hover {
+  @apply transition-all duration-200 hover:bg-accent/10 hover:border-primary/20;
+}
+
+/* Text gradient for headings */
+.text-gradient {
+  background: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 85%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Purple text gradient */
+.text-gradient-purple {
+  background: linear-gradient(135deg, hsl(262 83% 70%) 0%, hsl(262 83% 58%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subtle glow effect */
+.glow-purple {
+  box-shadow: 0 0 20px hsl(262 83% 58% / 0.3);
+}
+
+/* Panel styling consistent with design system */
+.panel {
+  @apply bg-card border border-border/20 rounded-lg;
+}
+
+/* Category pill styling */
+.category-pill {
+  @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200;
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+}
+
+.category-pill.active {
+  @apply bg-primary text-primary-foreground;
+}
+
+/* Order summary panel */
+.order-panel {
+  @apply bg-card/80 backdrop-blur-sm border-l border-border/30;
+}
+
+/* Header styling */
+.pos-header {
+  @apply bg-card/90 backdrop-blur-md border-b border-border/30;
+}
+
+/* Input field dark theme override */
+input,
+textarea,
+select {
+  @apply bg-input text-foreground border-border;
+}
+
+input::placeholder,
+textarea::placeholder {
+  @apply text-muted-foreground;
+}
+
+/* Dialog/modal dark theme */
+[role="dialog"] {
+  @apply bg-card border-border;
+}
+
+/* Table styling */
+table {
+  @apply w-full;
+}
+
+th {
+  @apply text-muted-foreground font-medium text-left;
+}
+
+td {
+  @apply border-t border-border/30;
+}
+
+/* Badge/chip styling */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-primary/10 text-primary border border-primary/20;
+}
+
+.badge-success {
+  @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
+}
+
+.badge-warning {
+  @apply bg-amber-500/10 text-amber-400 border border-amber-500/20;
+}
+
+.badge-error {
+  @apply bg-red-500/10 text-red-400 border border-red-500/20;
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Focus ring styling */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
+}
+
+/* Disable default focus outlines */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
