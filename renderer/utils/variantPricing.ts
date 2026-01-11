@@ -121,7 +121,7 @@ export function determinePricingMode(
 ): PricingMode {
   const itemVariants = variants || item.variants || [];
   const hasVariants = itemVariants.length > 0;
-  const basePrice = item.price ?? 0;
+  const basePrice = item.base_price ?? item.price ?? 0;
   const basePriceDineIn = item.price_dine_in ?? 0;
   const basePriceDelivery = item.price_delivery ?? 0;
   
@@ -234,15 +234,15 @@ export function getItemDisplayPrice(
   let basePrice = 0;
   switch (mode) {
     case 'DINE-IN':
-      basePrice = item.price_dine_in ?? item.price ?? 0;
+      basePrice = item.price_dine_in ?? item.base_price ?? item.price ?? 0;
       break;
     case 'DELIVERY':
-      basePrice = item.price_delivery ?? item.price ?? 0;
+      basePrice = item.price_delivery ?? item.base_price ?? item.price ?? 0;
       break;
     case 'COLLECTION':
     case 'WAITING':
     default:
-      basePrice = item.price ?? 0;
+      basePrice = item.base_price ?? item.price ?? 0;
   }
 
   // CASE 1: Single-price item (no variants, has valid base price)
@@ -491,8 +491,8 @@ export function validateItemPricing(
   const hasDeliveryPrice = (item.price_delivery ?? 0) > 0;
   const hasAnyPrice = hasDineInPrice || hasTakeawayPrice || hasDeliveryPrice;
   
-  // Legacy base price (for backward compatibility)
-  const basePrice = item.price ?? 0;
+  // Base price (primary field preferred)
+  const basePrice = item.base_price ?? item.price ?? 0;
   const hasBasePrice = basePrice > 0;
 
   // ✅ VALIDATION RULE: Single items must have at least one price type set

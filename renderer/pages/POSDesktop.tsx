@@ -1141,7 +1141,7 @@ export default function POSDesktop() {
       const paymentData = {
         payment_method: paymentResult?.method || 'CASH',
         subtotal,
-        vat_amount: vatAmount,
+        tax_amount: vatAmount, // ✅ FIXED: vat_amount -> tax_amount
         tip_amount: tipSelection.amount,
         total_amount: finalTotal
       };
@@ -1208,7 +1208,7 @@ export default function POSDesktop() {
           notes: item.notes || ''
         })),
         subtotal: subtotal,
-        vat_amount: vatAmount,
+        tax_amount: vatAmount, // ✅ FIXED: vat_amount -> tax_amount
         total_amount: totalAmount,
         status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
         customer_name: customerStore.customerData.name || null,
@@ -1283,7 +1283,7 @@ export default function POSDesktop() {
           notes: item.notes || ''
         })),
         subtotal: subtotal,
-        vat_amount: vatAmount,
+        tax_amount: vatAmount, // ✅ FIXED: vat_amount -> tax_amount
         total_amount: totalAmount,
         status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
         customer_name: customerStore.customerData.name || null,
@@ -1390,7 +1390,7 @@ export default function POSDesktop() {
           notes: item.notes || ''
         })),
         subtotal: subtotal,
-        vat_amount: vatAmount,
+        tax_amount: vatAmount, // ✅ FIXED: vat_amount -> tax_amount
         total_amount: totalAmount,
         status: 'IN_PROGRESS', // Mark as in progress (sent to kitchen)
         customer_name: customerStore.customerData.name || null,

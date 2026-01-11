@@ -66,7 +66,7 @@ export const useMenuData = (): MenuData => {
         const { data: menuItemsData, error: menuItemsError } = await supabase
           .from('menu_items')
           .select('*')
-          .eq('active', true)
+          .eq('is_active', true)
           .order('display_order');
         
         if (menuItemsError) {
@@ -77,8 +77,10 @@ export const useMenuData = (): MenuData => {
         
         // Fetch item variants
         const { data: variantsData, error: variantsError } = await supabase
-          .from('item_variants')
+          .from('menu_item_variants')
           .select('*')
+          .eq('is_active', true)
+          .eq('active', true)
           .order('display_order');
         
         if (variantsError) {
@@ -161,15 +163,17 @@ export const useMenuData = (): MenuData => {
       const { data: menuItemsData, error: menuItemsError } = await supabase
         .from('menu_items')
         .select('*')
-        .eq('active', true)
+        .eq('is_active', true)
         .order('display_order');
       
       if (menuItemsError) throw menuItemsError;
       
       // Fetch variants
       const { data: variantsData, error: variantsError } = await supabase
-        .from('item_variants')
+        .from('menu_item_variants')
         .select('*')
+        .eq('is_active', true)
+        .eq('active', true)
         .order('display_order');
       
       if (variantsError) throw variantsError;

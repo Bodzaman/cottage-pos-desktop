@@ -253,7 +253,9 @@ export function useItemVariants(options?: UseQueryOptions<ItemVariant[]>) {
         .select(`
           *,
           protein_type:menu_protein_types(name)
-        `);
+        `)
+        .eq('is_active', true)
+        .eq('active', true);
       
       if (error) {
         console.error('❌ [React Query] Item variants fetch failed:', error);
@@ -328,7 +330,7 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
         supabase.from('menu_item_variants').select(`
           *,
           protein_type:menu_protein_types(name)
-        `),
+        `).eq('is_active', true).eq('active', true),
         apiClient.get_customizations(),
       ]);
       

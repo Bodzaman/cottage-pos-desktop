@@ -5,18 +5,30 @@
 
 /**
  * Menu category definition
+ * 
+ * Database Schema (menu_categories table):
+ * - sorting: Uses sort_order (mapped to display_order)
+ * - status: Uses is_active (mapped to active)
+ * - print: Uses print_order and print_to_kitchen
  */
 export interface Category {
   id: string;
   name: string;
   description: string | null;
-  display_order: number;
-  print_order: number;
-  print_to_kitchen: boolean;
+  display_order: number;              // Mapped from DB sort_order
+  sort_order?: number;                // Raw DB field
+  print_order: number;                // DB print_order
+  display_print_order?: number;       // DB display_print_order
+  print_to_kitchen: boolean;          // DB print_to_kitchen
   image_url: string | null;
-  parent_category_id: string | null;  // Mapped from database parent_id (AdminMenu standard)
-  active: boolean;                    // Mapped from database is_active (AdminMenu standard)
-  is_protein_type?: boolean; // Flag to indicate if this category should be treated as a protein type
+  parent_category_id: string | null;  // Mapped from database parent_category_id
+  active: boolean;                    // Mapped from database is_active
+  is_active?: boolean;                // Raw DB field
+  is_protein_type?: boolean;          // Flag to indicate if this category should be treated as a protein type
+  category_prefix?: string;
+  code_prefix?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
@@ -73,32 +85,32 @@ export interface SetMeal {
 /**
  * MenuItem variant (different protein types, sizes, or preparations of a menu item)
  *
- * Database Schema (item_variants table):
+ * Database Schema (menu_item_variants table):
  * - image_url: EXISTS but often NULL (legacy field)
  * - image_asset_id: UUID linking to media_assets table (preferred)
  * - is_active and active: Both exist in DB (use is_active primarily)
  */
 export interface ItemVariant {
-  id?: string;
+  id: string;                     // UUID (PK)
   menu_item_id: string;           // ✅ Required for variant lookup (FK to menu_items)
-  protein_type_id: string;
-  protein_type_name?: string;     // ✅ Enriched from JOIN with menu_protein_types
-  name: string;
-  variant_name?: string;          // ✅ Alternative name field from DB
+  protein_type_id: string;        // UUID (FK to menu_protein_types)
+  protein_type_name?: string;     // ✅ Enriched from JOIN or lookup
+  name: string;                   // DB 'name' field
+  variant_name: string;           // ✅ Direct variant name from DB
   description?: string;
   description_state?: 'inherited' | 'custom';
-  price: number;
-  price_dine_in?: number;
-  price_delivery?: number;
-  is_default?: boolean;
+  price: number;                  // Primary price (takeaway)
+  price_dine_in?: number;         // DB price_dine_in
+  price_delivery?: number;        // DB price_delivery
+  is_default?: boolean;           // DB is_default
   is_active?: boolean;            // ✅ Required for filtering active variants
   active?: boolean;               // ✅ DB has both is_active and active
-  image_url?: string;             // May be NULL - check display_image_url
+  image_url?: string;             // Legacy field
   image_asset_id?: string;        // UUID to media_assets table
-  display_image_url?: string;     // ✅ Resolved URL from media_assets
+  display_image_url?: string;     // ✅ Resolved URL from media_assets via asset_id
   image_state?: 'inherited' | 'custom';
-  display_order?: number;
-  variant_code?: string;          // ✅ Variant code from DB
+  display_order?: number;         // DB display_order
+  variant_code?: string;          // ✅ Variant code from DB (e.g. V001)
 
   // Food-specific variant fields
   spice_level?: number;
@@ -121,9 +133,9 @@ export interface ItemVariant {
  * Menu item definition
  *
  * Database Schema (menu_items table):
- * - base_price: Primary price field (NOT "price")
- * - image_asset_id: UUID linking to media_assets (NOT direct image_url)
- * - is_active: Active status field
+ * - pricing: Uses base_price (NOT "price")
+ * - images: Uses image_asset_id (links to media_assets)
+ * - status: Uses is_active
  */
 export interface MenuItem {
   id: string;
@@ -131,31 +143,48 @@ export interface MenuItem {
   kitchen_display_name?: string | null; // Optional optimized name for thermal receipt printing
   // Unified description field from database migration
   description: string | null;
+  menu_item_description?: string | null; // Legacy field sometimes returned by API
   image_url: string | null;             // Enriched from media_assets via image_asset_id
   image_asset_id?: string | null;       // ✅ UUID linking to media_assets table
+  image_widescreen_asset_id?: string | null; // ✅ Secondary asset ID from DB
+  preferred_aspect_ratio?: string | null;
+  
   // ✅ NEW: Optimized image variants from media_assets table
   image_variants?: {
     square?: { webp?: string | null; jpeg?: string | null };
     widescreen?: { webp?: string | null; jpeg?: string | null };
     thumbnail?: { webp?: string | null; jpeg?: string | null };
   } | null;
-  spice_indicators: string | null;
+  
+  spice_indicators?: string | null;
+  spice_level?: number;                 // DB spice_level integer
   category_id: string;
-  // Array of ingredients for the dish
-  featured: boolean;
-  dietary_tags: string[] | null; // Array of dietary tags like 'Vegetarian', 'Vegan', etc.
+  featured: boolean;                    // Mapped from DB chefs_special or similar
+  chefs_special?: boolean;              // Raw DB field
+  dietary_tags: string[] | null;        // Array of dietary tags like 'Vegetarian', 'Vegan', etc.
   item_code?: string | null;
-  display_order: number;
-  active: boolean;
-  is_active?: boolean;                  // ✅ DB uses is_active (mapped to active)
-  has_variants?: boolean;               // ✅ Whether item has multiple variants
+  display_order: number;                // Mapped from DB display_print_order or similar
+  display_print_order?: number;         // Raw DB field
+  
+  active: boolean;                      // Mapped from database is_active
+  is_active?: boolean;                  // ✅ DB uses is_active
+  is_available?: boolean;               // DB is_available
+  
+  has_variants?: boolean;               // ✅ Whether item has multiple variants (DB column)
   inherit_category_print_settings?: boolean;
+  
   // Pricing fields from database
-  base_price?: number;                  // ✅ Primary price field from DB
+  base_price: number;                   // ✅ Primary price field from DB (Required)
   price?: number;                       // Alias for backward compatibility
-  price_dine_in?: number;               // Dine-in price
-  price_takeaway?: number;              // Takeaway/collection price
-  price_delivery?: number;              // Delivery price
+  price_dine_in?: number;               // DB price_dine_in
+  price_takeaway?: number;              // DB price_takeaway
+  price_delivery?: number;              // DB price_delivery
+  
+  // Dietary flags (mapped from DB columns)
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  
   // Set meal fields
   is_set_meal?: boolean;
   set_meal_id?: string | null;
@@ -308,20 +337,50 @@ export interface DeliverySettings {
 
 /**
  * Order definition for the POS system
+ * 
+ * Database Schema (orders table):
+ * - Tracking: order_number (string)
+ * - Financials: subtotal, total_amount, tax_amount, delivery_fee
  */
 export interface Order {
-  id: string;
+  id: string;                         // UUID (PK)
+  order_number: string;               // Display order number (e.g. "T-1234")
   order_type: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
-  table_number?: number;
+  order_source?: "POS" | "WEBSITE" | "APP";
+  table_number?: string | number;     // DB is text
+  table_id?: string;                  // UUID (FK to pos_tables)
+  
   customer_name?: string;
+  customer_email?: string;
   customer_phone?: string;
-  customer_address?: string;
+  customer_address?: string;          // For delivery/collection
+  customer_id?: string;               // UUID (FK to customers)
+  
   status: "PENDING" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
-  items: OrderItem[];
-  subtotal: number;
-  total: number;
+  payment_method?: string;            // CASH, CARD, etc.
+  payment_status?: string;            // pending, completed, etc.
+  
+  items: OrderItem[];                 // JSONB in DB
+  
+  subtotal: number;                   // DB subtotal
+  total: number;                      // Alias for total_amount
+  total_amount: number;               // DB total_amount
+  tax_amount?: number;                // DB tax_amount
+  delivery_fee?: number;              // DB delivery_fee
+  discount_amount?: number;           // DB discount_amount
+  service_charge?: number;            // DB service_charge
+  tip_amount?: number;                // DB tip_amount
+  
+  special_instructions?: string;
+  notes?: string;
+  
   created_at: string;
   updated_at: string;
+  completed_at?: string;
+  status_updated_at?: string;
+  
+  staff_id?: string;                  // UUID of staff member
+  server_name?: string;               // Aggregated server name
 }
 
 /**

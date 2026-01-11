@@ -112,6 +112,7 @@ interface MenuStoreState {
   initialize: () => Promise<void>;
   refreshData: () => Promise<void>;
   fetchSupplementaryData: () => Promise<void>;
+  fetchSetMeals: () => Promise<void>;
   fallbackRefreshData: () => Promise<void>;
   subscribeToChanges: () => void;
   unsubscribeFromChanges: () => void;
@@ -238,6 +239,10 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       lastUpdate: 0,
       lastFetched: 0,
       error: null,
+      
+      // AI Context initial state
+      aiContextLastUpdate: 0,
+      aiContextStatus: 'idle',
       
       // Computed data
       menuItemsByCategory: {},
@@ -414,10 +419,10 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           supabase.from('menu_items').select('*').eq('is_active', true).order('display_print_order'),
           supabase.from('menu_protein_types').select('*').order('name'),
           supabase.from('menu_customizations').select('*').eq('is_active', true).order('menu_order'),
-          supabase.from('item_variants').select(`
+          supabase.from('menu_item_variants').select(`
             *,
             menu_protein_types:protein_type_id(id, name)
-          `).order('menu_item_id')
+          `).eq('is_active', true).eq('active', true).order('menu_item_id')
         ];
 
         const results = await Promise.allSettled(dataPromises);
@@ -479,20 +484,30 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         if (rawItems.length > 0) {
           console.log('🖼️ [Menu Debug] Raw items from Supabase:', rawItems.length);
 
-          // ✅ FIX v1.8.41: Enrich items with resolved image URLs from media_assets
-          const enrichedItems = rawItems.map((item: any) => {
-            const resolvedImageUrl = item.image_asset_id ? assetUrlMap.get(item.image_asset_id) : null;
-            return {
-              ...item,
-              active: item.is_active ?? item.active ?? true,
-              // ✅ Enrich with resolved image URL
-              image_url: resolvedImageUrl || item.image_url || null,
-              // ✅ Map base_price to price for backward compatibility
-              price: item.base_price ?? item.price ?? 0
-            };
-          });
+        // ✅ FIX v1.8.41 & 1.8.43: Enrich items with resolved image URLs and handle multi-variant images
+        const enrichedItems = rawItems.map((item: any) => {
+          let resolvedImageUrl = item.image_asset_id ? assetUrlMap.get(item.image_asset_id) : null;
+          
+          if (!resolvedImageUrl && item.has_variants) {
+            // Find first variant with an image if parent doesn't have one
+            const variantsOfItem = rawVariants.filter((v: any) => v.menu_item_id === item.id);
+            const firstVariantWithImage = variantsOfItem.find((v: any) => v.image_asset_id);
+            if (firstVariantWithImage) {
+              resolvedImageUrl = assetUrlMap.get(firstVariantWithImage.image_asset_id);
+            }
+          }
 
-          get().setMenuItems(enrichedItems);
+          return {
+            ...item,
+            active: item.is_active ?? item.active ?? true,
+            // ✅ Enrich with resolved image URL
+            image_url: resolvedImageUrl || item.image_url || null,
+            // ✅ Map base_price to price for backward compatibility
+            price: item.base_price ?? item.price ?? 0
+          };
+        });
+
+        get().setMenuItems(enrichedItems);
 
           // Log enrichment results
           const itemsWithImages = enrichedItems.filter((i: any) => i.image_url).length;
@@ -665,7 +680,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           // Subscribe to menu_item_variants changes
           const variantsChannel = supabase
             .channel('menu_item_variants_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'item_variants' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, (payload) => {
               handleVariantsChange(payload);
             })
             .subscribe();
@@ -751,7 +766,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           const configSuccess = await ensureSupabaseConfigured();
           
           // ✅ NEW: Only refresh data if bundle is NOT fresh
-          await state.refreshData();
+          await get().refreshData();
           
           set({ 
             isLoading: false, 
@@ -1145,7 +1160,8 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
       fetchSetMeals: async () => {
         try {
           const response = await apiClient.list_set_meals({ active_only: true });
-          const setMeals = response.json ? await response.json() : response;
+          const jsonResponse = await response.json();
+          const setMeals = jsonResponse.data || jsonResponse; // Handle different API response shapes
           
           if (Array.isArray(setMeals)) {
             get().setSetMeals(setMeals);
@@ -1184,6 +1200,9 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
             inherit_category_print_settings: false,
             // Add price field from set_price
             price: setMeal.set_price,
+            base_price: setMeal.set_price, // Added for MenuItem compatibility
+            display_order: 999,           // Added for MenuItem compatibility
+            variants: [],                 // Added for MenuItem compatibility
             // Add Set Meal specific properties
             set_meal_data: {
               individual_items_total: setMeal.individual_items_total,
@@ -1191,7 +1210,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               items: setMeal.items
             },
             item_type: 'set_meal' as const
-          } as MenuItem & { price?: number; set_meal_data?: any; item_type?: string }));
+          } as unknown as MenuItem & { price?: number; set_meal_data?: any; item_type?: string }));
         
         return setMealMenuItems;
       },

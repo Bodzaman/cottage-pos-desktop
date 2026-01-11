@@ -858,9 +858,9 @@ export function POSOrderSummary({
               notes: item.notes
             })),
             subtotal: subtotal,
-            tax: tax,
+            tax_amount: tax, // ✅ FIXED: tax -> tax_amount
             service_charge: serviceChargeValue,
-            total: total,
+            total_amount: total, // ✅ FIXED: total -> total_amount
             payment: {
               method: 'CASH',
               amount: total,
@@ -946,9 +946,9 @@ export function POSOrderSummary({
               notes: item.notes
             })),
             subtotal: subtotal,
-            tax: tax,
+            tax_amount: tax, // ✅ FIXED: tax -> tax_amount
             service_charge: serviceChargeValue,
-            total: total,
+            total_amount: total, // ✅ FIXED: total -> total_amount
             payment: {
               method: result.method,
               amount: total,
