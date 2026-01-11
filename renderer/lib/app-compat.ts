@@ -73,7 +73,23 @@ export const apiClient = {
     return mockResponse({ success: false, message: 'Stub - use Supabase fallback' });
   },
 
-  get_menu_items: async () => mockResponse({ items: [] }),
+  get_menu_items: async () => {
+    console.log('🔄 [app-compat] get_menu_items - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('menu_items')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_print_order');
+
+    if (error) {
+      console.error('❌ [app-compat] get_menu_items error:', error);
+      return mockResponse({ items: [] });
+    }
+
+    console.log('✅ [app-compat] get_menu_items loaded:', data?.length || 0, 'items');
+    // Return in format expected by normalizeMenuItemsResponse
+    return mockResponse({ items: data || [] });
+  },
 
   item_details: async (itemId: string) => mockResponse({ item: null }),
 
@@ -231,7 +247,23 @@ export const apiClient = {
   // ============================================================================
   // CUSTOMIZATIONS
   // ============================================================================
-  get_customizations: async (params?: any) => mockResponse({ customizations: [] }),
+  get_customizations: async (_params?: any) => {
+    console.log('🔄 [app-compat] get_customizations - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('menu_customizations')
+      .select('*')
+      .eq('is_active', true)
+      .order('menu_order');
+
+    if (error) {
+      console.error('❌ [app-compat] get_customizations error:', error);
+      return mockResponse([]);
+    }
+
+    console.log('✅ [app-compat] get_customizations loaded:', data?.length || 0, 'items');
+    // Return as array (menuQueries expects array directly)
+    return mockResponse(data || []);
+  },
 
   create_customization: async (data: any) => mockResponse({ success: true }),
 
@@ -244,7 +276,21 @@ export const apiClient = {
   // ============================================================================
   save_category: async (data: any) => mockResponse({ success: true }),
 
-  get_menu_categories: async (params?: any) => mockResponse({ categories: [] }),
+  get_menu_categories: async (_params?: any) => {
+    console.log('🔄 [app-compat] get_menu_categories - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .select('*')
+      .order('sort_order');
+
+    if (error) {
+      console.error('❌ [app-compat] get_menu_categories error:', error);
+      return mockResponse({ categories: [] });
+    }
+
+    console.log('✅ [app-compat] get_menu_categories loaded:', data?.length || 0, 'categories');
+    return mockResponse({ categories: data || [] });
+  },
 
   check_category_delete: async (params: any) => mockResponse({ can_delete: true }),
 
@@ -452,9 +498,39 @@ export const apiClient = {
   // ============================================================================
   // MEDIA / STORAGE
   // ============================================================================
-  get_media_library: async (params?: any) => mockResponse({ assets: [] }),
+  get_media_library: async (_params?: any) => {
+    console.log('🔄 [app-compat] get_media_library - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('media_assets')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
 
-  get_enhanced_media_library: async (params: any) => mockResponse({ assets: [] }),
+    if (error) {
+      console.error('❌ [app-compat] get_media_library error:', error);
+      return mockResponse({ assets: [], success: false, message: error.message });
+    }
+
+    console.log('✅ [app-compat] get_media_library loaded:', data?.length || 0, 'assets');
+    return mockResponse({ assets: data || [], success: true });
+  },
+
+  get_enhanced_media_library: async (_params: any) => {
+    console.log('🔄 [app-compat] get_enhanced_media_library - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('media_assets')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('❌ [app-compat] get_enhanced_media_library error:', error);
+      return mockResponse({ assets: [], success: false, message: error.message });
+    }
+
+    console.log('✅ [app-compat] get_enhanced_media_library loaded:', data?.length || 0, 'assets');
+    return mockResponse({ assets: data || [], success: true });
+  },
 
   get_media_asset: async (params: any) => mockResponse({ asset: null }),
 
@@ -627,15 +703,71 @@ export const apiClient = {
 
   search_menu: async (params: any) => mockResponse({ results: [] }),
 
-  get_menu_items_with_variants: async (params: any) => mockResponse({ items: [] }),
+  get_menu_items_with_variants: async (_params: any) => {
+    console.log('🔄 [app-compat] get_menu_items_with_variants - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('menu_items')
+      .select(`
+        *,
+        variants:item_variants(*)
+      `)
+      .eq('is_active', true)
+      .order('display_print_order');
 
-  get_item_customizations: async (params: any) => mockResponse({ customizations: [] }),
+    if (error) {
+      console.error('❌ [app-compat] get_menu_items_with_variants error:', error);
+      return mockResponse({ items: [] });
+    }
+
+    console.log('✅ [app-compat] get_menu_items_with_variants loaded:', data?.length || 0, 'items');
+    return mockResponse({ items: data || [] });
+  },
+
+  get_item_customizations: async (_params: any) => {
+    console.log('🔄 [app-compat] get_item_customizations - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('menu_customizations')
+      .select('*')
+      .eq('is_active', true)
+      .order('menu_order');
+
+    if (error) {
+      console.error('❌ [app-compat] get_item_customizations error:', error);
+      return mockResponse({ customizations: [] });
+    }
+
+    console.log('✅ [app-compat] get_item_customizations loaded:', data?.length || 0, 'items');
+    return mockResponse({ customizations: data || [] });
+  },
 
   get_restaurant_info: async () => mockResponse({ info: {} }),
 
   check_delivery_zone: async (params: any) => mockResponse({ in_zone: true }),
 
-  get_item_variants: async (params: any) => mockResponse({ variants: [] }),
+  get_item_variants: async (_params: any) => {
+    console.log('🔄 [app-compat] get_item_variants - querying Supabase directly');
+    const { data, error } = await supabase
+      .from('item_variants')
+      .select(`
+        *,
+        protein_type:menu_protein_types(id, name)
+      `)
+      .order('menu_item_id');
+
+    if (error) {
+      console.error('❌ [app-compat] get_item_variants error:', error);
+      return mockResponse({ variants: [] });
+    }
+
+    // Map protein_type.name to protein_type_name for backward compatibility
+    const mapped = (data || []).map((variant: any) => ({
+      ...variant,
+      protein_type_name: variant.protein_type?.name || null,
+    }));
+
+    console.log('✅ [app-compat] get_item_variants loaded:', mapped.length, 'variants');
+    return mockResponse({ variants: mapped });
+  },
 
   get_chat_config: async () => mockResponse({ config: {} }),
 
