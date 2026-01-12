@@ -208,7 +208,7 @@ export default function POSDesktop() {
   const handleOrderTypeChange = useCallback((orderType: any) => {
     setOrderType(orderType);
     setActiveView(orderType === 'ONLINE_ORDERS' ? 'online-orders' : 'pos');
-  }, [orderStore, uiStore]);
+  }, []);
   
   const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
     const table = restaurantTables.find((t: any) => parseInt(t.table_number) === tableNumber);
@@ -222,7 +222,7 @@ export default function POSDesktop() {
       setModal('showGuestCountModal', true);
     }
     updateCustomer({ ...customerDataStoreData, tableNumber: tableNumber.toString(), guestCount: guestCount || 1 } as any);
-  }, [restaurantTables, orderStore, uiStore, customerStore, customerDataStoreData]);
+  }, [restaurantTables, customerDataStoreData]);
   
   const handleGuestCountSave = useCallback(async (guestCount: number, action: string, linkedTables?: number[]) => {
     const tableIdVal = selectedTableNumber;
@@ -237,7 +237,7 @@ export default function POSDesktop() {
       setModal('showGuestCountModal', false);
       setModal('showDineInModal', true);
     }
-  }, [createOrder, orderStore, uiStore, refetchTables]);
+  }, [createOrder, refetchTables]);
 
   const handleCustomerIntelligenceSelected = useCallback((customer: any) => {
     const data = {
@@ -252,7 +252,7 @@ export default function POSDesktop() {
     };
     updateCustomer(data as any);
     setCustomerData(data as any);
-  }, [customerStore, setCustomerData]);
+  }, [setCustomerData]);
 
   const handleLoadPastOrder = useCallback(async (order: any) => {
     const data = await getOrderItems(order.order_id);
@@ -273,7 +273,7 @@ export default function POSDesktop() {
       setOrderItems([...orderItems, ...items]);
       setShowOrderHistoryModal(false);
     }
-  }, [orderStore]);
+  }, []);
 
   const calculateOrderTotal = useCallback((): number => {
     return orderItems.reduce((total: number, item: OrderItem) => {
@@ -283,7 +283,7 @@ export default function POSDesktop() {
     }, 0);
   }, [orderItems]);
 
-  const handleCustomerSave = useCallback((data: any) => { updateCustomer(data); setCustomerData(data); }, [customerStore, setCustomerData]);
+  const handleCustomerSave = useCallback((data: any) => { updateCustomer(data); setCustomerData(data); }, [setCustomerData]);
 
   const orderManagement = useOrderManagement(orderItems, setOrderItems);
   const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
@@ -296,7 +296,7 @@ export default function POSDesktop() {
     else orderManagement.handleAddToOrder(item);
   }, [orderType, addItemToDineIn, orderManagement]);
 
-  const handleClearOrder = useCallback(() => { orderManagement.handleClearOrder(); clearOrder(); }, [orderManagement, orderStore]);
+  const handleClearOrder = useCallback(() => { orderManagement.handleClearOrder(); clearOrder(); }, [orderManagement]);
 
   const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
     const subtotal = calculateOrderTotal();
@@ -306,14 +306,14 @@ export default function POSDesktop() {
     await printing.handlePrintReceipt(finalTotal);
     clearOrder();
     clearCustomer();
-  }, [calculateOrderTotal, orderProcessing, printing, orderStore, customerStore]);
+  }, [calculateOrderTotal, orderProcessing, printing]);
 
   const handleSendToKitchen = useCallback(async () => {
     if (orderItems.length === 0) return;
     const subtotal = calculateOrderTotal();
     await supabase.from('orders').insert({ order_type: orderType, table_number: selectedTableNumber, guest_count: guestCount || 1, items: orderItems as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
     toast.success('🍽️ Sent to kitchen!');
-  }, [orderStore, calculateOrderTotal]);
+  }, [calculateOrderTotal]);
 
   const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
   const [paymentFlowMode, setPaymentFlowMode] = useState<PaymentFlowMode>('payment');
@@ -330,7 +330,7 @@ export default function POSDesktop() {
     setPaymentFlowMode(mode);
     setShowPaymentChoiceModal(false);
     setModal('showPaymentFlow', true);
-  }, [uiStore]);
+  }, []);
 
   const handlePaymentFlowComplete = useCallback(async (result: PaymentFlowResult) => {
     if (!result.success) {
@@ -343,13 +343,13 @@ export default function POSDesktop() {
     clearCustomer();
     setModal('showPaymentFlow', false);
     toast.success('💰 Payment successful!');
-  }, [printing, orderStore, customerStore, uiStore]);
+  }, [printing]);
 
   const { printerStatus } = useOnDemandPrinter();
 
   useEffect(() => {
     if (printerStatus?.queuedJobs !== undefined) setQueuedJobsCount(printerStatus.queuedJobs);
-  }, [printerStatus, uiStore]);
+  }, [printerStatus]);
 
   useEffect(() => {
     const timer = setTimeout(() => { startRealtimeSubscriptionsIfNeeded(); }, 500);
