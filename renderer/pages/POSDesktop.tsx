@@ -110,33 +110,43 @@ export default function POSDesktop() {
   const isConnected = useRealtimeMenuStore(state => state.isConnected);
   const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
   
-  // ✅ FIX: Access store state via getState() to prevent subscription re-render loops
-  const orderStore = useMemo(() => usePOSOrderStore.getState(), []);
-  const customerStore = useMemo(() => usePOSCustomerStore.getState(), []);
-  const uiStore = useMemo(() => usePOSUIStore.getState(), []);
-  
-  // Subscribe only to specific fields that should trigger re-renders
+  // ✅ FIX: Use reactive selectors for values that should trigger re-renders
+  // Use getState() only for actions (mutations), not for reading values
   const orderType = usePOSOrderStore(state => state.orderType);
-  const orderItemsFromStore = usePOSOrderStore(state => state.orderItems, shallow);
+  const orderItems = usePOSOrderStore(state => state.orderItems, shallow);
   const selectedTableNumber = usePOSOrderStore(state => state.selectedTableNumber);
+  const guestCount = usePOSOrderStore(state => state.guestCount);
+  const setOrderType = usePOSOrderStore(state => state.setOrderType);
+  const setOrderItems = usePOSOrderStore(state => state.setOrderItems);
+  const setSelectedTableNumber = usePOSOrderStore(state => state.setSelectedTableNumber);
+  const setGuestCount = usePOSOrderStore(state => state.setGuestCount);
+  const clearOrder = usePOSOrderStore(state => state.clearOrder);
+  
+  const customerData = usePOSCustomerStore(state => state.customerData, shallow);
+  const updateCustomer = usePOSCustomerStore(state => state.updateCustomer);
+  const clearCustomer = usePOSCustomerStore(state => state.clearCustomer);
+  
   const activeView = usePOSUIStore(state => state.activeView);
   const showDineInModal = usePOSUIStore(state => state.showDineInModal);
   const showGuestCountModal = usePOSUIStore(state => state.showGuestCountModal);
   const showCustomerModal = usePOSUIStore(state => state.showCustomerModal);
   const showPaymentFlow = usePOSUIStore(state => state.showPaymentFlow);
+  const setActiveView = usePOSUIStore(state => state.setActiveView);
+  const setModal = usePOSUIStore(state => state.setModal);
+  const setQueuedJobsCount = usePOSUIStore(state => state.setQueuedJobsCount);
   const persistedTableOrders = useTableOrdersStore((state) => state.persistedTableOrders);
 
   const { tables: restaurantTables, loading: tablesLoading, refetch: refetchTables } = useRestaurantTables();
   
   const selectedTableUuid = useMemo(() => {
-    if (orderStore.orderType !== 'DINE-IN' || !orderStore.selectedTableNumber) return null;
-    const table = restaurantTables.find((t: any) => t.table_number === orderStore.selectedTableNumber?.toString());
+    if (orderType !== 'DINE-IN' || !selectedTableNumber) return null;
+    const table = restaurantTables.find((t: any) => t.table_number === selectedTableNumber?.toString());
     return table?.id || null;
-  }, [orderStore.orderType, orderStore.selectedTableNumber, restaurantTables]);
+  }, [orderType, selectedTableNumber, restaurantTables]);
 
   const linkedTableContext = useMemo(() => {
-    if (orderStore.orderType !== 'DINE-IN' || !orderStore.selectedTableNumber) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
-    const selectedTable = restaurantTables.find((t: any) => parseInt(t.table_number) === orderStore.selectedTableNumber);
+    if (orderType !== 'DINE-IN' || !selectedTableNumber) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    const selectedTable = restaurantTables.find((t: any) => parseInt(t.table_number) === selectedTableNumber);
     if (!selectedTable) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
     const isLinked = selectedTable.is_linked_table || selectedTable.is_linked_primary;
     if (!isLinked || !selectedTable.linked_with_tables) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
@@ -145,14 +155,14 @@ export default function POSDesktop() {
     const linkedTableObjects = restaurantTables.filter((t: any) => linkedTableNumbers.includes(parseInt(t.table_number)));
     const totalLinkedCapacity = selectedTable.capacity + linkedTableObjects.reduce((sum: number, t: any) => sum + (t.capacity || 0), 0);
     return { linkedTableNumbers, isPrimaryTable, totalLinkedCapacity };
-  }, [orderStore.orderType, orderStore.selectedTableNumber, restaurantTables]);
+  }, [orderType, selectedTableNumber, restaurantTables]);
 
   const { order: dineInOrder, enrichedItems: dineInEnrichedItems, enrichedLoading: dineInEnrichedLoading, enrichedError: dineInEnrichedError, createOrder, addItem: addItemToDineIn, removeItem: removeItemFromDineIn, updateItemQuantity, sendToKitchen: sendDineInToKitchen, updateGuestCount } = useDineInOrder(selectedTableUuid || '');
 
   const dineInOrderRef = useRef(dineInOrder);
   useEffect(() => { dineInOrderRef.current = dineInOrder; }, [dineInOrder]);
 
-  const { customerTabs: customerTabsData, activeTabId, setActiveTabId, createTab, addItemsToTab, renameTab, closeTab, splitTab, mergeTabs, moveItemsBetweenTabs } = useCustomerTabs(orderStore.orderType === 'DINE-IN' ? orderStore.selectedTableNumber : null);
+  const { customerTabs: customerTabsData, activeTabId, setActiveTabId, createTab, addItemsToTab, renameTab, closeTab, splitTab, mergeTabs, moveItemsBetweenTabs } = useCustomerTabs(orderType === 'DINE-IN' ? selectedTableNumber : null);
 
   const [dineInStagingItems, setDineInStagingItems] = useState<OrderItem[]>([]);
   const addToStagingCart = useCallback((item: OrderItem) => setDineInStagingItems(prev => [...prev, item]), []);
@@ -183,39 +193,39 @@ export default function POSDesktop() {
   const { settings: posSettings } = usePOSSettingsWithAutoFetch();
   const variantCarouselEnabled = posSettings?.variant_carousel_enabled ?? true;
   
-  const orderTotal = useMemo(() => orderStore.orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderStore.orderItems]);
+  const orderTotal = useMemo(() => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderItems]);
   const deliveryFee = useMemo((): number => {
-    if (orderStore.orderType === "DELIVERY" && (customerStore.customerData as any).deliveryFee !== undefined) return (customerStore.customerData as any).deliveryFee;
-    if (orderStore.orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled) return posSettings.delivery_charge.amount;
+    if (orderType === "DELIVERY" && (customerData as any).deliveryFee !== undefined) return (customerData as any).deliveryFee;
+    if (orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled) return posSettings.delivery_charge.amount;
     return 0;
-  }, [orderStore.orderType, customerStore.customerData, posSettings]);
+  }, [orderType, customerData, posSettings]);
   
-  const initialization = usePOSInitialization({ onViewChange: (view: any) => uiStore.setActiveView(view) });
+  const initialization = usePOSInitialization({ onViewChange: (view: any) => setActiveView(view) });
 
   const handleLogout = useCallback(async () => { await logout(); navigate('/pos-login', { replace: true }); }, [logout, navigate]);
   const handleManagementAuthSuccess = useCallback(() => { setManagerOverrideGranted(true); if (managerApprovalResolverRef.current) managerApprovalResolverRef.current(true); setIsManagementDialogOpen(false); setShowAdminPanel(true); }, []);
 
   const handleOrderTypeChange = useCallback((orderType: any) => {
-    orderStore.setOrderType(orderType);
-    uiStore.setActiveView(orderType === 'ONLINE_ORDERS' ? 'online-orders' : 'pos');
+    setOrderType(orderType);
+    setActiveView(orderType === 'ONLINE_ORDERS' ? 'online-orders' : 'pos');
   }, [orderStore, uiStore]);
   
   const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
     const table = restaurantTables.find((t: any) => parseInt(t.table_number) === tableNumber);
     if (table?.is_linked_table || table?.is_linked_primary || (tableStatus && tableStatus !== 'AVAILABLE')) {
-      orderStore.setOrderType('DINE-IN');
-      orderStore.setSelectedTableNumber(tableNumber);
-      uiStore.setModal('showDineInModal', true);
+      setOrderType('DINE-IN');
+      setSelectedTableNumber(tableNumber);
+      setModal('showDineInModal', true);
     } else {
-      orderStore.setOrderType('DINE-IN');
-      orderStore.setSelectedTableNumber(tableNumber);
-      uiStore.setModal('showGuestCountModal', true);
+      setOrderType('DINE-IN');
+      setSelectedTableNumber(tableNumber);
+      setModal('showGuestCountModal', true);
     }
-    customerStore.updateCustomer({ ...customerDataStoreData, tableNumber: tableNumber.toString(), guestCount: orderStore.guestCount || 1 } as any);
+    updateCustomer({ ...customerDataStoreData, tableNumber: tableNumber.toString(), guestCount: guestCount || 1 } as any);
   }, [restaurantTables, orderStore, uiStore, customerStore, customerDataStoreData]);
   
   const handleGuestCountSave = useCallback(async (guestCount: number, action: string, linkedTables?: number[]) => {
-    const tableIdVal = orderStore.selectedTableNumber;
+    const tableIdVal = selectedTableNumber;
     if (!tableIdVal) return;
     
     const orderId = await createOrder(guestCount);
@@ -223,9 +233,9 @@ export default function POSDesktop() {
       if (action === 'link' && linkedTables) {
         try { await apiClient.link_tables({ order_id: orderId, tables_to_link: linkedTables }); await refetchTables(); } catch {}
       }
-      orderStore.setGuestCount(guestCount);
-      uiStore.setModal('showGuestCountModal', false);
-      uiStore.setModal('showDineInModal', true);
+      setGuestCount(guestCount);
+      setModal('showGuestCountModal', false);
+      setModal('showDineInModal', true);
     }
   }, [createOrder, orderStore, uiStore, refetchTables]);
 
@@ -240,7 +250,7 @@ export default function POSDesktop() {
       city: customer.default_address?.city || '',
       postcode: customer.default_address?.postal_code || '',
     };
-    customerStore.updateCustomer(data as any);
+    updateCustomer(data as any);
     setCustomerData(data as any);
   }, [customerStore, setCustomerData]);
 
@@ -260,33 +270,33 @@ export default function POSDesktop() {
         notes: i.notes || '',
         image_url: i.image_url || '',
       }));
-      orderStore.setOrderItems([...orderStore.orderItems, ...items]);
+      setOrderItems([...orderItems, ...items]);
       setShowOrderHistoryModal(false);
     }
   }, [orderStore]);
 
   const calculateOrderTotal = useCallback((): number => {
-    return orderStore.orderItems.reduce((total: number, item: OrderItem) => {
+    return orderItems.reduce((total: number, item: OrderItem) => {
       let it = item.price * item.quantity;
       if (item.modifiers) item.modifiers.forEach((m: any) => { it += (m.price_adjustment || 0) * item.quantity; });
       return total + it;
     }, 0);
-  }, [orderStore.orderItems]);
+  }, [orderItems]);
 
-  const handleCustomerSave = useCallback((data: any) => { customerStore.updateCustomer(data); setCustomerData(data); }, [customerStore, setCustomerData]);
+  const handleCustomerSave = useCallback((data: any) => { updateCustomer(data); setCustomerData(data); }, [customerStore, setCustomerData]);
 
-  const orderManagement = useOrderManagement(orderStore.orderItems, orderStore.setOrderItems);
-  const customerFlow = useCustomerFlow(orderStore.orderType as any, customerStore.customerData as any, (data: any) => customerStore.updateCustomer(data), orderStore.selectedTableNumber, orderStore.guestCount);
-  const orderProcessing = useOrderProcessing(orderStore.orderType as any, orderStore.orderItems, customerStore.customerData as any, orderStore.selectedTableNumber, orderStore.guestCount);
-  const printing = usePrintingOperations(orderStore.orderType as any, orderStore.orderItems, customerStore.customerData as any, orderStore.selectedTableNumber, orderStore.guestCount);
+  const orderManagement = useOrderManagement(orderItems, setOrderItems);
+  const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
+  const orderProcessing = useOrderProcessing(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
+  const printing = usePrintingOperations(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
 
 
   const handleAddToOrder = useCallback((item: OrderItem) => {
-    if (orderStore.orderType === 'DINE-IN') addItemToDineIn(item);
+    if (orderType === 'DINE-IN') addItemToDineIn(item);
     else orderManagement.handleAddToOrder(item);
-  }, [orderStore.orderType, addItemToDineIn, orderManagement]);
+  }, [orderType, addItemToDineIn, orderManagement]);
 
-  const handleClearOrder = useCallback(() => { orderManagement.handleClearOrder(); orderStore.clearOrder(); }, [orderManagement, orderStore]);
+  const handleClearOrder = useCallback(() => { orderManagement.handleClearOrder(); clearOrder(); }, [orderManagement, orderStore]);
 
   const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
     const subtotal = calculateOrderTotal();
@@ -294,14 +304,14 @@ export default function POSDesktop() {
     await (orderProcessing as any).persistPayment({ payment_method: paymentResult?.method || 'CASH', subtotal, tax_amount: subtotal * 0.2, tip_amount: tipSelection.amount, total_amount: finalTotal });
     await printing.handlePrintKitchen();
     await printing.handlePrintReceipt(finalTotal);
-    orderStore.clearOrder();
-    customerStore.clearCustomer();
+    clearOrder();
+    clearCustomer();
   }, [calculateOrderTotal, orderProcessing, printing, orderStore, customerStore]);
 
   const handleSendToKitchen = useCallback(async () => {
-    if (orderStore.orderItems.length === 0) return;
+    if (orderItems.length === 0) return;
     const subtotal = calculateOrderTotal();
-    await supabase.from('orders').insert({ order_type: orderStore.orderType, table_number: orderStore.selectedTableNumber, guest_count: orderStore.guestCount || 1, items: orderStore.orderItems as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
+    await supabase.from('orders').insert({ order_type: orderType, table_number: selectedTableNumber, guest_count: guestCount || 1, items: orderItems as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
     toast.success('🍽️ Sent to kitchen!');
   }, [orderStore, calculateOrderTotal]);
 
@@ -312,33 +322,33 @@ export default function POSDesktop() {
   const [showBillPreviewModal, setShowBillPreviewModal] = useState(false);
 
   const handleShowPaymentModal = useCallback(async () => {
-    if (orderStore.orderType === 'DINE-IN') return await printing.handlePrintBill(orderTotal);
+    if (orderType === 'DINE-IN') return await printing.handlePrintBill(orderTotal);
     setShowPaymentChoiceModal(true);
-  }, [orderStore.orderType, printing, orderTotal]);
+  }, [orderType, printing, orderTotal]);
 
   const handleSelectPaymentMode = useCallback((mode: PaymentFlowMode) => {
     setPaymentFlowMode(mode);
     setShowPaymentChoiceModal(false);
-    uiStore.setModal('showPaymentFlow', true);
+    setModal('showPaymentFlow', true);
   }, [uiStore]);
 
   const handlePaymentFlowComplete = useCallback(async (result: PaymentFlowResult) => {
     if (!result.success) {
-      uiStore.setModal('showPaymentFlow', false);
+      setModal('showPaymentFlow', false);
       return;
     }
     await printing.handlePrintKitchen();
     await printing.handlePrintReceipt(result.orderTotal ?? 0);
-    orderStore.clearOrder();
-    customerStore.clearCustomer();
-    uiStore.setModal('showPaymentFlow', false);
+    clearOrder();
+    clearCustomer();
+    setModal('showPaymentFlow', false);
     toast.success('💰 Payment successful!');
   }, [printing, orderStore, customerStore, uiStore]);
 
   const { printerStatus } = useOnDemandPrinter();
 
   useEffect(() => {
-    if (printerStatus?.queuedJobs !== undefined) uiStore.setQueuedJobsCount(printerStatus.queuedJobs);
+    if (printerStatus?.queuedJobs !== undefined) setQueuedJobsCount(printerStatus.queuedJobs);
   }, [printerStatus, uiStore]);
 
   useEffect(() => {
@@ -355,7 +365,7 @@ export default function POSDesktop() {
       customer: (
         <POSZoneErrorBoundary zoneName="Customer" onReset={() => {}} showHomeButton>
           <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5 p-3">
-            {orderStore.orderType === "DINE-IN" ? <DineInTableSelector selectedTable={orderStore.selectedTableNumber} onTableSelect={handleTableSelect} tableOrders={persistedTableOrders as any} /> : <OrderCustomerCard orderType={orderStore.orderType} onTakeOrder={() => uiStore.setModal('showCustomerModal', true)} onCustomerSelected={handleCustomerIntelligenceSelected} onOrderAgain={handleLoadPastOrder} onViewOrders={() => setShowOrderHistoryModal(true)} onClear={() => { customerStore.clearCustomer(); clearCustomerData(); }} />}
+            {orderType === "DINE-IN" ? <DineInTableSelector selectedTable={selectedTableNumber} onTableSelect={handleTableSelect} tableOrders={persistedTableOrders as any} /> : <OrderCustomerCard orderType={orderType} onTakeOrder={() => setModal('showCustomerModal', true)} onCustomerSelected={handleCustomerIntelligenceSelected} onOrderAgain={handleLoadPastOrder} onViewOrders={() => setShowOrderHistoryModal(true)} onClear={() => { clearCustomer(); clearCustomerData(); }} />}
           </div>
         </POSZoneErrorBoundary>
       ),
@@ -368,14 +378,14 @@ export default function POSDesktop() {
               {selectedSectionId && <POSCategoryPills categories={childCats} selectedCategoryId={selectedCategoryId} onCategorySelect={handleCategorySelect} />}
             </div>
             <div className="flex-1 overflow-hidden">
-              <POSMenuSelector onAddToOrder={handleAddToOrder} onCustomizeItem={handleAddToOrder} onCategoryChange={handleCategorySelect} orderType={orderStore.orderType} selectedSectionId={selectedSectionId} childCategories={childCats} selectedCategoryId={selectedCategoryId} onCategorySelect={handleCategorySelect} variantCarouselEnabled={variantCarouselEnabled} />
+              <POSMenuSelector onAddToOrder={handleAddToOrder} onCustomizeItem={handleAddToOrder} onCategoryChange={handleCategorySelect} orderType={orderType} selectedSectionId={selectedSectionId} childCategories={childCats} selectedCategoryId={selectedCategoryId} onCategorySelect={handleCategorySelect} variantCarouselEnabled={variantCarouselEnabled} />
             </div>
           </div>
         </POSZoneErrorBoundary>
       ),
       summary: (
         <POSZoneErrorBoundary zoneName="Order" onReset={handleClearOrder} showHomeButton>
-          <OrderSummaryPanel orderItems={orderStore.orderType === 'DINE-IN' ? [] : orderStore.orderItems} orderType={orderStore.orderType as any} tableNumber={orderStore.selectedTableNumber || 0} guestCount={orderStore.guestCount} customerFirstName={customerStore.customerData.firstName} customerLastName={customerStore.customerData.lastName} customerPhone={customerStore.customerData.phone} customerAddress={customerStore.customerData.address} customerPostcode={customerStore.customerData.postcode} deliveryFee={deliveryFee} onRemoveItem={orderManagement.handleRemoveItem} onUpdateQuantity={(itemId: string, quantity: number) => orderManagement.handleUpdateQuantity(0, quantity) /* dummy index */} onClearOrder={handleClearOrder} onPaymentSuccess={handlePaymentSuccess} onSendToKitchen={handleSendToKitchen} onPrintBill={() => printing.handlePrintBill(orderTotal)} onSaveUpdate={() => {}} onTableSelect={(num: number) => orderStore.setSelectedTableNumber(num)} onTableSelectionClick={() => uiStore.setModal('showGuestCountModal', true)} onCustomizeItem={orderManagement.handleCustomizeItem} onCustomerDetailsClick={() => uiStore.setModal('showCustomerModal', true)} onShowPaymentModal={handleShowPaymentModal} />
+          <OrderSummaryPanel orderItems={orderType === 'DINE-IN' ? [] : orderItems} orderType={orderType as any} tableNumber={selectedTableNumber || 0} guestCount={guestCount} customerFirstName={customerData.firstName} customerLastName={customerData.lastName} customerPhone={customerData.phone} customerAddress={customerData.address} customerPostcode={customerData.postcode} deliveryFee={deliveryFee} onRemoveItem={orderManagement.handleRemoveItem} onUpdateQuantity={(itemId: string, quantity: number) => orderManagement.handleUpdateQuantity(0, quantity) /* dummy index */} onClearOrder={handleClearOrder} onPaymentSuccess={handlePaymentSuccess} onSendToKitchen={handleSendToKitchen} onPrintBill={() => printing.handlePrintBill(orderTotal)} onSaveUpdate={() => {}} onTableSelect={(num: number) => setSelectedTableNumber(num)} onTableSelectionClick={() => setModal('showGuestCountModal', true)} onCustomizeItem={orderManagement.handleCustomizeItem} onCustomerDetailsClick={() => setModal('showCustomerModal', true)} onShowPaymentModal={handleShowPaymentModal} />
         </POSZoneErrorBoundary>
       )
     }} />
@@ -388,17 +398,17 @@ export default function POSDesktop() {
     <CustomizeOrchestratorProvider>
       <div className="grid grid-rows-[auto_1fr_auto] h-screen bg-black overflow-hidden">
         <ManagementHeader title="POS" onAdminSuccess={handleManagementAuthSuccess} onLogout={handleLogout} />
-        <POSNavigation activeView={(uiStore.activeView as any)} currentOrderType={orderStore.orderType} onOrderTypeChange={handleOrderTypeChange} />
-        <div className="flex-1 overflow-hidden">{uiStore.activeView === 'pos' ? renderMainPOSView() : uiStore.activeView === 'online-orders' ? <OnlineOrderManagement onBack={() => uiStore.setActiveView('pos')} /> : <ReservationsPlaceholder onBack={() => uiStore.setActiveView('pos')} />}</div>
-        <POSFooter currentOrderType={orderStore.orderType} />
+        <POSNavigation activeView={(activeView as any)} currentOrderType={orderType} onOrderTypeChange={handleOrderTypeChange} />
+        <div className="flex-1 overflow-hidden">{activeView === 'pos' ? renderMainPOSView() : activeView === 'online-orders' ? <OnlineOrderManagement onBack={() => setActiveView('pos')} /> : <ReservationsPlaceholder onBack={() => setActiveView('pos')} />}</div>
+        <POSFooter currentOrderType={orderType} />
         
-        <DineInOrderModal isOpen={uiStore.showDineInModal} onClose={() => uiStore.setModal('showDineInModal', false)} tableId={selectedTableUuid} tableNumber={orderStore.selectedTableNumber as any} tableCapacity={4} restaurantTables={restaurantTables} eventDrivenOrder={orderStore.orderType === 'DINE-IN' ? (dineInOrder as any) : null} eventDrivenCustomerTabs={customerTabsData} eventDrivenActiveTabId={activeTabId} onEventDrivenSetActiveTabId={setActiveTabId} onEventDrivenAddItem={addItemToDineIn} onEventDrivenRemoveItem={removeItemFromDineIn} onEventDrivenUpdateItemQuantity={updateItemQuantity} onEventDrivenUpdateGuestCount={updateGuestCount} onEventDrivenSendToKitchen={sendDineInToKitchen} onEventDrivenCreateTab={createTab} onEventDrivenAddItemsToTab={addItemsToTab} onEventDrivenRenameTab={renameTab} onEventDrivenCloseTab={closeTab} onEventDrivenSplitTab={splitTab} onEventDrivenMergeTabs={mergeTabs} onEventDrivenMoveItemsBetweenTabs={moveItemsBetweenTabs} stagingItems={dineInStagingItems} onAddToStaging={addToStagingCart} onRemoveFromStaging={removeFromStagingCart} onClearStaging={clearStagingCart} onPersistStaging={persistStagingCart as any} enrichedItems={dineInEnrichedItems} enrichedLoading={dineInEnrichedLoading} enrichedError={dineInEnrichedError} />
-        {uiStore.showGuestCountModal && <POSGuestCountModal isOpen={true} onClose={() => uiStore.setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={orderStore.selectedTableNumber || 0} tableCapacity={4} initialGuestCount={1} restaurantTables={restaurantTables} tablesLoading={tablesLoading} />}
-        {uiStore.showCustomerModal && <CustomerDetailsModal isOpen={true} onClose={() => uiStore.setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderStore.orderType as any} initialData={customerStore.customerData as any} orderValue={orderTotal} onOrderTypeSwitch={() => {}} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />}
+        <DineInOrderModal isOpen={showDineInModal} onClose={() => setModal('showDineInModal', false)} tableId={selectedTableUuid} tableNumber={selectedTableNumber as any} tableCapacity={4} restaurantTables={restaurantTables} eventDrivenOrder={orderType === 'DINE-IN' ? (dineInOrder as any) : null} eventDrivenCustomerTabs={customerTabsData} eventDrivenActiveTabId={activeTabId} onEventDrivenSetActiveTabId={setActiveTabId} onEventDrivenAddItem={addItemToDineIn} onEventDrivenRemoveItem={removeItemFromDineIn} onEventDrivenUpdateItemQuantity={updateItemQuantity} onEventDrivenUpdateGuestCount={updateGuestCount} onEventDrivenSendToKitchen={sendDineInToKitchen} onEventDrivenCreateTab={createTab} onEventDrivenAddItemsToTab={addItemsToTab} onEventDrivenRenameTab={renameTab} onEventDrivenCloseTab={closeTab} onEventDrivenSplitTab={splitTab} onEventDrivenMergeTabs={mergeTabs} onEventDrivenMoveItemsBetweenTabs={moveItemsBetweenTabs} stagingItems={dineInStagingItems} onAddToStaging={addToStagingCart} onRemoveFromStaging={removeFromStagingCart} onClearStaging={clearStagingCart} onPersistStaging={persistStagingCart as any} enrichedItems={dineInEnrichedItems} enrichedLoading={dineInEnrichedLoading} enrichedError={dineInEnrichedError} />
+        {showGuestCountModal && <POSGuestCountModal isOpen={true} onClose={() => setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={selectedTableNumber || 0} tableCapacity={4} initialGuestCount={1} restaurantTables={restaurantTables} tablesLoading={tablesLoading} />}
+        {showCustomerModal && <CustomerDetailsModal isOpen={true} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={() => {}} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />}
         {showAdminPanel && <AdminSidePanel isOpen={true} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />}
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={null} orders={[]} onReorder={handleLoadPastOrder} />
-        <PaymentChoiceModal isOpen={showPaymentChoiceModal} onClose={() => setShowPaymentChoiceModal(false)} onSelectMode={handleSelectPaymentMode} orderTotal={orderTotal} orderType={orderStore.orderType as any} />
-        <PaymentFlowOrchestrator isOpen={uiStore.showPaymentFlow} onClose={() => uiStore.setModal('showPaymentFlow', false)} mode={paymentFlowMode} orderItems={orderStore.orderItems} orderTotal={orderTotal} orderType={orderStore.orderType as any} customerData={customerStore.customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
+        <PaymentChoiceModal isOpen={showPaymentChoiceModal} onClose={() => setShowPaymentChoiceModal(false)} onSelectMode={handleSelectPaymentMode} orderTotal={orderTotal} orderType={orderType as any} />
+        <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} mode={paymentFlowMode} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
       </div>
     </CustomizeOrchestratorProvider>
   );

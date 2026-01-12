@@ -11,7 +11,7 @@ let isClientInitializing = false;
 // Default configuration for immediate sync client (will be replaced when backend config loads)
 const DEFAULT_CONFIG = {
   url: 'https://mxrkttvgwwdhgnecqhfo.supabase.co',
-  anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cmt0dHZnd3dkaGduZWNxaGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4OTI0NjcsImV4cCI6MjA2MDQ2ODQ2N30.G-Hj0Tf5HpkhzfrZpbxsNcr4-XGA20w5-MRLmix9au4'
+  anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cmt0dHZnd3dkaGduZWNxaGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4OTI0NjcsImV4cCI6MjA2MDQ2ODQyN30.G-Hj0Tf5HpkhzfrZpbxsNcr4-XGA20w5-MRLmix9au4'
 };
 
 // Extract project ref from URL for logging
@@ -130,7 +130,7 @@ const fetchSupabaseConfig = async (): Promise<{url: string, anon_key: string}> =
     }
     
     // No cache available, use default configuration
-    console.log('✅ [Supabase] Using DEFAULT_CONFIG - project:', getProjectRef(DEFAULT_CONFIG.url));
+    console.log('✅ Using default Supabase configuration');
     configFetched = true;
     return DEFAULT_CONFIG;
   })();
