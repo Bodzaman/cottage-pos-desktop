@@ -52,8 +52,8 @@ jobs:
               "zod": "^3.23.8",
               "@tanstack/react-query": "5.79.0",
               "@supabase/supabase-js": "2.47.3",
-              "@stripe/stripe-js": "5.0.0",
-              "@stripe/react-stripe-js": "2.9.0",
+              "@stripe/stripe-js": "^4.10.0",
+              "@stripe/react-stripe-js": "^2.9.0",
               "@google/genai": "1.11.0",
               "@react-google-maps/api": "2.20.3",
               "@dnd-kit/core": "6.1.0",
@@ -112,11 +112,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Install electron dependencies
         working-directory: electron
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       # Create production .env file from GitHub secrets
       - name: Create production environment file
