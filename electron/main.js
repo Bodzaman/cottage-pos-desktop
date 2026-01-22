@@ -643,9 +643,9 @@ class CottageTandooriPOS {
             this.mainWindow.webContents.openDevTools();
         } else {
             // Production: Load local bundled frontend
-            const indexPath = path.join(__dirname, 'dist', 'renderer', 'index.html');
+            const indexPath = path.join(__dirname, 'dist', 'index.html');
             log.info(`Loading POS from: ${indexPath} (production mode)`);
-            this.mainWindow.loadURL(`file://${indexPath}`);
+            this.mainWindow.loadFile(indexPath);
         }
 
         this.mainWindow.once('ready-to-show', () => {
