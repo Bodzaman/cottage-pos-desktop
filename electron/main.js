@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog, nativeTheme } = require('electron');
 // Note: electron-updater is lazily loaded after app.whenReady() to avoid initialization errors
 let autoUpdater = null;
 const log = require('electron-log');
@@ -609,6 +609,8 @@ class CottageTandooriPOS {
     }
 
     createMainWindow() {
+        nativeTheme.themeSource = 'dark';
+
         const windowConfig = {
             width: 1200,
             height: 800,
@@ -623,7 +625,7 @@ class CottageTandooriPOS {
             title: 'Cottage Tandoori POS',
             show: false,
             icon: path.join(__dirname, 'assets', 'icon.png'),
-            autoHideMenuBar: false,
+            autoHideMenuBar: true,
             titleBarStyle: 'default'
         };
 
@@ -649,6 +651,7 @@ class CottageTandooriPOS {
         }
 
         this.mainWindow.once('ready-to-show', () => {
+            this.mainWindow.maximize();
             this.mainWindow.show();
             this.mainWindow.focus();
             log.info('POS window loaded successfully');
