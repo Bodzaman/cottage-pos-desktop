@@ -114,9 +114,13 @@ jobs:
         working-directory: frontend
         run: npm install --legacy-peer-deps
 
+      # Remove stale lock file to ensure Windows platform binaries are installed
       - name: Install electron dependencies
         working-directory: electron
-        run: npm install
+        shell: bash
+        run: |
+          rm -f package-lock.json
+          npm install
 
       # Create production .env file from GitHub secrets
       - name: Create production environment file
