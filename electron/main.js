@@ -917,13 +917,36 @@ Copyright © 2024 Cottage Tandoori Restaurant`
     async initializePrinter() {
         try {
             const printers = await this.discoverPrinters();
-            
-            const epsonPrinter = printers.find(p => 
-                p.name.toLowerCase().includes('epson') && 
+
+            // Priority 1: Look for Epson thermal printer by name
+            const epsonPrinter = printers.find(p =>
+                p.name.toLowerCase().includes('epson') &&
                 (p.name.toLowerCase().includes('tm-t20') || p.name.toLowerCase().includes('tm-t88'))
             );
-            
-            this.defaultPrinter = epsonPrinter ? epsonPrinter.name : printers[0]?.name;
+
+            if (epsonPrinter) {
+                this.defaultPrinter = epsonPrinter.name;
+            } else if (process.platform === 'win32') {
+                // Priority 2: Use Windows system default printer
+                try {
+                    const { stdout } = await execAsync(
+                        'powershell -NoProfile -Command "(Get-CimInstance Win32_Printer -Filter \\"Default=TRUE\\").Name"'
+                    );
+                    const defaultName = stdout.trim();
+                    if (defaultName) {
+                        this.defaultPrinter = defaultName;
+                    } else {
+                        this.defaultPrinter = printers[0]?.name;
+                    }
+                } catch (e) {
+                    this.defaultPrinter = printers[0]?.name;
+                }
+            } else {
+                // macOS: discoverPrinters already marks isDefault
+                const defaultPrinter = printers.find(p => p.isDefault);
+                this.defaultPrinter = defaultPrinter?.name || printers[0]?.name;
+            }
+
             log.info('Default printer set to:', this.defaultPrinter);
         } catch (error) {
             log.error('Printer initialization error:', error);
