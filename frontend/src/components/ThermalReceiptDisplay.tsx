@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient } from 'app';
 import ThermalPreview from './ThermalPreview';
 import { ReceiptDesignerService } from 'utils/receiptDesignerService';
 import { Template, FormData } from 'utils/receiptDesignerTypes';
-import { OrderItem } from '../utils/menuTypes';
+// Direct Supabase queries - replaces brain API calls
+import { getTemplateAssignment } from 'utils/supabaseQueries';
 import { useSimpleAuth } from 'utils/simple-auth-context';
 import { usePOSAuth } from 'utils/usePOSAuth';
 
@@ -19,6 +19,9 @@ interface OrderItem {
   basePrice?: number;
   price?: number;
   quantity: number;
+  // Section divider support - these fields enable ThermalPreview to group items by section
+  category_id?: string;
+  menu_item_id?: string;
   variant?: {
     id: string;
     name: string;
@@ -59,17 +62,22 @@ interface OrderData {
 interface ThermalReceiptDisplayProps {
   // Option 1: Load by template ID
   templateId?: string;
-  
+
   // Option 2: Load by order mode (auto-fetch assigned template)
   orderMode?: 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY' | 'ONLINE_ORDERS';
-  
+
   // Real order data to inject
   orderData: OrderData;
-  
+
   // Display options
   paperWidth?: 58 | 80;
   showZoomControls?: boolean;
   className?: string;
+
+  // Receipt format: determines which assigned template to use
+  // 'kitchen' or 'kitchen_customer' -> uses kitchen_template_id
+  // 'front_of_house' or undefined -> uses customer_template_id
+  receiptFormat?: 'front_of_house' | 'kitchen' | 'kitchen_customer';
 }
 
 // ==================== Helper Functions ====================
@@ -100,7 +108,10 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     total: item.total || ((item.basePrice || item.price || 0) * item.quantity), // Ensure total is set
     variant: item.variant,
     customizations: item.customizations || [],
-    instructions: item.instructions
+    instructions: item.instructions,
+    // Section divider support - pass through for ThermalPreview grouping
+    category_id: item.category_id,
+    menu_item_id: item.menu_item_id
   }));
   
   // Build complete FormData with merged data
@@ -165,7 +176,12 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     serviceCharge: orderData.serviceCharge || 0,
     deliveryFee: orderData.deliveryFee || 0,
     discount: orderData.discount || 0,
-    
+
+    // Kitchen Copy Options from template
+    showKitchenTotals: baseFormData.showKitchenTotals,
+    showContainerQtyField: baseFormData.showContainerQtyField,
+    showCheckedField: baseFormData.showCheckedField,
+
     // Receipt format - always FOH
     receiptFormat: 'front_of_house',
     
@@ -215,7 +231,7 @@ function orderModeToStorageKey(orderMode: string): string {
  *   paperWidth={80}
  * />
  */
-export default function ThermalReceiptDisplay({
+const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayProps>(({
   templateId,
   orderMode,
   orderData,
@@ -223,7 +239,7 @@ export default function ThermalReceiptDisplay({
   showZoomControls = false,
   className = '',
   receiptFormat = 'front_of_house'
-}: ThermalReceiptDisplayProps) {
+}, ref) => {
   const { user } = useSimpleAuth();
   const { userId } = usePOSAuth();
   const [template, setTemplate] = useState<Template | null>(null);
@@ -234,7 +250,7 @@ export default function ThermalReceiptDisplay({
   // Load template on mount or when props change
   useEffect(() => {
     loadTemplate();
-  }, [templateId, orderMode]);
+  }, [templateId, orderMode, receiptFormat]);
   
   // Re-map order data when template or orderData changes
   useEffect(() => {
@@ -257,41 +273,45 @@ export default function ThermalReceiptDisplay({
       
       // Option 1: Load by template ID
       if (templateId) {
-        console.log('📡 Loading template by ID:', templateId);
         const response = await ReceiptDesignerService.fetchTemplate(templateId);
         
         if (response.success && response.data) {
           loadedTemplate = response.data;
-          console.log('✅ Template loaded:', loadedTemplate.metadata.name);
         } else {
           throw new Error(response.error || 'Template not found');
         }
       }
       // Option 2: Load by order mode (fetch assigned template)
       else if (orderMode) {
-        console.log('📡 Loading template for order mode:', orderMode);
-        
-        // Get template assignment for this order mode
+
+        // Get template assignment for this order mode (direct Supabase query)
         const storageKey = orderModeToStorageKey(orderMode);
-        const assignmentResponse = await apiClient.get_template_assignment({ orderMode: storageKey });
-        const assignmentData = await assignmentResponse.json();
-        
-        if (assignmentData.customer_template_id) {
-          console.log('✅ Found assigned template:', assignmentData.customer_template_id);
-          
+        const assignmentData = await getTemplateAssignment(storageKey);
+
+        // Handle case where no assignment exists
+        if (!assignmentData) {
+          throw new Error(`No template assignment found for ${storageKey}`);
+        }
+
+        // Determine which template ID to use based on receiptFormat
+        // Kitchen receipts use kitchen_template_id, customer receipts use customer_template_id
+        const isKitchenReceipt = receiptFormat === 'kitchen' || receiptFormat === 'kitchen_customer';
+        const templateIdToUse = isKitchenReceipt
+          ? assignmentData.kitchen_template_id
+          : assignmentData.customer_template_id;
+
+        if (templateIdToUse) {
+
           // Load the assigned template (no userId needed)
-          const templateResponse = await ReceiptDesignerService.fetchTemplate(
-            assignmentData.customer_template_id
-          );
-          
+          const templateResponse = await ReceiptDesignerService.fetchTemplate(templateIdToUse);
+
           if (templateResponse.success && templateResponse.data) {
             loadedTemplate = templateResponse.data;
-            console.log('✅ Template loaded:', loadedTemplate.metadata.name);
           } else {
             throw new Error('Assigned template not found');
           }
         } else {
-          throw new Error('No template assigned for this order mode');
+          throw new Error(`No ${isKitchenReceipt ? 'kitchen' : 'customer'} template assigned for this order mode`);
         }
       } else {
         throw new Error('Either templateId or orderMode must be provided');
@@ -301,7 +321,6 @@ export default function ThermalReceiptDisplay({
       setIsLoading(false);
       
     } catch (err) {
-      console.error('❌ Error loading template:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load template';
       setError(errorMessage);
       setIsLoading(false);
@@ -350,14 +369,23 @@ export default function ThermalReceiptDisplay({
   }
   
   // Success state - render receipt
+  // Map receiptFormat prop to ThermalPreview format
+  const previewFormat = receiptFormat === 'kitchen' || receiptFormat === 'kitchen_customer'
+    ? 'kitchen_customer'
+    : 'front_of_house';
+
   return (
-    <div className={className}>
+    <div ref={ref} className={className}>
       <ThermalPreview
         formData={formData}
         paperWidth={paperWidth}
         mode="form"
-        receiptFormat="front_of_house"
+        receiptFormat={previewFormat}
       />
     </div>
   );
-}
+});
+
+ThermalReceiptDisplay.displayName = 'ThermalReceiptDisplay';
+
+export default ThermalReceiptDisplay;

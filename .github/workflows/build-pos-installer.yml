@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (will be read from package.json)'
+        description: 'Version number (will be read from electron/package.json)'
         required: false
 
 # REQUIRED: Grant write permission for uploading release assets
@@ -16,54 +16,75 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
-      - name: Install dependencies
+
+      # Install frontend dependencies first (electron references these)
+      - name: Install frontend dependencies
+        working-directory: frontend
         run: npm install
-      
+
+      # Install electron dependencies
+      - name: Install electron dependencies
+        working-directory: electron
+        run: npm install
+
+      # Create production .env file from GitHub secrets
+      - name: Create production environment file
+        working-directory: electron
+        run: |
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env.production
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.production
+          echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.production
+          echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.production
+        shell: bash
+
+      # Build React frontend with Vite (production mode)
       - name: Build React frontend with Vite
-        run: npm run build:renderer
-      
+        working-directory: electron
+        run: npm run build:renderer -- --mode production
+
       - name: Verify frontend build
+        working-directory: electron
         run: |
           echo "Checking dist directory:"
           dir dist
-          echo "Checking renderer directory:"
-          dir dist\renderer
-          if not exist "dist\renderer\index.html" (
+          if not exist "dist\index.html" (
             echo "ERROR: Frontend build failed - index.html not found!"
             exit /b 1
           )
           echo "Build verification successful"
         shell: cmd
-      
+
       - name: Build Electron app with electron-builder
+        working-directory: electron
         run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: List output files
+        working-directory: electron
         run: |
           echo "Contents of release directory:"
           dir release
         shell: cmd
-      
+
       - name: Read version from package.json
         id: package-version
+        working-directory: electron
         shell: pwsh
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           echo "Detected version: $version"
-      
+
       - name: Upload installer to release
         if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
@@ -71,14 +92,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
+          asset_path: ./electron/release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
           asset_name: Cottage-Tandoori-POS-Setup-${{ steps.package-version.outputs.VERSION }}.exe
           asset_content_type: application/octet-stream
-      
+
+      # Also upload latest.yml for auto-updater
+      - name: Upload latest.yml to release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./electron/release/latest.yml
+          asset_name: latest.yml
+          asset_content_type: text/yaml
+
       - name: Upload installer as artifact (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: pos-installer
-          path: ./release/*.exe
+          path: ./electron/release/*.exe
           retention-days: 30

@@ -1,24 +1,20 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { List, LayoutGrid, Grid3x3, SearchX } from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { List, Grid3x3, SearchX } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { POSMenuSearch } from './POSMenuSearch';
 import { PremiumMenuCard } from './PremiumMenuCard';
 import { POSMenuItemCard } from './POSMenuItemCard';
-import { POSSectionPills } from './POSSectionPills';
-import { POSCategoryPills } from './POSCategoryPills';
 import { POSMenuCardSkeleton } from './POSMenuCardSkeleton';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { groupItemsByHierarchy, getSectionDisplayName, getDisplayMode, groupItemsBySection } from 'utils/menuHelpers';
-import { Skeleton } from '@/components/ui/skeleton';
 import { QSAITheme } from '../utils/QSAIDesign';
-import type { MenuItem, OrderItem } from 'utils/menuTypes';
+import type { MenuItem, ItemVariant, OrderItem as MenuOrderItem } from 'utils/menuTypes';
+import type { OrderItem } from 'types';
 import { shallow } from 'zustand/shallow';
 
 interface Props {
   onAddToOrder: (orderItem: OrderItem) => void;
-  onCustomizeItem?: (orderItem: OrderItem) => void;
+  onCustomizeItem?: (item: MenuItem, variant?: ItemVariant) => void;
   onCategoryChange: (categoryId: string | null) => void;
   className?: string;
   showSkeletons?: boolean;
@@ -229,6 +225,13 @@ export function POSMenuSelector({
     background: 'linear-gradient(90deg, rgba(124, 93, 250, 0.8) 0%, rgba(124, 93, 250, 0) 100%)'
   };
 
+  // ✅ ABOVE-FOLD OPTIMIZATION: First 8 items get eager image loading
+  // This set allows O(1) lookup to check if an item should be prioritized
+  const aboveFoldItemIds = useMemo(() => {
+    const ABOVE_FOLD_COUNT = 8;
+    return new Set(filteredMenuItems.slice(0, ABOVE_FOLD_COUNT).map(item => item.id));
+  }, [filteredMenuItems]);
+
   // ✅ NEW: Render hierarchical structure based on display mode
   const renderMenuContent = () => {
     if (shouldShowSkeletons) {
@@ -309,9 +312,9 @@ export function POSMenuSelector({
                           key={menuItem.id}
                           item={menuItem}
                           onAddToOrder={onAddToOrder}
-                          onCustomizeItem={onCustomizeItem}
                           orderType={orderType}
                           variantCarouselEnabled={variantCarouselEnabled}
+                          isAboveFold={aboveFoldItemIds.has(menuItem.id)}
                         />
                       ) : (
                         <PremiumMenuCard
@@ -385,9 +388,9 @@ export function POSMenuSelector({
                       key={menuItem.id}
                       item={menuItem}
                       onAddToOrder={onAddToOrder}
-                      onCustomizeItem={onCustomizeItem}
                       orderType={orderType}
                       variantCarouselEnabled={variantCarouselEnabled}
+                      isAboveFold={aboveFoldItemIds.has(menuItem.id)}
                     />
                   ) : (
                     <PremiumMenuCard
@@ -434,19 +437,19 @@ export function POSMenuSelector({
           </div>
           
           {/* Items Grid */}
-          <div className={viewMode === 'card' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+          <div className={viewMode === 'card'
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
             : "space-y-2"
           }>
-            {filteredMenuItems.map((menuItem) => (
+            {filteredMenuItems.map((menuItem, index) => (
               viewMode === 'card' ? (
                 <POSMenuItemCard
                   key={menuItem.id}
                   item={menuItem}
                   onAddToOrder={onAddToOrder}
-                  onCustomizeItem={onCustomizeItem}
                   orderType={orderType}
                   variantCarouselEnabled={variantCarouselEnabled}
+                  isAboveFold={index < 8}
                 />
               ) : (
                 <PremiumMenuCard
@@ -471,19 +474,19 @@ export function POSMenuSelector({
 
     // Fallback: flat list (should not reach here)
     return (
-      <div className={viewMode === 'card' 
-        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-1" 
+      <div className={viewMode === 'card'
+        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-1"
         : "space-y-2 p-1"
       }>
-        {filteredMenuItems.map((menuItem) => (
+        {filteredMenuItems.map((menuItem, index) => (
           viewMode === 'card' ? (
             <POSMenuItemCard
               key={menuItem.id}
               item={menuItem}
               onAddToOrder={onAddToOrder}
-              onCustomizeItem={onCustomizeItem}
               orderType={orderType}
               variantCarouselEnabled={variantCarouselEnabled}
+              isAboveFold={index < 8}
             />
           ) : (
             <PremiumMenuCard

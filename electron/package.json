@@ -1,0 +1,72 @@
+{
+  "name": "cottage-tandoori-pos-electron",
+  "version": "1.0.0",
+  "description": "Cottage Tandoori POS Desktop - Electron wrapper for USB thermal printing",
+  "main": "main.js",
+  "author": "Cottage Tandoori",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --mode development",
+    "dev:electron": "cross-env NODE_ENV=development electron .",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json || true",
+    "build:preload": "tsc -p tsconfig.preload.json || true",
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "electron-log": "5.0.1",
+    "electron-updater": "6.1.7",
+    "sharp": "^0.34.5",
+    "stripe": "^20.1.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.2.0",
+    "autoprefixer": "^10.4.23",
+    "cross-env": "^10.1.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^25.0.0",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.3.3",
+    "vite": "5.0.0"
+  },
+  "build": {
+    "appId": "com.cottagetandoori.pos",
+    "productName": "Cottage Tandoori POS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "settings-preload.js",
+      "settings.html"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cottage Tandoori POS"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Bodzaman",
+      "repo": "cottage-pos-desktop"
+    }
+  }
+}

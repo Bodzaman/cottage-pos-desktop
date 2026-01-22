@@ -2,7 +2,6 @@ import React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { apiClient } from 'app';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,26 +25,25 @@ import {
   Save,
   Utensils,
   Settings,
-  Cog
+  Cog,
+  Package,
+  Truck
 } from 'lucide-react';
-import { OrderItem, ModifierSelection, CustomizationSelection } from '../utils/menuTypes';
+import { OrderItem, ModifierSelection, CustomizationSelection, MenuItem, PaymentResult, ItemVariant } from '../utils/menuTypes';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
-import POSTipSelector, { TipSelection } from './POSTipSelector';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
 import { usePOSSettingsWithAutoFetch } from '../utils/posSettingsStore';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
+import brain from 'brain';
 import { createLogger } from 'utils/logger';
 import { colors as designColors } from '@/utils/designSystem';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
-import { StaffCustomizationModal } from './StaffCustomizationModal';
-import { SelectedCustomization } from '../utils/menuTypes';
-import { usePOSOrderStore } from '../utils/posOrderStore';
-import { MenuItem, ItemVariant } from '../utils/menuTypes';
-import { StaffVariantSelector } from './StaffVariantSelector';
-import { POSVariantSelector } from './POSVariantSelector';
+import { StaffCustomizationModal, SelectedCustomization } from './StaffCustomizationModal';
+import { CustomerData } from '../utils/customerTypes';
+import { TipSelection } from '../types/orders';
 
 interface Props {
   orderItems: OrderItem[];
@@ -150,9 +148,6 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   // ✅ Get menu items from store for customization modal
   const { menuItems, itemVariants } = useRealtimeMenuStore();
   
-  // ✅ Get posOrderStore for direct state updates (Takeaway modes)
-  const updateItemWithCustomizations = usePOSOrderStore(state => state.updateItemWithCustomizations);
-  
   // ✅ NEW: State for StaffCustomizationModal
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [customizingOrderItem, setCustomizingOrderItem] = useState<OrderItem | null>(null);
@@ -174,59 +169,36 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   
   // Get customer data from store
   const { customerData: storeCustomerData } = useCustomerDataStore();
-
-  // ✅ SIMPLIFIED: Handler to open StaffCustomizationModal directly (no variant selector)
+  
+  // ✅ NEW: Handler to open StaffCustomizationModal for editing order items
   const handleOpenCustomization = (index: number, item: OrderItem) => {
-    console.log('🔧 [OrderSummaryPanel] handleOpenCustomization called:', {
-      index,
-      item,
-      menuItemId: item.menu_item_id,
-      variantId: item.variant_id
-    });
-    
     setCustomizingOrderItem(item);
     setCustomizingItemIndex(index);
-    setIsCustomizationModalOpen(true); // ✅ Direct open, like DineInOrderSummary
+    setIsCustomizationModalOpen(true);
   };
   
-  // ✅ SIMPLIFIED: Handler to save customized item from StaffCustomizationModal
-  const handleCustomizationConfirm = (menuItem: MenuItem, quantity: number, variant?: any, customizations?: SelectedCustomization[], notes?: string) => {
+  // ✅ NEW: Handler to save customized item from StaffCustomizationModal
+  const handleCustomizationConfirm = (menuItem: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string) => {
     if (customizingItemIndex === -1 || !customizingOrderItem) return;
-    
-    console.log('💾 [OrderSummaryPanel] handleCustomizationConfirm called:', {
-      itemId: customizingOrderItem.id,
-      quantity,
-      customizations,
-      notes
-    });
-    
-    // Build updates object
-    const updates: {
-      quantity?: number;
-      customizations?: any[];
-      notes?: string;
-    } = {};
-    
-    if (quantity !== customizingOrderItem.quantity) {
-      updates.quantity = quantity;
-    }
-    
-    if (customizations) {
-      updates.customizations = customizations.map(c => ({
+
+    // Build updated OrderItem
+    const updatedItem: OrderItem = {
+      ...customizingOrderItem,
+      quantity: quantity,
+      notes: notes || '',
+      customizations: customizations?.map(c => ({
         id: c.id,
         customization_id: c.id,
         name: c.name,
-        price_adjustment: c.price,
+        price_adjustment: c.price_adjustment,
         group: c.group
-      }));
-    }
+      })) || customizingOrderItem.customizations || []
+    };
     
-    if (notes !== undefined) {
-      updates.notes = notes;
+    // Call parent callback if it exists
+    if (onCustomizeItem) {
+      onCustomizeItem(customizingItemIndex, updatedItem);
     }
-    
-    // Call posOrderStore update method (direct state update for Takeaway)
-    updateItemWithCustomizations(customizingOrderItem.id, updates);
     
     // Close modal
     setIsCustomizationModalOpen(false);
@@ -423,12 +395,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
       
       // Close modal
       setShowFinalBillModal(false);
-      
-      // Complete the order (this should close the table)
-      if (onCompleteOrder) {
-        onCompleteOrder();
-      }
-      
+
       console.log(`✅ Final bill printed - Table ${tableNumber} closed`);
       
     } catch (error) {
@@ -482,33 +449,21 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // Handle payment success
   const handlePaymentSuccess = async (
-    tipSelection: TipSelection,
-    paymentResult?: PaymentResult
+    paymentResult: PaymentResult
   ) => {
     try {
-      // setPaymentProcessing(true);
-      setCurrentTipSelection(tipSelection || null);
-      
       console.log('💳 [OrderSummaryPanel] Payment success - calling parent callback');
-      
+
       // Send to kitchen if not already sent
       if (onSendToKitchen) {
         onSendToKitchen();
       }
-      
-      // ✅ Call parent payment success handler to clear cart and complete order
-      if (onPaymentSuccess) {
-        console.log('✅ [OrderSummaryPanel] Invoking parent onPaymentSuccess callback');
-        await onPaymentSuccess(tipSelection, paymentResult);
-      }
-      
+
       // Local state updates
       setIsPaymentComplete(true);
-      // setPaymentProcessing(false);
-      
+
     } catch (error) {
       console.error('❌ [OrderSummaryPanel] Payment success handler failed:', error);
-      // setPaymentProcessing(false);
       toast.error('Failed to complete payment');
     }
   };
@@ -585,15 +540,14 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // Payment handlers - following old POSOrderSummary pattern
   const handleCashPayment = async () => {
-    const paymentResult: TipSelection = {
-      type: 'cash',
-      amount: 0,
+    const paymentResult: PaymentResult = {
       method: 'CASH',
+      amount: total,
       reference: `CASH-${Date.now()}`,
       tipAmount: currentTipSelection?.amount || 0,
       totalWithTip: total + (currentTipSelection?.amount || 0)
     };
-    
+
     console.log('💵 [OrderSummaryPanel] Cash payment - calling handlePaymentSuccess');
     handlePaymentSuccess(paymentResult);
   };
@@ -605,16 +559,11 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
     }
   };
 
-  const handleStripeSuccess = async (paymentResult: TipSelection) => {
+  const handleStripeSuccess = async (paymentResult: PaymentResult) => {
     console.log('💳 [OrderSummaryPanel] Stripe payment success:', paymentResult);
-    
-    // If parent provides a hide callback, invoke it
-    if (onHidePaymentModal) {
-      onHidePaymentModal();
-    }
-    
+
     setIsPaymentComplete(true);
-    
+
     console.log('💳 [OrderSummaryPanel] Stripe - calling handlePaymentSuccess');
     handlePaymentSuccess(paymentResult);
   };
@@ -753,17 +702,17 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   </h4>
                   
                   {/* Variant and protein info */}
-                  {(item.variant || item.protein_type) && (
+                  {(item.variantName || item.protein_type) && (
                     <div className="flex items-center space-x-2 mb-2">
-                      {item.variant && (
-                        <span 
-                          className="text-xs px-2 py-1 rounded" 
-                          style={{ 
+                      {item.variantName && (
+                        <span
+                          className="text-xs px-2 py-1 rounded"
+                          style={{
                             backgroundColor: QSAITheme.purple.primaryTransparent,
                             color: QSAITheme.text.secondary
                           }}
                         >
-                          {item.variant}
+                          {item.variantName}
                         </span>
                       )}
                       {item.protein_type && (
@@ -785,11 +734,10 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                     <div className="space-y-1 mb-2">
                       {item.modifiers.map((modifier, modIndex) => (
                         <div key={modIndex} className="text-xs" style={{ color: QSAITheme.text.muted }}>
-                          <span className="font-medium">{modifier.name}:</span>
-                          <span className="ml-1">{modifier.options.map(opt => opt.name).join(', ')}</span>
-                          {modifier.options.some(opt => opt.price > 0) && (
+                          <span className="font-medium">{modifier.name}</span>
+                          {modifier.price_adjustment > 0 && (
                             <span className="ml-1" style={{ color: QSAITheme.purple.light }}>
-                              (+£{modifier.options.reduce((sum, opt) => sum + opt.price, 0).toFixed(2)})
+                              (+£{modifier.price_adjustment.toFixed(2)})
                             </span>
                           )}
                         </div>
@@ -813,27 +761,6 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                     </div>
                   )}
                   
-                  {/* Add-ons display */}
-                  {(item.add_ons && item.add_ons.length > 0) && (
-                    <div className="mb-2">
-                      <div className="text-xs font-medium mb-1" style={{ color: QSAITheme.text.secondary }}>Add-ons:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {item.add_ons.map((addon, addonIndex) => (
-                          <span 
-                            key={addonIndex}
-                            className="text-xs px-2 py-1 rounded" 
-                            style={{ 
-                              backgroundColor: QSAITheme.background.secondary,
-                              color: QSAITheme.text.muted
-                            }}
-                          >
-                            {addon.name} {addon.price > 0 && `(+£${addon.price.toFixed(2)})`}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
                   {/* Notes and special instructions */}
                   {item.notes && (
                     <div 
@@ -853,7 +780,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onRemoveItem(item.id)}
+                  onClick={() => onRemoveItem?.(item.id)}
                   className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10 flex-shrink-0"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -867,7 +794,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                    onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
@@ -876,15 +803,15 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
-                  
+
                   <span className="text-sm font-medium w-8 text-center" style={{ color: QSAITheme.text.primary }}>
                     {item.quantity}
                   </span>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                    onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-6 w-6 p-0"
                     style={{
                       borderColor: QSAITheme.border.medium,
@@ -1068,14 +995,19 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
         customerLastName={customerLastName || customerData?.lastName || ''}
         customerPhone={customerPhone || customerData?.phone || ''}
         customerAddress={customerAddress || customerData?.address || ''}
+        subtotal={subtotal}
+        serviceCharge={serviceCharge}
+        deliveryFee={deliveryFee}
+        total={total}
         onConfirm={handleOrderConfirmation}
+        actionLabel="Confirm Order"
       />
 
       {/* Table Selection Modal (DINE-IN) */}
-      <TableSelectionModal 
+      <TableSelectionModal
         isOpen={!!showTableSelection}
         onClose={onCloseTableSelection || (() => {})}
-        onSelectTable={handleTableSelect}
+        onTableSelect={handleTableSelect}
       />
 
       {/* Bill Review Dialog (DINE-IN) - Final Bill Confirmation */}
@@ -1208,39 +1140,6 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* ✅ StaffCustomizationModal - Direct opening for editing order items */}
-      {isCustomizationModalOpen && customizingOrderItem && (() => {
-        const fullMenuItem = menuItems.find(mi => mi.id === customizingOrderItem.menu_item_id);
-        const selectedVariant = customizingOrderItem.variant_id 
-          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id)
-          : null;
-        
-        return fullMenuItem ? (
-          <StaffCustomizationModal
-            item={fullMenuItem}
-            variant={selectedVariant}
-            isOpen={isCustomizationModalOpen}
-            onClose={() => {
-              setIsCustomizationModalOpen(false);
-              setCustomizingOrderItem(null);
-              setCustomizingItemIndex(-1);
-            }}
-            onConfirm={handleCustomizationConfirm}
-            orderType={orderType}
-            initialQuantity={customizingOrderItem.quantity}
-            existingCustomizations={customizingOrderItem.customizations?.map(c => ({
-              id: c.id || c.customization_id,
-              name: c.name,
-              price: c.price_adjustment,
-              group: c.group
-            })) || []}
-            existingNotes={customizingOrderItem.notes || ''}
-          />
-        ) : null;
-      })()}
-      
-      {/* ✅ KEEP: Existing modals (Order Confirmation, Table Selection, etc.) */}
     </div>
   );
 });

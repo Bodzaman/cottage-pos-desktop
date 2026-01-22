@@ -1,38 +1,48 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
+frontend/node_modules/
+electron/node_modules/
 
-# dependencies
-node_modules
-.pnp
-.pnp.js
+# Build outputs
+electron/dist/
+electron/release/
+frontend/dist/
+dist/
+build/
+out/
+release/
 
-# testing
-coverage
-
-# production
-build
-dist
-
-# misc
-.DS_Store
+# Environment files (contain secrets - injected at build time via GitHub secrets)
+.env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.development
+.env.production
+.env.*.local
+electron/.env
+electron/.env.*
+frontend/.env
+frontend/.env.*
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Electron
-out
-release
+# TypeScript
+*.tsbuildinfo
 
-# Installer outputs
-installer/*.exe
-installer/*.log
-
-# Portable Node.js (downloaded during build)
-printer-service/node.exe
-
-# Printer service dependencies (installed during build)
-printer-service/node_modules
+# Test
+coverage/
+.pnp
+.pnp.js
