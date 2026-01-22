@@ -1806,6 +1806,102 @@ Copyright © 2024 Cottage Tandoori Restaurant`
     }
 
     /**
+     * Send raw binary data to a Windows printer via the Print Spooler API.
+     * Uses P/Invoke to call winspool.drv (OpenPrinter, WritePrinter, etc.)
+     * This is the Windows equivalent of macOS `lp -d "printer" -o raw "file"`
+     *
+     * Works with ANY printer type: USB, network, parallel, virtual.
+     * Does not need to know the port name - uses printer name directly.
+     */
+    async sendRawToWindowsPrinter(printerName, filePath) {
+        const safePrinterName = printerName.replace(/'/g, "''");
+        const safeFilePath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "''");
+
+        const psScript = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class RawPrinterHelper
+{
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DOCINFO
+    {
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDatatype;
+    }
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFO pDocInfo);
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+    public static void SendFileToPrinter(string printerName, string filePath)
+    {
+        IntPtr hPrinter = IntPtr.Zero;
+        if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero))
+            throw new Exception("OpenPrinter failed for: " + printerName + " (Error: " + Marshal.GetLastWin32Error() + ")");
+        try
+        {
+            DOCINFO docInfo = new DOCINFO();
+            docInfo.pDocName = "RAW ESC/POS Document";
+            docInfo.pOutputFile = null;
+            docInfo.pDatatype = "RAW";
+            if (!StartDocPrinter(hPrinter, 1, ref docInfo))
+                throw new Exception("StartDocPrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
+            try
+            {
+                if (!StartPagePrinter(hPrinter))
+                    throw new Exception("StartPagePrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
+                byte[] fileData = File.ReadAllBytes(filePath);
+                IntPtr unmanagedBytes = Marshal.AllocHGlobal(fileData.Length);
+                try
+                {
+                    Marshal.Copy(fileData, 0, unmanagedBytes, fileData.Length);
+                    int bytesWritten = 0;
+                    if (!WritePrinter(hPrinter, unmanagedBytes, fileData.Length, out bytesWritten))
+                        throw new Exception("WritePrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
+                }
+                finally { Marshal.FreeHGlobal(unmanagedBytes); }
+                EndPagePrinter(hPrinter);
+            }
+            finally { EndDocPrinter(hPrinter); }
+        }
+        finally { ClosePrinter(hPrinter); }
+    }
+}
+'@ -ReferencedAssemblies System.IO
+[RawPrinterHelper]::SendFileToPrinter('${safePrinterName}', '${safeFilePath}')
+Write-Output 'SUCCESS'
+`;
+
+        log.info(`[Windows Print] Sending raw data to printer: ${printerName}, file: ${filePath}`);
+
+        const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
+        const { stdout, stderr } = await execAsync(
+            `powershell -NoProfile -NonInteractive -EncodedCommand ${encodedScript}`,
+            { timeout: 30000 }
+        );
+
+        const output = stdout.trim();
+        if (output !== 'SUCCESS') {
+            throw new Error(`Windows raw print failed: ${output || stderr || 'unknown error'}`);
+        }
+
+        log.info(`[Windows Print] Raw data sent successfully to ${printerName}`);
+    }
+
+    /**
      * Print receipt using ESC/POS commands (raw thermal printing)
      * This is the hybrid approach - ESC/POS for text, reliable and fast
      *
@@ -1847,19 +1943,8 @@ Copyright © 2024 Cottage Tandoori Restaurant`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Get printer port and copy raw data
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
-                `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    throw new Error('Could not determine printer port');
-                }
+                // Windows: Send raw ESC/POS via Print Spooler API
+                await this.sendRawToWindowsPrinter(printer, tempFile);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
@@ -1908,22 +1993,8 @@ Copyright © 2024 Cottage Tandoori Restaurant`
                 log.info(`Sending cut command to printer: ${printerName}`);
                 await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Use copy command to send raw data to printer port
-                // First get the printer port
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printerName.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
-                `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    // Copy raw bytes to printer port
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    log.warn('Could not determine printer port for cut command');
-                    return false;
-                }
+                // Windows: Send raw cut command via Print Spooler API
+                await this.sendRawToWindowsPrinter(printerName, tempFile);
             }
 
             log.info('Paper cut command sent successfully');
@@ -1985,19 +2056,8 @@ Copyright © 2024 Cottage Tandoori Restaurant`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Get printer port and copy raw data
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
-                `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    throw new Error('Could not determine printer port');
-                }
+                // Windows: Send raw raster data via Print Spooler API
+                await this.sendRawToWindowsPrinter(printer, tempFile);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
