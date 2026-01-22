@@ -33,12 +33,12 @@ jobs:
       # Install frontend dependencies first (electron references these)
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       # Install electron dependencies
       - name: Install electron dependencies
         working-directory: electron
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       # Create production .env file from GitHub secrets
       - name: Create production environment file
