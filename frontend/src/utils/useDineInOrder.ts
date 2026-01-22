@@ -134,11 +134,11 @@ export const useDineInOrder = (tableId: string | null) => {
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        // Query orders table directly by table_number
+        // Query orders table directly by table_id (UUID)
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select('*')
-          .eq('table_number', tableId)
+          .eq('table_id', tableId)
           .in('status', ['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT'])
           .order('created_at', { ascending: false })
           .limit(1)
@@ -175,7 +175,7 @@ export const useDineInOrder = (tableId: string | null) => {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `table_number=eq.${tableId}`,
+          filter: `table_id=eq.${tableId}`,
         },
         (payload) => {
           console.log('[useDineInOrder] Real-time order update:', payload);
@@ -206,7 +206,7 @@ export const useDineInOrder = (tableId: string | null) => {
           event: '*',
           schema: 'public',
           table: 'dine_in_order_items',
-          filter: `table_number=eq.${tableId}`,
+          filter: `table_id=eq.${tableId}`,
         },
         (payload) => {
           console.log('[useDineInOrder] Real-time items update:', payload);
@@ -235,29 +235,58 @@ export const useDineInOrder = (tableId: string | null) => {
   }, [order?.id, fetchEnrichedItems]);
 
   // Command: Create Order
-  const createOrder = async (guestCountOrServerId?: number | string, serverName?: string): Promise<string | null> => {
+  // Now accepts full order creation params including linking data
+  interface CreateOrderParams {
+    guestCount?: number;
+    linkedTables?: number[];
+    tableGroupId?: string;
+    serverId?: string;
+    serverName?: string;
+  }
+
+  const createOrder = async (paramsOrGuestCount?: CreateOrderParams | number, serverName?: string): Promise<string | null> => {
     if (!tableId) {
       toast.error('No table selected');
       return null;
     }
 
-    // Handle overloaded parameters: can be (guestCount) or (serverId, serverName)
-    const serverId = typeof guestCountOrServerId === 'string' ? guestCountOrServerId : undefined;
-    const guestCount = typeof guestCountOrServerId === 'number' ? guestCountOrServerId : undefined;
+    // Handle backwards compatibility: can be (number) or (CreateOrderParams)
+    let params: CreateOrderParams = {};
+    if (typeof paramsOrGuestCount === 'number') {
+      params.guestCount = paramsOrGuestCount;
+      // serverName passed as second arg for backwards compat
+    } else if (typeof paramsOrGuestCount === 'object') {
+      params = paramsOrGuestCount;
+    }
 
     setLoading(true);
     try {
+      // Create order via brain API - now includes linking data
       const response = await brain.create_order({
         table_id: tableId,
-        server_id: serverId,
-        server_name: serverName,
-        guest_count: guestCount,
+        server_id: params.serverId,
+        server_name: params.serverName || serverName,
+        // Pass linking data directly (backend now supports these fields)
+        guest_count: params.guestCount,
+        linked_tables: params.linkedTables,
+        table_group_id: params.tableGroupId,
       });
       const result = await response.json();
-      console.log('[useDineInOrder] Order created:', result);
+      const orderId = result.id;
+
+      if (!orderId) {
+        throw new Error('Order creation returned no ID');
+      }
+
+      console.log('[useDineInOrder] Order created via brain with linking data:', {
+        orderId,
+        guestCount: params.guestCount,
+        linkedTables: params.linkedTables,
+        tableGroupId: params.tableGroupId
+      });
+
       toast.success('Order created');
-      // State updates automatically via subscription
-      return result.order_id || result.id || tableId;
+      return orderId;
     } catch (err: any) {
       console.error('[useDineInOrder] Create order error:', err);
       toast.error('Failed to create order');
@@ -473,6 +502,65 @@ export const useDineInOrder = (tableId: string | null) => {
     }
   };
 
+  // Command: Update Linked Tables
+  // Used when modifying linked tables on an existing order
+  const updateLinkedTables = async (linkedTables: number[], tableGroupId: string): Promise<boolean> => {
+    if (!order) {
+      toast.error('No active order');
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          linked_tables: linkedTables,
+          table_group_id: tableGroupId
+        })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
+
+      console.log('[useDineInOrder] Linked tables updated:', linkedTables);
+      toast.success('Linked tables updated');
+      return true;
+    } catch (err: any) {
+      console.error('[useDineInOrder] Update linked tables error:', err);
+      toast.error('Failed to update linked tables');
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Command: Update Linked Tables by Order ID (static method for external use)
+  // Used when we need to update an order we don't have loaded in state
+  const updateLinkedTablesById = async (
+    orderId: string,
+    linkedTables: number[],
+    tableGroupId: string
+  ): Promise<boolean> => {
+    try {
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          linked_tables: linkedTables,
+          table_group_id: tableGroupId
+        })
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+
+      console.log('[useDineInOrder] Linked tables updated for order:', orderId, linkedTables);
+      return true;
+    } catch (err: any) {
+      console.error('[useDineInOrder] Update linked tables error:', err);
+      return false;
+    }
+  };
+
   return {
     order,
     loading,
@@ -490,5 +578,7 @@ export const useDineInOrder = (tableId: string | null) => {
     requestCheck,
     markPaid,
     updateGuestCount,
+    updateLinkedTables,
+    updateLinkedTablesById,
   };
 };

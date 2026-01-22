@@ -1088,6 +1088,13 @@ export function DineInOrderModal({
   };
   
   // ✅ Handle saving linked tables configuration
+  /**
+   * Handle saving linked tables
+   *
+   * ARCHITECTURE: Orders are the source of truth for table linking.
+   * We only update the orders table - the dashboard derives linking state from orders.
+   * This eliminates sync issues between pos_tables and orders.
+   */
   const handleSaveLinkedTables = async (newLinkedTables: number[]): Promise<boolean> => {
     if (!tableId) {
       toast.error('No table selected');
@@ -1095,73 +1102,49 @@ export function DineInOrderModal({
     }
 
     try {
-      console.log('🔗 [handleSaveLinkedTables] Updating linked tables:', {
+      console.log('🔗 [handleSaveLinkedTables] Updating linked tables (orders as source of truth):', {
         currentTable: tableNumber,
         newLinkedTables
       });
 
-      // Check if we need to link or unlink tables
-      const currentLinked = linkedTables || [];
-      const tablesToAdd = newLinkedTables.filter(t => !currentLinked.includes(t));
-      const tablesToRemove = currentLinked.filter(t => !newLinkedTables.includes(t));
-
-      console.log('🔗 [handleSaveLinkedTables] Changes:', {
-        tablesToAdd,
-        tablesToRemove
-      });
-
-      // If we have an event-driven order, use the link/unlink commands
-      if (isEventDrivenMode && eventDrivenOrder?.id) {
-        // Add new linked tables
-        if (tablesToAdd.length > 0) {
-          const linkedGroupId = crypto.randomUUID();
-
-          // Update the order with linked tables
-          const { error: linkError } = await supabase
-            .from('orders')
-            .update({
-              linked_tables: [...(eventDrivenOrder.linked_tables || []), ...tablesToAdd],
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', eventDrivenOrder.id);
-
-          if (linkError) {
-            toast.error('Failed to link tables');
-            console.error('Link tables error:', linkError);
-            return false;
-          }
-          console.log('✅ [handleSaveLinkedTables] Tables linked successfully');
-        }
-
-        // Remove unlinked tables
-        if (tablesToRemove.length > 0) {
-          const remainingLinkedTables = (eventDrivenOrder.linked_tables || []).filter(
-            t => !tablesToRemove.includes(t)
-          );
-
-          const { error: unlinkError } = await supabase
-            .from('orders')
-            .update({
-              linked_tables: remainingLinkedTables,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', eventDrivenOrder.id);
-
-          if (unlinkError) {
-            toast.error('Failed to unlink tables');
-            console.error('Unlink tables error:', unlinkError);
-            return false;
-          }
-          console.log('✅ [handleSaveLinkedTables] Tables unlinked successfully');
-        }
-
-        toast.success('Linked tables updated successfully');
-        return true;
+      // Must have an active order to link tables
+      if (!isEventDrivenMode || !eventDrivenOrder?.id || !tableNumber) {
+        toast.info('Linked tables management requires an active order');
+        return false;
       }
 
-      // Legacy mode - no API support yet
-      toast.info('Linked tables management only available in event-driven mode');
-      return false;
+      // Get or generate table group ID
+      // Use existing group ID if available, or create new one
+      // Note: table_group_id may not be in the type definition yet, so we access it safely
+      const existingGroupId = (eventDrivenOrder as any).table_group_id;
+      const tableGroupId = newLinkedTables.length > 0
+        ? (existingGroupId || `group_${Date.now()}`)
+        : null;
+
+      // Update orders table - this is the ONLY source of truth
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          linked_tables: newLinkedTables,
+          table_group_id: tableGroupId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', eventDrivenOrder.id);
+
+      if (updateError) {
+        console.error('❌ [handleSaveLinkedTables] Failed to update orders:', updateError);
+        toast.error('Failed to update linked tables');
+        return false;
+      }
+
+      console.log('✅ [handleSaveLinkedTables] Orders table updated successfully:', {
+        orderId: eventDrivenOrder.id,
+        linkedTables: newLinkedTables,
+        tableGroupId
+      });
+
+      toast.success('Linked tables updated successfully');
+      return true;
 
     } catch (error) {
       console.error('❌ [handleSaveLinkedTables] Failed to update linked tables:', error);
@@ -1204,7 +1187,12 @@ export function DineInOrderModal({
     }
 
     // Legacy mode - use store function
-    const success = await createCustomerTab(selectedTableTab, tabName);
+    // Pass orderId to scope tab to order lifecycle (prevents orphaned tabs)
+    const orderId = eventDrivenOrder?.id || '';
+    if (!orderId) {
+      console.warn('[DineInOrderModal] Creating tab without orderId - tab may persist across sessions');
+    }
+    const success = await createCustomerTab(selectedTableTab, tabName, orderId);
     if (success) {
       toast.success(`Customer tab "${tabName}" created`);
     } else {
@@ -1799,8 +1787,8 @@ export function DineInOrderModal({
               
               {/* C) Menu Grid - SCROLLABLE */}
               <POSMenuSelector
-                onAddToOrder={handleAddToOrder}
-                onCustomizeItem={handleCustomizeItemFromMenu}
+                onAddToOrder={handleAddToOrder as unknown as (orderItem: TypesOrderItem) => void}
+                onCustomizeItem={handleCustomizeItemFromMenu as any}
                 onCategoryChange={handleCategoryChange}
                 className="h-full"
                 showSkeletons={false}
@@ -1974,7 +1962,7 @@ export function DineInOrderModal({
         onClose={() => setShowBillView(false)}
         tableNumber={selectedTableTab}
         orderItems={eventDrivenOrder?.items || []}
-        customerTabs={currentTableCustomerTabs}
+        customerTabs={currentTableCustomerTabs as any}
         onProcessPayment={handleProcessPayment}
       />
       
@@ -2057,9 +2045,9 @@ export function DineInOrderModal({
         enrichedItems={enrichedItems}
         enrichedLoading={enrichedLoading}
         enrichedError={enrichedError}
-        customerTabs={currentTableCustomerTabs}
-        activeTab={currentActiveCustomerTab}
-        order={eventDrivenOrder} // NEW: Pass full order object for notes
+        customerTabs={currentTableCustomerTabs as any}
+        activeTab={currentActiveCustomerTab as any}
+        order={eventDrivenOrder as any}
         linkedTables={linkedTables}
         tableCapacity={tableCapacity}
         isPrimaryTable={isPrimaryTable}

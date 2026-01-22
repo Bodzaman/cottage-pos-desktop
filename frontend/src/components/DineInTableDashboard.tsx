@@ -4,6 +4,11 @@
  * Centered single-panel table dashboard for Dine-In mode.
  * Replaces the 3-panel layout when DINE-IN order type is selected.
  * Features a summary header and max-width centered grid.
+ *
+ * ARCHITECTURE NOTE (2024):
+ * This component now uses the "orders as source of truth" pattern.
+ * Table linking data is derived from the orders table, not pos_tables.
+ * The useTableState hook provides unified table state with linking info.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -13,6 +18,7 @@ import { QSAITheme } from '../utils/QSAIDesign';
 import { TableDashboardCard } from './TableDashboardCard';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
+import { useActiveOrders } from '../utils/useActiveOrders';
 import {
   deriveTableCardData,
   DashboardCustomerTab,
@@ -20,7 +26,7 @@ import {
   TableCardData
 } from '../utils/tableDashboardHelpers';
 import type { RestaurantTable } from '../utils/useRestaurantTables';
-import { buildLinkedGroupColorMap, getLinkedTableColorFromMap } from '../utils/linkedTableColors';
+import { buildLinkedGroupColorMap, getLinkedTableColorFromMap, type LinkedTableColor } from '../utils/linkedTableColors';
 
 interface DineInTableDashboardProps {
   tables: RestaurantTable[];
@@ -180,17 +186,74 @@ export function DineInTableDashboard({
   // Get completeTableOrder from store
   const { completeTableOrder } = useTableOrdersStore();
 
+  // NEW: Get active orders for linking data (orders are source of truth)
+  const { orders: activeOrders } = useActiveOrders();
+
   // Derive enriched table data for all tables
+  // Now merges order-based linking with other data sources
   const enrichedTables = useMemo(() => {
     return tables
-      .map(table => deriveTableCardData(table, persistedTableOrders, customerTabs))
-      .sort((a, b) => a.tableNumber - b.tableNumber);
-  }, [tables, persistedTableOrders, customerTabs]);
+      .map(table => {
+        const baseData = deriveTableCardData(table, persistedTableOrders, customerTabs);
 
-  // Build color map for linked table groups (dynamic sequential assignment)
+        // Find active order for this table (by table number)
+        const tableNumber = parseInt(table.table_number, 10);
+        const order = activeOrders.find(o =>
+          o.tableNumber === tableNumber ||
+          (o.linkedTables && o.linkedTables.includes(tableNumber))
+        );
+
+        // Override linking data from orders (source of truth)
+        if (order && order.linkedTables && order.linkedTables.length > 1) {
+          return {
+            ...baseData,
+            isLinked: true,
+            isPrimary: order.tableNumber === tableNumber,
+            linkedTableNumbers: order.linkedTables.filter(t => t !== tableNumber),
+            linkedTableGroupId: order.tableGroupId || `order-${order.id}`,
+            // Also ensure guest count comes from order
+            guestCount: order.guestCount || baseData.guestCount,
+          };
+        }
+
+        return baseData;
+      })
+      .sort((a, b) => a.tableNumber - b.tableNumber);
+  }, [tables, persistedTableOrders, customerTabs, activeOrders]);
+
+  // Build color map for linked table groups from orders (source of truth)
   const linkedGroupColorMap = useMemo(() => {
-    return buildLinkedGroupColorMap(tables);
-  }, [tables]);
+    const colorMap = new Map<string, LinkedTableColor>();
+    const colors: LinkedTableColor[] = [
+      { name: 'purple', primary: '#A855F7', glow: 'rgba(168, 85, 247, 0.5)', background: 'rgba(168, 85, 247, 0.1)', border: 'rgba(168, 85, 247, 0.5)' },
+      { name: 'cyan', primary: '#06B6D4', glow: 'rgba(6, 182, 212, 0.5)', background: 'rgba(6, 182, 212, 0.1)', border: 'rgba(6, 182, 212, 0.5)' },
+      { name: 'orange', primary: '#F97316', glow: 'rgba(249, 115, 22, 0.5)', background: 'rgba(249, 115, 22, 0.1)', border: 'rgba(249, 115, 22, 0.5)' },
+      { name: 'pink', primary: '#EC4899', glow: 'rgba(236, 72, 153, 0.5)', background: 'rgba(236, 72, 153, 0.1)', border: 'rgba(236, 72, 153, 0.5)' },
+      { name: 'green', primary: '#22C55E', glow: 'rgba(34, 197, 94, 0.5)', background: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.5)' }
+    ];
+
+    let colorIndex = 0;
+
+    // Build from orders (source of truth)
+    activeOrders.forEach(order => {
+      if (order.linkedTables && order.linkedTables.length > 1 && order.tableGroupId) {
+        if (!colorMap.has(order.tableGroupId)) {
+          colorMap.set(order.tableGroupId, colors[colorIndex % colors.length]);
+          colorIndex++;
+        }
+      }
+    });
+
+    // Fallback: Also build from tables prop (legacy support)
+    const legacyMap = buildLinkedGroupColorMap(tables);
+    legacyMap.forEach((color, groupId) => {
+      if (!colorMap.has(groupId)) {
+        colorMap.set(groupId, color);
+      }
+    });
+
+    return colorMap;
+  }, [activeOrders, tables]);
 
   // Handle reset button click - opens password dialog
   const handleResetClick = useCallback((tableNumber: number) => {

@@ -21,6 +21,7 @@ import {
   completeTableOrder as completeTableOrderQuery,
   resetTableToAvailable as resetTableQuery,
   getCustomerTabsForTable,
+  getCustomerTabsForOrder,
   createCustomerTab as createCustomerTabQuery,
   updateCustomerTab as updateCustomerTabQuery,
   addItemsToCustomerTab as addItemsToCustomerTabQuery,
@@ -71,6 +72,7 @@ interface PersistentTableOrder {
 interface CustomerTab {
   id: string;
   table_number: number;
+  order_id?: string;  // Links tab to specific order (source of truth for cleanup)
   tab_name: string;
   order_items: OrderItem[];
   status: 'active' | 'paid' | 'cancelled';
@@ -84,6 +86,7 @@ function mapSupabaseCustomerTab(tab: SupabaseCustomerTab): CustomerTab {
   return {
     id: tab.id,
     table_number: tab.table_number,
+    order_id: (tab as any).order_id,  // New field for order-scoped tabs
     tab_name: tab.tab_name,
     order_items: (tab.order_items || []).map(mapSupabaseOrderItemToOrderItem),
     status: tab.status,
@@ -206,7 +209,8 @@ interface TableOrdersState {
   // ENHANCED: Customer tab management actions with optimistic updates
   initializeCustomerTabsSchema: () => Promise<void>;
   loadCustomerTabsForTable: (tableNumber: number) => Promise<void>;
-  createCustomerTab: (tableNumber: number, tabName: string, guestId?: string) => Promise<string | null>;
+  loadCustomerTabsForOrder: (orderId: string, tableNumber: number) => Promise<void>;
+  createCustomerTab: (tableNumber: number, tabName: string, orderId: string, guestId?: string) => Promise<string | null>;
   updateCustomerTab: (tabId: string, updates: { tab_name?: string; order_items?: OrderItem[]; status?: string }) => Promise<boolean>;
   addItemsToCustomerTab: (tabId: string, items: OrderItem[]) => Promise<boolean>;
   closeCustomerTab: (tabId: string) => Promise<boolean>;
@@ -387,6 +391,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   },
 
   // ENHANCED: Load customer tabs for specific table with optimistic support - Direct Supabase
+  // @deprecated Use loadCustomerTabsForOrder instead - tabs should be scoped to orders
   loadCustomerTabsForTable: async (tableNumber: number) => {
     try {
       // Direct Supabase query - no backend needed
@@ -416,16 +421,48 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
   },
 
+  // NEW: Load customer tabs for specific order (preferred - scoped to order lifecycle)
+  loadCustomerTabsForOrder: async (orderId: string, tableNumber: number) => {
+    try {
+      // Direct Supabase query - scoped to order
+      const supabaseTabs = await getCustomerTabsForOrder(orderId);
+      const mappedTabs: CustomerTab[] = supabaseTabs.map(mapSupabaseCustomerTab);
+      set(state => ({
+        customerTabs: {
+          ...state.customerTabs,
+          [tableNumber]: mappedTabs
+        },
+        optimisticCustomerTabs: {
+          ...state.optimisticCustomerTabs,
+          [tableNumber]: mappedTabs
+        }
+      }));
+    } catch (error) {
+      console.error(`Failed to load customer tabs for order ${orderId}:`, error);
+      set(state => ({
+        errors: {
+          ...state.errors,
+          tableErrors: {
+            ...state.errors.tableErrors,
+            [tableNumber]: 'Failed to load customer tabs'
+          }
+        }
+      }));
+    }
+  },
+
   // ENHANCED: Create customer tab with optimistic updates
-  createCustomerTab: async (tableNumber: number, tabName: string, guestId?: string) => {
+  // orderId is now required to scope tabs to order lifecycle
+  createCustomerTab: async (tableNumber: number, tabName: string, orderId: string, guestId?: string) => {
     const { options } = get();
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Optimistic update
     if (options.enableOptimisticUpdates) {
       const optimisticTab: CustomerTab = {
         id: tempId,
         table_number: tableNumber,
+        order_id: orderId,
         tab_name: tabName,
         order_items: [],
         status: 'active',
@@ -433,7 +470,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-      
+
       set(state => ({
         optimisticCustomerTabs: {
           ...state.optimisticCustomerTabs,
@@ -446,8 +483,8 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     }
 
     try {
-      // Direct Supabase query - no backend needed
-      const supabaseTab = await createCustomerTabQuery(tableNumber, tabName, guestId);
+      // Direct Supabase query - pass orderId to scope tab to order lifecycle
+      const supabaseTab = await createCustomerTabQuery(tableNumber, tabName, orderId, guestId);
       const realTab = mapSupabaseCustomerTab(supabaseTab);
 
       set(state => ({
@@ -770,37 +807,238 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
     return get().updateCustomerTab(tabId, { tab_name: newName });
   },
 
-  // NEW: Split customer tab - Advanced feature (not yet implemented for direct Supabase)
+  /**
+   * Split customer tab - Move selected items to a new tab
+   * Creates a new tab and reassigns selected items to it via dine_in_order_items.customer_tab_id
+   */
   splitCustomerTab: async (sourceTabId: string, newTabName: string, itemIndices: number[], guestId?: string) => {
-    // This advanced feature requires custom Supabase logic
-    // For now, show a helpful message
-    toast.error('Split tab feature is not available in offline mode');
-    return {
-      success: false,
-      message: 'Split tab feature is not available in offline mode'
-    };
+    const { customerTabs } = get();
+
+    try {
+      // Find source tab and table number
+      let tableNumber: number | null = null;
+      let sourceTab: CustomerTab | null = null;
+
+      for (const [tNum, tabs] of Object.entries(customerTabs)) {
+        const tab = tabs.find(t => t.id === sourceTabId);
+        if (tab) {
+          tableNumber = parseInt(tNum);
+          sourceTab = tab;
+          break;
+        }
+      }
+
+      if (!tableNumber || !sourceTab) {
+        return { success: false, message: 'Source tab not found' };
+      }
+
+      // Get items from source tab
+      const { data: sourceItems, error: fetchError } = await supabase
+        .from('dine_in_order_items')
+        .select('*')
+        .eq('customer_tab_id', sourceTabId)
+        .order('created_at');
+
+      if (fetchError || !sourceItems) {
+        console.error('Failed to fetch source tab items:', fetchError);
+        return { success: false, message: 'Failed to fetch source tab items' };
+      }
+
+      // Get items to move based on indices
+      const itemsToMove = itemIndices.map(idx => sourceItems[idx]).filter(Boolean);
+      if (itemsToMove.length === 0) {
+        return { success: false, message: 'No valid items to move' };
+      }
+
+      // Create new tab
+      const { data: newTabData, error: createError } = await supabase
+        .from('customer_tabs')
+        .insert({
+          table_number: tableNumber,
+          tab_name: newTabName,
+          status: 'active',
+          guest_id: guestId || null
+        })
+        .select()
+        .single();
+
+      if (createError || !newTabData) {
+        console.error('Failed to create new tab:', createError);
+        return { success: false, message: 'Failed to create new tab' };
+      }
+
+      // Move items to new tab
+      const itemIds = itemsToMove.map(item => item.id);
+      const { error: moveError } = await supabase
+        .from('dine_in_order_items')
+        .update({ customer_tab_id: newTabData.id })
+        .in('id', itemIds);
+
+      if (moveError) {
+        console.error('Failed to move items to new tab:', moveError);
+        // Rollback: delete the new tab
+        await supabase.from('customer_tabs').delete().eq('id', newTabData.id);
+        return { success: false, message: 'Failed to move items to new tab' };
+      }
+
+      // Refresh tabs from database
+      await get().loadCustomerTabsForTable(tableNumber);
+
+      toast.success(`Split ${itemsToMove.length} items to "${newTabName}"`);
+      return {
+        success: true,
+        originalTab: sourceTab,
+        newTab: { ...sourceTab, id: newTabData.id, tab_name: newTabName },
+        message: `Split ${itemsToMove.length} items to new tab`
+      };
+
+    } catch (error) {
+      console.error('Split tab error:', error);
+      return { success: false, message: 'Failed to split tab' };
+    }
   },
 
-  // NEW: Merge customer tabs - Advanced feature (not yet implemented for direct Supabase)
+  /**
+   * Merge customer tabs - Combine all items from source tab into target tab
+   * Moves items via dine_in_order_items.customer_tab_id, then deletes source tab
+   */
   mergeCustomerTabs: async (sourceTabId: string, targetTabId: string) => {
-    // This advanced feature requires custom Supabase logic
-    // For now, show a helpful message
-    toast.error('Merge tabs feature is not available in offline mode');
-    return {
-      success: false,
-      message: 'Merge tabs feature is not available in offline mode'
-    };
+    const { customerTabs } = get();
+
+    try {
+      // Find both tabs
+      let tableNumber: number | null = null;
+      let sourceTab: CustomerTab | null = null;
+      let targetTab: CustomerTab | null = null;
+
+      for (const [tNum, tabs] of Object.entries(customerTabs)) {
+        for (const tab of tabs) {
+          if (tab.id === sourceTabId) {
+            sourceTab = tab;
+            tableNumber = parseInt(tNum);
+          }
+          if (tab.id === targetTabId) {
+            targetTab = tab;
+          }
+        }
+      }
+
+      if (!sourceTab || !targetTab || !tableNumber) {
+        return { success: false, message: 'Source or target tab not found' };
+      }
+
+      // Move all items from source to target
+      const { error: moveError } = await supabase
+        .from('dine_in_order_items')
+        .update({ customer_tab_id: targetTabId })
+        .eq('customer_tab_id', sourceTabId);
+
+      if (moveError) {
+        console.error('Failed to merge tab items:', moveError);
+        return { success: false, message: 'Failed to merge tab items' };
+      }
+
+      // Delete source tab
+      const { error: deleteError } = await supabase
+        .from('customer_tabs')
+        .delete()
+        .eq('id', sourceTabId);
+
+      if (deleteError) {
+        console.error('Failed to delete source tab:', deleteError);
+        // Items already moved, so this is a partial success
+      }
+
+      // Refresh tabs from database
+      await get().loadCustomerTabsForTable(tableNumber);
+
+      toast.success(`Merged "${sourceTab.tab_name}" into "${targetTab.tab_name}"`);
+      return {
+        success: true,
+        targetTab,
+        message: `Merged tabs successfully`
+      };
+
+    } catch (error) {
+      console.error('Merge tabs error:', error);
+      return { success: false, message: 'Failed to merge tabs' };
+    }
   },
 
-  // NEW: Move items between customer tabs - Advanced feature (not yet implemented for direct Supabase)
+  /**
+   * Move items between customer tabs
+   * Updates dine_in_order_items.customer_tab_id for selected items
+   */
   moveItemsBetweenTabs: async (sourceTabId: string, targetTabId: string, itemIndices: number[]) => {
-    // This advanced feature requires custom Supabase logic
-    // For now, show a helpful message
-    toast.error('Move items feature is not available in offline mode');
-    return {
-      success: false,
-      message: 'Move items feature is not available in offline mode'
-    };
+    const { customerTabs } = get();
+
+    try {
+      // Find source tab
+      let tableNumber: number | null = null;
+      let sourceTab: CustomerTab | null = null;
+      let targetTab: CustomerTab | null = null;
+
+      for (const [tNum, tabs] of Object.entries(customerTabs)) {
+        for (const tab of tabs) {
+          if (tab.id === sourceTabId) {
+            sourceTab = tab;
+            tableNumber = parseInt(tNum);
+          }
+          if (tab.id === targetTabId) {
+            targetTab = tab;
+          }
+        }
+      }
+
+      if (!sourceTab || !targetTab || !tableNumber) {
+        return { success: false, message: 'Source or target tab not found' };
+      }
+
+      // Get items from source tab
+      const { data: sourceItems, error: fetchError } = await supabase
+        .from('dine_in_order_items')
+        .select('*')
+        .eq('customer_tab_id', sourceTabId)
+        .order('created_at');
+
+      if (fetchError || !sourceItems) {
+        console.error('Failed to fetch source tab items:', fetchError);
+        return { success: false, message: 'Failed to fetch source tab items' };
+      }
+
+      // Get items to move based on indices
+      const itemsToMove = itemIndices.map(idx => sourceItems[idx]).filter(Boolean);
+      if (itemsToMove.length === 0) {
+        return { success: false, message: 'No valid items to move' };
+      }
+
+      // Move items to target tab
+      const itemIds = itemsToMove.map(item => item.id);
+      const { error: moveError } = await supabase
+        .from('dine_in_order_items')
+        .update({ customer_tab_id: targetTabId })
+        .in('id', itemIds);
+
+      if (moveError) {
+        console.error('Failed to move items:', moveError);
+        return { success: false, message: 'Failed to move items' };
+      }
+
+      // Refresh tabs from database
+      await get().loadCustomerTabsForTable(tableNumber);
+
+      toast.success(`Moved ${itemsToMove.length} items to "${targetTab.tab_name}"`);
+      return {
+        success: true,
+        sourceTab,
+        targetTab,
+        message: `Moved ${itemsToMove.length} items`
+      };
+
+    } catch (error) {
+      console.error('Move items error:', error);
+      return { success: false, message: 'Failed to move items' };
+    }
   },
 
   // NEW: Delete customer tab

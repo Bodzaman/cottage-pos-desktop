@@ -169,7 +169,7 @@ export default function POSDesktop() {
   
   const selectedTableUuid = useMemo(() => {
     if (orderType !== 'DINE-IN' || !selectedTableNumber) return null;
-    const table = restaurantTables.find((t: any) => t.table_number === selectedTableNumber?.toString());
+    const table = restaurantTables.find((t: any) => Number(t.table_number) === selectedTableNumber);
     return table?.id || null;
   }, [orderType, selectedTableNumber, restaurantTables]);
 
@@ -198,7 +198,8 @@ export default function POSDesktop() {
   const dineInOrderRef = useRef(dineInOrder);
   useEffect(() => { dineInOrderRef.current = dineInOrder; }, [dineInOrder]);
 
-  const { customerTabs: customerTabsData, activeTabId, setActiveTabId, createTab, addItemsToTab, renameTab, closeTab, splitTab, mergeTabs, moveItemsBetweenTabs } = useCustomerTabs(orderType === 'DINE-IN' ? selectedTableNumber : null);
+  // Pass orderId to useCustomerTabs for proper tab scoping (tabs are cleaned up when order completes)
+  const { customerTabs: customerTabsData, activeTabId, setActiveTabId, createTab, addItemsToTab, renameTab, closeTab, splitTab, mergeTabs, moveItemsBetweenTabs } = useCustomerTabs(orderType === 'DINE-IN' ? selectedTableNumber : null, dineInOrder?.id);
 
   const [dineInStagingItems, setDineInStagingItems] = useState<OrderItem[]>([]);
   const addToStagingCart = useCallback((item: OrderItem) => setDineInStagingItems(prev => [...prev, item]), []);
@@ -371,51 +372,30 @@ export default function POSDesktop() {
     const tableIdVal = selectedTableNumber;
     if (!tableIdVal) return;
 
-    const orderId = await createOrder(guestCount);
+    // Generate table group ID if linking tables
+    const allTableNumbers = linkedTables && linkedTables.length > 0
+      ? [tableIdVal, ...linkedTables]
+      : [tableIdVal];
+    const tableGroupId = allTableNumbers.length > 1 ? `group_${Date.now()}` : undefined;
+
+    // Create order with all linking data (orders are the source of truth)
+    const orderId = await createOrder({
+      guestCount,
+      linkedTables: allTableNumbers,
+      tableGroupId,
+    });
+
     if (orderId !== null) {
-      // Sync to table_orders table for dashboard display
+      // Sync to table_orders table for dashboard display (legacy compatibility)
       await createTableOrder(tableIdVal, guestCount, linkedTables || []);
 
       if (action === 'link' && linkedTables && linkedTables.length > 0) {
-        try {
-          // Generate a unique group ID for linked tables
-          const groupId = `group_${Date.now()}`;
-          const allTableNumbers = [tableIdVal, ...linkedTables];
-
-          // Update PRIMARY table with full linking data
-          await supabase
-            .from('pos_tables')
-            .update({
-              status: 'OCCUPIED',
-              is_linked_table: true,
-              is_linked_primary: true,
-              linked_table_group_id: groupId,
-              linked_with_tables: linkedTables,
-            })
-            .eq('table_number', tableIdVal);
-
-          // Update SECONDARY (linked) tables
-          for (const linkedTableNum of linkedTables) {
-            const otherLinkedTables = [tableIdVal, ...linkedTables.filter(t => t !== linkedTableNum)];
-            await supabase
-              .from('pos_tables')
-              .update({
-                status: 'OCCUPIED',
-                is_linked_table: true,
-                is_linked_primary: false,
-                linked_table_group_id: groupId,
-                linked_with_tables: otherLinkedTables,
-              })
-              .eq('table_number', linkedTableNum);
-          }
-
-          await refetchTables();
-          toast.success(`Linked tables ${allTableNumbers.map(t => `T${t}`).join(' + ')}`);
-        } catch (error) {
-          console.error('Failed to link tables:', error);
-          toast.error('Failed to link tables');
-        }
+        // Note: Linking data is now stored in the orders table (source of truth)
+        // The dashboard will derive linking state from orders via useTableState hook
+        toast.success(`Linked tables ${allTableNumbers.map(t => `T${t}`).join(' + ')}`);
+        await refetchTables();
       }
+
       setGuestCount(guestCount);
       setModal('showGuestCountModal', false);
       setModal('showDineInModal', true);

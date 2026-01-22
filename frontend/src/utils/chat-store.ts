@@ -10,15 +10,32 @@ import { toast } from 'sonner';
 import { validateChatMessage, cleanupCorruptedMessages } from './messageValidation';
 import { supabase } from './supabaseClient';
 import { getOrCreateSessionId } from './session-manager';
+import { useAgentConfigStore } from './agentConfigStore';
 
 // NEW: Import structured streaming components
-import { 
-  StructuredStreamHandler, 
+import {
+  StructuredStreamHandler,
   parseStreamingEvent,
   createStructuredStreamRequest,
   type ProcessedMessage,
   type MessageContentPart
 } from './structured-stream-handler';
+
+// NEW: Import unified structured event types
+import {
+  type StructuredEvent,
+  type MenuRef,
+  type SuggestedAction,
+  type CartProposal,
+  type CartProposalItem,
+  isTextDeltaEvent,
+  isMenuRefsEvent,
+  isSuggestedActionsEvent,
+  isCartProposalEvent,
+  isMetadataEvent,
+  isCompleteEvent,
+  isErrorEvent,
+} from '../types/structured-events';
 
 // ✅ Platform-agnostic VoiceCallStatus enum
 export enum VoiceCallStatus {
@@ -37,7 +54,7 @@ const generateMessageId = (): string => {
 // ✅ STREAMING BUFFER: Batch updates to prevent per-character re-renders
 let streamBuffer = '';
 let bufferTimer: NodeJS.Timeout | null = null;
-const BUFFER_INTERVAL = 80; // Update every 80ms for smooth 12fps streaming
+const BUFFER_INTERVAL = 30; // Update every 30ms for near real-time ~33fps streaming
 
 // Helper function to flush the streaming buffer
 const flushStreamBuffer = (messageId: string, accumulatedContent: string, set: any) => {
@@ -74,6 +91,11 @@ export interface ChatMessage {
   // NEW: Support structured content parts
   structuredParts?: MessageContentPart[];
   menuCards?: MenuItem[];
+  // NEW: Structured event protocol fields
+  /** Menu item references for rendering cards (from model structured output) */
+  menuRefs?: MenuRef[];
+  /** Suggested quick-reply actions */
+  suggestedActions?: SuggestedAction[];
   metadata?: {
     userId?: string;
     sessionId?: string;
@@ -82,6 +104,9 @@ export interface ChatMessage {
     modelUsed?: string;
     latencyMs?: number;
     cartItemName?: string;
+    // NEW: Structured event metadata
+    intent?: string;
+    toolsUsed?: string[];
   };
 }
 
@@ -115,7 +140,11 @@ interface ChatState {
   
   // NEW: Structured streaming state
   streamHandler: StructuredStreamHandler | null;
-  
+
+  // NEW: Pending cart proposal requiring user confirmation
+  pendingCartProposal: CartProposal | null;
+  isCartConfirmOpen: boolean;
+
   // User Context (for personalization)
   userContext: {
     isAuthenticated: boolean;
@@ -165,11 +194,23 @@ interface ChatState {
   setStreaming: (streaming: boolean) => void;
   
   // Streaming Chat API
+  abortController: AbortController | null;
   sendMessage: (message: string) => Promise<void>;
+  stopGeneration: () => void;
   
   // NEW: Structured response processing
   processStructuredElements: (elements: any[]) => Promise<MenuItem[]>;
-  
+
+  // NEW: Cart proposal actions
+  setPendingCartProposal: (proposal: CartProposal | null) => void;
+  openCartConfirmDialog: () => void;
+  closeCartConfirmDialog: () => void;
+  confirmCartProposal: (items: CartProposalItem[]) => Promise<void>;
+  cancelCartProposal: () => void;
+
+  // NEW: Handle structured events
+  handleStructuredEvent: (event: StructuredEvent, messageId: string) => void;
+
   // User Context Actions
   setUserContext: (context: Partial<ChatState['userContext']>) => void;
   
@@ -231,6 +272,13 @@ export const useChatStore = create<ChatState>()(
 
       streamHandler: null,
 
+      // Abort controller for stop generation
+      abortController: null,
+
+      // NEW: Cart proposal state
+      pendingCartProposal: null,
+      isCartConfirmOpen: false,
+
       userContext: {
         isAuthenticated: false,
         userId: undefined,
@@ -280,6 +328,21 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           messages: [...state.messages, newMessage].slice(-state.config.maxMessages)
         }));
+      },
+
+      // Phase 7 Fix: Implement addMessageWithDetection for dish mention detection
+      addMessageWithDetection: (message) => {
+        // Detect dish mentions in the message content
+        const detected = detectDishMentionsFast(message.content);
+
+        // Create enriched message with menu cards if dishes were detected
+        const enrichedMessage: Omit<ChatMessage, 'id' | 'timestamp'> = {
+          ...message,
+          menuCards: detected.length > 0 ? detected : undefined
+        };
+
+        // Use addMessage to add the enriched message
+        get().addMessage(enrichedMessage);
       },
 
       clearMessages: () => set({ messages: [] }),
@@ -413,9 +476,26 @@ export const useChatStore = create<ChatState>()(
             notes: item.notes || null
           }));
 
-          // Make structured streaming request
-          const response = await fetch(`${API_URL}/structured-streaming/chat`, {
+          // Create AbortController for stop generation capability
+          const abortController = new AbortController();
+          set({ abortController });
+
+          // Make streaming chat request (Phase 8: Using correct Phase 6 compliant endpoint)
+          // NOTE: Backend uses /routes prefix for all API endpoints (see backend/main.py)
+          const response = await fetch(`${API_URL}/routes/streaming-chat/chat`, {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: abortController.signal,
+            body: JSON.stringify({
+              message,
+              conversation_history: conversationHistory,
+              user_id: userContext.userId,
+              session_id: sessionId,
+              cart_context,
+              // Phase 8: Removed enable_structured_parsing (not used by /streaming-chat/chat)
+            }),
           });
           
           if (!response.ok) {
@@ -426,7 +506,7 @@ export const useChatStore = create<ChatState>()(
             } catch (e) {
               console.error('Failed to read error response body:', e);
             }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorBody}`);
           }
           
           const reader = response.body?.getReader();
@@ -457,20 +537,17 @@ export const useChatStore = create<ChatState>()(
                     
                     if (event.type === 'content' && event.text) {
                       // ✅ On first content chunk:
-                      // - Replace typing indicator with actual bot message
-                      // - Transition from loading → streaming
+                      // - Transition typing indicator into streaming message (same DOM element)
+                      // - This prevents abrupt swap and enables smooth crossfade
                       if (isFirstChunk) {
-                        botMessageId = generateMessageId();
-                        const botMessage: ChatMessage = {
-                          id: botMessageId,
-                          content: '',
-                          sender: 'bot',
-                          timestamp: new Date(),
-                          isStreaming: true
-                        };
+                        botMessageId = typingMessageId; // Reuse same message ID for smooth transition
 
                         set((state) => ({
-                          messages: state.messages.filter(msg => msg.id !== typingMessageId).concat(botMessage),
+                          messages: state.messages.map(msg =>
+                            msg.id === typingMessageId
+                              ? { ...msg, isTyping: false, isStreaming: true, content: '' }
+                              : msg
+                          ),
                           isLoading: false,
                           isStreaming: true,
                           isTyping: false
@@ -486,6 +563,45 @@ export const useChatStore = create<ChatState>()(
                         clearTimeout(bufferTimer);
                       }
                       
+                      bufferTimer = setTimeout(() => {
+                        const fullContent = accumulatedContent;
+                        set((state) => ({
+                          messages: state.messages.map((msg) =>
+                            msg.id === botMessageId
+                              ? { ...msg, content: fullContent }
+                              : msg
+                          )
+                        }));
+                        bufferTimer = null;
+                      }, BUFFER_INTERVAL);
+                    } else if (event.type === 'text' && (event.text || event.content)) {
+                      // Handle 'text' event from /streaming-chat/chat endpoint
+                      // Backend sends { type: "text", content: "..." } so handle both properties
+                      const textContent = event.text || event.content;
+                      if (isFirstChunk) {
+                        botMessageId = typingMessageId; // Reuse same message ID for smooth transition
+
+                        set((state) => ({
+                          messages: state.messages.map(msg =>
+                            msg.id === typingMessageId
+                              ? { ...msg, isTyping: false, isStreaming: true, content: '' }
+                              : msg
+                          ),
+                          isLoading: false,
+                          isStreaming: true,
+                          isTyping: false
+                        }));
+
+                        isFirstChunk = false;
+                      }
+
+                      accumulatedContent += textContent;
+
+                      // Throttled update for smooth streaming
+                      if (bufferTimer) {
+                        clearTimeout(bufferTimer);
+                      }
+
                       bufferTimer = setTimeout(() => {
                         const fullContent = accumulatedContent;
                         set((state) => ({
@@ -620,7 +736,7 @@ export const useChatStore = create<ChatState>()(
                           
                         case 'update_quantity':
                           if (result.cart_item_id && result.new_quantity !== undefined) {
-                            cartStore.updateItemQuantity(result.cart_item_id, result.new_quantity);
+                            cartStore.updateQuantity?.(result.cart_item_id, result.new_quantity);
                             toast.success(result.message || 'Quantity updated');
                           }
                           break;
@@ -639,6 +755,30 @@ export const useChatStore = create<ChatState>()(
                       // This ensures cart drawer reflects the latest state from database
                       if (operation !== 'get_cart_summary') {
                         await cartStore.fetchCartFromSupabase();
+                      }
+                    } else if (event.type === 'menu_refs') {
+                      // Phase 7: Handle menu_refs structured event
+                      // These are menu item references from model structured output
+                      if (botMessageId && event.items && Array.isArray(event.items)) {
+                        get().handleStructuredEvent(event as any, botMessageId);
+                      }
+                    } else if (event.type === 'suggested_actions') {
+                      // Phase 7: Handle suggested_actions structured event
+                      // These are quick-reply action chips
+                      if (botMessageId && event.actions && Array.isArray(event.actions)) {
+                        get().handleStructuredEvent(event as any, botMessageId);
+                      }
+                    } else if (event.type === 'cart_proposal') {
+                      // Phase 7: Handle cart_proposal structured event
+                      // This requires user confirmation before modifying cart
+                      if (event.proposal) {
+                        get().handleStructuredEvent(event as any, botMessageId);
+                      }
+                    } else if (event.type === 'metadata') {
+                      // Phase 7: Handle metadata structured event
+                      // Store intent, confidence, and tools used for analytics
+                      if (botMessageId) {
+                        get().handleStructuredEvent(event as any, botMessageId);
                       }
                     } else if (event.type === 'complete') {
                       // Flush buffer immediately on completion
@@ -664,19 +804,35 @@ export const useChatStore = create<ChatState>()(
                         ),
                         isStreaming: false,
                         isLoading: false,
-                        isTyping: false
+                        isTyping: false,
+                        abortController: null
                       }));
                       break;
                     }
                   }
                 } catch (parseError) {
+                  console.error('[chat-store] Failed to parse stream event:', line, parseError);
                 }
               }
             }
           }
           
 
-        } catch (error) {
+        } catch (error: any) {
+          // If aborted by user (stop generation), just finalize the current message
+          if (error?.name === 'AbortError') {
+            set((state) => ({
+              messages: state.messages
+                .filter(msg => msg.id !== typingMessageId)
+                .map(msg => msg.id === botMessageId ? { ...msg, isStreaming: false } : msg),
+              isLoading: false,
+              isStreaming: false,
+              isTyping: false,
+              abortController: null
+            }));
+            return;
+          }
+
           console.error('[chat-store] Failed to send message:', error);
 
           // ✅ OPTIMISTIC UI ERROR HANDLING:
@@ -693,8 +849,17 @@ export const useChatStore = create<ChatState>()(
             messages: state.messages.filter(msg => msg.id !== typingMessageId).concat(errorMessage),
             isLoading: false,
             isStreaming: false,
-            isTyping: false
+            isTyping: false,
+            abortController: null
           }));
+        }
+      },
+
+      // Stop generation: abort streaming and keep current content
+      stopGeneration: () => {
+        const { abortController } = get();
+        if (abortController) {
+          abortController.abort();
         }
       },
       
@@ -702,15 +867,15 @@ export const useChatStore = create<ChatState>()(
       processStructuredElements: async (elements: any[]) => {
         const menuStore = useRealtimeMenuStore.getState();
         const menuCards: MenuItem[] = [];
-        
+
         for (const element of elements) {
           if (element.type === 'menu_card' && element.item_id) {
             // Find the menu item by ID
-            const menuItem = menuStore.menuItems.find(item => 
-              item.id === element.item_id || 
+            const menuItem = menuStore.menuItems.find(item =>
+              item.id === element.item_id ||
               item.name.toLowerCase().replace(/\s+/g, '_') === element.item_id
             );
-            
+
             if (menuItem && menuItem.active) {
               menuCards.push(menuItem);
             }
@@ -718,6 +883,143 @@ export const useChatStore = create<ChatState>()(
         }
 
         return menuCards;
+      },
+
+      // NEW: Cart proposal actions
+      setPendingCartProposal: (proposal: CartProposal | null) => {
+        set({ pendingCartProposal: proposal });
+      },
+
+      openCartConfirmDialog: () => {
+        set({ isCartConfirmOpen: true });
+      },
+
+      closeCartConfirmDialog: () => {
+        set({ isCartConfirmOpen: false });
+      },
+
+      confirmCartProposal: async (items: CartProposalItem[]) => {
+        const cartStore = useCartStore.getState();
+        const menuStore = useRealtimeMenuStore.getState();
+        const { pendingCartProposal } = get();
+
+        if (!pendingCartProposal) return;
+
+        try {
+          for (const item of items) {
+            // Find the full menu item from the store
+            const menuItem = menuStore.menuItems.find(mi => mi.id === item.menu_item_id);
+
+            if (menuItem) {
+              // Find variant if specified
+              const variant = item.variant_id
+                ? menuItem.variants?.find(v => v.id === item.variant_id)
+                : null;
+
+              // Add to cart
+              cartStore.addItem(
+                menuItem,
+                variant || null,
+                item.quantity,
+                item.customizations || [],
+                cartStore.currentOrderMode,
+                item.notes
+              );
+            }
+          }
+
+          // Sync cart after adding items
+          await cartStore.fetchCartFromSupabase();
+
+          toast.success('Items added to cart');
+        } catch (error) {
+          console.error('[chat-store] Failed to confirm cart proposal:', error);
+          toast.error('Failed to add items to cart');
+        }
+
+        // Clear the proposal
+        set({
+          pendingCartProposal: null,
+          isCartConfirmOpen: false
+        });
+      },
+
+      cancelCartProposal: () => {
+        set({
+          pendingCartProposal: null,
+          isCartConfirmOpen: false
+        });
+      },
+
+      // NEW: Handle unified structured events
+      handleStructuredEvent: (event: StructuredEvent, messageId: string) => {
+        if (isTextDeltaEvent(event)) {
+          // Text deltas are handled in the streaming loop
+          return;
+        }
+
+        if (isMenuRefsEvent(event)) {
+          // Add menu refs to the message for card rendering
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, menuRefs: [...(msg.menuRefs || []), ...event.items] }
+                : msg
+            )
+          }));
+          return;
+        }
+
+        if (isSuggestedActionsEvent(event)) {
+          // Add suggested actions to the message
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, suggestedActions: event.actions }
+                : msg
+            )
+          }));
+          return;
+        }
+
+        if (isCartProposalEvent(event)) {
+          // Set pending cart proposal and open confirmation dialog
+          set({
+            pendingCartProposal: event.proposal,
+            isCartConfirmOpen: true
+          });
+          return;
+        }
+
+        if (isMetadataEvent(event)) {
+          // Store metadata on the message
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    metadata: {
+                      ...msg.metadata,
+                      intent: event.intent,
+                      confidence: event.confidence,
+                      toolsUsed: event.toolsUsed
+                    }
+                  }
+                : msg
+            )
+          }));
+          return;
+        }
+
+        if (isErrorEvent(event)) {
+          console.error('[chat-store] Structured event error:', event.code, event.message);
+          if (!event.recoverable) {
+            toast.error(event.message || 'An error occurred');
+          }
+          return;
+        }
+
+        // isCompleteEvent is handled in the streaming loop
       },
 
       // User Context Actions
@@ -754,14 +1056,13 @@ export const useChatStore = create<ChatState>()(
       // Session Management
       startNewSession: () => {
         const newSessionId = generateSessionId();
-        const { userContext, config } = get();
+        const { config } = get();
 
         const welcomeMessage: ChatMessage = {
           id: `welcome_${newSessionId}`,
           content: config.welcomeMessage,
           sender: 'bot',
-          timestamp: new Date(),
-          status: 'sent'
+          timestamp: new Date()
         };
 
         set({
@@ -769,7 +1070,7 @@ export const useChatStore = create<ChatState>()(
           messages: [welcomeMessage],
           isLoading: false,
           isStreaming: false,
-          error: null
+          isTyping: false
         });
       },
 
@@ -795,20 +1096,35 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // Load system prompt from primary agent config
+      // Phase 6: Load system prompt from agentConfigStore (unified source)
+      // Note: The actual system prompt is built on the backend using build_complete_prompt()
+      // This function now just loads agent identity for UI display
       loadSystemPrompt: async () => {
         set({ isLoadingPrompt: true });
         try {
-          const response = await fetch(`${API_URL}/api/system-prompt?channel=chat`);
-          if (response.ok) {
-            const data = await response.json();
+          // Fetch config from unified store
+          await useAgentConfigStore.getState().fetchConfig();
+          const agentConfig = useAgentConfigStore.getState().config;
 
-            set({
-              systemPrompt: data.prompt,
-              agentName: data.agent_name,
-              agentNationality: data.nationality,
-              isLoadingPrompt: false
-            });
+          if (agentConfig) {
+            const chatConfig = agentConfig.channel_settings?.chat;
+
+            set((state) => ({
+              // The systemPrompt is built on backend, but we cache it here for reference
+              systemPrompt: chatConfig?.system_prompt || '',
+              agentName: agentConfig.agent_name || 'Uncle Raj',
+              agentNationality: agentConfig.personality_settings?.nationality || '',
+              isLoadingPrompt: false,
+              // Phase 6 Fix: Also update config.botAvatar and botName for ChatTriggerButton widget
+              config: {
+                ...state.config,
+                botName: agentConfig.agent_name || state.config.botName,
+                botAvatar: agentConfig.agent_avatar_url || state.config.botAvatar,
+              }
+            }));
+          } else {
+            console.warn('[chat-store] No agent config found, using defaults');
+            set({ isLoadingPrompt: false });
           }
         } catch (error) {
           console.error('[chat-store] Failed to load system prompt:', error);
@@ -864,6 +1180,19 @@ export const useShowVoiceTCScreen = () => useChatStore((state) => state.showVoic
 export const useLiveTranscript = () => useChatStore((state) => state.liveTranscript);
 export const useIsAISpeaking = () => useChatStore((state) => state.isAISpeaking);
 
+// NEW: Cart proposal selector hooks
+export const usePendingCartProposal = () => useChatStore((state) => state.pendingCartProposal);
+export const useIsCartConfirmOpen = () => useChatStore((state) => state.isCartConfirmOpen);
+
+// NEW: Cart proposal actions hook
+export const useCartProposalActions = () => useChatStore((state) => ({
+  setPendingCartProposal: state.setPendingCartProposal,
+  openCartConfirmDialog: state.openCartConfirmDialog,
+  closeCartConfirmDialog: state.closeCartConfirmDialog,
+  confirmCartProposal: state.confirmCartProposal,
+  cancelCartProposal: state.cancelCartProposal,
+}));
+
 // Actions hook
 export const useChatActions = () => useChatStore((state) => ({
   toggleChat: state.toggleChat,
@@ -883,7 +1212,13 @@ export const useChatActions = () => useChatStore((state) => ({
   endVoiceCall: state.endVoiceCall,
   setVoiceCallId: state.setVoiceCallId,
   updateVoiceStatus: state.updateVoiceStatus,
-  setShowVoiceTCScreen: state.setShowVoiceTCScreen
+  setShowVoiceTCScreen: state.setShowVoiceTCScreen,
+  // Stop generation
+  stopGeneration: state.stopGeneration,
+  // NEW: Cart proposal actions
+  confirmCartProposal: state.confirmCartProposal,
+  cancelCartProposal: state.cancelCartProposal,
+  handleStructuredEvent: state.handleStructuredEvent,
 }));
 
 // Helper functions
