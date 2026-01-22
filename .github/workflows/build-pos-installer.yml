@@ -98,7 +98,11 @@ jobs:
               "input-otp": "^1.2.4",
               "react-day-picker": "8.10.1",
               "next-themes": "^0.3.0",
-              "react-resizable-panels": "^2.1.2"
+              "react-resizable-panels": "^2.1.2",
+              "uuid": "^13.0.0",
+              "lodash": "4.17.21",
+              "immer": "10.1.1",
+              "nanoid": "5.1.5"
             },
             "devDependencies": {
               "@vitejs/plugin-react": "^4.0.0",
