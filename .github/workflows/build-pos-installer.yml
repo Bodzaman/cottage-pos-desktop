@@ -116,7 +116,7 @@ jobs:
 
       - name: Install electron dependencies
         working-directory: electron
-        run: npm install --legacy-peer-deps
+        run: npm install
 
       # Create production .env file from GitHub secrets
       - name: Create production environment file
