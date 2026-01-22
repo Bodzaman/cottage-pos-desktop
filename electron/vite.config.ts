@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
       // IMPORTANT: Use local brain.ts (app-compat) instead of frontend brain
       // This routes API calls to Supabase directly, not backend HTTP endpoints
       'brain': path.resolve(__dirname, 'lib/brain.ts'),
-      'types': path.resolve(__dirname, '../frontend/src/brain/data-contracts.ts'),
+      'types': path.resolve(__dirname, '../frontend/src/types'),
       'app': path.resolve(__dirname, '../frontend/src/app'),
       'pages': path.resolve(__dirname, '../frontend/src/pages'),
 
