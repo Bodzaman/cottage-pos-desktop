@@ -1887,18 +1887,25 @@ Write-Output 'SUCCESS'
 
         log.info(`[Windows Print] Sending raw data to printer: ${printerName}, file: ${filePath}`);
 
-        const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
-        const { stdout, stderr } = await execAsync(
-            `powershell -NoProfile -NonInteractive -EncodedCommand ${encodedScript}`,
-            { timeout: 30000 }
-        );
+        // Write script to temp file to avoid Windows 8191-char command line limit
+        const scriptFile = path.join(os.tmpdir(), `raw-print-${Date.now()}.ps1`);
+        await fs.writeFile(scriptFile, psScript, 'utf8');
 
-        const output = stdout.trim();
-        if (output !== 'SUCCESS') {
-            throw new Error(`Windows raw print failed: ${output || stderr || 'unknown error'}`);
+        try {
+            const { stdout, stderr } = await execAsync(
+                `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptFile}"`,
+                { timeout: 30000 }
+            );
+
+            const output = stdout.trim();
+            if (output !== 'SUCCESS') {
+                throw new Error(`Windows raw print failed: ${output || stderr || 'unknown error'}`);
+            }
+
+            log.info(`[Windows Print] Raw data sent successfully to ${printerName}`);
+        } finally {
+            await fs.unlink(scriptFile).catch(() => {});
         }
-
-        log.info(`[Windows Print] Raw data sent successfully to ${printerName}`);
     }
 
     /**
