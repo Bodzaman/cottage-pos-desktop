@@ -26,15 +26,19 @@ jobs:
         with:
           node-version: '20'
 
+      # Clean npm cache to avoid Windows EPERM issues
+      - name: Clean npm cache
+        run: npm cache clean --force
+
       # Install frontend dependencies first (electron references these)
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --no-optional
 
       # Install electron dependencies
       - name: Install electron dependencies
         working-directory: electron
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --no-optional
 
       # Create production .env file from GitHub secrets
       - name: Create production environment file
