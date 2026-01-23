@@ -9,6 +9,9 @@ electron/release/
 frontend/dist/
 dist/
 build/
+!electron/build/
+electron/build/*
+!electron/build/icon.*
 out/
 release/
 

@@ -17,6 +17,7 @@ import { computeUnitPrice } from 'utils/priceUtils';
 
 interface InlineMenuCardProps {
   itemId: string; // UUID of menu_item
+  itemData?: MenuItem; // Direct item data (bypasses store lookup when provided)
   className?: string;
   animationDelay?: number; // ✅ NEW: Delay in ms for staggered animations (default: 0)
 }
@@ -36,7 +37,7 @@ interface InlineMenuCardProps {
  * - Expandable description with "See more/See less"
  * - Supports both variant-based and single items
  */
-export function InlineMenuCard({ itemId, className, animationDelay = 0 }: InlineMenuCardProps) {
+export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0 }: InlineMenuCardProps) {
   // ✅ CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // This ensures consistent hook call order on every render (React Rules of Hooks)
   const { menuItems, itemVariants, proteinTypes, customizations, isLoading } = useRealtimeMenuStore();
@@ -48,8 +49,8 @@ export function InlineMenuCard({ itemId, className, animationDelay = 0 }: Inline
   const [selectedVariant, setSelectedVariant] = React.useState<ItemVariant | null>(null);
   const [quantity, setQuantity] = React.useState(1);
 
-  // Find menu item by UUID
-  const menuItem = menuItems?.find(item => item.id === itemId);
+  // Use provided item data or fall back to store lookup by UUID
+  const menuItem = itemData || menuItems?.find(item => item.id === itemId);
 
   // Get variants for this item (may be empty for single items)
   // Note: itemVariants from realtimeMenuStore use snake_case fields (menu_item_id, is_active)

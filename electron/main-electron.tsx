@@ -30,6 +30,7 @@ const LoadingFallback = () => (
  *
  * Uses MemoryRouter for SPA routing without URL bar
  * Only exposes POS Login and POS Desktop routes
+ * Always starts at POS Login — user must authenticate on every launch
  */
 function ElectronApp() {
   return (

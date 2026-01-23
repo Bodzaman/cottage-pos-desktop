@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickServe AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0A0A0A;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .splash-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Background glow effects */
+    .bg-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.4;
+      animation: glowPulse 6s ease-in-out infinite;
+    }
+
+    .bg-glow-1 {
+      top: -40px;
+      left: -60px;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+    }
+
+    .bg-glow-2 {
+      bottom: -40px;
+      right: -60px;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+      animation-delay: -3s;
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.15); }
+    }
+
+    /* Nucleus Animation */
+    .nucleus-container {
+      width: 80px;
+      height: 80px;
+      position: relative;
+      transform-style: preserve-3d;
+      perspective: 1000px;
+    }
+
+    .nucleus-core {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #FFFFFF 0%, #7C5DFA 100%);
+      box-shadow:
+        0 0 10px rgba(124, 93, 250, 0.8),
+        0 0 20px rgba(124, 93, 250, 0.4),
+        inset 0 0 5px rgba(255, 255, 255, 0.5);
+      animation: nucleusPulse 3s ease-in-out infinite;
+      z-index: 10;
+    }
+
+    @keyframes nucleusPulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(0.95);
+        box-shadow:
+          0 0 10px rgba(124, 93, 250, 0.6),
+          0 0 20px rgba(124, 93, 250, 0.3),
+          inset 0 0 5px rgba(255, 255, 255, 0.5);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.05);
+        box-shadow:
+          0 0 15px rgba(124, 93, 250, 0.9),
+          0 0 30px rgba(124, 93, 250, 0.5),
+          inset 0 0 8px rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .orbit-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      transform-style: preserve-3d;
+    }
+
+    .orbit-1 {
+      width: 68px;
+      height: 68px;
+      transform: translate(-50%, -50%) rotateX(60deg);
+      border: 1px solid rgba(124, 93, 250, 0.3);
+      animation: orbitRotate1 8s linear infinite;
+    }
+
+    .orbit-2 {
+      width: 56px;
+      height: 56px;
+      transform: translate(-50%, -50%) rotateX(75deg) rotateZ(120deg);
+      border: 1px solid rgba(124, 93, 250, 0.25);
+      animation: orbitRotate2 12s linear infinite;
+      animation-delay: -4s;
+    }
+
+    .orbit-3 {
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%) rotateX(85deg) rotateZ(240deg);
+      border: 1px solid rgba(124, 93, 250, 0.2);
+      animation: orbitRotate3 16s linear infinite;
+      animation-delay: -10.67s;
+    }
+
+    .electron {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: #FFFFFF;
+      box-shadow:
+        0 0 5px rgba(124, 93, 250, 0.8),
+        0 0 10px rgba(124, 93, 250, 0.4);
+    }
+
+    @keyframes orbitRotate1 {
+      from { transform: translate(-50%, -50%) rotateX(60deg) rotateZ(0deg); }
+      to { transform: translate(-50%, -50%) rotateX(60deg) rotateZ(360deg); }
+    }
+
+    @keyframes orbitRotate2 {
+      from { transform: translate(-50%, -50%) rotateX(75deg) rotateZ(120deg); }
+      to { transform: translate(-50%, -50%) rotateX(75deg) rotateZ(480deg); }
+    }
+
+    @keyframes orbitRotate3 {
+      from { transform: translate(-50%, -50%) rotateX(85deg) rotateZ(240deg); }
+      to { transform: translate(-50%, -50%) rotateX(85deg) rotateZ(600deg); }
+    }
+
+    /* Text: "QuickServe AI" with flying letters */
+    .brand-text {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .brand-text .letter {
+      display: inline-block;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      background: linear-gradient(135deg, #FFFFFF 20%, #A78BFA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      opacity: 0;
+      transform: translateY(-40px) scale(0);
+      animation: letterFlyIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .brand-text .space {
+      width: 0.4em;
+    }
+
+    @keyframes letterFlyIn {
+      0% {
+        opacity: 0;
+        transform: translateY(-40px) scale(0);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Staggered delays for each letter: Q-u-i-c-k-S-e-r-v-e-[space]-A-I */
+    .letter:nth-child(1)  { animation-delay: 0.30s; }
+    .letter:nth-child(2)  { animation-delay: 0.35s; }
+    .letter:nth-child(3)  { animation-delay: 0.40s; }
+    .letter:nth-child(4)  { animation-delay: 0.45s; }
+    .letter:nth-child(5)  { animation-delay: 0.50s; }
+    .letter:nth-child(6)  { animation-delay: 0.55s; }
+    .letter:nth-child(7)  { animation-delay: 0.60s; }
+    .letter:nth-child(8)  { animation-delay: 0.65s; }
+    .letter:nth-child(9)  { animation-delay: 0.70s; }
+    .letter:nth-child(10) { animation-delay: 0.75s; }
+    .letter:nth-child(11) { animation-delay: 0.80s; } /* space */
+    .letter:nth-child(12) { animation-delay: 0.85s; }
+    .letter:nth-child(13) { animation-delay: 0.90s; }
+
+    /* Subtitle */
+    .subtitle {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 0.02em;
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+      animation-delay: 1.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Loading indicator */
+    .loading-bar {
+      width: 120px;
+      height: 2px;
+      background: rgba(124, 58, 237, 0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+      animation-delay: 1.6s;
+    }
+
+    .loading-bar-fill {
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(90deg, #7C3AED, #A78BFA);
+      border-radius: 2px;
+      animation: loadingSlide 1.5s ease-in-out infinite;
+      animation-delay: 1.6s;
+    }
+
+    @keyframes loadingSlide {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(150%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* Fade out when app is ready */
+    body.fade-out {
+      animation: fadeOut 0.3s ease forwards;
+    }
+
+    @keyframes fadeOut {
+      to { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Background glows -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <div class="splash-container">
+    <!-- Nucleus Animation -->
+    <div class="nucleus-container">
+      <div class="nucleus-core"></div>
+      <div class="orbit-ring orbit-1"><div class="electron"></div></div>
+      <div class="orbit-ring orbit-2"><div class="electron"></div></div>
+      <div class="orbit-ring orbit-3"><div class="electron"></div></div>
+    </div>
+
+    <!-- Brand text with flying letters -->
+    <div class="brand-text">
+      <span class="letter">Q</span>
+      <span class="letter">u</span>
+      <span class="letter">i</span>
+      <span class="letter">c</span>
+      <span class="letter">k</span>
+      <span class="letter">S</span>
+      <span class="letter">e</span>
+      <span class="letter">r</span>
+      <span class="letter">v</span>
+      <span class="letter">e</span>
+      <span class="letter space"> </span>
+      <span class="letter">A</span>
+      <span class="letter">I</span>
+    </div>
+
+    <!-- Subtitle -->
+    <div class="subtitle">AI-Powered Restaurant Platform</div>
+
+    <!-- Loading indicator -->
+    <div class="loading-bar">
+      <div class="loading-bar-fill"></div>
+    </div>
+  </div>
+
+  <script>
+    // Listen for fade-out signal from main process
+    window.addEventListener('message', (event) => {
+      if (event.data === 'fade-out') {
+        document.body.classList.add('fade-out');
+      }
+    });
+  </script>
+</body>
+</html>

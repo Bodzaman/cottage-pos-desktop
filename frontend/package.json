@@ -75,7 +75,6 @@
     "@pdfme/generator": "5.3.3",
     "@pdfme/schemas": "5.3.3",
     "@pdfme/ui": "5.3.3",
-    "@play-ai/agent-web-sdk": "^0.1.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",

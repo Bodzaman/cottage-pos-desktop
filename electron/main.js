@@ -565,7 +565,8 @@ class CottageTandooriPOS {
         this.tray = null;
         this.defaultPrinter = null;
         this.isProduction = !process.defaultApp;
-        
+        this.isManualUpdateCheck = false;
+
         this.init();
     }
 
@@ -581,11 +582,16 @@ class CottageTandooriPOS {
         app.on('second-instance', () => {
             if (this.mainWindow) {
                 if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+                this.mainWindow.show();
                 this.mainWindow.focus();
+            } else {
+                this.createSplashScreen();
+                this.createMainWindow();
             }
         });
 
         app.whenReady().then(() => {
+            this.createSplashScreen();
             this.createMainWindow();
             this.setupPrinting();
             this.setupStripePayments();
@@ -606,6 +612,24 @@ class CottageTandooriPOS {
                 this.createMainWindow();
             }
         });
+    }
+
+    createSplashScreen() {
+        this.splashStartTime = Date.now();
+        this.splashWindow = new BrowserWindow({
+            frame: false,
+            transparent: true,
+            alwaysOnTop: true,
+            resizable: false,
+            skipTaskbar: true,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+        this.splashWindow.maximize();
+        this.splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+        log.info('Splash screen displayed');
     }
 
     createMainWindow() {
@@ -651,10 +675,30 @@ class CottageTandooriPOS {
         }
 
         this.mainWindow.once('ready-to-show', () => {
-            this.mainWindow.maximize();
-            this.mainWindow.show();
-            this.mainWindow.focus();
-            log.info('POS window loaded successfully');
+            // Ensure splash shows for at least 2.5s so the animation is visible
+            const splashMinTime = 2500;
+            const elapsed = Date.now() - (this.splashStartTime || 0);
+            const remainingDelay = Math.max(0, splashMinTime - elapsed);
+
+            setTimeout(() => {
+                // Dismiss splash screen
+                if (this.splashWindow && !this.splashWindow.isDestroyed()) {
+                    this.splashWindow.webContents.executeJavaScript(
+                        "document.body.classList.add('fade-out')"
+                    ).catch(() => {});
+                    setTimeout(() => {
+                        if (this.splashWindow && !this.splashWindow.isDestroyed()) {
+                            this.splashWindow.destroy();
+                            this.splashWindow = null;
+                        }
+                    }, 350);
+                }
+
+                this.mainWindow.maximize();
+                this.mainWindow.show();
+                this.mainWindow.focus();
+                log.info('POS window loaded successfully');
+            }, remainingDelay);
         });
 
         this.mainWindow.on('closed', () => {
@@ -711,9 +755,15 @@ class CottageTandooriPOS {
                         label: 'Check for Updates',
                         click: () => {
                             if (autoUpdater) {
-                                autoUpdater.checkForUpdatesAndNotify();
+                                this.isManualUpdateCheck = true;
+                                autoUpdater.checkForUpdates();
                             } else {
-                                log.info('Auto-updater not available in development mode');
+                                dialog.showMessageBox(this.mainWindow, {
+                                    type: 'info',
+                                    title: 'Updates',
+                                    message: 'Auto-updater is not available in development mode.',
+                                    buttons: ['OK']
+                                });
                             }
                         }
                     },
@@ -723,11 +773,8 @@ class CottageTandooriPOS {
                             dialog.showMessageBox(this.mainWindow, {
                                 type: 'info',
                                 title: 'About Cottage Tandoori POS',
-                                message: 'Cottage Tandoori POS v1.0.0',
-                                detail: `Professional Restaurant Point of Sale System
-
-Built with Electron
-Copyright © 2024 Cottage Tandoori Restaurant`
+                                message: `Cottage Tandoori POS v${app.getVersion()}`,
+                                detail: `Professional Restaurant Point of Sale System\n\nBuilt with Electron ${process.versions.electron}\nCopyright \u00A9 ${new Date().getFullYear()} Cottage Tandoori Restaurant`
                             });
                         }
                     }
@@ -748,8 +795,7 @@ Copyright © 2024 Cottage Tandoori Restaurant`
         // Lazily load electron-updater after app is ready
         autoUpdater = require('electron-updater').autoUpdater;
         autoUpdater.logger = log;
-
-        autoUpdater.checkForUpdatesAndNotify();
+        autoUpdater.autoDownload = false;
 
         autoUpdater.on('checking-for-update', () => {
             log.info('Checking for updates...');
@@ -757,27 +803,82 @@ Copyright © 2024 Cottage Tandoori Restaurant`
 
         autoUpdater.on('update-available', (info) => {
             log.info('Update available:', info.version);
+            if (this.mainWindow) {
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'Update Available',
+                    message: `A new version (v${info.version}) is available.`,
+                    detail: `Current version: v${app.getVersion()}\nNew version: v${info.version}\n\nWould you like to download it now?`,
+                    buttons: ['Download', 'Later'],
+                    defaultId: 0,
+                    cancelId: 1
+                }).then(({ response }) => {
+                    if (response === 0) {
+                        autoUpdater.downloadUpdate();
+                    }
+                });
+            }
         });
 
         autoUpdater.on('update-not-available', (info) => {
-            log.info('Update not available:', info.version);
+            log.info('No update available. Current version:', app.getVersion());
+            if (this.isManualUpdateCheck && this.mainWindow) {
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'No Updates Available',
+                    message: 'You are running the latest version.',
+                    detail: `Current version: v${app.getVersion()}`,
+                    buttons: ['OK']
+                });
+            }
+            this.isManualUpdateCheck = false;
         });
 
         autoUpdater.on('error', (err) => {
             log.error('Error in auto-updater:', err);
+            if (this.isManualUpdateCheck && this.mainWindow) {
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'error',
+                    title: 'Update Error',
+                    message: 'Failed to check for updates.',
+                    detail: `Error: ${err.message}\n\nPlease check your internet connection and try again.`,
+                    buttons: ['OK']
+                });
+            }
+            this.isManualUpdateCheck = false;
         });
 
         autoUpdater.on('download-progress', (progressObj) => {
-            let log_message = "Download speed: " + progressObj.bytesPerSecond;
-            log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-            log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-            log.info(log_message);
+            log.info(`Download: ${Math.round(progressObj.percent)}% (${progressObj.transferred}/${progressObj.total})`);
+            if (this.mainWindow) {
+                this.mainWindow.setProgressBar(progressObj.percent / 100);
+            }
         });
 
         autoUpdater.on('update-downloaded', (info) => {
             log.info('Update downloaded:', info.version);
-            autoUpdater.quitAndInstall();
+            if (this.mainWindow) {
+                this.mainWindow.setProgressBar(-1);
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'Update Ready',
+                    message: `Version ${info.version} has been downloaded.`,
+                    detail: 'The update will be installed when you restart the application. Would you like to restart now?',
+                    buttons: ['Restart Now', 'Later'],
+                    defaultId: 0,
+                    cancelId: 1
+                }).then(({ response }) => {
+                    if (response === 0) {
+                        autoUpdater.quitAndInstall(false, true);
+                    }
+                });
+            }
+            this.isManualUpdateCheck = false;
         });
+
+        // Auto-check on startup (silent unless update found)
+        this.isManualUpdateCheck = false;
+        autoUpdater.checkForUpdates();
     }
 
     setupPrinting() {
@@ -1081,9 +1182,15 @@ Copyright © 2024 Cottage Tandoori Restaurant`
                 label: 'Check for Updates',
                 click: () => {
                     if (autoUpdater) {
-                        autoUpdater.checkForUpdatesAndNotify();
+                        this.isManualUpdateCheck = true;
+                        autoUpdater.checkForUpdates();
                     } else {
-                        log.info('Auto-updater not available in development mode');
+                        dialog.showMessageBox(null, {
+                            type: 'info',
+                            title: 'Updates',
+                            message: 'Auto-updater is not available in development mode.',
+                            buttons: ['OK']
+                        });
                     }
                 }
             },
@@ -1101,6 +1208,9 @@ Copyright © 2024 Cottage Tandoori Restaurant`
             if (this.mainWindow) {
                 this.mainWindow.show();
                 this.mainWindow.focus();
+            } else {
+                this.createSplashScreen();
+                this.createMainWindow();
             }
         });
     }

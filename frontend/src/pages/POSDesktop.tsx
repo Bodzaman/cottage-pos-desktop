@@ -57,6 +57,8 @@ import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal'
 import { DineInBillPreviewModal } from 'components/DineInBillPreviewModal';
 import { CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
 import { POSFooter } from 'components/POSFooter';
+import { POSLockScreen } from 'components/POSLockScreen';
+import { AnimatePresence } from 'framer-motion';
 import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
@@ -93,7 +95,49 @@ export default function POSDesktop() {
   const navigate = useNavigate();
   const location = useLocation();
   useSimpleAuth();
-  const { user, isAuthenticated, isLoading: authLoading, logout } = usePOSAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout, pinEnabled } = usePOSAuth();
+
+  // Lock screen state with 10-minute inactivity timeout
+  const [isLocked, setIsLocked] = useState(false);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    // Only set timer if PIN is enabled (otherwise lock screen won't work)
+    if (pinEnabled) {
+      inactivityTimerRef.current = setTimeout(() => {
+        setIsLocked(true);
+      }, INACTIVITY_TIMEOUT);
+    }
+  }, [pinEnabled]);
+
+  useEffect(() => {
+    if (!pinEnabled) return;
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    const handleActivity = () => resetInactivityTimer();
+
+    events.forEach(event => window.addEventListener(event, handleActivity));
+    resetInactivityTimer(); // Start timer on mount
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, handleActivity));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [pinEnabled, resetInactivityTimer]);
+
+  const handleUnlock = useCallback(() => {
+    setIsLocked(false);
+    resetInactivityTimer();
+  }, [resetInactivityTimer]);
+
+  // F4 shortcut handler - lock screen manually
+  const handleLockScreen = useCallback(() => {
+    if (pinEnabled) setIsLocked(true);
+  }, [pinEnabled]);
 
   // 🎯 DRAFT/PUBLISH WORKFLOW: Set POS context to only see published menu items
   // This must be called BEFORE any store initialization
@@ -617,6 +661,50 @@ export default function POSDesktop() {
     );
   };
 
+  // Keyboard shortcuts: F1-F5 for POS actions
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when lock screen is active or in input fields
+      if (isLocked) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case 'F1':
+          e.preventDefault();
+          handleClearOrder();
+          toast.info('New order started');
+          break;
+        case 'F2':
+          e.preventDefault();
+          if (orderItems.length > 0) {
+            setShowPaymentChoiceModal(true);
+          } else {
+            toast.warning('Add items before checkout');
+          }
+          break;
+        case 'F3':
+          e.preventDefault();
+          if (orderItems.length > 0) {
+            printing.handlePrintReceipt(orderTotal);
+          }
+          break;
+        case 'F4':
+          e.preventDefault();
+          handleLockScreen();
+          break;
+        case 'F5':
+          e.preventDefault();
+          loadPOSBundle();
+          toast.info('Menu refreshed');
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen]);
+
   if (authLoading) return <div className="h-screen w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
   if (!isAuthenticated) return null;
 
@@ -702,6 +790,10 @@ export default function POSDesktop() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/* Lock Screen Overlay */}
+        <AnimatePresence>
+          {isLocked && <POSLockScreen onUnlock={handleUnlock} />}
+        </AnimatePresence>
       </div>
     </CustomizeOrchestratorProvider>
   );

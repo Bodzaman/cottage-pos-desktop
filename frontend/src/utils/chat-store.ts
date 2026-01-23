@@ -222,8 +222,7 @@ interface ChatState {
   
   // Configuration
   updateConfig: (config: Partial<ChatState['config']>) => void;
-  loadChatbotConfig: () => Promise<void>;
-  
+
   // NEW: Load system prompt from primary agent
   loadSystemPrompt: () => Promise<void>;
 }
@@ -520,14 +519,22 @@ export const useChatStore = create<ChatState>()(
           let isFirstChunk = true;
           let botMessageId = ''; // Will be set when we replace typing indicator
           
-          // Process streaming events
+          // Process streaming events with line buffering
+          // (large JSON payloads like structured_data can span multiple chunks)
+          let lineBuffer = '';
+          let streamComplete = false;
+
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
-            
+            if (done || streamComplete) break;
+
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            
+            lineBuffer += chunk;
+
+            // Split into complete lines, keep last (possibly incomplete) line in buffer
+            const lines = lineBuffer.split('\n');
+            lineBuffer = lines.pop() || '';
+
             for (const line of lines) {
               if (line.trim()) {
                 try {
@@ -614,8 +621,10 @@ export const useChatStore = create<ChatState>()(
                         bufferTimer = null;
                       }, BUFFER_INTERVAL);
                     } else if (event.type === 'structured_data' && event.items) {
-                      // ✅ NEW: Handle structured menu data with images from backend
-                      
+                      // Handle structured menu data with images from backend
+                      console.log(`[chat-store] Received structured_data: ${event.items.length} items`,
+                        event.items.map((i: any) => i.name));
+
                       // Flush text buffer immediately before adding structured data
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
                       
@@ -648,6 +657,7 @@ export const useChatStore = create<ChatState>()(
                             : msg
                         )
                       }));
+                      console.log(`[chat-store] menuCards updated: ${structuredMenuCards.length} cards for message ${botMessageId}`);
                     } else if (event.type === 'ui_element' && event.element === 'menu_card') {
                       // Flush buffer immediately before adding menu card
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
@@ -807,6 +817,7 @@ export const useChatStore = create<ChatState>()(
                         isTyping: false,
                         abortController: null
                       }));
+                      streamComplete = true;
                       break;
                     }
                   }
@@ -1081,21 +1092,6 @@ export const useChatStore = create<ChatState>()(
         }));
       },
 
-      // Load chatbot configuration from API
-      loadChatbotConfig: async () => {
-        try {
-          const response = await fetch(`${API_URL}/chatbot/config`);
-          if (response.ok) {
-            const config = await response.json();
-            set((state) => ({
-              config: { ...state.config, ...config }
-            }));
-          }
-        } catch (error) {
-          console.error('[chat-store] Failed to load chat configuration:', error);
-        }
-      },
-
       // Phase 6: Load system prompt from agentConfigStore (unified source)
       // Note: The actual system prompt is built on the backend using build_complete_prompt()
       // This function now just loads agent identity for UI display
@@ -1207,7 +1203,6 @@ export const useChatActions = () => useChatStore((state) => ({
   setStreaming: state.setStreaming,
   setUserContext: state.setUserContext,
   startNewSession: state.startNewSession,
-  loadChatbotConfig: state.loadChatbotConfig,
   startVoiceCall: state.startVoiceCall,
   endVoiceCall: state.endVoiceCall,
   setVoiceCallId: state.setVoiceCallId,

@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from './supabaseClient';
 
+/** Compute SHA-256 hash of PIN + userId for offline verification */
+async function hashPinLocally(pin: string, userId: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin + ':' + userId);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 interface POSStaffUser {
   userId: string;
   username: string;
@@ -12,9 +21,17 @@ interface POSAuthStore {
   user: POSStaffUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
+  // PIN state (persisted)
+  pinEnabled: boolean;
+  lastUserId: string | null;
+  lastUserName: string | null;
+  localPinHash: string | null;
+
   // Actions
   login: (username: string, password: string) => Promise<void>;
+  loginWithPin: (pin: string) => Promise<boolean>;
+  setPin: (pin: string) => Promise<boolean>;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
@@ -30,6 +47,10 @@ export const usePOSAuth = create<POSAuthStore>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      pinEnabled: false,
+      lastUserId: null,
+      lastUserName: null,
+      localPinHash: null,
 
       login: async (username: string, password: string) => {
         set({ isLoading: true });
@@ -59,11 +80,85 @@ export const usePOSAuth = create<POSAuthStore>()(
               fullName: user.full_name
             },
             isAuthenticated: true,
-            isLoading: false
+            isLoading: false,
+            lastUserId: user.user_id,
+            lastUserName: user.full_name
           });
         } catch (error) {
           set({ isLoading: false, isAuthenticated: false, user: null });
           throw error;
+        }
+      },
+
+      loginWithPin: async (pin: string): Promise<boolean> => {
+        const { lastUserId, localPinHash, user } = get();
+        if (!lastUserId) return false;
+
+        set({ isLoading: true });
+
+        // Try server-side verification first (when online)
+        try {
+          const { data, error } = await supabase.rpc('pos_staff_login_pin', {
+            p_user_id: lastUserId,
+            p_pin: pin
+          });
+
+          if (!error && data?.success) {
+            set({
+              user: {
+                userId: data.user_id,
+                username: data.username,
+                fullName: data.full_name
+              },
+              isAuthenticated: true,
+              isLoading: false
+            });
+            return true;
+          }
+
+          // RPC returned invalid PIN (not a network error)
+          if (!error && data && !data.success) {
+            set({ isLoading: false });
+            return false;
+          }
+        } catch {
+          // Network error — fall through to offline verification
+        }
+
+        // Offline fallback: verify against local SHA-256 hash
+        if (localPinHash && user) {
+          const computedHash = await hashPinLocally(pin, lastUserId);
+          if (computedHash === localPinHash) {
+            set({ isAuthenticated: true, isLoading: false });
+            return true;
+          }
+        }
+
+        set({ isLoading: false });
+        return false;
+      },
+
+      setPin: async (pin: string): Promise<boolean> => {
+        const { user } = get();
+        if (!user) return false;
+
+        try {
+          const { error } = await supabase.rpc('pos_staff_set_pin', {
+            p_user_id: user.userId,
+            p_pin: pin
+          });
+
+          if (error) {
+            console.error('Set PIN error:', error);
+            return false;
+          }
+
+          // Store local hash for offline verification
+          const localHash = await hashPinLocally(pin, user.userId);
+          set({ pinEnabled: true, localPinHash: localHash });
+          return true;
+        } catch {
+          return false;
         }
       },
 
@@ -93,7 +188,11 @@ export const usePOSAuth = create<POSAuthStore>()(
       name: 'pos-auth-storage',
       partialize: (state) => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated
+        isAuthenticated: state.isAuthenticated,
+        pinEnabled: state.pinEnabled,
+        lastUserId: state.lastUserId,
+        lastUserName: state.lastUserName,
+        localPinHash: state.localPinHash
       })
     }
   )

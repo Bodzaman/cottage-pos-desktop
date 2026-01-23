@@ -94,6 +94,7 @@ export class GeminiVoiceClient {
   private state: GeminiVoiceState = "idle";
   private options: GeminiVoiceClientOptions;
   private menuContext: string = "";
+  private assembledSystemPrompt: string = "";
   private apiKey: string = "";
 
   // Flag to track if we should send audio (pause when Gemini is responding)
@@ -132,8 +133,8 @@ export class GeminiVoiceClient {
     try {
       this.setState("requesting-token");
 
-      // 1) Fetch menu context
-      await this.fetchMenuContext();
+      // 1) Fetch assembled system prompt from backend (includes menu context)
+      await this.fetchSystemPrompt();
 
       // 2) Get ephemeral token from backend (Phase 2.2)
       const resp = await brain.create_gemini_voice_session({});
@@ -434,26 +435,7 @@ export class GeminiVoiceClient {
           },
           systemInstruction: {
             parts: [{
-              text: (this.options.systemPrompt || `You are the AI voice assistant for Cottage Tandoori restaurant. Be friendly, concise, and help customers order food.
-
-IMPORTANT GUIDELINES:
-- Always confirm items, quantities, and any special requests
-- Check for allergens when requested
-- Use the add_to_cart function when customer orders items
-- Use check_allergens function when asked about allergens
-- Keep responses brief and natural
-- If unsure about an item, check the menu
-
-MENU:
-${this.menuContext}
-
-You have access to these functions:
-- add_to_cart(item_name, quantity, notes) - Add items to cart
-- remove_from_cart(item_name) - Remove items
-- check_allergens(item_name) - Check allergen information
-
-Always use functions to perform cart operations.`) +
-              (this.options.firstResponse ? `\n\nIMPORTANT: When the session starts, immediately greet the user by saying: "${this.options.firstResponse}"` : '')
+              text: this.options.systemPrompt || this.assembledSystemPrompt || this.buildFallbackPrompt()
             }]
           },
           speechConfig: {
@@ -638,7 +620,29 @@ Always use functions to perform cart operations.`) +
     }
   }
 
-  private async fetchMenuContext(): Promise<void> {
+  private async fetchSystemPrompt(): Promise<void> {
+    try {
+      // Fetch assembled system prompt from backend (includes menu context, identity, safety, etc.)
+      const resp = await fetch('/routes/gemini-voice/system-prompt');
+      const data = await resp.json();
+      if (data?.success && data?.system_prompt) {
+        this.assembledSystemPrompt = data.system_prompt;
+        // Use first_response from backend config if not overridden via options
+        if (data.first_response && !this.options.firstResponse) {
+          this.options.firstResponse = data.first_response;
+        }
+        console.log(`[Voice] Fetched system prompt from backend (${data.layer_count} layers, ${data.total_chars} chars)`);
+      } else {
+        console.warn("[Voice] Backend returned unsuccessful, using fallback prompt");
+        await this.fetchMenuContextFallback();
+      }
+    } catch (e) {
+      console.warn("[Voice] Failed to fetch system prompt from backend, using fallback:", e);
+      await this.fetchMenuContextFallback();
+    }
+  }
+
+  private async fetchMenuContextFallback(): Promise<void> {
     try {
       const resp = await brain.get_menu_context();
       const data = await resp.json();
@@ -646,9 +650,36 @@ Always use functions to perform cart operations.`) +
         this.menuContext = data.menu_text;
       }
     } catch (e) {
-      console.warn("Failed to fetch menu context:", e);
       this.menuContext = "Menu currently unavailable. Please ask for available items.";
     }
+  }
+
+  private buildFallbackPrompt(): string {
+    // Fallback prompt used when backend /system-prompt endpoint is unavailable
+    const basePrompt = `You are the AI voice assistant for Cottage Tandoori restaurant. Be friendly, concise, and help customers order food.
+
+IMPORTANT GUIDELINES:
+- Always confirm items, quantities, and any special requests
+- Check for allergens when requested
+- Use the add_to_cart function when customer orders items
+- Use check_allergens function when asked about allergens
+- Keep responses brief and natural
+- If unsure about an item, check the menu
+
+MENU:
+${this.menuContext}
+
+You have access to these functions:
+- add_to_cart(item_name, quantity, notes) - Add items to cart
+- remove_from_cart(item_name) - Remove items
+- check_allergens(item_name) - Check allergen information
+
+Always use functions to perform cart operations.`;
+
+    if (this.options.firstResponse) {
+      return basePrompt + `\n\nIMPORTANT: When the session starts, immediately greet the user by saying: "${this.options.firstResponse}"`;
+    }
+    return basePrompt;
   }
 
   private async startMic() {

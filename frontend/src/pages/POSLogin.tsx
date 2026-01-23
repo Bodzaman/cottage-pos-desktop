@@ -10,9 +10,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePOSAuth } from 'utils/usePOSAuth';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { AnimatedNucleus } from 'components/AnimatedNucleus';
+import { PINPad } from 'components/PINPad';
 import { toast } from 'sonner';
 
 const APP_VERSION = 'v1.0.2';
+
+type LoginView = 'pin-login' | 'password' | 'pin-setup';
 
 export default function POSLogin() {
   const [username, setUsername] = useState('');
@@ -20,9 +23,14 @@ export default function POSLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [shakeError, setShakeError] = useState(false);
-  
+
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading } = usePOSAuth();
+  const { login, loginWithPin, setPin, isAuthenticated, isLoading, pinEnabled, lastUserId, lastUserName } = usePOSAuth();
+
+  // Determine initial view: PIN login if previously configured, otherwise password
+  const [view, setView] = useState<LoginView>(
+    pinEnabled && lastUserId ? 'pin-login' : 'password'
+  );
   
   // ============================================================================
   // NAVIGATION GUARDS - PREVENT REDIRECT LOOPS
@@ -63,11 +71,21 @@ export default function POSLogin() {
 
     try {
       await login(username, password);
-      
-      // Show success animation, then redirect after 1 second
+
+      // If PIN not yet configured, prompt to set one
+      if (!pinEnabled) {
+        setLoginSuccess(true);
+        toast.success('Login successful');
+        setTimeout(() => {
+          setView('pin-setup');
+          setLoginSuccess(false);
+        }, 800);
+        return;
+      }
+
+      // PIN already configured — go straight to POS
       setLoginSuccess(true);
       toast.success('Login successful');
-      
       setTimeout(() => {
         navigate('/pos-desktop', { replace: true });
       }, 1000);
@@ -140,8 +158,109 @@ export default function POSLogin() {
 
       {/* Main Container - Centers everything */}
       <div className="w-full max-w-md px-4 sm:px-0 relative z-10 flex flex-col items-center">
-        
-        {/* Login Card */}
+
+        {/* PIN Login View */}
+        {view === 'pin-login' && (
+          <motion.div
+            className="w-full"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            style={{
+              background: `linear-gradient(135deg, ${QSAITheme.background.secondary} 0%, ${QSAITheme.background.dark} 100%)`,
+              borderRadius: '16px',
+              border: `1px solid rgba(124, 93, 250, 0.15)`,
+              boxShadow: `0 20px 60px -10px rgba(0, 0, 0, 0.6), 0 0 40px ${QSAITheme.purple.glow}`,
+              padding: '2.5rem'
+            }}
+          >
+            <div className="flex flex-col items-center mb-6">
+              <AnimatedNucleus size={56} />
+              <h1
+                className="text-2xl font-bold mt-4"
+                style={{
+                  background: `linear-gradient(135deg, ${QSAITheme.text.primary} 20%, ${QSAITheme.purple.light} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                QuickServe AI
+              </h1>
+            </div>
+            <PINPad
+              mode="login"
+              staffName={lastUserName || undefined}
+              onSubmit={async (pin) => {
+                const success = await loginWithPin(pin);
+                if (success) {
+                  toast.success('Welcome back!');
+                  setTimeout(() => navigate('/pos-desktop', { replace: true }), 300);
+                }
+                return success;
+              }}
+              onSwitchToPassword={() => setView('password')}
+              isLoading={isLoading}
+            />
+          </motion.div>
+        )}
+
+        {/* PIN Setup View */}
+        {view === 'pin-setup' && (
+          <motion.div
+            className="w-full"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            style={{
+              background: `linear-gradient(135deg, ${QSAITheme.background.secondary} 0%, ${QSAITheme.background.dark} 100%)`,
+              borderRadius: '16px',
+              border: `1px solid rgba(124, 93, 250, 0.15)`,
+              boxShadow: `0 20px 60px -10px rgba(0, 0, 0, 0.6), 0 0 40px ${QSAITheme.purple.glow}`,
+              padding: '2.5rem'
+            }}
+          >
+            <div className="flex flex-col items-center mb-6">
+              <AnimatedNucleus size={56} />
+              <h2
+                className="text-xl font-bold mt-4"
+                style={{ color: QSAITheme.text.primary }}
+              >
+                Quick Access PIN
+              </h2>
+              <p
+                className="text-sm mt-2 text-center"
+                style={{ color: QSAITheme.text.muted }}
+              >
+                Set a 4-digit PIN for faster login next time
+              </p>
+            </div>
+            <PINPad
+              mode="set"
+              onSubmit={async (pin) => {
+                const success = await setPin(pin);
+                if (success) {
+                  toast.success('PIN set successfully!');
+                  setTimeout(() => navigate('/pos-desktop', { replace: true }), 500);
+                }
+                return success;
+              }}
+              isLoading={isLoading}
+            />
+            <button
+              onClick={() => navigate('/pos-desktop', { replace: true })}
+              className="w-full text-center text-xs mt-4 transition-colors duration-200"
+              style={{ color: QSAITheme.text.muted }}
+              onMouseEnter={(e) => e.currentTarget.style.color = QSAITheme.purple.light}
+              onMouseLeave={(e) => e.currentTarget.style.color = QSAITheme.text.muted}
+            >
+              Skip for now
+            </button>
+          </motion.div>
+        )}
+
+        {/* Password Login Card (existing) */}
+        {view === 'password' && (
         <motion.div 
           className="w-full"
           initial={{ opacity: 0, y: 20 }}
@@ -443,7 +562,8 @@ export default function POSLogin() {
             </motion.div>
           </form>
         </motion.div>
-        
+        )}
+
         {/* Footer Section - Outside Card */}
         <motion.div
           className="w-full flex flex-col items-center mt-8 space-y-4"
