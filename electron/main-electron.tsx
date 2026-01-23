@@ -18,10 +18,24 @@ import '../frontend/src/polyfills/react-polyfill';
 const POSDesktop = lazy(() => import('../frontend/src/pages/POSDesktop'));
 const POSLogin = lazy(() => import('../frontend/src/pages/POSLogin'));
 
-// Loading fallback for lazy components
+// Loading fallback for lazy components — uses inline styles to guarantee centering
+// even before Tailwind CSS loads
 const LoadingFallback = () => (
-  <div className="h-screen w-screen flex items-center justify-center bg-black">
-    <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full" />
+  <div style={{
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000'
+  }}>
+    <div style={{
+      width: 32, height: 32,
+      border: '2px solid #9333ea',
+      borderTopColor: 'transparent',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite'
+    }} />
   </div>
 );
 

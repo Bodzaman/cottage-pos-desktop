@@ -27,6 +27,7 @@ export function StaffManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isResetPinDialogOpen, setIsResetPinDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
 
   // Form states
@@ -196,6 +197,32 @@ export function StaffManagement() {
     }
   };
 
+  const handleResetPin = async () => {
+    if (!selectedStaff) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('pos_staff_reset_pin', {
+        p_user_id: selectedStaff.id
+      });
+
+      if (error) {
+        console.error('Failed to reset PIN:', error);
+        toast.error(error.message || 'Failed to reset PIN');
+        return;
+      }
+
+      toast.success(`PIN reset for ${selectedStaff.full_name || selectedStaff.username}. They will set a new PIN on next login.`);
+      setIsResetPinDialogOpen(false);
+      setSelectedStaff(null);
+    } catch (err) {
+      console.error('Error resetting PIN:', err);
+      toast.error('An error occurred while resetting PIN');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleToggleActive = async (user: StaffUser) => {
     try {
       const { error } = await supabase.rpc('pos_staff_update', {
@@ -358,6 +385,13 @@ export function StaffManagement() {
                             style={{ color: colors.text.secondary }}
                           >
                             Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => { setSelectedStaff(user); setIsResetPinDialogOpen(true); }}
+                            className="hover:bg-[rgba(124,58,237,0.1)] cursor-pointer"
+                            style={{ color: colors.text.secondary }}
+                          >
+                            Reset PIN
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleToggleActive(user)}
@@ -590,6 +624,52 @@ export function StaffManagement() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset PIN Dialog */}
+      <Dialog open={isResetPinDialogOpen} onOpenChange={setIsResetPinDialogOpen}>
+        <DialogContent
+          style={{
+            backgroundColor: 'rgba(15, 15, 15, 0.98)',
+            border: `1px solid ${colors.border.accent}`,
+            color: colors.text.primary,
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-xl" style={{ color: colors.text.primary }}>Reset PIN</DialogTitle>
+            <DialogDescription style={{ color: colors.text.secondary }}>
+              This will clear the PIN for <strong>{selectedStaff?.full_name || selectedStaff?.username}</strong>. They will need to set a new 4-digit PIN on their next login.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsResetPinDialogOpen(false)}
+              className="hover:bg-[rgba(124,58,237,0.1)]"
+              style={{ borderColor: colors.border.accent, color: colors.text.secondary }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleResetPin}
+              className="text-white transition-all duration-200"
+              style={{ backgroundColor: colors.purple.primary }}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                'Reset PIN'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
