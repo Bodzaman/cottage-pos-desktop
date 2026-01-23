@@ -62,7 +62,36 @@ export const generateFormattedOrderNumber = (orderId: string): string => {
   if (numericPart) {
     return numericPart[0].substring(0, 6).padStart(6, '0');
   }
-  
+
   // Fallback to timestamp
   return Date.now().toString().substring(7);
 };
+
+/**
+ * Hook for tracking orders with real-time updates
+ * Used by LiveNotificationSystem for order status notifications
+ */
+export interface OrderTrackingResult {
+  orders: TableOrder[];
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  lastEvent: {
+    type: string;
+    orderId?: string;
+    timestamp: Date;
+  } | null;
+}
+
+export interface UseOrderTrackingOptions {
+  userId?: string;
+  enabled?: boolean;
+}
+
+export function useOrderTracking(options: UseOrderTrackingOptions = {}): OrderTrackingResult {
+  // Stub implementation - returns empty state
+  // Real implementation would connect to Supabase realtime
+  return {
+    orders: [],
+    connectionStatus: 'disconnected',
+    lastEvent: null,
+  };
+}

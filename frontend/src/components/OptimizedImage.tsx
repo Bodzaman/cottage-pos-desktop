@@ -1,6 +1,6 @@
 import React from 'react';
 import { getOptimizedImagePreset } from 'utils/imageOptimization';
-import { MediaImagePreviewMetadata } from 'utils/menuTypes';
+import { MediaImagePreviewMetadata } from 'types';
 
 // DEBUG: Verify this module is loading
 

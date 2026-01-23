@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { AppApisOrdersOrderModel } from '../brain/data-contracts';
+import { OrderModel } from 'types';
 import { globalColors } from '../utils/QSAIDesign';
 import { Clock, Phone, DollarSign, ChevronRight } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
 interface SearchResultsDropdownProps {
-  results: AppApisOrdersOrderModel[];
+  results: OrderModel[];
   isVisible: boolean;
   isLoading: boolean;
-  onSelectOrder: (order: AppApisOrdersOrderModel) => void;
+  onSelectOrder: (order: OrderModel) => void;
   onShowAllResults: () => void;
   searchQuery: string;
 }
@@ -186,12 +186,11 @@ const SearchResultsDropdown: React.FC<SearchResultsDropdownProps> = ({
                   }`}
                   style={{ 
                     borderColor: globalColors.border.light,
-                    backgroundColor: isSelected 
-                      ? 'rgba(91, 33, 182, 0.15)' 
-                      : index === 0 && selectedIndex === -1 
-                        ? 'rgba(255, 255, 255, 0.03)' 
-                        : 'transparent',
-                    ringColor: isSelected ? globalColors.text.accent : 'transparent'
+                    backgroundColor: isSelected
+                      ? 'rgba(91, 33, 182, 0.15)'
+                      : index === 0 && selectedIndex === -1
+                        ? 'rgba(255, 255, 255, 0.03)'
+                        : 'transparent'
                   }}
                   onMouseEnter={() => setSelectedIndex(index)}
                   onMouseLeave={() => setSelectedIndex(-1)}
@@ -286,12 +285,11 @@ const SearchResultsDropdown: React.FC<SearchResultsDropdownProps> = ({
               className={`p-3 cursor-pointer transition-colors duration-150 border-t ${
                 selectedIndex === Math.min(results.length, 5) ? 'ring-2 ring-inset' : ''
               }`}
-              style={{ 
+              style={{
                 borderColor: globalColors.border.light,
                 backgroundColor: selectedIndex === Math.min(results.length, 5)
                   ? 'rgba(91, 33, 182, 0.15)'
-                  : 'rgba(91, 33, 182, 0.05)',
-                ringColor: selectedIndex === Math.min(results.length, 5) ? globalColors.text.accent : 'transparent'
+                  : 'rgba(91, 33, 182, 0.05)'
               }}
               onMouseEnter={() => setSelectedIndex(Math.min(results.length, 5))}
               onMouseLeave={() => setSelectedIndex(-1)}

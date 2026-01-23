@@ -208,8 +208,8 @@ export function BillViewModal({
                         <span style={{ color: QSAITheme.text.secondary }}>
                           {item.quantity}x {item.name}
                         </span>
-                        {item.variant && (
-                          <span className="ml-2 text-xs" style={{ color: QSAITheme.text.muted }}>({item.variant})</span>
+                        {item.variantName && (
+                          <span className="ml-2 text-xs" style={{ color: QSAITheme.text.muted }}>({item.variantName})</span>
                         )}
                       </div>
                       <div className="font-medium ml-2" style={{ color: QSAITheme.text.primary }}>

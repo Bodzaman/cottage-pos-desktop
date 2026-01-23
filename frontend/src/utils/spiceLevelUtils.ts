@@ -1,8 +1,20 @@
-
 /**
  * Utility functions for converting spice levels to display format
  * Supports both old and new spice level systems for backward compatibility
  */
+
+/**
+ * Mapping of spice levels to their display information
+ */
+const SPICE_LEVEL_MAPPING = {
+  0: { label: 'None', emoji: '' },
+  1: { label: 'Mild', emoji: '🧈' },
+  2: { label: 'Medium', emoji: '🟠' },
+  3: { label: 'Hot', emoji: '🌶️' },
+  4: { label: 'Very Hot', emoji: '🌶️🌶️' },
+  5: { label: 'Extra Hot', emoji: '🌶️🌶️🌶️' },
+  6: { label: 'Extreme', emoji: '🌶️🌶️🌶️🌶️' }
+} as const;
 
 /**
  * Get emoji representation for a specific spice level

@@ -115,21 +115,26 @@ export const SmartBulkDeleteDialog: React.FC<Props> = ({
               isUsed: false,
               usageCount: 0,
               linkedItems: [],
-              canDelete: true,
-              status: 'not_found'
+              notFound: true
             });
             continue;
           }
 
           const data = await response.json();
 
+          // Map API response to internal format
+          const linkedItems = (data.menu_items || []).map((item: any) => ({
+            id: item.id || item.menu_item_id,
+            name: item.name || item.menu_item_name,
+            type: 'menu_item'
+          }));
           newUsageData.set(asset.id, {
             id: asset.id,
             name: asset.name,
             friendlyName: asset.friendlyName,
-            isUsed: data.is_used || false,
-            usageCount: data.usage_count || 0,
-            linkedItems: data.linked_items || [],
+            isUsed: (data.total_usage_count || 0) > 0,
+            usageCount: data.total_usage_count || 0,
+            linkedItems: linkedItems,
             notFound: false,
           });
         } catch (err: any) {
@@ -243,7 +248,7 @@ export const SmartBulkDeleteDialog: React.FC<Props> = ({
           for (const asset of usedAssets) {
             try {
               const removeResponse = await brain.remove_asset_references({
-                asset_id: asset.id,
+                assetId: asset.id,
               });
               const removeData = await removeResponse.json();
               

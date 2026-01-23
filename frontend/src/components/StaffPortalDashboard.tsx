@@ -29,10 +29,25 @@ interface DashboardStat {
   color?: string;
 }
 
-// Placeholder function for dashboard stats
-const getDashboardStats = (type: string): DashboardStat[] => {
+// Quick stats object for staff dashboard
+interface QuickStats {
+  pendingOrders: number;
+  todayReservations: number;
+  activeDeliveries: number;
+  unreadNotifications: number;
+  popularDish?: string;
+}
+
+// Placeholder function for dashboard stats - returns object with named properties
+const getDashboardStats = (type: string): QuickStats => {
   // TODO: Import from launch-page-modules when module is available
-  return [];
+  return {
+    pendingOrders: 0,
+    todayReservations: 0,
+    activeDeliveries: 0,
+    unreadNotifications: 0,
+    popularDish: 'Chicken Tikka'
+  };
 };
 
 interface StaffPortalDashboardProps {

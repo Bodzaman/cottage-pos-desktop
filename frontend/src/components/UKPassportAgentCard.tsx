@@ -362,7 +362,7 @@ export const UKPassportAgentCard: React.FC<UKPassportAgentCardProps> = ({
             <div className="min-w-0">
               <div className="text-[6px] font-normal mb-0.5" style={{ color: passportColors.secondaryText }}>Date of issue/Date de délivrance (8)</div>
               <div className="text-[6px] font-bold truncate" style={{ color: passportColors.lightText }}>
-                {formatPassportDate(agent.activation_date || agent.created_at)}
+                {formatPassportDate(agent.creation_date || agent.created_at)}
               </div>
             </div>
             <div className="min-w-0">

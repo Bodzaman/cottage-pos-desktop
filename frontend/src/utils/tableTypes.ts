@@ -69,14 +69,16 @@ export const calculateOrderTotal = (order: TableOrder): { subtotal: number, tax:
   }>;
 }// Table status types for the POS system
 
-export type TableStatus = 
+export type TableStatus =
   | "AVAILABLE"
   | "SEATED"
   | "ORDERED"
   | "BILL_REQUESTED"
   | "PAYMENT_PROCESSING"
   | "PAYMENT_COMPLETE"
-  | "LINKED"; // Added for table linking functionality
+  | "LINKED"
+  | "WAITING" // Added for waiting/queue functionality
+  | "RESERVED"; // Added for reserved tables
 
 
 // Represents an item in a table order
@@ -88,6 +90,10 @@ export interface TableOrderItem extends OrderItem {
   kitchenNotes?: string; // Additional notes for the kitchen
   isNewItem: boolean; // Indicates this is a new item added to an existing order
   lastKitchenPrintAt?: Date | null; // When this item was last printed on a kitchen ticket
+  lastUpdatedAt?: Date; // When this item was last updated
+  // Kitchen display fields
+  variations?: string[]; // Item variations/customizations for kitchen display
+  specialInstructions?: string; // Special instructions for kitchen
 }
 
 export interface TableOrder {
@@ -118,6 +124,7 @@ export interface TableData {
   status: TableStatus;
   occupiedAt: Date | null;
   guestCount: number;
+  customerName?: string; // Customer name for waiting/queue orders
   orders: TableOrder[]; // All orders for this table
   activeOrderId: string | null; // Currently active order ID
   sentToKitchen: boolean; // Whether current order items have been sent to kitchen

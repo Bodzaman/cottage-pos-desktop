@@ -87,7 +87,7 @@ export function ThermalReceiptOrderSummary({
                       className="font-medium text-sm leading-tight"
                       style={{ color: QSAITheme.text.primary }}
                     >
-                      {item.variantName || item.name}
+                      {item.variant_name || item.name}
                     </h4>
                     
                     {item.notes && (

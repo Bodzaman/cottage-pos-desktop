@@ -169,6 +169,7 @@ interface MenuStoreState {
   setCategories: (categories: Category[]) => void;
   setMenuItems: (items: MenuItem[]) => void;
   setSetMeals: (setMeals: SetMeal[]) => void; // Add Set Meals setter
+  fetchSetMeals: () => Promise<void>; // Fetch Set Meals from backend
   setProteinTypes: (types: ProteinType[]) => void;
   setCustomizations: (customizations: CustomizationBase[]) => void;
   setItemVariants: (variants: ItemVariant[]) => void;
@@ -349,7 +350,11 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         primaryTableNumber: 0,
         splitMode: 'equal'
       },
-      
+
+      // AI Context state
+      aiContextLastUpdate: 0,
+      aiContextStatus: 'idle' as const,
+
       // Actions
       initialize: async () => {
         // Prevent concurrent menu store initializations
@@ -750,7 +755,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
           const configSuccess = await ensureSupabaseConfigured();
           
           // ✅ NEW: Only refresh data if bundle is NOT fresh
-          await state.refreshData();
+          await get().refreshData();
 
           set({
             isLoading: false,
@@ -822,7 +827,19 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         invalidateMenuContext();
         set({ aiContextStatus: 'idle' });
       },
-      
+
+      validateAIMenuItem: async (query: string, categoryFilter?: string) => {
+        // Local menu item validation - matches by name
+        const { menuItems } = get();
+        const items = categoryFilter
+          ? menuItems.filter(item => item.category_id === categoryFilter)
+          : menuItems;
+        const match = items.find(item =>
+          item.name.toLowerCase().includes(query.toLowerCase())
+        );
+        return match || null;
+      },
+
       // Filtering methods
       setSelectedParentCategory: (categoryId: string | null) => {
         set({ selectedParentCategory: categoryId });
@@ -1095,7 +1112,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
               items: setMeal.items
             },
             item_type: 'set_meal' as const
-          } as MenuItem & { price?: number; set_meal_data?: any; item_type?: string }));
+          } as unknown as MenuItem));
 
         return setMealMenuItems;
       },
@@ -1152,6 +1169,49 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         });
 
         return customizationsByGroup;
+      },
+
+      // FlexibleBillingModal actions
+      openFlexibleBillingModal: (orderItems, linkedTables, primaryTableNumber) => {
+        set({
+          flexibleBillingModal: {
+            isOpen: true,
+            orderItems,
+            linkedTables,
+            primaryTableNumber,
+            splitMode: 'equal'
+          }
+        });
+      },
+
+      closeFlexibleBillingModal: () => {
+        set({
+          flexibleBillingModal: {
+            isOpen: false,
+            orderItems: [],
+            linkedTables: [],
+            primaryTableNumber: 0,
+            splitMode: 'equal'
+          }
+        });
+      },
+
+      setFlexibleBillingMode: (mode) => {
+        set((state) => ({
+          flexibleBillingModal: {
+            ...state.flexibleBillingModal,
+            splitMode: mode
+          }
+        }));
+      },
+
+      updateFlexibleBillingItems: (items) => {
+        set((state) => ({
+          flexibleBillingModal: {
+            ...state.flexibleBillingModal,
+            orderItems: items
+          }
+        }));
       },
 
       // ✅ NEW: Manual cache invalidation method
@@ -1390,7 +1450,7 @@ export const loadPOSBundle = async () => {
     }
   } catch (error) {
     console.error(' [POS Bundle] Failed to load bundle:', error);
-    store.setError(error as Error);
+    store.setError(error instanceof Error ? error.message : 'Failed to load POS bundle');
     store.setLoading(false);
     return false;
   } finally {

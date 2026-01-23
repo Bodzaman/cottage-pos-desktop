@@ -131,8 +131,8 @@ export function CartRecoveryDialog({
           {/* Item List Preview */}
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {sortedItems.slice(0, 5).map((item, idx) => {
-              // ✅ FIX #12: Read variant_name from database field first, then fallback to variant object
-              const variantName = item.variant_name || item.variant?.variant_name || item.variant?.name;
+              // ✅ FIX #12: Read variantName from database field first, then fallback to variant object
+              const variantName = item.variantName || item.variant?.variantName || item.variant?.name;
               const displayVariant = getVariantDisplayName(item.name || '', variantName);
               const customizationsArray = Array.isArray(item.customizations) ? item.customizations : [];
               const hasExtras = customizationsArray.length > 0 || !!item.notes;
@@ -144,8 +144,8 @@ export function CartRecoveryDialog({
               const primaryDisplayName = isGenericVariant ? item.name : variantName;
               
               // ✅ FIXED: Resolve variant image using correct hierarchy (matches CartContent/CheckoutView/OrderSummaryPanel)
-              // Priority: display_image_url (backend-resolved) → image_url (raw) → item fallback
-              const imageUrl = item.variant?.display_image_url || item.variant?.image_url || item.image_url;
+              // Priority: displayImageUrl (backend-resolved) → imageUrl (raw) → item fallback
+              const imageUrl = item.variant?.displayImageUrl || item.variant?.imageUrl || item.imageUrl;
               
               return (
                 <div key={idx} className="text-sm">

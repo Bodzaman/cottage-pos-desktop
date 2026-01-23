@@ -8,8 +8,16 @@ import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 import { StagingStatusBanner } from 'components/StagingStatusBanner';
 import { OrderItemCard } from 'components/OrderItemCard';
 
+// Extended order item type with variant object for display
+interface DineInOrderItem extends AppApisTableOrdersOrderItem {
+  variant?: {
+    display_image_url?: string;
+    image_url?: string;
+  } | string;
+}
+
 interface Props {
-  orderItems: AppApisTableOrdersOrderItem[];
+  orderItems: DineInOrderItem[];
   customerTabs?: CustomerTab[];
   activeCustomerTabId?: string | null;
   onUpdateQuantity: (index: number, quantity: number) => void;
@@ -21,7 +29,7 @@ interface Props {
   // NEW: Staging item count for banner display
   stagingItemCount?: number;
   // NEW: Enriched items for better display
-  enrichedItems?: any[];
+  enrichedItems?: DineInOrderItem[];
   className?: string;
 }
 
@@ -68,7 +76,7 @@ export function DineInOrderSummary({
   };
 
   // NEW: Render item group helper
-  const renderItemGroup = (items: AppApisTableOrdersOrderItem[], tabId: string | null, startIndex: number) => {
+  const renderItemGroup = (items: DineInOrderItem[], tabId: string | null, startIndex: number) => {
     const tabName = getCustomerTabName(tabId);
     const isActiveTab = tabId === activeCustomerTabId;
     const isTableLevel = tabId === null;
@@ -128,7 +136,7 @@ export function DineInOrderSummary({
                 {/* Item Header Row */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   {/* ✅ NEW: Add thumbnail image on the left */}
-                  <div 
+                  <div
                     className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 relative"
                     style={{
                       border: `1px solid ${QSAITheme.border.medium}`,
@@ -136,24 +144,30 @@ export function DineInOrderSummary({
                     }}
                   >
                     {/* ✅ Use variant image resolution hierarchy */}
-                    {(item.variant?.display_image_url || item.variant?.image_url || item.image_url) ? (
-                      <img 
-                        src={item.variant?.display_image_url || item.variant?.image_url || item.image_url} 
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // On error, hide image and show placeholder
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                        }}
-                      />
-                    ) : null}
+                    {(() => {
+                      const variantObj = typeof item.variant === 'object' ? item.variant : null;
+                      const imageUrl = variantObj?.display_image_url || variantObj?.image_url || item.image_url;
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      ) : null;
+                    })()}
                     {/* Fallback placeholder - show if no image or if image fails */}
-                    <div 
+                    <div
                       className="w-full h-full flex items-center justify-center rounded-md"
-                      style={{ 
+                      style={{
                         backgroundColor: QSAITheme.background.secondary,
-                        display: (item.variant?.display_image_url || item.variant?.image_url || item.image_url) ? 'none' : 'flex'
+                        display: (() => {
+                          const variantObj = typeof item.variant === 'object' ? item.variant : null;
+                          return (variantObj?.display_image_url || variantObj?.image_url || item.image_url) ? 'none' : 'flex';
+                        })()
                       }}
                     >
                       <Utensils className="h-5 w-5" style={{ color: QSAITheme.text.muted }} />
@@ -164,19 +178,19 @@ export function DineInOrderSummary({
                     <h4 className="text-sm font-medium truncate" style={{ color: QSAITheme.text.primary }}>
                       {item.name}
                     </h4>
-                    
+
                     {/* Variant and protein info badges - matching OrderSummaryPanel */}
-                    {(item.variant || item.protein_type) && (
+                    {(item.variant || item.variant_name || item.protein_type) && (
                       <div className="flex items-center space-x-2 mt-1 mb-1">
-                        {item.variant && (
-                          <span 
-                            className="text-xs px-2 py-1 rounded" 
-                            style={{ 
+                        {(item.variant || item.variant_name) && (
+                          <span
+                            className="text-xs px-2 py-1 rounded"
+                            style={{
                               backgroundColor: QSAITheme.purple.primaryTransparent,
                               color: QSAITheme.text.secondary
                             }}
                           >
-                            {item.variant}
+                            {typeof item.variant === 'string' ? item.variant : item.variant_name}
                           </span>
                         )}
                         {item.protein_type && (

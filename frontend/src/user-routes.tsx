@@ -11,7 +11,6 @@ const About = lazy(() => import("./pages/About.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
 const AllOrders = lazy(() => import("./pages/AllOrders.tsx"));
 const App = lazy(() => import("./pages/App.tsx"));
-const ChatbotConfiguration = lazy(() => import("./pages/ChatbotConfiguration.tsx"));
 const CheckoutPayment = lazy(() => import("./pages/CheckoutPayment.tsx"));
 const Contact = lazy(() => import("./pages/Contact.tsx"));
 const CustomerPortal = lazy(() => import("./pages/CustomerPortal.tsx"));
@@ -46,8 +45,6 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/all-orders", element: <AllOrders />},
 	{ path: "/allorders", element: <AllOrders />},
 	{ path: "/", element: <App />},
-	{ path: "/chatbot-configuration", element: <ChatbotConfiguration />},
-	{ path: "/chatbotconfiguration", element: <ChatbotConfiguration />},
 	{ path: "/checkout-payment", element: <CheckoutPayment />},
 	{ path: "/checkoutpayment", element: <CheckoutPayment />},
 	{ path: "/contact", element: <Contact />},

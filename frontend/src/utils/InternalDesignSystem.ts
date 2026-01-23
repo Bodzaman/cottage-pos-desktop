@@ -116,6 +116,7 @@ export const luxury = {
 // Main color palette
 export const colors = {
   background: {
+    base: '#0F0F0F', // Alias for primary
     primary: '#0F0F0F',
     secondary: '#1A1A1A',
     tertiary: '#1E1E1E',
@@ -138,21 +139,33 @@ export const colors = {
     gold_light: 'rgba(124, 58, 237, 0.8)',
     magenta_light: 'rgba(167, 139, 250, 0.8)',
     turquoise_light: 'rgba(91, 33, 182, 0.8)',
+    secondary: '#A78BFA', // Secondary accent color
   },
   text: {
     primary: '#FFFFFF',
     secondary: 'rgba(255, 255, 255, 0.87)',
     tertiary: 'rgba(255, 255, 255, 0.6)',
     muted: 'rgba(255, 255, 255, 0.5)',
-    disabled: 'rgba(255, 255, 255, 0.4)',
+    disabled: 'rgba(255, 255, 255, 0.38)',
     accent: '#7C3AED',
+    placeholder: 'rgba(255, 255, 255, 0.4)', // Alias for disabled
   },
   border: {
     subtle: 'rgba(255, 255, 255, 0.05)',
     light: 'rgba(255, 255, 255, 0.07)',
     medium: 'rgba(255, 255, 255, 0.1)',
     strong: 'rgba(255, 255, 255, 0.15)',
-    accent: 'rgba(124, 58, 237, 0.3)'
+    accent: 'rgba(124, 58, 237, 0.3)',
+    primary: 'rgba(124, 58, 237, 0.3)', // Primary accent border
+    secondary: 'rgba(255, 255, 255, 0.08)', // Backward compatibility alias
+  },
+  // Brand colors for backward compatibility
+  brand: {
+    purple: '#7C3AED',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    info: '#3B82F6',
   },
   status: {
     success: '#10B981',
@@ -176,7 +189,52 @@ export const globalColors = {
     light: colors.purple.light,
     dark: colors.purple.dark,
     glow: colors.purple.glow
-  }
+  },
+  // Primary and secondary color scales for VisualCanvas and other components
+  primary: {
+    50: '#F5F3FF',
+    100: '#EDE9FE',
+    200: '#DDD6FE',
+    300: '#C4B5FD',
+    400: '#A78BFA',
+    500: '#7C3AED',
+    600: '#6D28D9',
+    700: '#5B21B6',
+    800: '#4C1D95',
+    900: '#3B0764',
+  },
+  secondary: {
+    50: '#ECFDF5',
+    100: '#D1FAE5',
+    200: '#A7F3D0',
+    300: '#6EE7B7',
+    400: '#34D399',
+    500: '#10B981',
+    600: '#059669',
+    700: '#047857',
+    800: '#065F46',
+    900: '#064E3B',
+  },
+  // Gray scale for UI elements
+  gray: {
+    50: '#F9FAFB',
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    300: '#D1D5DB',
+    400: '#9CA3AF',
+    500: '#6B7280',
+    600: '#4B5563',
+    700: '#374151',
+    800: '#1F2937',
+    900: '#111827',
+  },
+  // Additional color aliases for backward compatibility
+  blue: '#3B82F6',
+  green: '#10B981', // Alias for success
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  info: '#3B82F6',
 };
 
 // Export as QSAITheme for semantic naming
@@ -264,11 +322,47 @@ export const styles = {
     background: 'radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.5) 100%)',
     pointerEvents: 'none',
     zIndex: 1
-  }
+  },
+  // Button styles for backward compatibility
+  button: {
+    primary: {
+      background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)',
+      border: '1px solid rgba(124, 58, 237, 0.3)',
+      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+      borderRadius: '0.5rem',
+      transition: 'all 0.2s ease',
+    },
+    secondary: {
+      background: 'linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+      borderRadius: '0.5rem',
+      transition: 'all 0.2s ease',
+    },
+    ghost: {
+      background: 'transparent',
+      border: '1px solid transparent',
+      borderRadius: '0.5rem',
+      transition: 'all 0.2s ease',
+    },
+  },
+  // Input styles for backward compatibility
+  input: {
+    background: '#1E1E1E',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '0.5rem',
+    color: '#FFFFFF',
+    padding: '0.5rem 1rem',
+    transition: 'all 0.2s ease',
+  },
 };
 
 // Dynamic effects with purple accents
 export const effects = {
+  // Neumorphism effect for cards
+  neuMorphism: {
+    boxShadow: '8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.05)',
+  },
   innerGlow: (intensity: 'subtle' | 'medium' | 'strong' = 'medium') => {
     const opacityMap = { subtle: 0.1, medium: 0.15, strong: 0.2 };
     return `inset 0 0 20px rgba(124, 93, 250, ${opacityMap[intensity]})`;

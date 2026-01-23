@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, MicOff, Loader2, ShoppingCart, Trash2, Plus, Minus, Copy, RefreshCw, ChevronDown, ChevronUp, Check, ShieldAlert, ShieldCheck, Power } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Mic, MicOff, Loader2, ShoppingCart, Trash2, Plus, Minus, Copy, RefreshCw, ChevronDown, ChevronUp, Check, ShieldAlert, ShieldCheck, Power, BarChart3, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { GeminiVoiceClient, GeminiVoiceState } from "utils/geminiVoiceClient";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceAgentStore } from "utils/voiceAgentStore";
+import { TranscriptsViewerTab } from "@/components/ai-lab/TranscriptsViewerTab";
+import { UsageDashboardTab } from "@/components/ai-lab/UsageDashboardTab";
 
 // Dedicated lab page to build and test the Gemini Live API voice ordering flow safely.
 // No props. Router will mount this page at /gemini-voice-lab automatically.
@@ -77,7 +80,7 @@ export default function GeminiVoiceLab() {
   const cartItems = useCartStore((state) => state.items);
   const cartTotalItems = useCartStore((state) => state.totalItems);
   const clearRealCart = useCartStore((state) => state.clearCart);
-  const updateItemQuantity = useCartStore((state) => state.updateItemQuantity);
+  const updateItemQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
 
   const [functionCalls, setFunctionCalls] = useState<FunctionCallLog[]>([]);
@@ -533,8 +536,11 @@ export default function GeminiVoiceLab() {
     };
   }, [masterSwitchEnabled, underMaintenance]);
 
+  // Check if user is admin for transcript access
+  const isAdmin = user?.is_admin || false;
+
   return (
-    <main 
+    <main
       className="min-h-screen p-6"
       style={{
         background: QSAITheme.background.primary, // Deep black #121212
@@ -543,7 +549,7 @@ export default function GeminiVoiceLab() {
     >
       <div className="max-w-7xl mx-auto space-y-6">
         <div>
-          <h1 
+          <h1
             className="text-2xl font-bold"
             style={qsaiStyles.purpleGradientText}
           >
@@ -554,7 +560,44 @@ export default function GeminiVoiceLab() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tab Navigation */}
+        <Tabs defaultValue="voice-lab" className="w-full">
+          <TabsList
+            className="grid w-full grid-cols-3 mb-6"
+            style={{
+              backgroundColor: QSAITheme.background.tertiary,
+              borderColor: QSAITheme.border.medium
+            }}
+          >
+            <TabsTrigger
+              value="voice-lab"
+              className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-400"
+              style={{ color: QSAITheme.text.muted }}
+            >
+              <Mic className="h-4 w-4 mr-2" />
+              Voice Lab
+            </TabsTrigger>
+            <TabsTrigger
+              value="usage"
+              className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-400"
+              style={{ color: QSAITheme.text.muted }}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Usage Dashboard
+            </TabsTrigger>
+            <TabsTrigger
+              value="transcripts"
+              className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-400"
+              style={{ color: QSAITheme.text.muted }}
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Transcripts
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Voice Lab Tab */}
+          <TabsContent value="voice-lab" className="mt-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column: Controls + Assistant */}
           <div className="space-y-6">
             {/* AI Voice Master Control */}
@@ -1034,8 +1077,8 @@ export default function GeminiVoiceLab() {
                   <div className="space-y-3">
                     {cartItems.map((item, idx) => {
                       // ✅ PHASE 4: Use production cart display pattern (CartContent.tsx line 357)
-                      // Priority: variant_name from cart table → variant object → item.name → fallback
-                      const displayName = item.variant_name || item.variant?.variant_name || item.name || 'Menu item';
+                      // Priority: variantName from cart table → variant object → item.name → fallback
+                      const displayName = item.variantName || item.variant?.name || item.name || 'Menu item';
                       
                       return (
                         <div 
@@ -1107,7 +1150,19 @@ export default function GeminiVoiceLab() {
               </CardContent>
             </Card>
           </div>
-        </div>
+            </div>
+          </TabsContent>
+
+          {/* Usage Dashboard Tab */}
+          <TabsContent value="usage" className="mt-0">
+            <UsageDashboardTab />
+          </TabsContent>
+
+          {/* Transcripts Tab */}
+          <TabsContent value="transcripts" className="mt-0">
+            <TranscriptsViewerTab isAdmin={isAdmin} />
+          </TabsContent>
+        </Tabs>
       </div>
     </main>
   );

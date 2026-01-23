@@ -18,16 +18,25 @@ export const menuItemSchema = z.object({
   // Added media type field to specify image or video
   media_type: z.enum(['image', 'video']).default('image'),
   name: z.string().min(2, { message: 'Item name must be at least 2 characters' }),
+  kitchen_display_name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   category_id: z.string().optional().nullable(),
   default_spice_level: z.coerce.number().int().min(0).max(5).default(0),
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
   display_order: z.coerce.number().int().nonnegative().default(0),
+  menu_order: z.coerce.number().int().nonnegative().default(0),
   print_order: z.coerce.number().int().nonnegative().default(0),
   print_to_kitchen: z.boolean().default(true),
   inherit_category_print_settings: z.boolean().default(true),
   dietary_tags: z.array(z.string()).optional().nullable(),
+  // Individual dietary flags
+  vegetarian: z.boolean().default(false),
+  vegan: z.boolean().default(false),
+  gluten_free: z.boolean().default(false),
+  halal: z.boolean().default(false),
+  dairy_free: z.boolean().default(false),
+  nut_free: z.boolean().default(false),
   // AI-enhanced voice fields
   voice_description: z.string().optional().nullable(),
   spoken_alias: z.string().optional().nullable(),
@@ -101,16 +110,25 @@ export type MenuItemFormInput = z.infer<typeof menuItemSchema>;
 export interface MenuItemFormValues {
   id?: string;
   name: string;
+  kitchen_display_name?: string | null;
   description: string | null;
   category_id: string | null;
   default_spice_level: number;
   featured: boolean;
   active: boolean;
   display_order: number;
+  menu_order?: number;
   print_order: number;
   print_to_kitchen: boolean;
   inherit_category_print_settings: boolean;
   dietary_tags: string[];
+  // Individual dietary flags
+  vegetarian?: boolean;
+  vegan?: boolean;
+  gluten_free?: boolean;
+  halal?: boolean;
+  dairy_free?: boolean;
+  nut_free?: boolean;
   image_url?: string | null;
   image_url_widescreen?: string | null;
   image_asset_id?: string | null;

@@ -46,6 +46,7 @@ interface Template {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  templateId?: string | null; // Optional: Pre-select a template when opening
   onAssignmentUpdate?: () => void;
   className?: string;
 }

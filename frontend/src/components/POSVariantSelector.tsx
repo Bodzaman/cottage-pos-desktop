@@ -176,7 +176,7 @@ export function POSVariantSelector({ menuItem, isOpen, onClose, onAddToOrder, or
               </div>
             )}
           </div>
-          <p className="text-sm mb-4" style={{ color: QSAITheme.text.secondary }}>{menuItem.long_description || menuItem.menu_item_description}</p>
+          <p className="text-sm mb-4" style={{ color: QSAITheme.text.secondary }}>{menuItem.description}</p>
           
           {(menuItem.spice_indicators || menuItem.default_spice_level !== null) && (
             <div className="text-sm mb-4" style={{ 

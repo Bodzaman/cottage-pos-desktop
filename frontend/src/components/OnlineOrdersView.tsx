@@ -149,7 +149,7 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
       }
       
       // Reset pagination when filters change
-      setCurrentPage(1);
+      setPage(1);
       setFilters(newFilters);
     }, 500);
   }, [searchQuery, dateRange, selectedOrderType, selectedPaymentMethod, selectedStatus, mountedRef, setSafeTimeout]);
@@ -908,7 +908,7 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
                         from: dateRange.from,
                         to: dateRange.to,
                       }}
-                      onSelect={setDateRange}
+                      onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
                       numberOfMonths={2}
                     />
                   </PopoverContent>
@@ -1169,8 +1169,8 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
       
       {/* Detailed Order Dialog */}
       <DetailedOrderDialog
-        order={selectedOrder}
-        open={dialogOpen}
+        order={selectedOrder as any}
+        isOpen={dialogOpen}
         onOpenChange={setDialogOpen}
         orderSource="WEBSITE"
       />

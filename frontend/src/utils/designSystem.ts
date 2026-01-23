@@ -18,7 +18,9 @@ const colors = {
     platinum: '#E5E5E5',     // Platinum - highlight accent
     turquoise: '#0EBAB1',    // Turquoise - success states (keeping this)
     turquoisedark: '#0A9A92', // Darker turquoise for hover states
-    
+    teal: '#0EBAB1',         // Alias for turquoise (backward compatibility)
+    tealDark: '#0A9A92',     // Alias for turquoisedark
+
     // Legacy accent colors (keeping for backward compatibility but all map to silver now)
     gold: '#C0C0C0',         // Now maps to silver
     golddark: '#A8A8A8',     // Now maps to silverDark
@@ -31,6 +33,9 @@ const colors = {
   
   // Modern accent colors
   accent: {
+    // Primary and secondary semantic
+    primary: '#7C5DFA',
+    secondary: '#C0C0C0',       // Secondary accent (silver)
     // Purple - primary accent color
     purple: '#7C5DFA',
     purple_light: '#9277FF',
@@ -66,17 +71,24 @@ const colors = {
     secondary: '#BBC3E1',
     tertiary: '#8B92B3',
     muted: '#6B7794',
-    accent: '#C0C0C0'      // Silver accent text
+    accent: '#C0C0C0',      // Silver accent text
+    disabled: 'rgba(255, 255, 255, 0.38)', // Disabled text
+    placeholder: 'rgba(255, 255, 255, 0.4)', // Placeholder text
   },
   
   // Background colors
   background: {
+    base: '#0F0F0F',
     primary: '#0F0F0F',
     secondary: '#1A1A1A',
     tertiary: '#252525',
+    dark: '#0A0A0A',
     highlight: '#2A2A2A',
     card: '#1A1A1A',
-    cardHighlight: '#252525'
+    cardHighlight: '#252525',
+    elevated: '#2A2A2A',      // Elevated surface
+    input: '#1E1E1E',         // Input background
+    overlay: 'rgba(0, 0, 0, 0.7)', // Overlay background
   },
   
   // Border colors - updated with silver theme
@@ -155,10 +167,10 @@ export const gridBackgroundStyle = {
   background: `linear-gradient(135deg, #1a1a1a 0%, #121212 50%, #1a1a1a 100%)`,
   backgroundSize: '100% 100%',
   backdropFilter: 'blur(0px)',
-  position: 'relative',
+  position: 'relative' as const,
   // Subtle box shadow for content area definition
   '& > *': {
-    position: 'relative',
+    position: 'relative' as const,
     zIndex: 1
   }
 };

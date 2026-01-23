@@ -190,20 +190,28 @@ export function POSMenuItemCard({
 
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      menuItemId: item.id,
       menu_item_id: item.id,
-      variant_id: variant.id,
+      variantId: variant.id || null,
+      variant_id: variant.id || null,
       name: displayName,
       variantName: variantDisplayName || undefined,
       quantity: quantity,
       price: price,
+      proteinType: variant.protein_type_name,
       protein_type: variant.protein_type_name,
+      imageUrl: variant.display_image_url || variant.image_url || item.image_url || '',
       image_url: variant.display_image_url || variant.image_url || item.image_url || '',
       modifiers: [],
       customizations: undefined,
+      itemType: 'menu_item',
       item_type: 'menu_item',
+      categoryId: item.category_id,
       category_id: item.category_id,
       // Include kitchen display name and display order for receipt printing
+      kitchenDisplayName: item.kitchen_display_name || null,
       kitchen_display_name: item.kitchen_display_name || null,
+      displayOrder: item.display_order || 0,
       display_order: item.display_order || 0,
     };
 
@@ -239,20 +247,28 @@ export function POSMenuItemCard({
 
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      menuItemId: item.id,
       menu_item_id: item.id,
-      variant_id: null, // ✅ FIX: Send null instead of synthetic "single-" prefix
+      variantId: null, // ✅ FIX: Send null instead of synthetic "single-" prefix
+      variant_id: null,
       name: item.name,
       variantName: undefined,
       quantity: quantity,
       price: price,
+      proteinType: undefined,
       protein_type: undefined,
+      imageUrl: item.image_url || '',
       image_url: item.image_url || '',
       modifiers: [],
       customizations: undefined,
+      itemType: 'menu_item',
       item_type: 'menu_item',
+      categoryId: item.category_id,
       category_id: item.category_id,
       // Include kitchen display name and display order for receipt printing
+      kitchenDisplayName: item.kitchen_display_name || null,
       kitchen_display_name: item.kitchen_display_name || null,
+      displayOrder: item.display_order || 0,
       display_order: item.display_order || 0,
     };
 

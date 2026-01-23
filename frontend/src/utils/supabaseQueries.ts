@@ -321,11 +321,12 @@ export async function addItemsToTableOrder(
  * Complete table order (mark as completed)
  * ENHANCED: Handles ALL tables in a linked group
  * When clearing ANY table in a linked group, ALL tables are cleared
+ * Also cleans up customer_tabs associated with the orders
  * Replaces: brain.complete_table_order()
  */
 export async function completeTableOrder(tableNumber: number): Promise<boolean> {
   try {
-    // Step 1: Check if this table is part of a linked group
+    // Step 1: Check if this table is part of a linked group (check both pos_tables and orders)
     const { data: table } = await supabase
       .from('pos_tables')
       .select('linked_table_group_id')
@@ -334,8 +335,8 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
 
     let allTableNumbers = [tableNumber];
 
+    // Check pos_tables for linked group
     if (table?.linked_table_group_id) {
-      // Get ALL tables in this linked group
       const { data: groupTables } = await supabase
         .from('pos_tables')
         .select('table_number')
@@ -346,7 +347,55 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
       }
     }
 
-    // Step 2: Complete ALL table orders in the group
+    // Also check orders table for linked_tables (source of truth)
+    const { data: activeOrder } = await supabase
+      .from('orders')
+      .select('id, linked_tables, table_group_id')
+      .eq('table_number', tableNumber)
+      .in('status', ['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    // If order has linked_tables, use those
+    if (activeOrder?.linked_tables && activeOrder.linked_tables.length > 0) {
+      allTableNumbers = [...new Set([...allTableNumbers, ...activeOrder.linked_tables])];
+    }
+
+    // Step 2: Find all active orders for these tables (to get order IDs for cleanup)
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .in('table_number', allTableNumbers)
+      .in('status', ['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT']);
+
+    const orderIds = activeOrders?.map(o => o.id) || [];
+
+    // Step 3: Delete customer_tabs for these orders
+    if (orderIds.length > 0) {
+      const { error: tabsError } = await supabase
+        .from('customer_tabs')
+        .delete()
+        .in('order_id', orderIds);
+
+      if (tabsError) {
+        console.warn('[supabaseQueries] Failed to delete customer_tabs:', tabsError);
+        // Don't throw - continue with order completion
+      }
+    }
+
+    // Also delete any orphaned tabs by table_number (legacy cleanup)
+    const { error: orphanedTabsError } = await supabase
+      .from('customer_tabs')
+      .delete()
+      .in('table_number', allTableNumbers)
+      .eq('status', 'active');
+
+    if (orphanedTabsError) {
+      console.warn('[supabaseQueries] Failed to delete orphaned customer_tabs:', orphanedTabsError);
+    }
+
+    // Step 4: Complete ALL table orders in the group (legacy table_orders)
     const { error: orderError } = await supabase
       .from('table_orders')
       .update({
@@ -358,7 +407,22 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
 
     if (orderError) throw orderError;
 
-    // Step 3: Clear linked flags AND reset status for ALL tables
+    // Step 5: Mark orders as COMPLETED in the orders table (source of truth)
+    if (orderIds.length > 0) {
+      const { error: ordersUpdateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'COMPLETED',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', orderIds);
+
+      if (ordersUpdateError) {
+        console.warn('[supabaseQueries] Failed to update orders status:', ordersUpdateError);
+      }
+    }
+
+    // Step 6: Clear linked flags AND reset status for ALL tables
     const { error: tableError } = await supabase
       .from('pos_tables')
       .update({
@@ -485,6 +549,7 @@ export async function resetTableToAvailable(tableNumber: number): Promise<boolea
 
 /**
  * Get customer tabs for a specific table
+ * @deprecated Use getCustomerTabsForOrder() instead - tabs should be scoped to orders
  * Replaces: brain.list_customer_tabs_for_table()
  */
 export async function getCustomerTabsForTable(tableNumber: number): Promise<CustomerTab[]> {
@@ -505,18 +570,42 @@ export async function getCustomerTabsForTable(tableNumber: number): Promise<Cust
 }
 
 /**
+ * Get customer tabs for a specific order
+ * This is the preferred method - tabs are scoped to orders, not tables
+ */
+export async function getCustomerTabsForOrder(orderId: string): Promise<CustomerTab[]> {
+  try {
+    const { data, error } = await supabase
+      .from('customer_tabs')
+      .select('*')
+      .eq('order_id', orderId)
+      .eq('status', 'active')
+      .order('created_at');
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('[supabaseQueries] getCustomerTabsForOrder failed:', error);
+    throw error;
+  }
+}
+
+/**
  * Create a new customer tab
  * Replaces: brain.create_customer_tab()
+ * @param orderId - Required: The order this tab belongs to (scopes tab to order lifecycle)
  */
 export async function createCustomerTab(
   tableNumber: number,
   tabName: string,
+  orderId: string,
   guestId?: string
 ): Promise<CustomerTab> {
   try {
     const newTab = {
       table_number: tableNumber,
       tab_name: tabName,
+      order_id: orderId,
       order_items: [],
       status: 'active',
       guest_id: guestId || null,
@@ -1783,16 +1872,19 @@ export async function createPOSOrder(payload: {
 /**
  * Create customer tab directly
  * Replaces: brain.create_customer_tab()
+ * @param orderId - Required: The order this tab belongs to (scopes tab to order lifecycle)
  */
 export async function createCustomerTabDirect(
   tableNumber: number,
   tabName: string,
+  orderId: string,
   guestId?: string
 ): Promise<{ success: boolean; customer_tab?: any }> {
   try {
     const newTab = {
       table_number: tableNumber,
       tab_name: tabName,
+      order_id: orderId,
       order_items: [],
       status: 'active',
       guest_id: guestId || null,
@@ -2166,7 +2258,7 @@ async function syncMenuItemVariants(menuItemId: string, variants: any[]): Promis
         const { id, ...variantData } = cleanVariantData(v); // Remove id and clean data
         return {
           ...variantData,
-          menu_item_id: itemId
+          menu_item_id: menuItemId
         };
       });
 
@@ -3199,12 +3291,13 @@ export async function uploadAgentAvatar(file: File): Promise<{
 export async function publishWizardConfig(config: any): Promise<{
   success: boolean;
   message?: string;
+  config_version?: number;
 }> {
   try {
-    // Get actual config ID first
+    // Phase 6: Fetch existing config with ALL fields to enable MERGING (not overwriting)
     const { data: existing, error: fetchError } = await supabase
       .from('unified_agent_config')
-      .select('id')
+      .select('*')
       .limit(1)
       .single();
 
@@ -3214,34 +3307,59 @@ export async function publishWizardConfig(config: any): Promise<{
       throw new Error('No configuration found to publish');
     }
 
-    // Update using actual UUID - update all fields from config
-    const { error } = await supabase
+    // Phase 6: MERGE channel_settings instead of overwriting
+    // This preserves settings from other stages that weren't part of this publish
+    const existingChannelSettings = existing.channel_settings || {};
+
+    const mergedChannelSettings = {
+      ...existingChannelSettings,
+      chat: {
+        ...(existingChannelSettings.chat || {}),
+        // Only update fields that were provided in config
+        ...(config.chat_system_prompt !== undefined && { system_prompt: config.chat_system_prompt }),
+        ...(config.chat_custom_instructions !== undefined && { custom_instructions: config.chat_custom_instructions }),
+        ...(config.chat_tone !== undefined && { tone: config.chat_tone }),
+        enabled: true,  // Enable on publish
+      },
+      voice: {
+        ...(existingChannelSettings.voice || {}),
+        // Only update fields that were provided in config
+        ...(config.voice_system_prompt !== undefined && { system_prompt: config.voice_system_prompt }),
+        ...(config.voice_first_response !== undefined && { first_response: config.voice_first_response }),
+        ...(config.voice_model !== undefined && { voice_model: config.voice_model }),
+        enabled: true,  // Enable on publish
+      },
+    };
+
+    // Phase 6: Update with is_active = true (this triggers version bump via database trigger)
+    const { data: updatedData, error } = await supabase
       .from('unified_agent_config')
       .update({
         agent_name: config.agent_name,
         agent_role: config.agent_role,
         agent_avatar_url: config.agent_avatar_url,
         personality_settings: {
+          ...existing.personality_settings,
           nationality: config.nationality,
           core_traits: config.core_traits || ''
         },
-        channel_settings: {
-          chat: {
-            system_prompt: config.chat_system_prompt,
-            custom_instructions: config.chat_custom_instructions
-          },
-          voice: {
-            system_prompt: config.voice_system_prompt,
-            first_response: config.voice_first_response,
-            voice_model: config.voice_model
-          }
-        }
+        channel_settings: mergedChannelSettings,
+        // CRITICAL: Set is_active = true on publish (triggers config_version bump)
+        is_active: true,
       })
-      .eq('id', existing.id);
+      .eq('id', existing.id)
+      .select('config_version')
+      .single();
 
     if (error) throw error;
 
-    return { success: true, message: 'Configuration published successfully' };
+    console.log('[supabaseQueries] Published config, new version:', updatedData?.config_version);
+
+    return {
+      success: true,
+      message: 'Configuration published successfully',
+      config_version: updatedData?.config_version,
+    };
   } catch (error) {
     console.error(' [supabaseQueries] publishWizardConfig failed:', error);
     return { success: false, message: (error as Error).message };
@@ -3643,6 +3761,130 @@ export async function getDraftSetMeals(): Promise<{
       success: false,
       items: [],
       count: 0,
+      error: (error as Error).message,
+    };
+  }
+}
+
+// ============================================================================
+// STORAGE & MEDIA MANAGEMENT
+// ============================================================================
+
+/**
+ * Get storage status including bucket info and usage
+ */
+export async function getStorageStatus(): Promise<{
+  success: boolean;
+  total_size_bytes?: number;
+  file_count?: number;
+  buckets?: string[];
+  error?: string;
+}> {
+  try {
+    // List buckets to verify access
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+
+    if (bucketsError) throw bucketsError;
+
+    return {
+      success: true,
+      buckets: buckets?.map(b => b.name) || [],
+      total_size_bytes: 0, // Would require additional queries to calculate
+      file_count: 0,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] getStorageStatus failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Replace asset references in menu items when swapping images
+ */
+export async function replaceAssetInMenuItems(
+  oldAssetId: string,
+  newAssetId: string
+): Promise<{
+  success: boolean;
+  updated_count?: number;
+  error?: string;
+}> {
+  try {
+    // Update menu_items where image_asset_id matches
+    const { data: menuItems, error: menuError } = await supabase
+      .from('menu_items')
+      .update({ image_asset_id: newAssetId })
+      .eq('image_asset_id', oldAssetId)
+      .select('id');
+
+    if (menuError) throw menuError;
+
+    // Update item_variants where image_asset_id matches
+    const { data: variants, error: variantError } = await supabase
+      .from('item_variants')
+      .update({ image_asset_id: newAssetId })
+      .eq('image_asset_id', oldAssetId)
+      .select('id');
+
+    if (variantError) throw variantError;
+
+    const totalUpdated = (menuItems?.length || 0) + (variants?.length || 0);
+
+    return {
+      success: true,
+      updated_count: totalUpdated,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] replaceAssetInMenuItems failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Remove asset references from menu items (clear the image_asset_id)
+ */
+export async function removeAssetReferences(
+  assetId: string
+): Promise<{
+  success: boolean;
+  updated_count?: number;
+  error?: string;
+}> {
+  try {
+    // Clear image_asset_id in menu_items
+    const { data: menuItems, error: menuError } = await supabase
+      .from('menu_items')
+      .update({ image_asset_id: null })
+      .eq('image_asset_id', assetId)
+      .select('id');
+
+    if (menuError) throw menuError;
+
+    // Clear image_asset_id in item_variants
+    const { data: variants, error: variantError } = await supabase
+      .from('item_variants')
+      .update({ image_asset_id: null })
+      .eq('image_asset_id', assetId)
+      .select('id');
+
+    if (variantError) throw variantError;
+
+    const totalUpdated = (menuItems?.length || 0) + (variants?.length || 0);
+
+    return {
+      success: true,
+      updated_count: totalUpdated,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] removeAssetReferences failed:', error);
+    return {
+      success: false,
       error: (error as Error).message,
     };
   }

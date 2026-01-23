@@ -9,7 +9,7 @@ import { Clock, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { DayOfWeek, OpeningHours, DaySchedule } from "../utils/useRestaurantSettings";
+import { DayOfWeek, OpeningHours, DaySchedule } from "types";
 
 interface OpeningHoursSettingsProps {
   openingHours?: OpeningHours;

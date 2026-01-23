@@ -9,28 +9,86 @@ import type { OrderMode } from './common';
 import type { MenuItem } from './menu';
 
 // ================================
+// FLEXIBLE INPUT TYPES
+// ================================
+
+/**
+ * Flexible MenuItem input type - accepts both camelCase and snake_case properties.
+ * This enables compatibility with both types/menu.ts and utils/menuTypes.ts.
+ */
+export type MenuItemInput = {
+  id: string;
+  name: string;
+  description?: string | null;
+  // CamelCase pricing
+  price?: number;
+  basePrice?: number;
+  priceDelivery?: number;
+  priceTakeaway?: number;
+  priceCollection?: number;
+  imageUrl?: string | null;
+  // Snake_case pricing (from menuTypes.ts)
+  base_price?: number;
+  price_delivery?: number;
+  price_takeaway?: number;
+  image_url?: string | null;
+};
+
+// ================================
 // CART CUSTOMIZATION
 // ================================
 
 /**
- * Cart customization (add-ons, modifications)
+ * Base customization interface for shared properties
  */
-export interface CartCustomization {
+interface BaseCustomization {
   id: string;
   name: string;
-  price: number;
   group?: string | null;
+}
+
+/**
+ * Cart customization (add-ons, modifications)
+ * Compatible with SelectedCustomization for modal interop
+ */
+export interface CartCustomization extends BaseCustomization {
+  price: number;
+  price_adjustment?: number; // Alias for compatibility
 }
 
 /**
  * Selected customization (for POS and order modals)
  * Uses snake_case for price_adjustment to match DB schema
  */
-export interface SelectedCustomization {
-  id: string;
-  name: string;
+export interface SelectedCustomization extends BaseCustomization {
   price_adjustment: number;
-  group?: string;
+  price?: number; // Alias for compatibility
+}
+
+/**
+ * Type guard to convert CartCustomization[] to SelectedCustomization[]
+ */
+export function toSelectedCustomizations(items: CartCustomization[]): SelectedCustomization[] {
+  return items.map(item => ({
+    id: item.id,
+    name: item.name,
+    price_adjustment: item.price_adjustment ?? item.price,
+    price: item.price,
+    group: item.group ?? undefined,
+  }));
+}
+
+/**
+ * Type guard to convert SelectedCustomization[] to CartCustomization[]
+ */
+export function toCartCustomizations(items: SelectedCustomization[]): CartCustomization[] {
+  return items.map(item => ({
+    id: item.id,
+    name: item.name,
+    price: item.price ?? item.price_adjustment,
+    price_adjustment: item.price_adjustment,
+    group: item.group,
+  }));
 }
 
 // ================================
@@ -39,11 +97,31 @@ export interface SelectedCustomization {
 
 /**
  * Cart item variant info
+ * Extended to be compatible with ItemVariant from types/menu.ts
  */
 export interface CartItemVariant {
   id: string;
   name: string;
   price?: number;
+  variantName?: string;
+  variant_name?: string; // Snake_case alias
+  imageUrl?: string;
+  displayImageUrl?: string;
+  customizations?: CartCustomization[];
+
+  // Additional fields for ItemVariant compatibility
+  menuItemId?: string;
+  menu_item_id?: string;
+  proteinTypeId?: string | null;
+  protein_type_id?: string | null;
+  isDefault?: boolean;
+  is_default?: boolean;
+  priceDineIn?: number | null;
+  price_dine_in?: number | null;
+  priceDelivery?: number | null;
+  price_delivery?: number | null;
+  priceTakeaway?: number | null;
+  price_takeaway?: number | null;
 }
 
 /**
@@ -119,6 +197,9 @@ export interface CartState {
   /** Chat cart drawer state (ChatLargeModal) */
   isChatCartOpen: boolean;
 
+  /** Whether cart is empty (computed) */
+  isEmpty?: boolean;
+
   /** Currently editing item ID */
   editingItemId: string | null;
 
@@ -184,9 +265,9 @@ export interface CartState {
   // CART ITEM ACTIONS
   // ================================
 
-  /** Add an item to the cart */
+  /** Add an item to the cart (accepts both camelCase and snake_case MenuItem) */
   addItem: (
-    item: MenuItem,
+    item: MenuItemInput,
     variant: any,
     quantity: number,
     customizations?: CartCustomization[],
@@ -200,8 +281,14 @@ export interface CartState {
   /** Update item quantity (immediate) */
   updateQuantity?: (itemId: string, quantity: number) => void;
 
+  /** Update item quantity (alias for updateQuantity) */
+  updateItemQuantity?: (itemId: string, quantity: number) => void;
+
   /** Update item quantity (debounced) */
   updateQuantityDebounced: (itemId: string, quantity: number) => void;
+
+  /** Update item notes/special instructions */
+  updateItemNotes?: (itemId: string, notes: string) => void;
 
   /** Update an existing item in the cart */
   updateItem?: (

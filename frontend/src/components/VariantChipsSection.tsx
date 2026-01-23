@@ -1,14 +1,14 @@
 import React from 'react'
 import { VariantChip } from 'components/VariantChip'
-import type { AppApisMenuManagementItemVariant, AppApisMenuManagementProteinType } from '../brain/data-contracts'
+import type { ItemVariant, ProteinType } from 'types'
 import { CardDesignTokens } from '../utils/cardDesignTokens'
 
 interface Props {
-  variants: AppApisMenuManagementItemVariant[]
-  proteinTypes: AppApisMenuManagementProteinType[]
+  variants: ItemVariant[]
+  proteinTypes: ProteinType[]
   mode: 'collection' | 'delivery'
   selectedVariantId: string | null
-  onVariantClick: (variant: AppApisMenuManagementItemVariant) => void
+  onVariantClick: (variant: ItemVariant) => void
   theme?: 'premium' | 'pos'
 }
 
@@ -22,8 +22,8 @@ export function VariantChipsSection({
 }: Props) {
   // Filter and sort variants
   const activeVariants = variants
-    .filter(v => v.is_active)
-    .sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999))
+    .filter(v => v.isDefault !== false) // Filter active variants
+    .sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
 
   if (activeVariants.length === 0) return null
 
@@ -45,13 +45,13 @@ export function VariantChipsSection({
         {activeVariants.map(variant => {
           // Find protein type name
           const proteinType = proteinTypes.find(
-            pt => pt.id === variant.protein_type_id
+            pt => pt.id === variant.proteinTypeId
           )
           const proteinName = proteinType?.name || variant.name || 'Unknown'
 
           // Calculate display price
           const displayPrice = mode === 'delivery'
-            ? (variant.price_delivery ?? variant.price)
+            ? (variant.priceDelivery ?? variant.price)
             : variant.price
 
           return (

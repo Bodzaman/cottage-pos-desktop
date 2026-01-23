@@ -19,24 +19,33 @@ import type { ModifierSelection, CustomizationSelection } from './menu';
 export interface OrderItem {
   id: string;
   menuItemId: string;
+  menu_item_id?: string; // Snake_case alias
   variantId?: string | null;
+  variant_id?: string | null; // Snake_case alias
   name: string;
   quantity: number;
   price: number;
   variantName?: string;
+  variant_name?: string; // Snake_case alias
   notes?: string;
   proteinType?: string;
+  protein_type?: string; // Snake_case alias
   imageUrl?: string;
+  image_url?: string; // Snake_case alias
   modifiers: ModifierSelection[];
   customizations?: CustomizationSelection[];
 
   // Category tracking for receipt organization
   categoryId?: string;
+  category_id?: string; // Snake_case alias
   categoryName?: string;
+  category_name?: string; // Snake_case alias
 
   // Set meal fields
   itemType?: 'menu_item' | 'set_meal';
+  item_type?: 'menu_item' | 'set_meal'; // Snake_case alias
   setMealCode?: string;
+  set_meal_code?: string; // Snake_case alias
   setMealItems?: Array<{
     menuItemName: string;
     quantity: number;
@@ -45,11 +54,19 @@ export interface OrderItem {
 
   // Customer identification for kitchen tickets
   customerName?: string;
+  customer_name?: string; // Snake_case alias
   customerNumber?: number;
+  customer_number?: number; // Snake_case alias
   customerTabId?: string;
+  customer_tab_id?: string; // Snake_case alias
 
   // Kitchen display
   kitchenDisplayName?: string | null;
+  kitchen_display_name?: string | null; // Snake_case alias
+
+  // Display order
+  displayOrder?: number;
+  display_order?: number; // Snake_case alias
 
   // Kitchen status tracking
   status?: 'NEW' | 'PREPARING' | 'READY' | 'SERVED';
@@ -125,6 +142,7 @@ export interface CompletedOrder {
   discount?: number;
   discountCode?: string;
   deliveryFee?: number;
+  delivery_fee?: number; // Snake_case alias for compatibility
   serviceFee?: number;
   tip?: number;
   total: number;
@@ -138,6 +156,8 @@ export interface CompletedOrder {
   isVoiceOrder?: boolean;
   voiceTranscript?: string;
   voiceAgentId?: string;
+  voiceConfidence?: number;
+  voice_confidence?: number; // Snake_case alias for compatibility
 
   // Timestamps
   createdAt: string;

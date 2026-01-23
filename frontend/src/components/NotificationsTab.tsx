@@ -11,7 +11,8 @@ interface ReservationNotification {
   id: string;
   user_id: string;
   reservation_id: string;
-  type: 'confirmation' | 'reminder' | 'cancellation' | 'modification';
+  type?: 'confirmation' | 'reminder' | 'cancellation' | 'modification';
+  notification_type?: string; // Alias for type (API uses this name)
   title: string;
   message: string;
   is_read: boolean;

@@ -9,7 +9,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ImageIcon, Upload, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
-import { AppApisMediaManagementMediaAsset, AppApisMediaManagementMediaLibraryResponse } from '../brain/data-contracts';
+import { MediaAsset } from 'types';
+import { MediaLibraryResponse, FileUploadResponse } from '../brain/data-contracts';
+
+// Simple response type for API calls
+interface SimpleApiResponse {
+  success: boolean;
+  message?: string;
+}
+
+// Local response type for media library
+interface MediaLibraryResponse {
+  success: boolean;
+  items?: MediaAsset[];
+  error?: string;
+}
 
 export interface ImageUploadBrowserProps {
   selectedImageUrl?: string;
@@ -25,7 +39,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
   triggerButton
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [images, setImages] = useState<AppApisMediaManagementMediaAsset[]>([]);
+  const [images, setImages] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -54,7 +68,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
     setLoading(true);
     try {
       const response = await (brain as any).get_media_library({ tags: JSON.stringify(["avatar"]) });
-      const data: AppApisMediaManagementMediaLibraryResponse = await response.json();
+      const data: MediaLibraryResponse = await response.json();
       
       if (data.success && data.assets) {
         setImages(data.assets);
@@ -93,8 +107,8 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
 
     setUploading(true);
     try {
-      // Brain client expects BodyUploadAvatarImage object with file property
-      const uploadData: BodyUploadAvatarImage = {
+      // Brain client expects upload data with file property
+      const uploadData = {
         file: selectedFile,
         user_id: "user123", // Default user ID for now
         user_name: "User"
@@ -127,14 +141,14 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
   const handleDeleteImage = async (filename: string) => {
     try {
       const response = await (brain as any).delete_avatar_image({ filename });
-      const data: BaseResponse = await response.json();
+      const data: SimpleApiResponse = await response.json();
 
       if (data.success) {
         toast.success('Image deleted successfully');
         await loadImages();
         
         // Clear selection if deleted image was selected
-        const deletedImageUrl = images.find(img => img.filename === filename)?.url;
+        const deletedImageUrl = images.find(img => img.file_name === filename)?.url;
         if (localSelectedImage === deletedImageUrl) {
           setLocalSelectedImage(null);
         }
@@ -155,7 +169,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
     if (localSelectedImage) {
       const selectedImage = images.find(img => img.url === localSelectedImage);
       if (selectedImage) {
-        onImageSelect(selectedImage.url, selectedImage.filename);
+        onImageSelect(selectedImage.url, selectedImage.file_name);
         toast.success('Avatar image selected!');
         setIsOpen(false);
       }
@@ -301,13 +315,13 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {images.map((image, index) => (
                   <Card
-                    key={image.id || image.asset_id || image.filename || `image-${index}`}
+                    key={image.id || image.asset_id || image.file_name || `image-${index}`}
                     className={`cursor-pointer transition-all hover:shadow-md group ${
                       localSelectedImage === image.url
                         ? 'ring-2 ring-blue-500 shadow-md'
                         : ''
                     }`}
-                    onClick={() => handleImageSelect(image.url, image.filename)}
+                    onClick={() => handleImageSelect(image.url, image.file_name)}
                   >
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center">
@@ -316,7 +330,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
                           <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden border-2 border-gray-200 shadow-sm bg-gray-100 hover:shadow-md transition-shadow">
                             <img
                               src={image.url || ''}
-                              alt={image.filename || 'Avatar image'}
+                              alt={image.file_name || 'Avatar image'}
                               className="w-full h-full object-cover"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
@@ -341,8 +355,8 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
                             className="absolute -top-1 -left-1 p-1.5 h-auto w-auto rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (image.filename) {
-                                handleDeleteImage(image.filename);
+                              if (image.file_name) {
+                                handleDeleteImage(image.file_name);
                               }
                             }}
                           >
@@ -352,8 +366,8 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
                         
                         {/* Image Info */}
                         <div className="mt-3 text-center w-full">
-                          <p className="text-xs font-medium truncate px-1" title={image.filename || 'Unknown'}>
-                            {image.filename ? image.filename.replace(/\.[^/.]+$/, "") : 'Unknown'}
+                          <p className="text-xs font-medium truncate px-1" title={image.file_name || 'Unknown'}>
+                            {image.file_name ? image.file_name.replace(/\.[^/.]+$/, "") : 'Unknown'}
                           </p>
                           <Badge variant="secondary" className="text-xs mt-1">
                             {image.file_size ? formatFileSize(image.file_size) : 'Unknown size'}

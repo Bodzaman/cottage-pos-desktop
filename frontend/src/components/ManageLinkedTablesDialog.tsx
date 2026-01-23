@@ -106,7 +106,7 @@ export function ManageLinkedTablesDialog({
       <DialogContent
         className="max-w-2xl border-0 border-b-2"
         style={{
-          background: `linear-gradient(135deg, ${QSAITheme.purple.dark} 0%, ${QSAITheme.background.darker} 100%)`,
+          background: `linear-gradient(135deg, ${QSAITheme.purple.dark} 0%, ${QSAITheme.background.dark} 100%)`,
           borderBottom: `2px solid ${QSAITheme.purple.primary}`
         }}
       >

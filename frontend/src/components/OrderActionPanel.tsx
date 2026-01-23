@@ -6,6 +6,7 @@ import { CompletedOrder } from '../utils/orderManagementService';
 import { formatCurrency } from '../utils/formatters';
 import { AlertCircle, Check, Clock, MessageSquare, Phone, Printer, ShoppingBag, Truck, X, Headphones } from 'lucide-react';
 import brain from '../brain';
+import { toast } from 'sonner';
 
 export interface OrderActionPanelProps {
   order: CompletedOrder | null;

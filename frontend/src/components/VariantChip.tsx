@@ -1,13 +1,13 @@
 import { PremiumTheme } from '../utils/premiumTheme'
-import type { AppApisMenuManagementItemVariant } from '../brain/data-contracts'
+import type { ItemVariant } from 'types'
 import { CardDesignTokens } from '../utils/cardDesignTokens'
 
 interface Props {
-  variant: AppApisMenuManagementItemVariant
+  variant: ItemVariant
   proteinTypeName: string
   displayPrice: number
   mode: 'collection' | 'delivery'
-  onClick: (variant: AppApisMenuManagementItemVariant) => void
+  onClick: (variant: ItemVariant) => void
   isSelected?: boolean
   size?: 'normal' | 'compact'
   theme?: 'premium' | 'pos'

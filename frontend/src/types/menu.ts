@@ -71,60 +71,98 @@ export interface ProteinType {
 export interface ItemVariant {
   id: string;
   menuItemId: string;
+  menu_item_id?: string; // Snake_case alias
   proteinTypeId?: string | null;
+  protein_type_id?: string | null; // Snake_case alias
   proteinType?: ProteinType;
+  protein_type?: ProteinType; // Snake_case alias
   name?: string | null;
   variantName?: string | null;
+  variant_name?: string | null; // Snake_case alias
 
   // Pricing
   price: number;
   priceDineIn?: number | null;
+  price_dine_in?: number | null; // Snake_case alias
   priceDelivery?: number | null;
+  price_delivery?: number | null; // Snake_case alias
   priceTakeaway?: number | null;
+  price_takeaway?: number | null; // Snake_case alias
 
   // Variant properties
   isDefault: boolean;
+  is_default?: boolean; // Snake_case alias
   descriptionOverride?: string | null;
+  description_override?: string | null; // Snake_case alias
   spiceLevelOverride?: number | null;
+  spice_level_override?: number | null; // Snake_case alias
   dietaryTagsOverride?: string[] | null;
+  dietary_tags_override?: string[] | null; // Snake_case alias
 
   // Image with inheritance state
   imageUrl?: string | null;
+  image_url?: string | null; // Snake_case alias
   imageAssetId?: string | null;
+  image_asset_id?: string | null; // Snake_case alias
   imageState?: InheritanceState;
+  image_state?: InheritanceState; // Snake_case alias
   displayImageUrl?: string | null;
+  display_image_url?: string | null; // Snake_case alias
   imageSource?: ImageSource;
+  image_source?: ImageSource; // Snake_case alias
 
   // Description with inheritance state
   description?: string | null;
   descriptionState?: InheritanceState;
+  description_state?: InheritanceState; // Snake_case alias
   displayDescription?: string | null;
+  display_description?: string | null; // Snake_case alias
   descriptionSource?: ImageSource;
+  description_source?: ImageSource; // Snake_case alias
 
   // Dietary flags (variant-specific overrides)
   isVegetarian?: boolean;
+  is_vegetarian?: boolean; // Snake_case alias
   isVegan?: boolean;
+  is_vegan?: boolean; // Snake_case alias
   isGlutenFree?: boolean;
+  is_gluten_free?: boolean; // Snake_case alias
   isHalal?: boolean;
+  is_halal?: boolean; // Snake_case alias
   isDairyFree?: boolean;
+  is_dairy_free?: boolean; // Snake_case alias
   isNutFree?: boolean;
+  is_nut_free?: boolean; // Snake_case alias
 
   // Food-specific
   spiceLevel?: number;
+  spice_level?: number; // Snake_case alias
   allergens?: string[];
   allergenNotes?: string;
+  allergen_notes?: string; // Snake_case alias
 
   // Availability
   availableForDelivery?: boolean;
+  available_for_delivery?: boolean; // Snake_case alias
   availableForTakeaway?: boolean;
+  available_for_takeaway?: boolean; // Snake_case alias
   availableForDineIn?: boolean;
+  available_for_dine_in?: boolean; // Snake_case alias
 
   // System fields
   variantCode?: string | null;
+  variant_code?: string | null; // Snake_case alias
   displayOrder?: number;
+  display_order?: number; // Snake_case alias
   featured?: boolean;
   createdAt?: string;
+  created_at?: string; // Snake_case alias
   updatedAt?: string;
+  updated_at?: string; // Snake_case alias
+
+  // API compatibility fields
+  active?: boolean; // Alias for isDefault or availability
+  protein_type_name?: string; // API field for protein type name
 }
 
 /**
@@ -151,44 +189,83 @@ export interface MenuItem {
   id: string;
   name: string;
   kitchenDisplayName?: string | null;
+  kitchen_display_name?: string | null; // Snake_case alias
   description?: string | null;
+  menu_item_description?: string | null; // Snake_case alias for description
+  long_description?: string | null; // Extended description
   imageUrl?: string | null;
+  image_url?: string | null; // Snake_case alias
   imageVariants?: {
     square?: { webp?: string | null; jpeg?: string | null };
     widescreen?: { webp?: string | null; jpeg?: string | null };
     thumbnail?: { webp?: string | null; jpeg?: string | null };
   } | null;
   spiceIndicators?: string | null;
+  spice_indicators?: string | null; // Snake_case alias
   defaultSpiceLevel?: number | null;
+  default_spice_level?: number | null; // Snake_case alias
   publishedAt?: string | null;
   categoryId: string;
+  category_id?: string; // Snake_case alias
   categoryName?: string;
   featured: boolean;
   dietaryTags?: string[] | null;
+  dietary_tags?: string[] | null; // Snake_case alias
   itemCode?: string | null;
+  item_code?: string | null; // Snake_case alias
   menuOrder: number;
+  display_order?: number; // Snake_case alias for menuOrder
+  section_order?: number; // Alias for menuOrder within section
   active: boolean;
+  is_active?: boolean; // Snake_case alias
   inheritCategoryPrintSettings?: boolean;
+  inherit_category_print_settings?: boolean; // Snake_case alias
 
   // Pricing
   price?: number;
   basePrice?: number;
+  base_price?: number; // Snake_case alias
   priceDineIn?: number;
+  price_dine_in?: number; // Snake_case alias
+  dine_in_price?: number; // Alternative snake_case alias
   priceTakeaway?: number;
+  price_takeaway?: number; // Snake_case alias
   priceDelivery?: number;
+  price_delivery?: number; // Snake_case alias
   priceCollection?: number;
 
   // Set meal fields
   isSetMeal?: boolean;
+  is_set_meal?: boolean; // Snake_case alias
   setMealId?: string | null;
+  set_meal_id?: string | null; // Snake_case alias
   setMealCode?: string | null;
+  set_meal_code?: string | null; // Snake_case alias
 
   // Variants
   variants: ItemVariant[];
   hasVariants?: boolean;
+  defaultVariant?: ItemVariant | null; // Default selected variant
+
+  // Availability
+  is_available?: boolean; // Snake_case availability flag
+  isAvailable?: boolean; // CamelCase alias
+
+  // Dietary flags
+  vegetarian?: boolean;
+  is_vegetarian?: boolean; // Snake_case alias
+  vegan?: boolean;
+  is_vegan?: boolean; // Snake_case alias
+  gluten_free?: boolean;
+  isGlutenFree?: boolean; // CamelCase alias
+  halal?: boolean;
+  is_halal?: boolean; // Snake_case alias
+  dairy_free?: boolean;
+  isDairyFree?: boolean; // CamelCase alias
+  nut_free?: boolean;
+  isNutFree?: boolean; // CamelCase alias
 
   // Food-specific fields
-  defaultSpiceLevel?: number;
   allergens?: string[];
   allergenWarnings?: string;
   specialtyNotes?: string;
@@ -293,6 +370,7 @@ export interface ModifierSelection {
   optionId?: string;
   name: string;
   priceAdjustment: number;
+  price?: number; // Alias for priceAdjustment for compatibility
 }
 
 /**
@@ -303,6 +381,8 @@ export interface CustomizationSelection {
   customizationId?: string;
   name: string;
   priceAdjustment: number;
+  price?: number; // Alias for priceAdjustment for compatibility
+  price_adjustment?: number; // Snake_case alias
   group?: string;
 }
 
@@ -530,6 +610,44 @@ export function mapMenuItemToApi(item: MenuItem): any {
 }
 
 // ================================
+// SIGNATURE DISH TYPES
+// ================================
+
+/**
+ * Variant information for signature dishes display
+ */
+export interface SignatureVariantInfo {
+  id: string;
+  variant_name: string;
+  price: number;
+  image_url?: string;
+  description?: string;
+  featured?: boolean;
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  is_halal?: boolean;
+  is_dairy_free?: boolean;
+  is_nut_free?: boolean;
+}
+
+/**
+ * Signature dish for featured items display
+ */
+export interface SignatureDish {
+  id: string;
+  title: string;
+  description: string;
+  main_image: string;
+  spice_level: number;
+  tags: string[];
+  category: string;
+  price: Record<string, string>;
+  has_variants: boolean;
+  variants: SignatureVariantInfo[];
+}
+
+// ================================
 // LEGACY COMPATIBILITY
 // ================================
 
@@ -542,3 +660,8 @@ export type Category = MenuCategory;
  * @deprecated Use ItemVariant instead
  */
 export type MenuItemVariant = ItemVariant;
+
+/**
+ * VariantInfo alias for SignatureVariantInfo (used in DishDetailsModal)
+ */
+export type VariantInfo = SignatureVariantInfo;

@@ -5,13 +5,15 @@
 
 export type OrderType = 'ai' | 'online' | 'dine_in' | 'waiting' | 'collection' | 'delivery';
 export type TemplateType = 'foh' | 'kitchen';
-export type ElementType = 'header' | 'order_info' | 'item_section' | 'customer_info' | 'totals' | 'footer' | 'decorative';
+export type ElementType = 'header' | 'order_info' | 'item_section' | 'customer_info' | 'totals' | 'footer' | 'decorative' | 'qr_code' | 'image' | 'separator' | 'text';
 export type GridDensity = 'fine' | 'medium' | 'coarse';
 export type PaperWidth = 58 | 80 | 'custom';
-export type FontFamily = 'JetBrains Mono' | 'Fira Code' | 'Hack' | 'Inconsolata' | 'Space Mono' | 'IBM Plex Mono' | 
-                         'Inter' | 'Poppins' | 'Nunito Sans' | 'Work Sans' | 'Lato' | 'Open Sans' | 
-                         'Montserrat' | 'Source Sans Pro' | 'Rubik' | 'Barlow' | 'Roboto' | 
-                         'Arial' | 'Times' | 'Courier' | 'Impact';
+export type FontFamily = 'JetBrains Mono' | 'Fira Code' | 'Hack' | 'Inconsolata' | 'Space Mono' | 'IBM Plex Mono' |
+                         'Inter' | 'Poppins' | 'Nunito Sans' | 'Work Sans' | 'Lato' | 'Open Sans' |
+                         'Montserrat' | 'Source Sans Pro' | 'Rubik' | 'Barlow' | 'Roboto' |
+                         'Arial' | 'Times' | 'Courier' | 'Impact' |
+                         'Playfair Display' | 'Merriweather' | 'Crimson Text' | 'Oswald' | 'Raleway' |
+                         'Receipt' | 'Star';
 export type FontWeight = 'normal' | 'bold';
 export type TextAlign = 'left' | 'center' | 'right';
 
@@ -20,7 +22,9 @@ export const FONT_FAMILIES: FontFamily[] = [
   'JetBrains Mono', 'Fira Code', 'Hack', 'Inconsolata', 'Space Mono', 'IBM Plex Mono',
   'Inter', 'Poppins', 'Nunito Sans', 'Work Sans', 'Lato', 'Open Sans',
   'Montserrat', 'Source Sans Pro', 'Rubik', 'Barlow', 'Roboto',
-  'Arial', 'Times', 'Courier', 'Impact'
+  'Arial', 'Times', 'Courier', 'Impact',
+  'Playfair Display', 'Merriweather', 'Crimson Text', 'Oswald', 'Raleway',
+  'Receipt', 'Star'
 ];
 
 export const FONT_WEIGHTS: FontWeight[] = ['normal', 'bold'];
@@ -41,6 +45,7 @@ export interface CanvasElement {
   zIndex: number;
   data: ElementData;
   style: ElementStyle;
+  content?: string; // Direct content property for text elements
 }
 
 // Element Data (content)
@@ -77,6 +82,11 @@ export interface ElementStyle {
   padding_right: number;
   margin_top: number;
   margin_bottom: number;
+  // Thermal printing properties
+  double_height?: boolean;
+  double_width?: boolean;
+  text_decoration?: 'none' | 'underline' | 'line-through';
+  inverse?: boolean; // White text on black background
 }
 
 // Conditional Visibility Rules

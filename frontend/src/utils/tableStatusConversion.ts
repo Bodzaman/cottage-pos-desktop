@@ -7,8 +7,8 @@ export const convertApiStatusToTableStatus = (apiStatus: string): TableStatus =>
   const statusMap: Record<string, TableStatus> = {
     'available': 'AVAILABLE',
     'occupied': 'SEATED',
-    'reserved': 'RESERVED', 
-    'unavailable': 'UNAVAILABLE',
+    'reserved': 'SEATED',  // Map reserved to SEATED
+    'unavailable': 'PAYMENT_COMPLETE', // Map unavailable to PAYMENT_COMPLETE (temporarily unavailable)
     'seated': 'SEATED',
     'ordered': 'ORDERED'
   };

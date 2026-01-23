@@ -245,6 +245,7 @@ export const THERMAL_FONTS: ThermalFont[] = [
   },
   {
     name: 'Source Sans Pro',
+    family: 'Source Sans Pro',
     cssFamily: 'Source Sans Pro, sans-serif',
     category: 'specialized',
     subcategory: 'industry-standard',

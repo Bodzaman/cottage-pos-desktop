@@ -43,6 +43,7 @@ import {
   uploadAgentAvatar,
   publishWizardConfig
 } from '../utils/supabaseQueries';
+import { supabase } from '../utils/supabaseClient';
 import { MultiNationalityPassportCard } from 'components/MultiNationalityPassportCard';
 
 // Type definitions (previously from brain/data-contracts)
@@ -82,6 +83,7 @@ interface PublishWizardConfigRequest {
   agent_name: string;
   agent_role: string;
   nationality: string;
+  core_traits: string;
   agent_avatar_url: string | null;
   chat_system_prompt: string;
   chat_custom_instructions: string | null;
@@ -471,7 +473,7 @@ const AIStaffManagementHub: React.FC = () => {
       chatBot: {
         system_prompt: (config.channel_settings as any)?.chat?.system_prompt || '',
         tone: [],
-        custom_instructions: '',
+        custom_instructions: (config.channel_settings as any)?.chat?.custom_instructions || '',
       },
       voice: {
         system_prompt: finalVoicePrompt,
@@ -579,8 +581,9 @@ const AIStaffManagementHub: React.FC = () => {
         agent_name: wizardState.identity.name,
         agent_role: wizardState.identity.title,
         nationality: wizardState.identity.nationality,
+        core_traits: wizardState.identity.tone || '',
         agent_avatar_url: wizardState.identity.avatar_url || null,
-        chat_system_prompt: wizardState.chatBot.system_prompt || wizardState.voice.system_prompt, // Fallback to voice prompt
+        chat_system_prompt: wizardState.chatBot.system_prompt,
         chat_custom_instructions: wizardState.chatBot.custom_instructions || null,
         voice_system_prompt: wizardState.voice.system_prompt,
         voice_first_response: wizardState.voice.first_response,
@@ -706,44 +709,60 @@ const AIStaffManagementHub: React.FC = () => {
         return; // Stop save if validation fails
       }
       
-      // Build update payload based on current stage
+      // Phase 6: Fetch existing config first to enable MERGING channel_settings
+      // This prevents chat saves from overwriting voice settings and vice versa
+      const { data: existingConfig, error: fetchError } = await supabase
+        .from('unified_agent_config')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (fetchError) {
+        throw new Error('Failed to fetch existing configuration');
+      }
+
+      const existingChannelSettings = existingConfig?.channel_settings || {};
+
+      // Build update payload based on current stage with MERGING
       const updates: any = {};
-      
+
       if (currentStage === 'identity') {
         updates.agent_name = wizardState.identity.name;
         updates.agent_role = wizardState.identity.title;
         updates.personality_settings = {
+          ...(existingConfig?.personality_settings || {}),
           nationality: wizardState.identity.nationality,
           core_traits: wizardState.identity.tone,
         };
       } else if (currentStage === 'chat') {
+        // Phase 6: MERGE with existing channel_settings - preserve voice settings
         updates.channel_settings = {
+          ...existingChannelSettings,
           chat: {
+            ...(existingChannelSettings.chat || {}),
             system_prompt: wizardState.chatBot.system_prompt,
             tone: wizardState.chatBot.tone,
             custom_instructions: wizardState.chatBot.custom_instructions,
           },
         };
       } else if (currentStage === 'voice') {
+        // Phase 6: MERGE with existing channel_settings - preserve chat settings
         updates.channel_settings = {
+          ...existingChannelSettings,
           voice: {
+            ...(existingChannelSettings.voice || {}),
             system_prompt: wizardState.voice.system_prompt,
             first_response: wizardState.voice.first_response,
             voice_model: wizardState.voice.voice_model,
           },
         };
       }
-      
+
       const result = await updateUnifiedAgentConfig(updates);
 
       if (!result.success) {
         throw new Error('Failed to save configuration');
       }
-
-      setWizardState(prev => ({
-        ...prev,
-        [currentStage]: updates
-      }));
 
       toast.success(`${currentStage} settings saved`);
     } catch (error: any) {

@@ -18,13 +18,19 @@ import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
 
+// OrderMode type for mode prop
+type OrderMode = 'delivery' | 'collection' | 'dine-in';
+
+// Flexible variant type that accepts both ItemVariant and CartItemVariant
+type FlexibleVariant = Partial<ItemVariant> | null;
+
 interface CustomerCustomizationModalProps {
   item: MenuItem;
-  variant?: ItemVariant | null;
+  variant?: FlexibleVariant;
   isOpen: boolean;
   onClose: () => void;
-  addToCart: (item: MenuItem, quantity: number, variant: ItemVariant, customizations: SelectedCustomization[], notes: string) => void;
-  mode: 'delivery' | 'collection';
+  addToCart: (item: MenuItem, quantity: number, variant: any, customizations: SelectedCustomization[], notes: string) => void;
+  mode: OrderMode;
   initialQuantity?: number;
   // ✅ NEW: Edit mode props
   editMode?: boolean;
@@ -38,6 +44,7 @@ export interface SelectedCustomization {
   id: string;
   name: string;
   price_adjustment: number;
+  price?: number; // Alias for compatibility with CartCustomization
   group?: string;
 }
 

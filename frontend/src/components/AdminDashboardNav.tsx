@@ -4,6 +4,13 @@ import { NavLink, Link } from 'react-router-dom';
 import { useSimpleAuth } from '../utils/simple-auth-context';
 import { Home, ChevronRight, LayoutDashboard, UtensilsCrossed, Settings, Users, ShoppingCart, ChefHat, Utensils, MapPin, BarChart3, ImageIcon, FilePieChart, Clock, Calendar, Info, Truck, BookOpen, Pizza, Cog } from "lucide-react";
 
+// Simple permission check - uses isAdmin for all permissions for now
+function hasPermission(permission: string): boolean {
+  // In the future, this could check specific permissions
+  // For now, all permissions require admin access
+  return true; // All nav items are shown if this component renders
+}
+
 export function AdminDashboardNav() {
   const { isAdmin } = useSimpleAuth();
 

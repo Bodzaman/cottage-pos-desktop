@@ -163,7 +163,7 @@ export function searchMenuItems(
     return items
       .filter(item => {
         // Filter by active category
-        if (activeCategory && activeCategory !== 'all' && item.category_id !== activeCategory) {
+        if (activeCategory && activeCategory !== 'all' && item.categoryId !== activeCategory) {
           return false;
         }
         // Filter by dietary preferences
@@ -204,7 +204,7 @@ export function searchMenuItems(
     }
     
     // Search in category name
-    const categoryName = getCategoryName(item.category_id, categories);
+    const categoryName = getCategoryName(item.categoryId, categories);
     if (categoryName) {
       const catScore = calculateMatchScore(query, categoryName);
       if (catScore > 0) {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import brain from 'brain';
 import { toast } from 'sonner';
+import { supabase } from './supabaseClient';
 
 interface OnboardingStatus {
   customer_id: string;

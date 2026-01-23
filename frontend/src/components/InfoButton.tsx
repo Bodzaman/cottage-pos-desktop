@@ -16,12 +16,12 @@ export function InfoButton({ item, size = 'md', className = '' }: InfoButtonProp
   const tooltipContent = (
     <div className="space-y-2">
       <p className="font-medium text-sm">{item.name}</p>
-      {(item.description || item.menu_item_description || item.long_description) && (
+      {item.description && (
         <p className="text-xs text-gray-300">
-          {item.description || item.menu_item_description || item.long_description}
+          {item.description}
         </p>
       )}
-      {!item.description && !item.menu_item_description && !item.long_description && (
+      {!item.description && (
         <p className="text-xs text-gray-400 italic">No description available</p>
       )}
     </div>

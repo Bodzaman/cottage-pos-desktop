@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MapPin, Home, Briefcase, User, Star, Trash2, Navigation, CheckCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Home, Briefcase, User, Star, Trash2, Navigation, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
 import GooglePlacesAutocompleteEnhanced, { type ExtractedAddress } from './GooglePlacesAutocompleteEnhanced';

@@ -57,8 +57,8 @@ interface Props {
 // Safe color access helper
 const getPurplePrimary = () => QSAITheme?.purple?.primary || '#5B21B6';
 const getPurpleLight = () => QSAITheme?.purple?.light || '#7C3AED';
-const getGreenPrimary = () => QSAITheme?.green?.primary || '#10B981';
-const getBluePrimary = () => QSAITheme?.blue?.primary || '#3B82F6';
+const getGreenPrimary = () => QSAITheme?.green || '#10B981'; // green is a string, not an object
+const getBluePrimary = () => QSAITheme?.blue || '#3B82F6'; // blue is a string, not an object
 
 /**
  * TemplateManagementModal - Template library management for ThermalReceiptDesigner
@@ -87,6 +87,9 @@ export function TemplateManagementModal({
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [templateAssignments, setTemplateAssignments] = useState<Record<string, string[]>>({});
   const [selectedTemplateForAssignment, setSelectedTemplateForAssignment] = useState<string | null>(null);
+  // State for template save form
+  const [saveForm, setSaveForm] = useState({ name: '', description: '' });
+  const [activeTab, setActiveTab] = useState<'browse' | 'save'>('browse');
   
   // Load templates on modal open
   useEffect(() => {

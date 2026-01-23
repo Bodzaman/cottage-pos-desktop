@@ -9,14 +9,26 @@ import { useSimpleAuth } from '../utils/simple-auth-context';
 import { AlertCircle, Check, Phone } from 'lucide-react';
 
 // Define locally since Checkout.tsx was removed
-export type DeliveryMethod = 'delivery' | 'collection';
+export type DeliveryMethod = 'delivery' | 'collection' | 'pickup';
 export interface CheckoutData {
   deliveryMethod: DeliveryMethod;
   address?: string;
+  addressId?: string;
   postcode?: string;
   phone?: string;
   notes?: string;
   scheduledTime?: string;
+  customAddress?: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    postcode: string;
+    instructions?: string;
+  };
+  timeSlot?: {
+    date?: string;
+    time?: string;
+  };
 }
 
 interface Props {

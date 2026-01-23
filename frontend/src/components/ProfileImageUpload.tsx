@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import brain from 'brain';
+import type { BodyUploadProfileImage } from '../brain/data-contracts';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 
@@ -23,6 +24,25 @@ interface CropPosition {
   width: number;
   height: number;
   unit: string;
+}
+
+// Crop state for react-easy-crop
+interface CropState {
+  crop: Point;
+  zoom: number;
+  rotation: number;
+  croppedAreaPixels: Area | null;
+}
+
+// Helper to create an image element from a source URL
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', (error) => reject(error));
+    image.crossOrigin = 'anonymous';
+    image.src = url;
+  });
 }
 
 // Helper function to get cropped image
@@ -97,7 +117,8 @@ export const ProfileImageUpload: React.FC<Props> = ({
   const [cropState, setCropState] = useState<CropState>({
     crop: { x: 0, y: 0 },
     zoom: 1,
-    rotation: 0
+    rotation: 0,
+    croppedAreaPixels: null
   });
 
   // Generate user initials for fallback avatar
@@ -261,7 +282,7 @@ export const ProfileImageUpload: React.FC<Props> = ({
     try {
       const response = await brain.sync_google_profile_image({
         user_id: userId,
-        google_profile_image: googleProfileImage
+        google_image_url: googleProfileImage
       });
       const result = await response.json();
 
@@ -365,7 +386,7 @@ export const ProfileImageUpload: React.FC<Props> = ({
       formData.append('file', croppedBlob, selectedFile.name);
       formData.append('user_id', userId);
 
-      const response = await brain.upload_profile_image(formData);
+      const response = await brain.upload_profile_image(formData as any);
       const data = await response.json();
 
       if (data.image_url) {

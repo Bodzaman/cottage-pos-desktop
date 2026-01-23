@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { CheckCircle, AlertTriangle, RefreshCcw, Clock } from 'lucide-react';
+import { CheckCircle, AlertTriangle, RefreshCcw, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useInterval } from '../utils/hooks';
 import { paymentNotificationService } from '../utils/paymentNotificationService';
 import { formatRelativeTime } from '../utils/formatters';

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { MenuItem, OrderItem } from 'types';
+import { OrderItem } from 'types';
+import { MenuItem } from '../utils/menuTypes';
 import { useRealtimeMenuStore, getMenuDataForPOS } from '../utils/realtimeMenuStore';
 import { toast } from 'sonner';
 import { shallow } from 'zustand/shallow';
@@ -55,19 +56,17 @@ export function POSMenuSection({ onAddToOrder, orderMode, className = '' }: POSM
   const handleAddItem = (menuItem: MenuItem) => {
     const orderItem: OrderItem = {
       id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      menu_item_id: menuItem.id,
+      menuItemId: menuItem.id,
       name: menuItem.name,
-      price: menuItem.price,
+      price: menuItem.price ?? menuItem.base_price ?? 0,
       quantity: 1,
-      variant_id: menuItem.defaultVariant?.id || null,
-      variant_name: menuItem.defaultVariant?.name || null,
+      variantId: menuItem.defaultVariant?.id || null,
+      variantName: menuItem.defaultVariant?.name || null,
       notes: '',
       modifiers: [],
-      protein_type: null,
-      customization_notes: '',
-      special_instructions: ''
+      proteinType: undefined
     };
-    
+
     onAddToOrder(orderItem);
     toast.success(`Added ${menuItem.name} to order`);
   };
@@ -186,12 +185,11 @@ export function POSMenuSection({ onAddToOrder, orderMode, className = '' }: POSM
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <Card 
-                        className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2"
-                        style={{ 
-                          backgroundColor: '#2a2a2a', 
-                          borderColor: '#333',
-                          ':hover': { borderColor: '#fb923c' }
+                      <Card
+                        className="cursor-pointer hover:shadow-lg hover:border-orange-400 transition-all duration-200 border-2"
+                        style={{
+                          backgroundColor: '#2a2a2a',
+                          borderColor: '#333'
                         }}
                         onClick={() => handleAddItem(item)}
                       >

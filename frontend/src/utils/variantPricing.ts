@@ -163,7 +163,7 @@ export function determinePricingMode(
  * // Returns variant.price_dine_in || variant.price
  * ```
  */
-export function getVariantPrice(variant: MenuItemVariant, mode: OrderMode = 'COLLECTION'): number {
+export function getVariantPrice(variant: any, mode: OrderMode = 'COLLECTION'): number {
   switch (mode) {
     case 'DINE-IN':
       return variant.price_dine_in ?? variant.price;
@@ -190,7 +190,7 @@ export function getVariantPrice(variant: MenuItemVariant, mode: OrderMode = 'COL
  * ```
  */
 export function getVariantPriceRange(
-  variants: MenuItemVariant[],
+  variants: any[],
   mode: OrderMode = 'COLLECTION'
 ): { min: number; max: number } {
   if (!variants || variants.length === 0) {
@@ -236,8 +236,8 @@ export function getVariantPriceRange(
  * ```
  */
 export function getItemDisplayPrice(
-  item: MenuItem | Partial<MenuItem>,
-  variants?: MenuItemVariant[],
+  item: any, // Accepts any MenuItem-like object from menuTypes, masterTypes, or types/menu
+  variants?: any[], // Accepts any MenuItemVariant-like array
   mode: OrderMode = 'COLLECTION'
 ): PriceDisplay {
   // Use provided variants or fall back to item.variants
@@ -433,7 +433,7 @@ export function getDefaultVariant(
  * ```
  */
 export function getVariantSummary(
-  variants: MenuItemVariant[],
+  variants: any[],
   mode: OrderMode = 'COLLECTION'
 ): VariantSummary {
   if (!variants || variants.length === 0) {
@@ -448,12 +448,12 @@ export function getVariantSummary(
 
   // Extract protein names (filter out nulls/undefined)
   const proteins = variants
-    .map(v => v.protein_type_name || v.name)
+    .map(v => v.protein_type?.name || v.name || v.variant_name)
     .filter((name): name is string => Boolean(name));
 
   // Get cheapest variant info
   const cheapest = getCheapestVariant(variants, mode);
-  const cheapestName = cheapest?.protein_type_name || cheapest?.name || 'Unknown';
+  const cheapestName = cheapest?.protein_type?.name || cheapest?.name || cheapest?.variant_name || 'Unknown';
   const cheapestPrice = cheapest ? getVariantPrice(cheapest, mode) : 0;
 
   return {

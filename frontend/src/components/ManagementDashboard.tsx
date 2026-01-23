@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { colors } from "utils/designSystem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Users, Cog, Coffee, ActivitySquare, ClipboardList } from "lucide-react";
+import { BarChart, Users, Cog, Coffee, ActivitySquare, ClipboardList, LogOut } from "lucide-react";
 
 interface ManagementDashboardProps {
   onClose: () => void;

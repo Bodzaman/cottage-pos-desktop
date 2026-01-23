@@ -241,7 +241,10 @@ export const PremiumTheme = {
       primary: '#0F0F0F',
       secondary: '#1A1A1A',
       tertiary: '#252525',
-      highlight: '#2A2A2A'
+      dark: '#0A0A0A',
+      highlight: '#2A2A2A',
+      card: 'rgba(30, 30, 30, 0.95)', // For card backgrounds
+      base: '#0F0F0F', // Alias for primary
     },
     border: {
       light: 'rgba(255, 255, 255, 0.1)',

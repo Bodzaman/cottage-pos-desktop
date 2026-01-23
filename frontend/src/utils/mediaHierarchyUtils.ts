@@ -14,6 +14,7 @@ export interface MenuSection {
 export interface MenuCategory {
   id: string;
   name: string;
+  display_name: string; // Human-readable name
   section_id: string | null;
   is_section: boolean;
 }
@@ -61,15 +62,16 @@ export interface HierarchicalMediaData {
   // Flat arrays for easy component consumption
   sections: MenuSection[];          // Sections with nested categories
   menuImages: MediaAsset[];         // All menu images (flat)
+  menuVariantImages?: MediaAsset[]; // Menu item variant images
   aiAvatars: MediaAsset[];          // All AI avatars
   generalMedia: MediaAsset[];       // All general media
   orphanedMenuImages: MediaAsset[]; // Uncategorized menu images
   orphanedAiAvatars: MediaAsset[];  // Uncategorized AI avatars
-  
+
   // Metadata
-  totalAssets: number;
-  categorizedCount: number;
-  orphanedCount: number;
+  totalAssets?: number;
+  categorizedCount?: number;
+  orphanedCount?: number;
 }
 
 /**
@@ -85,6 +87,7 @@ function transformAPIResponse(apiData: APIResponse): HierarchicalMediaData {
     const categories: MenuCategory[] = sectionAPI.categories.map((catAPI) => ({
       id: catAPI.category_id,
       name: catAPI.category_name,
+      display_name: catAPI.category_name, // Use category name as display name
       section_id: catAPI.section_id,
       is_section: false,
     }));
@@ -179,6 +182,7 @@ export const fetchMenuSections = async (): Promise<MenuSection[]> => {
         categories.push({
           id: cat.id,
           name: cat.name,
+          display_name: cat.name, // Use category name as display name
           section_id: cat.parent_category_id,
           is_section: false,
         });
@@ -224,6 +228,7 @@ export const getCategoriesForSection = async (
       .map((cat: any) => ({
         id: cat.id,
         name: cat.name,
+        display_name: cat.name, // Use category name as display name
         section_id: cat.parent_category_id,
         is_section: false,
       }))

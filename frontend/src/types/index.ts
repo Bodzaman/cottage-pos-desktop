@@ -8,6 +8,9 @@
  * import { MenuItem, OrderItem, CartItem, OrderMode } from 'types';
  */
 
+// Import base CustomerProfile for extension
+import type { CustomerProfile as BaseCustomerProfileType } from '../brain/data-contracts';
+
 // ================================
 // COMMON TYPES
 // ================================
@@ -46,6 +49,66 @@ export {
 } from './common';
 
 // ================================
+// API TYPES (Re-exports from data-contracts)
+// ================================
+export type {
+  // Agent profiles
+  AgentProfileOutput as AgentProfile,
+  AgentProfileOutput,
+  AgentProfileInput,
+  AgentProfilesResponse,
+
+  // Tables
+  PosTableResponse,
+  TablesResponse,
+
+  // Enriched types
+  EnrichedDineInOrderItem,
+  EnrichedFavoriteItem,
+  FavoriteList,
+  FavoriteListItem,
+  EnrichedFavoritesResponse,
+
+  // POS types
+  POSBundleMenuItem,
+
+  // Variant info (API version)
+  VariantInfo as ApiVariantInfo,
+
+  // Orders
+  OrderModel,
+  RecentOrder,
+  SharedListResponse,
+
+  // Customer
+  CustomerProfileResponse,
+
+  // Cart/Item requests
+  AddItemRequest,
+  RemoveItemRequest,
+  UpdateQuantityRequest,
+  ChatRequest,
+
+  // Templates
+  TemplateAssignment,
+  TemplateAssignmentsResponse,
+} from '../brain/data-contracts';
+
+// Create OrderModelResponse as an alias (commonly expected pattern)
+export type OrderModelResponse = {
+  success: boolean;
+  orders: import('../brain/data-contracts').OrderModel[];
+  total?: number;
+};
+
+// Extended CustomerProfile with additional fields for profile image and auth provider
+export interface CustomerProfile extends BaseCustomerProfileType {
+  image_url?: string | null;
+  google_profile_image?: string | null;
+  auth_provider?: string | null;
+}
+
+// ================================
 // MENU TYPES
 // ================================
 export {
@@ -78,6 +141,11 @@ export {
 
   // Form data
   type MenuItemFormData,
+
+  // Signature dishes
+  type SignatureDish,
+  type SignatureVariantInfo,
+  type VariantInfo, // Alias for SignatureVariantInfo
 
   // API mappers
   mapApiCategoryToMenuCategory,
@@ -131,6 +199,9 @@ export {
   type CartItem,
   type CartItemVariant,
 
+  // Cart input types
+  type MenuItemInput,
+
   // Cart state
   type CartState,
 
@@ -176,6 +247,106 @@ export {
   mapApiTableOrderItem,
   mapApiCustomerTab,
 } from './tables';
+
+// ================================
+// SETTINGS TYPES
+// ================================
+export {
+  // Opening hours
+  type DayOfWeek,
+  type TimeShift,
+  type DaySchedule,
+  type OpeningHours,
+
+  // Custom serving sizes
+  type CustomServingSizeResponse,
+  type CustomServingSizeCreate,
+  type CustomServingSizeUpdate,
+} from './settings';
+
+// ================================
+// MEDIA TYPES
+// ================================
+export {
+  // Asset types
+  type AssetCategory,
+  type MediaAsset,
+  type MediaAssetDetails,
+  type ImageVariant,
+  type MediaImagePreviewMetadata,
+  type MediaItem,
+  type MenuItemInfo,
+  type EnhancedMediaItem,
+} from './media';
+
+// ================================
+// API TYPES (Custom)
+// ================================
+export {
+  // Agent configuration
+  type AgentCustomization,
+  type AgentConfig,
+  type AgentConfigResponse,
+  type AgentConfigRequest,
+  type AgentTestCallResponse,
+
+  // File upload
+  type UploadFileRequest,
+  type UploadFileResponse,
+
+  // Voice cart
+  type CreateAuthenticatedVoiceCartSessionRequest,
+  type VoiceCartSessionResponse,
+
+  // Order tracking
+  type EnrichedOrderItem,
+} from './api';
+
+// ================================
+// STRUCTURED EVENTS (AI Chat & Voice)
+// ================================
+export {
+  // Base types
+  type BaseStructuredEvent,
+  type StructuredEventType,
+
+  // Event types
+  type TextDeltaEvent,
+  type MenuRefsEvent,
+  type SuggestedActionsEvent,
+  type CartProposalEvent,
+  type MetadataEvent,
+  type CompleteEvent,
+  type ErrorEvent,
+  type StructuredEvent,
+
+  // Sub-types
+  type MenuRef,
+  type SuggestedAction,
+  type SuggestedActionType,
+  type CartOperation,
+  type CartProposal,
+  type CartProposalItem,
+  type CartProposalCustomization,
+
+  // Chat message extensions
+  type StructuredChatMessage,
+  type PendingCartProposalState,
+
+  // Type guards
+  isTextDeltaEvent,
+  isMenuRefsEvent,
+  isSuggestedActionsEvent,
+  isCartProposalEvent,
+  isMetadataEvent,
+  isCompleteEvent,
+  isErrorEvent,
+
+  // Intent constants
+  CARD_EMIT_INTENTS,
+  CARD_SUPPRESS_INTENTS,
+  DETERMINISTIC_INTENTS,
+} from './structured-events';
 
 // ================================
 // RE-EXPORTS FOR COMPATIBILITY

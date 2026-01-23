@@ -9,9 +9,9 @@ import { PlusCircle, Home, Check, MapPin, AlertCircle } from 'lucide-react';
 // DeliveryAddress interface for local use
 interface DeliveryAddress {
   id: string;
-  label: string;
-  line1: string;
-  line2?: string;
+  label?: string;
+  addressLine1: string;
+  addressLine2?: string;
   city: string;
   postcode: string;
   instructions?: string;
@@ -73,7 +73,7 @@ export function AddressSelection({
     if (activeTab === 'saved' && savedAddresses.length > 0) {
       // Select first address by default if none selected
       if (!selectedAddressId) {
-        const defaultAddress = savedAddresses.find(addr => addr.is_default) || savedAddresses[0];
+        const defaultAddress = savedAddresses.find(addr => addr.isDefault) || savedAddresses[0];
         onSelectAddress(defaultAddress.id);
       }
     } else if (activeTab === 'new') {
@@ -126,11 +126,11 @@ export function AddressSelection({
                       <Home className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{address.address_line1}</p>
-                      {address.address_line2 && <p>{address.address_line2}</p>}
-                      <p>{address.city}, {address.postal_code}</p>
+                      <p className="font-medium">{address.addressLine1}</p>
+                      {address.addressLine2 && <p>{address.addressLine2}</p>}
+                      <p>{address.city}, {address.postcode}</p>
                     </div>
-                    {address.is_default && (
+                    {address.isDefault && (
                       <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-tandoor-orange/20 text-tandoor-orange">
                         Default
                       </span>

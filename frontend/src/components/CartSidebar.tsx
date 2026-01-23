@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CartContent } from './CartContent';
-import type { MenuItem } from 'utils/masterTypes';
+import type { MenuItem } from 'types';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -181,13 +181,12 @@ export function CartSidebar({
                   currentOrderMode === 'collection' ? 'ring-2' : 'opacity-60'
                 }`}
                 style={{
-                  backgroundColor: currentOrderMode === 'collection' 
+                  backgroundColor: currentOrderMode === 'collection'
                     ? PremiumTheme.colors.burgundy[500] + '30'
                     : 'transparent',
                   color: currentOrderMode === 'collection'
                     ? PremiumTheme.colors.burgundy[400]
-                    : PremiumTheme.colors.text.muted,
-                  ringColor: currentOrderMode === 'collection' ? PremiumTheme.colors.burgundy[500] : 'transparent'
+                    : PremiumTheme.colors.text.muted
                 }}
               >
                 <PackageIcon className="h-4 w-4 mr-1.5" />
@@ -202,13 +201,12 @@ export function CartSidebar({
                   currentOrderMode === 'delivery' ? 'ring-2' : 'opacity-60'
                 }`}
                 style={{
-                  backgroundColor: currentOrderMode === 'delivery' 
+                  backgroundColor: currentOrderMode === 'delivery'
                     ? PremiumTheme.colors.silver[500] + '30'
                     : 'transparent',
                   color: currentOrderMode === 'delivery'
                     ? PremiumTheme.colors.silver[400]
-                    : PremiumTheme.colors.text.muted,
-                  ringColor: currentOrderMode === 'delivery' ? PremiumTheme.colors.silver[500] : 'transparent'
+                    : PremiumTheme.colors.text.muted
                 }}
               >
                 <Truck className="h-4 w-4 mr-1.5" />

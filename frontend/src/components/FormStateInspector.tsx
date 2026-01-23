@@ -3,7 +3,7 @@ import { UseFormWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Code, Eye, EyeOff } from 'lucide-react';
-import { MenuItemFormData, MenuVariant } from '../utils/masterTypes';
+import { MenuItemFormData, MenuItemVariant as MenuVariant } from '../utils/masterTypes';
 
 /**
  * FormStateInspector - Development Tool for Form Debugging

@@ -100,6 +100,7 @@ interface MediaLibraryStore {
 
   // Reset
   resetFilters: () => void;
+  clearAllFilters: () => void; // Alias for resetFilters
 
   // NEW: Batch selection
   batchSelection: BatchSelectionState;
@@ -261,6 +262,14 @@ export const useMediaLibraryStore = create<MediaLibraryStore>((set, get) => ({
   resetFilters: () => {
     set({
       menuImageFilters: initialMenuImageFilters,
+    });
+  },
+
+  // Alias for resetFilters
+  clearAllFilters: () => {
+    set({
+      menuImageFilters: initialMenuImageFilters,
+      unifiedFilters: initialUnifiedFilters,
     });
   },
 

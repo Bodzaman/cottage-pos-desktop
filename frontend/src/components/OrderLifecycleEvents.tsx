@@ -2,7 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Clock, Truck, ChefHat, Package, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, Truck, ChefHat, Package, AlertTriangle, Check, Car, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SafeDate } from '../utils';
 

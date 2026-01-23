@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { globalColors } from '../utils/QSAIDesign';
 import { generateKitchenDisplayName } from '../utils/smartAbbreviationSystem';
 import { HierarchicalCategorySelector } from './HierarchicalCategorySelector';
-import { FieldError as RHFFieldError } from './FieldError';
+import { RHFFieldError } from './FieldError';
 import { useWatch } from 'react-hook-form';
 import type { UseFormRegister, UseFormSetValue, FieldErrors, Control, UseFormWatch } from 'react-hook-form';
 import type { MenuItemFormInput } from '../utils/menuFormSchemas';

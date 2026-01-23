@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +12,7 @@ import { useChatVisibility } from '../utils/useChatVisibility';
  * Features:
  * - Always visible in bottom-right corner when chat is closed
  * - Opens ChatLargeModal when clicked
- * - Shows bot avatar if configured
+ * - Shows bot avatar if configured (Phase 6: loads on mount)
  * - Smooth entrance/exit animations
  * - Hides when chat is open
  * - Self-monitors route visibility (hides on internal/staff pages)
@@ -21,7 +21,13 @@ export function ChatTriggerButton() {
   const isChatAllowed = useChatVisibility();
   const isOpen = useChatStore((state) => state.isOpen);
   const openChat = useChatStore((state) => state.openChat);
+  const loadSystemPrompt = useChatStore((state) => state.loadSystemPrompt);
   const config = useChatConfig();
+
+  // Phase 6: Load agent config on mount to get avatar for widget button
+  useEffect(() => {
+    loadSystemPrompt();
+  }, [loadSystemPrompt]);
 
   // Don't render on excluded routes (internal/staff pages)
   if (!isChatAllowed) return null;

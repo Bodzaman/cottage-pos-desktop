@@ -34,9 +34,11 @@ export interface OrderAddress {
 export interface OrderData {
   id: string;
   orderNumber: string;
+  sourceOrderId?: string; // Original source order ID
   source: "ai-voice" | "online" | "pos";
   status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
   type: "delivery" | "pickup" | "dine-in";
+  tableNumber?: number; // For dine-in orders
   items: OrderItem[];
   customer: {
     name: string;

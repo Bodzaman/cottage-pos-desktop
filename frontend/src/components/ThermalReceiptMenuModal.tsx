@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { AppApisTableOrdersOrderItem, AppApisMenuManagementMenuItem, AppApisMenuManagementCategory } from '../brain/data-contracts';
+import { AppApisTableOrdersOrderItem } from '../brain/data-contracts';
+import { MenuItem, MenuCategory } from 'types';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { CustomizeOrchestratorProvider } from 'components/CustomizeOrchestrator';
 import DineInCategoryList from 'components/DineInCategoryList';
@@ -11,10 +12,20 @@ import ThermalReceiptOrderSummary from 'components/ThermalReceiptOrderSummary';
 import { toast } from 'sonner';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 
+// Extended order item type for thermal receipt with additional fields
+interface ThermalReceiptOrderItem extends AppApisTableOrdersOrderItem {
+  basePrice?: number;
+  total?: number;
+  modifiers?: Record<string, unknown>[];
+  instructions?: string;
+  category_id?: string;
+  category_name?: string;
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onOrderComplete: (orderItems: AppApisTableOrdersOrderItem[]) => void;
+  onOrderComplete: (orderItems: ThermalReceiptOrderItem[]) => void;
 }
 
 /**
@@ -28,7 +39,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [pendingItems, setPendingItems] = useState<AppApisTableOrdersOrderItem[]>([]);
+  const [pendingItems, setPendingItems] = useState<ThermalReceiptOrderItem[]>([]);
   const [isInitializing, setIsInitializing] = useState(false);
   
   // Initialize menu store when modal opens
@@ -86,17 +97,17 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   }, [isOpen]);
   
   // CustomizeOrchestrator onSave callback to capture order items
-  const handleOrchestratorSave = (orderItem: AppApisTableOrdersOrderItem) => {
+  const handleOrchestratorSave = (orderItem: ThermalReceiptOrderItem) => {
     console.log('📝 ThermalReceiptMenuModal - Saving order item from orchestrator:', {
       name: orderItem.name,
       menu_item_id: orderItem.menu_item_id,
       category_id: orderItem.category_id,
       category_name: orderItem.category_name,
-      variant: orderItem.variantName
+      variant: orderItem.variant_name
     });
-    
+
     // Enhanced order item with all necessary fields
-    const enhancedOrderItem: AppApisTableOrdersOrderItem = {
+    const enhancedOrderItem: ThermalReceiptOrderItem = {
       ...orderItem,
       basePrice: orderItem.basePrice || orderItem.price,
       total: (orderItem.basePrice || orderItem.price) * orderItem.quantity,

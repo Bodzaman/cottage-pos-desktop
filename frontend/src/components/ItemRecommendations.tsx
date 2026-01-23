@@ -124,7 +124,7 @@ export function ItemRecommendations({
             name: item.name,
             quantity: item.quantity,
             price: item.price,
-            category: item.category || null
+            category: item.categoryId || null
           })),
           customer_id: user?.id || null,
           order_mode: orderMode,

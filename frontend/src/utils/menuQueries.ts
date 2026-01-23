@@ -145,13 +145,13 @@ async function fetchProteinTypesOrdered(): Promise<ProteinType[]> {
 /**
  * Fetch menu categories with auto-refresh.
  * Replaces: fetchCategories() from useMenuData
- * 
+ *
  * Configuration:
  * - staleTime: 2 minutes (data considered fresh)
  * - refetchOnWindowFocus: true (auto-refresh when user returns to tab)
  * - cacheTime: 10 minutes (keep in cache after component unmounts)
  */
-export function useCategories(options?: UseQueryOptions<Category[]>) {
+export function useCategories(options?: Partial<Omit<UseQueryOptions<Category[]>, 'queryKey' | 'queryFn'>>) {
   return useQuery({
     queryKey: menuKeys.categories(),
     queryFn: async () => {
@@ -169,7 +169,7 @@ export function useCategories(options?: UseQueryOptions<Category[]>) {
  * Fetch all menu items with auto-refresh.
  * Replaces: fetchMenuItems() from useMenuData
  */
-export function useMenuItems(options?: UseQueryOptions<MenuItem[]>) {
+export function useMenuItems(options?: Partial<Omit<UseQueryOptions<MenuItem[]>, 'queryKey' | 'queryFn'>>) {
   return useQuery({
     queryKey: menuKeys.menuItems(),
     queryFn: async () => {
@@ -196,7 +196,7 @@ export function useMenuItems(options?: UseQueryOptions<MenuItem[]>) {
  */
 export function useMenuItemsByCategory(
   categoryId: string,
-  options?: UseQueryOptions<MenuItem[]>
+  options?: Partial<Omit<UseQueryOptions<MenuItem[]>, 'queryKey' | 'queryFn'>>
 ) {
   return useQuery({
     queryKey: menuKeys.menuItemsByCategory(categoryId),
@@ -224,7 +224,7 @@ export function useMenuItemsByCategory(
  * Fetch protein types with auto-refresh.
  * Replaces: fetchProteinTypes() from useMenuData
  */
-export function useProteinTypes(options?: UseQueryOptions<ProteinType[]>) {
+export function useProteinTypes(options?: Partial<Omit<UseQueryOptions<ProteinType[]>, 'queryKey' | 'queryFn'>>) {
   return useQuery({
     queryKey: menuKeys.proteinTypes(),
     queryFn: async () => {
@@ -242,7 +242,7 @@ export function useProteinTypes(options?: UseQueryOptions<ProteinType[]>) {
  * Fetch item variants with auto-refresh.
  * Replaces: fetchItemVariants() from useMenuData
  */
-export function useItemVariants(options?: UseQueryOptions<ItemVariant[]>) {
+export function useItemVariants(options?: Partial<Omit<UseQueryOptions<ItemVariant[]>, 'queryKey' | 'queryFn'>>) {
   return useQuery({
     queryKey: menuKeys.itemVariants(),
     queryFn: async () => {
@@ -282,7 +282,7 @@ export function useItemVariants(options?: UseQueryOptions<ItemVariant[]>) {
  * Fetch customizations with auto-refresh.
  * Replaces: fetchCustomizations() from useMenuData
  */
-export function useCustomizations(options?: UseQueryOptions<CustomizationBase[]>) {
+export function useCustomizations(options?: Partial<Omit<UseQueryOptions<CustomizationBase[]>, 'queryKey' | 'queryFn'>>) {
   return useQuery({
     queryKey: menuKeys.customizations(),
     queryFn: async () => {

@@ -189,7 +189,7 @@ export default function SharedFavoritesList() {
                         {/* Image */}
                         <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-black/40">
                           <img
-                            src={item.menu_item_image || '/placeholder-food.jpg'}
+                            src={item.image_url || '/placeholder-food.jpg'}
                             alt={item.menu_item_name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -197,22 +197,22 @@ export default function SharedFavoritesList() {
                             }}
                           />
                         </div>
-                        
+
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-[#EAECEF] mb-1">
                             {item.menu_item_name}
                           </h3>
-                          {item.menu_item_description && (
+                          {item.description && (
                             <p className="text-sm text-[#8B92A0] mb-2 line-clamp-2">
-                              {item.menu_item_description}
+                              {item.description}
                             </p>
                           )}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              {item.menu_item_price && (
+                              {item.price && (
                                 <p className="text-lg font-bold text-[#EAECEF]">
-                                  £{item.menu_item_price.toFixed(2)}
+                                  £{item.price.toFixed(2)}
                                 </p>
                               )}
                               {item.spice_level && item.spice_level > 0 && (

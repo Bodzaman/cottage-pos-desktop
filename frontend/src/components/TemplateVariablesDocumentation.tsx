@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { QuestionMarkCircle, FileText, User, ShoppingBag, Home, Calendar, Clock, CreditCard, Settings, Info, Cog } from "lucide-react";
+import { HelpCircle, FileText, User, ShoppingBag, Home, Calendar, Clock, CreditCard, Settings, Info, Cog } from "lucide-react";
 
 // Comprehensive variable category list
 const variableCategories = [
@@ -159,7 +159,7 @@ const variableCategories = [
   {
     id: 'condition',
     name: 'Conditionals',
-    icon: <QuestionMarkCircle className="h-4 w-4" />,
+    icon: <HelpCircle className="h-4 w-4" />,
     variables: [
       { name: '{{if delivery}}...{{end if}}', description: 'Show content only for delivery orders', example: 'Conditional section' },
       { name: '{{if collection}}...{{end if}}', description: 'Show content only for collection orders', example: 'Conditional section' },

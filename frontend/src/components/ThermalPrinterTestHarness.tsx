@@ -52,7 +52,7 @@ export default function ThermalPrinterTestHarness() {
   const checkPrinterStatus = async () => {
     setIsLoading(true);
     try {
-      const response = await brain.get_thermal_test_status();
+      const response = await brain.get_printer_status();
       const data = await response.json();
       setPrinterStatus({
         test_system_ready: data.test_system_ready,

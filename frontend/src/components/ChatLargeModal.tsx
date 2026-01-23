@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Maximize2, Minimize2, X, Bot, Send, Loader2, Phone, PhoneOff, Mic, MicOff, User, Copy, Trash2, RotateCcw, ShoppingCart, Check } from 'lucide-react';
+import { Maximize2, Minimize2, X, Bot, Send, Loader2, Phone, PhoneOff, Mic, MicOff, User, Copy, Trash2, RotateCcw, ShoppingCart, Check, Square } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,7 +27,7 @@ import { InlineMenuCard } from 'components/InlineMenuCard';
 import { toast } from 'sonner';
 import { useAgentConfig } from '../utils/useAgentConfig';
 import brain from 'brain';
-import { 
+import {
   useChatMessages,
   useChatIsLoading,
   useChatIsStreaming,
@@ -37,8 +37,12 @@ import {
   useVoiceCallStatus,
   VoiceCallStatus,
   useChatStore,
-  useIsAISpeaking
+  useIsAISpeaking,
+  usePendingCartProposal,
+  useIsCartConfirmOpen,
+  useCartProposalActions
 } from '../utils/chat-store';
+import { CartConfirmationDialog } from './CartConfirmationDialog';
 import { useCartStore } from '../utils/cartStore';
 import { usePageContext } from '../utils/pageContext';
 import { detectDishMentionsFast } from '../utils/dishMentionDetector';
@@ -232,7 +236,7 @@ const renderMessageContent = ({ message }: { message: ChatMessage }) => {
     return (
       <>
         {/* Main message content */}
-        <ReactMarkdown 
+        <ReactMarkdown
           className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
           components={{
             p: ({ children }) => <p className="mb-2">{children}</p>,
@@ -252,7 +256,7 @@ const renderMessageContent = ({ message }: { message: ChatMessage }) => {
         >
           {message.content}
         </ReactMarkdown>
-        
+
         {/* Render menu cards */}
         <div className="mt-3 space-y-2">
           {message.menuCards.map((menuItem, index) => (
@@ -263,6 +267,51 @@ const renderMessageContent = ({ message }: { message: ChatMessage }) => {
             />
           ))}
         </div>
+      </>
+    );
+  }
+
+  // Phase 7: Handle menuRefs from structured events (model structured output)
+  if (message.menuRefs && message.menuRefs.length > 0) {
+    return (
+      <>
+        {/* Main message content */}
+        <ReactMarkdown
+          className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
+          components={{
+            p: ({ children }) => <p className="mb-2">{children}</p>,
+            strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
+            em: ({ children }) => <em className="text-orange-200">{children}</em>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+            li: ({ children }) => <li className="text-gray-300">{children}</li>,
+            h1: ({ children }) => <h1 className="text-xl font-bold text-orange-300 mb-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-semibold text-orange-300 mb-2">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-medium text-orange-300 mb-1">{children}</h3>,
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-orange-500 pl-4 italic text-orange-200 my-2">
+                {children}
+              </blockquote>
+            ),
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+
+        {/* Render menu refs from structured events - smooth layout expansion */}
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          className="flex flex-wrap gap-2 mt-3 overflow-hidden"
+        >
+          {message.menuRefs.map((ref, index) => (
+            <InlineMenuCard
+              key={`${message.id}-ref-${ref.menu_item_id}-${index}`}
+              itemId={ref.menu_item_id}
+              animationDelay={index * 150}
+            />
+          ))}
+        </motion.div>
       </>
     );
   }
@@ -440,7 +489,6 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       '/update-kds',
       '/update-pos-desktop',
       '/pos-settings',
-      '/chatbot-configuration',
       '/media-library',
       '/health-monitor',
       '/gemini-voice-lab'
@@ -560,6 +608,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     setLoading,
     setStreaming,
     sendMessage,
+    stopGeneration,
     setUserContext,
     startNewSession,
     loadChatbotConfig
@@ -572,9 +621,14 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   const isVoiceCallActive = useVoiceCallActive();
   const voiceCallStatus = useVoiceCallStatus();
   const isAISpeaking = useIsAISpeaking(); // NEW: Reactive hook for AI speaking state
-  
+
   // NEW: Add voice T&C screen selector
   const showVoiceTCScreen = useChatStore((state) => state.showVoiceTCScreen);
+
+  // Phase 7: Cart proposal state for confirmation dialog
+  const pendingCartProposal = usePendingCartProposal();
+  const isCartConfirmOpen = useIsCartConfirmOpen();
+  const { confirmCartProposal, cancelCartProposal } = useCartProposalActions();
 
   // NEW: Track items added during call for summary
   const [callStartCartCount, setCallStartCartCount] = useState(0);
@@ -1415,7 +1469,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                                     {/* Render message content with inline menu cards */}
                                     <div className="prose prose-sm max-w-none dark:prose-invert">
                                       {isUser ? (
-                                        <ReactMarkdown 
+                                        <ReactMarkdown
                                           className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                                           components={{
                                             p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -1431,8 +1485,37 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                                         // NEW: Use structured content rendering
                                         renderStructuredContent(message, currentOrderMode)
                                       )}
+
+                                      {/* Phase 7: Render suggested actions (quick-reply chips) with stagger animation */}
+                                      {!isUser && message.suggestedActions && message.suggestedActions.length > 0 && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: 'auto' }}
+                                          transition={{ duration: 0.3, delay: 0.15 }}
+                                          className="flex flex-wrap gap-2 mt-3 overflow-hidden"
+                                        >
+                                          {message.suggestedActions.map((action, idx) => (
+                                            <motion.div
+                                              key={action.id}
+                                              initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                                              transition={{ duration: 0.25, delay: 0.25 + idx * 0.08 }}
+                                            >
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => sendMessage(action.message)}
+                                                disabled={isLoading}
+                                                className="text-xs px-3 py-1 h-auto rounded-full border-orange-500/30 hover:border-orange-500/60 hover:bg-orange-500/10 text-orange-300 transition-all duration-200"
+                                              >
+                                                {action.label}
+                                              </Button>
+                                            </motion.div>
+                                          ))}
+                                        </motion.div>
+                                      )}
                                     </div>
-                                    
+
                                     {/* Action buttons on hover */}
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mt-2">
                                       <MessageActions 
@@ -1587,40 +1670,56 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                             "transition-all duration-200",
                             "group"
                           )}
-                          title={isAuthenticated ? "Start voice call with Uncle Raj" : "Sign up to use voice ordering"}
+                          title={isAuthenticated ? `Start voice call with ${agentName}` : "Sign up to use voice ordering"}
                           aria-label={isAuthenticated ? "Start voice call" : "Sign up for voice calls"}
                         >
                           <Phone className="w-4 h-4 group-hover:scale-110 transition-transform" />
                           <span className="text-sm font-medium hidden sm:inline">
-                            Call Uncle Raj
+                            Call {agentName}
                           </span>
                         </button>
                       )}
                       
-                      {/* Burgundy Send Button - FAR RIGHT (inside pill) */}
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={!inputValue.trim() || isLoading || isVoiceCallActive}
-                        className={cn(
-                          "flex-shrink-0 h-9 w-9 rounded-full",
-                          "flex items-center justify-center",
-                          "disabled:opacity-50 disabled:cursor-not-allowed",
-                          "transition-all duration-200 shadow-md hover:shadow-lg hover:scale-110"
-                        )}
-                        style={{ 
-                          background: inputValue.trim() && !isLoading && !isVoiceCallActive
-                            ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[700]} 0%, ${PremiumTheme.colors.burgundy[800]} 100%)`
-                            : PremiumTheme.colors.background.tertiary
-                        }}
-                        title="Send message"
-                        aria-label="Send message"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="w-5 h-5 animate-spin text-white" />
-                        ) : (
-                          <Send className="w-5 h-5 text-white" />
-                        )}
-                      </button>
+                      {/* Send / Stop Button - FAR RIGHT (inside pill) */}
+                      {isStreaming ? (
+                        <button
+                          onClick={stopGeneration}
+                          className={cn(
+                            "flex-shrink-0 h-9 w-9 rounded-full",
+                            "flex items-center justify-center",
+                            "transition-all duration-200 shadow-md hover:shadow-lg hover:scale-110",
+                            "bg-gray-600 hover:bg-gray-500"
+                          )}
+                          title="Stop generating"
+                          aria-label="Stop generating"
+                        >
+                          <Square className="w-4 h-4 text-white fill-white" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={!inputValue.trim() || isLoading || isVoiceCallActive}
+                          className={cn(
+                            "flex-shrink-0 h-9 w-9 rounded-full",
+                            "flex items-center justify-center",
+                            "disabled:opacity-50 disabled:cursor-not-allowed",
+                            "transition-all duration-200 shadow-md hover:shadow-lg hover:scale-110"
+                          )}
+                          style={{
+                            background: inputValue.trim() && !isLoading && !isVoiceCallActive
+                              ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[700]} 0%, ${PremiumTheme.colors.burgundy[800]} 100%)`
+                              : PremiumTheme.colors.background.tertiary
+                          }}
+                          title="Send message"
+                          aria-label="Send message"
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin text-white" />
+                          ) : (
+                            <Send className="w-5 h-5 text-white" />
+                          )}
+                        </button>
+                      )}
                       
                     </div>
                   </div>
@@ -1664,9 +1763,17 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       />
       
       {/* Voice Maintenance Modal - Shown when maintenance mode is ON */}
-      <VoiceMaintenanceModal 
+      <VoiceMaintenanceModal
         isOpen={showVoiceMaintenanceModal}
         onClose={() => setShowVoiceMaintenanceModal(false)}
+      />
+
+      {/* Phase 7: Cart Confirmation Dialog for AI cart proposals */}
+      <CartConfirmationDialog
+        proposal={pendingCartProposal}
+        isOpen={isCartConfirmOpen}
+        onConfirm={confirmCartProposal}
+        onCancel={cancelCartProposal}
       />
     </>
   );

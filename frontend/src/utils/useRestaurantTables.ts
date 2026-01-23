@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 
 export interface RestaurantTable {
-  id: string; // Will use table_number as string
+  id: string; // Actual UUID from pos_tables
   table_number: string;
   capacity: number;
   status: 'VACANT' | 'SEATED' | 'DINING' | 'REQUESTING_CHECK' | 'PAYING' | 'CLEANING';
@@ -57,7 +57,7 @@ export const useRestaurantTables = () => {
         if (data) {
           // Transform pos_tables schema to RestaurantTable interface
           const transformedTables: RestaurantTable[] = data.map((table: any) => ({
-            id: table.table_number.toString(),
+            id: table.id,
             table_number: table.table_number.toString(),
             capacity: table.capacity || 4,
             status: mapStatus(table.status),
@@ -106,7 +106,7 @@ export const useRestaurantTables = () => {
             if (payload.eventType === 'INSERT') {
               const newTable = payload.new as any;
               const transformed: RestaurantTable = {
-                id: newTable.table_number.toString(),
+                id: newTable.id,
                 table_number: newTable.table_number.toString(),
                 capacity: newTable.capacity || 4,
                 status: mapStatus(newTable.status),
@@ -125,7 +125,7 @@ export const useRestaurantTables = () => {
             if (payload.eventType === 'UPDATE') {
               const updatedTable = payload.new as any;
               const transformed: RestaurantTable = {
-                id: updatedTable.table_number.toString(),
+                id: updatedTable.id,
                 table_number: updatedTable.table_number.toString(),
                 capacity: updatedTable.capacity || 4,
                 status: mapStatus(updatedTable.status),
@@ -144,7 +144,7 @@ export const useRestaurantTables = () => {
               );
             }
             if (payload.eventType === 'DELETE') {
-              return current.filter((t) => t.id !== payload.old.table_number.toString());
+              return current.filter((t) => t.id !== payload.old.id);
             }
             return current;
           });
@@ -173,7 +173,7 @@ export const useRestaurantTables = () => {
 
       if (data) {
         const transformedTables: RestaurantTable[] = data.map((table: any) => ({
-          id: table.table_number.toString(),
+          id: table.id,
           table_number: table.table_number.toString(),
           capacity: table.capacity || 4,
           status: mapStatus(table.status),

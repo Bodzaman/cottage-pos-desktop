@@ -237,8 +237,8 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
     <div className="h-full" onClick={clearNotification}>
       {/* Detailed Order Dialog */}
       <DetailedOrderDialog
-        order={selectedOrder}
-        open={detailDialogOpen}
+        order={selectedOrder as any}
+        isOpen={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         orderSource="WEBSITE"
       />

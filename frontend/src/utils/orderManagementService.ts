@@ -51,6 +51,12 @@ export interface CompletedOrder {
   customer_email?: string;
   delivery_address?: string;
   special_instructions?: string;
+  // Customer object for convenience
+  customer?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
   table_number?: number;
   guest_count?: number;
   created_at: Date;
@@ -150,6 +156,10 @@ export class OrderManagementService {
     return OrderManagementService.instance;
   }
 
+  // Method declarations for prototype extensions
+  public updateOrderPaymentStatus!: (orderId: string, status: string, paymentInfo?: any) => Promise<boolean>;
+  public trackOrderEdit!: (orderId: string, userId?: string, userName?: string) => void;
+
   // Convert a TableOrder to our CompletedOrder format
   private convertTableOrderToCompletedOrder(tableOrder: TableOrder, tableNumber: number, guestCount: number): CompletedOrder {
     // Calculate totals
@@ -219,8 +229,8 @@ export class OrderManagementService {
       // Convert the table order to our API format
       const completedOrder = this.convertTableOrderToCompletedOrder(tableOrder, tableNumber, guestCount);
       
-      // Store in the backend
-      const response = await brain.store_order(completedOrder);
+      // Store in the backend (cast to any to handle type differences)
+      const response = await brain.store_order(completedOrder as any);
       const result = await response.json();
       
       if (result.success) {
@@ -239,8 +249,8 @@ export class OrderManagementService {
   public async storeOnlineOrder(order: CompletedOrder): Promise<boolean> {
     try {
       
-      // Store in the backend
-      const response = await brain.store_order(order);
+      // Store in the backend (cast to any to handle type differences)
+      const response = await brain.store_order(order as any);
       const result = await response.json();
       
       if (result.success) {
@@ -364,9 +374,9 @@ export class OrderManagementService {
         queryParams.order_type = orderType;
       }
       
-      // Fetch reconciliation data from the API
-      const response = await brain.get_reconciliation_summary(queryParams);
-      return await response.json();
+      // Fetch reconciliation data from the API (cast for type compatibility)
+      const response = await brain.get_reconciliation_summary(queryParams as any);
+      return await response.json() as ReconciliationSummary;
     } catch (error) {
       console.error('Error fetching reconciliation summary:', error);
       return null;

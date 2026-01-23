@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { MediaGalleryGrid } from 'components/MediaGalleryGrid';
 import { MediaItem } from 'utils/mediaLibraryUtils';
+import { MediaAsset } from 'types';
 
 interface AIAvatarTabProps {
   allAvatars: MediaAsset[];

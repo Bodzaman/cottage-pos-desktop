@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, ChevronDown, ChevronUp, Utensils } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronUp, Utensils, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

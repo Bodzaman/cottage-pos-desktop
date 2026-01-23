@@ -25,6 +25,7 @@ interface CustomizationBase {
   id: string;
   name: string;
   price?: number;
+  price_adjustment?: number; // Alias for price (API uses this name)
   customization_group?: string;
   display_order: number;
   is_exclusive: boolean;
@@ -34,6 +35,11 @@ interface CustomizationBase {
   ai_voice_agent: boolean;
   is_global: boolean;
   item_ids?: string[];
+}
+
+// CustomizationItem for API responses
+interface CustomizationItem extends CustomizationBase {
+  price_adjustment?: number;
 }
 
 interface CustomizationsTabProps {
@@ -60,6 +66,7 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
     id: "",
     name: "",
     price: 0,
+    price_adjustment: 0, // Alias used by API
     customization_group: "_none_",
     display_order: 0,
     is_exclusive: false,
@@ -160,6 +167,7 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
       id: "",
       name: "",
       price: 0,
+      price_adjustment: 0,
       customization_group: "_none_",
       display_order: 0,
       is_exclusive: false,
@@ -292,7 +300,7 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
       
       toast.success(`Customization ${isUpdate ? 'updated' : 'created'} successfully`);
       
-      queryClient.invalidateQueries(menuKeys.customizations);
+      queryClient.invalidateQueries({ queryKey: menuKeys.customizations() });
       loadCustomizationsSimple();
       
     } catch (error: any) {
@@ -319,7 +327,7 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
       
       toast.success('Customization deleted successfully');
       
-      queryClient.invalidateQueries(menuKeys.customizations);
+      queryClient.invalidateQueries({ queryKey: menuKeys.customizations() });
       setSelectedCustomizationId(null);
       resetCustomizationForm();
       loadCustomizationsSimple();

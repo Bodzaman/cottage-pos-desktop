@@ -16,24 +16,27 @@ export const SafeText: React.FC<SafeTextProps> = ({ value, fallback = '' }) => {
 };
 
 interface SafeDateProps {
-  value: any;
+  value?: any;
+  date?: any; // Alias for value - for backward compatibility
   format?: 'date' | 'time' | 'datetime';
   fallback?: string;
 }
 
-export const SafeDate: React.FC<SafeDateProps> = ({ value, format = 'date', fallback = '' }) => {
+export const SafeDate: React.FC<SafeDateProps> = ({ value, date, format = 'date', fallback = '' }) => {
+  // Support both 'value' and 'date' props
+  const dateValue = value ?? date;
   let formattedValue = fallback;
   
   try {
     switch (format) {
       case 'date':
-        formattedValue = formatDate(value) || fallback;
+        formattedValue = formatDate(dateValue) || fallback;
         break;
       case 'time':
-        formattedValue = formatTime(value) || fallback;
+        formattedValue = formatTime(dateValue) || fallback;
         break;
       case 'datetime':
-        formattedValue = formatDateTime(value) || fallback;
+        formattedValue = formatDateTime(dateValue) || fallback;
         break;
     }
   } catch (error) {

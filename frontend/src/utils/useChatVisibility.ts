@@ -62,8 +62,6 @@ function useChatVisibilityInternal(): boolean {
       '/thermalreceiptdesignerv2',
       '/media-library',
       '/medialibrary',
-      '/chatbot-configuration',
-      '/chatbotconfiguration',
       '/health-monitor',
       '/healthmonitor',
       '/gemini-voice-lab',

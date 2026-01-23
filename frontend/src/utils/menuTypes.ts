@@ -73,39 +73,67 @@ export interface SetMeal {
 export interface ItemVariant {
   id?: string;
   menu_item_id?: string;
-  protein_type_id: string;
+  menuItemId?: string; // CamelCase alias
+  protein_type_id?: string; // Made optional for compatibility
+  proteinTypeId?: string; // CamelCase alias
   protein_type_name?: string;
+  proteinTypeName?: string; // CamelCase alias
   variant_name?: string;
+  variantName?: string; // CamelCase alias
   name: string;
   description?: string;
+  description_override?: string; // Variant-specific description override
+  descriptionOverride?: string; // CamelCase alias
   description_state?: 'inherited' | 'custom';
+  descriptionState?: 'inherited' | 'custom'; // CamelCase alias
   price: number;
   price_dine_in?: number;
+  priceDineIn?: number; // CamelCase alias
   price_delivery?: number;
+  priceDelivery?: number; // CamelCase alias
+  price_takeaway?: number;
+  priceTakeaway?: number; // CamelCase alias
   is_default?: boolean;
+  isDefault?: boolean; // CamelCase alias
   is_active?: boolean;
   image_url?: string;
+  imageUrl?: string; // CamelCase alias
   image_asset_id?: string;
+  imageAssetId?: string; // CamelCase alias
   image_url_override?: string;
   display_image_url?: string | null;
+  displayImageUrl?: string | null; // CamelCase alias
   image_state?: 'inherited' | 'custom';
+  imageState?: 'inherited' | 'custom'; // CamelCase alias
   image_source?: 'variant' | 'inherited' | 'none';
+  imageSource?: 'variant' | 'inherited' | 'none'; // CamelCase alias
   display_order?: number;
+  displayOrder?: number; // CamelCase alias
 
   // Food-specific variant fields
   spice_level?: number;
+  spiceLevel?: number; // CamelCase alias
   spice_level_override?: number; // Variant-specific spice override
+  spiceLevelOverride?: number; // CamelCase alias
   allergens?: string[];
   allergen_notes?: string;
+  allergenNotes?: string; // CamelCase alias
   dietary_tags_override?: string[];
+  dietaryTagsOverride?: string[]; // CamelCase alias
 
   // Dietary flags (variant-specific overrides)
   is_vegetarian?: boolean;
+  isVegetarian?: boolean; // CamelCase alias
   is_vegan?: boolean;
+  isVegan?: boolean; // CamelCase alias
   is_gluten_free?: boolean;
+  isGlutenFree?: boolean; // CamelCase alias
   is_halal?: boolean;
+  isHalal?: boolean; // CamelCase alias
   is_dairy_free?: boolean;
+  isDairyFree?: boolean; // CamelCase alias
   is_nut_free?: boolean;
+  isNutFree?: boolean; // CamelCase alias
 
   featured?: boolean;
 }
@@ -117,37 +145,81 @@ export interface MenuItem {
   id: string;
   name: string;
   kitchen_display_name?: string | null; // Optional optimized name for thermal receipt printing
+  kitchenDisplayName?: string | null; // CamelCase alias
   // Unified description field from database migration
   description: string | null;
   menu_item_description?: string | null; // Legacy/alternate description field
+  long_description?: string | null; // Extended description
   published_at?: string | null; // Publication timestamp
+  publishedAt?: string | null; // CamelCase alias
   hasPublishedSnapshot?: boolean; // Flag indicating item has a snapshot and can be reverted
   image_url: string | null;
+  imageUrl?: string | null; // CamelCase alias
   // ✅ NEW: Optimized image variants from media_assets table
   image_variants?: {
     square?: { webp?: string | null; jpeg?: string | null };
     widescreen?: { webp?: string | null; jpeg?: string | null };
     thumbnail?: { webp?: string | null; jpeg?: string | null };
   } | null;
+  imageVariants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null; // CamelCase alias
   spice_indicators: string | null;
+  spiceIndicators?: string | null; // CamelCase alias
   default_spice_level?: number | null; // Default spice level for item
+  defaultSpiceLevel?: number | null; // CamelCase alias
   category_id: string;
+  categoryId?: string; // CamelCase alias for types/menu.ts compatibility
+  categoryName?: string; // CamelCase property
   // Array of ingredients for the dish
   featured: boolean;
   dietary_tags: string[] | null; // Array of dietary tags like 'Vegetarian', 'Vegan', etc.
+  dietaryTags?: string[] | null; // CamelCase alias
   item_code?: string | null;
+  itemCode?: string | null; // CamelCase alias
   display_order: number;
+  menuOrder?: number; // CamelCase alias for types/menu.ts compatibility
   active: boolean;
   inherit_category_print_settings?: boolean;
+  inheritCategoryPrintSettings?: boolean; // CamelCase alias
   // Add missing pricing fields from database
   price?: number; // Base price
+  base_price?: number; // Alias for price
+  basePrice?: number; // CamelCase alias
   price_dine_in?: number; // Dine-in price
+  priceDineIn?: number; // CamelCase alias
   price_takeaway?: number; // Takeaway/collection price
+  priceTakeaway?: number; // CamelCase alias
+  takeaway_price?: number; // Alias for price_takeaway
   price_delivery?: number; // Delivery price
+  priceDelivery?: number; // CamelCase alias
+  priceCollection?: number; // CamelCase property
   // Set meal fields
   is_set_meal?: boolean;
+  isSetMeal?: boolean; // CamelCase alias
   set_meal_id?: string | null;
+  setMealId?: string | null; // CamelCase alias
   set_meal_code?: string | null;
+  setMealCode?: string | null; // CamelCase alias
+  hasVariants?: boolean; // CamelCase property for types/menu.ts compatibility
+  defaultVariant?: ItemVariant | null; // Default selected variant
+  is_available?: boolean; // Availability flag
+  isAvailable?: boolean; // CamelCase alias
+  // Dietary flags
+  vegetarian?: boolean;
+  is_vegetarian?: boolean;
+  vegan?: boolean;
+  is_vegan?: boolean;
+  gluten_free?: boolean;
+  isGlutenFree?: boolean;
+  halal?: boolean;
+  is_halal?: boolean;
+  dairy_free?: boolean;
+  isDairyFree?: boolean;
+  nut_free?: boolean;
+  isNutFree?: boolean;
   // Menu variants (different protein types, sizes, or preparations)
   variants: ItemVariant[];
 }
@@ -171,10 +243,17 @@ export interface SuggestedMenuItem {
 export interface MenuItemVariant {
   id: string;
   name: string;
+  variant_name?: string;
   price: string | number; // Base price (takeaway price)
   price_dine_in?: string | number;
   price_delivery?: string | number;
+  price_adjustment?: number;
   protein_type_name?: string;
+  protein_type?: string;
+  protein_type_id?: string;
+  is_active?: boolean;
+  image_url?: string;
+  image_variants?: Record<string, any>;
 }
 
 /**
@@ -199,6 +278,7 @@ export interface ModifierSelection {
   option_id?: string; // Add missing option_id property
   name: string;
   price_adjustment: number;
+  price?: number; // Alias for price_adjustment
 }
 
 /**
@@ -225,10 +305,12 @@ export interface CustomizationBase {
   display_order?: number;
   is_exclusive?: boolean;
   is_active?: boolean;
+  active?: boolean; // Alias for is_active
   show_on_pos?: boolean;
   show_on_website?: boolean;
   is_global?: boolean;
   item_ids?: string[];
+  menu_item_ids?: string[]; // Alias for item_ids
 }
 
 /**

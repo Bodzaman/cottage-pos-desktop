@@ -81,8 +81,8 @@ export const EditCategoryDialogEnhanced = React.memo(({
       });
       const data = await response.json();
 
-      if (data.success) {
-        setSectionChangeImpact(data.impact);
+      if (data.status === 'success' || data.status === 'ok') {
+        setSectionChangeImpact(data as any);
         setSelectedNewSection(newSectionId as SectionId);
         setShowSectionWarning(true);
       }
@@ -103,7 +103,7 @@ export const EditCategoryDialogEnhanced = React.memo(({
       });
       const data = await response.json();
 
-      if (data.success) {
+      if (data.status === 'success' || data.status === 'ok') {
         // Update local state to show the change immediately
         setEditForm(prev => ({
           ...prev,
@@ -113,14 +113,14 @@ export const EditCategoryDialogEnhanced = React.memo(({
         toast.success(
           `Category moved to ${getSectionById(selectedNewSection)?.displayName}`,
           {
-            description: `${data.items_affected} items and ${data.subcategories_affected} subcategories updated`
+            description: `${(data as any).items_affected ?? 0} items and ${(data as any).subcategories_affected ?? 0} subcategories updated`
           }
         );
 
         setShowSectionWarning(false);
         setSelectedNewSection(null);
       } else {
-        toast.error(data.error || 'Failed to move category');
+        toast.error(data.message || 'Failed to move category');
       }
     } catch (error) {
       console.error('Failed to move category:', error);

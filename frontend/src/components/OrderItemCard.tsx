@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Trash2, Edit2, StickyNote, Cog } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
-import type { EnrichedOrderItem } from 'utils/useDineInOrder';
+import type { EnrichedOrderItem } from 'types';
 import type { OrderItem } from 'types';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 

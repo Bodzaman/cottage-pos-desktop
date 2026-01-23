@@ -2271,6 +2271,12 @@ export interface CreateOrderCommand {
   server_id?: string | null;
   /** Server Name */
   server_name?: string | null;
+  /** Guest Count - number of guests at the table */
+  guest_count?: number | null;
+  /** Linked Tables - table numbers linked together for large parties */
+  linked_tables?: number[] | null;
+  /** Table Group Id - unique identifier for linked table groups */
+  table_group_id?: string | null;
 }
 
 /**

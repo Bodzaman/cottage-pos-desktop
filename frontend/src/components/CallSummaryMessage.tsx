@@ -62,11 +62,11 @@ export function CallSummaryMessage({
                     <span>•</span>
                     <span className="flex-1">
                       {item.name}
-                      {item.selectedVariant && (
-                        <span className="text-xs ml-1">({item.selectedVariant.name})</span>
+                      {item.variant && (
+                        <span className="text-xs ml-1">({item.variant.name})</span>
                       )}
-                      {item.spiceLevel && item.spiceLevel !== 'none' && (
-                        <span className="text-xs ml-1 capitalize">({item.spiceLevel} spice)</span>
+                      {item.variantName && item.variantName !== 'none' && (
+                        <span className="text-xs ml-1 capitalize">({item.variantName})</span>
                       )}
                       {item.quantity > 1 && (
                         <span className="text-xs ml-1">(x{item.quantity})</span>

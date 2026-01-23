@@ -1,160 +1,303 @@
-import { create } from 'zustand';
-import brain from 'brain';
-import { AgentConfigResponse, AgentConfigRequest } from 'types';
+/**
+ * Unified Agent Config Store
+ *
+ * Single source of truth for AI agent configuration.
+ * Provides reactive updates when config changes via Supabase Realtime.
+ * Used by both admin wizard (AIStaffManagementHub) AND customer chat (ChatLargeModal).
+ *
+ * Phase 6: AI Chat Frontend Architecture Fix
+ */
 
-interface AgentCustomization {
-  name: string;
-  isActive: boolean;
+import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { supabase } from './supabaseClient';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+// ==============================================================================
+// TYPES
+// ==============================================================================
+
+export interface AgentConfig {
+  // Database fields
+  id: string;
+
+  // Identity
+  agent_name: string;
+  agent_role: string;
+  agent_avatar_url: string | null;
+
+  // Personality settings
+  personality_settings: {
+    nationality?: string;
+    core_traits?: string;
+  };
+
+  // Channel settings (chat and voice)
+  channel_settings: {
+    chat?: {
+      enabled?: boolean;
+      system_prompt?: string;
+      custom_instructions?: string;
+      tone?: string[];
+      model_provider?: string;
+      model_name?: string;
+      temperature?: number;
+      max_tokens?: number;
+      greeting?: string;
+    };
+    voice?: {
+      enabled?: boolean;
+      system_prompt?: string;
+      first_response?: string;
+      voice_model?: string;
+    };
+  };
+
+  // Publish state (Phase 6 additions)
+  is_active: boolean;
+  config_version: number;
+  last_published_at: string | null;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
 }
 
 interface AgentConfigStore {
-  activeAgentId: string;
-  agentCustomizations: Record<string, AgentCustomization>;
+  // State
+  config: AgentConfig | null;
   isLoading: boolean;
   error: string | null;
-  
+  lastFetchedAt: number;
+
   // Actions
-  loadConfig: () => Promise<void>;
-  saveConfig: () => Promise<void>;
-  selectAgent: (agentId: string) => void;
-  updateAgentName: (agentId: string, name: string) => void;
-  toggleAgentStatus: (agentId: string, isActive: boolean) => void;
-  testAgentVoice: (agentId: string) => Promise<void>;
+  fetchConfig: () => Promise<void>;
+  invalidateAndRefetch: () => Promise<void>;
+  subscribeToChanges: () => () => void;
+  clearError: () => void;
+
+  // Selectors (for efficient component updates)
+  getIdentity: () => {
+    agent_name: string;
+    agent_role: string;
+    agent_avatar_url: string | null;
+    nationality?: string;
+  } | null;
+
+  getChatConfig: () => {
+    system_prompt?: string;
+    custom_instructions?: string;
+    tone?: string[];
+    greeting?: string;
+  } | null;
+
+  getVoiceConfig: () => {
+    system_prompt?: string;
+    first_response?: string;
+    voice_model?: string;
+  } | null;
+
+  getPublishState: () => {
+    is_active: boolean;
+    config_version: number;
+    last_published_at: string | null;
+  } | null;
 }
 
-export const useAgentConfigStore = create<AgentConfigStore>((set, get) => ({
-  activeAgentId: 'professional-female',
-  agentCustomizations: {
-    'professional-female': { name: 'Sarah', isActive: true },
-    'friendly-male': { name: 'James', isActive: false },
-    'casual-female': { name: 'Emma', isActive: false }
-  },
-  isLoading: false,
-  error: null,
+// ==============================================================================
+// STORE
+// ==============================================================================
 
-  loadConfig: async () => {
-    set({ isLoading: true, error: null });
+// Track realtime subscription to prevent duplicates
+let realtimeChannel: RealtimeChannel | null = null;
 
-    try {
-      const response = await (brain as any).get_agent_config();
-      const data: AgentConfigResponse = await response.json();
+export const useAgentConfigStore = create<AgentConfigStore>()(
+  subscribeWithSelector((set, get) => ({
+    // Initial state
+    config: null,
+    isLoading: false,
+    error: null,
+    lastFetchedAt: 0,
 
-      if (data.success && data.config) {
+    // Fetch config from database
+    fetchConfig: async () => {
+      // Avoid re-fetching if we fetched recently (within 5 seconds)
+      const now = Date.now();
+      const state = get();
+      if (state.isLoading) return;
+      if (state.config && now - state.lastFetchedAt < 5000) return;
+
+      set({ isLoading: true, error: null });
+
+      try {
+        const { data, error } = await supabase
+          .from('unified_agent_config')
+          .select('*')
+          .limit(1)
+          .single();
+
+        if (error) throw error;
+
         set({
-          activeAgentId: data.config.activeAgentId,
-          agentCustomizations: data.config.agentCustomizations,
-          isLoading: false
+          config: data as AgentConfig,
+          isLoading: false,
+          lastFetchedAt: Date.now(),
         });
-      } else {
-        throw new Error('Failed to load configuration');
-      }
-    } catch (error) {
-      console.error('Error loading agent config:', error);
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load configuration',
-        isLoading: false
-      });
-    }
-  },
 
-  saveConfig: async () => {
-    const { activeAgentId, agentCustomizations } = get();
-    set({ isLoading: true, error: null });
-    
-    try {
-      const request: AgentConfigRequest = {
-        activeAgentId,
-        agentCustomizations
+        console.log('[AgentConfigStore] Config fetched, version:', data?.config_version);
+      } catch (error) {
+        console.error('[AgentConfigStore] Failed to fetch config:', error);
+        set({
+          error: error instanceof Error ? error.message : 'Failed to fetch config',
+          isLoading: false,
+        });
+      }
+    },
+
+    // Force invalidate and refetch (used after publish or avatar upload)
+    invalidateAndRefetch: async () => {
+      set({ lastFetchedAt: 0 }); // Reset cache
+      await get().fetchConfig();
+    },
+
+    // Subscribe to realtime config changes
+    subscribeToChanges: () => {
+      // Prevent duplicate subscriptions
+      if (realtimeChannel) {
+        console.log('[AgentConfigStore] Already subscribed to realtime');
+        return () => {};
+      }
+
+      console.log('[AgentConfigStore] Subscribing to realtime changes');
+
+      realtimeChannel = supabase
+        .channel('agent-config-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'unified_agent_config',
+          },
+          (payload) => {
+            console.log('[AgentConfigStore] Config updated via realtime, refetching...');
+            // Invalidate and refetch on any update
+            get().invalidateAndRefetch();
+          }
+        )
+        .subscribe((status) => {
+          console.log('[AgentConfigStore] Realtime subscription status:', status);
+        });
+
+      // Return cleanup function
+      return () => {
+        console.log('[AgentConfigStore] Unsubscribing from realtime');
+        if (realtimeChannel) {
+          supabase.removeChannel(realtimeChannel);
+          realtimeChannel = null;
+        }
       };
-      
-      const response = await (brain as any).save_agent_config(request);
-      const data: AgentConfigResponse = await response.json();
-      
-      if (data.success) {
-        set({ isLoading: false });
-      } else {
-        throw new Error(data.message || 'Failed to save configuration');
-      }
-    } catch (error) {
-      console.error('Error saving agent config:', error);
-      set({
-        error: error instanceof Error ? error.message : 'Failed to save configuration',
-        isLoading: false
-      });
-    }
-  },
+    },
 
-  selectAgent: (agentId: string) => {
-    set((state) => {
-      // Create a copy of customizations
-      const updatedCustomizations = { ...state.agentCustomizations };
+    // Clear error state
+    clearError: () => set({ error: null }),
 
-      // Set all agents to inactive first
-      Object.keys(updatedCustomizations).forEach(key => {
-        updatedCustomizations[key] = { ...updatedCustomizations[key], isActive: false };
-      });
-
-      // Set selected agent to active
-      if (updatedCustomizations[agentId]) {
-        updatedCustomizations[agentId] = { ...updatedCustomizations[agentId], isActive: true };
-      }
+    // Selectors for efficient component updates
+    getIdentity: () => {
+      const config = get().config;
+      if (!config) return null;
 
       return {
-        activeAgentId: agentId,
-        agentCustomizations: updatedCustomizations
+        agent_name: config.agent_name,
+        agent_role: config.agent_role,
+        agent_avatar_url: config.agent_avatar_url,
+        nationality: config.personality_settings?.nationality,
       };
-    });
-  },
+    },
 
-  updateAgentName: (agentId: string, name: string) => {
-    set((state) => ({
-      agentCustomizations: {
-        ...state.agentCustomizations,
-        [agentId]: {
-          ...state.agentCustomizations[agentId],
-          name
-        }
-      }
-    }));
-  },
+    getChatConfig: () => {
+      const config = get().config;
+      if (!config) return null;
 
-  toggleAgentStatus: (agentId: string, isActive: boolean) => {
-    set((state) => {
-      const updatedCustomizations = { ...state.agentCustomizations };
+      const chat = config.channel_settings?.chat;
+      return {
+        system_prompt: chat?.system_prompt,
+        custom_instructions: chat?.custom_instructions,
+        tone: chat?.tone,
+        greeting: chat?.greeting,
+      };
+    },
 
-      if (updatedCustomizations[agentId]) {
-        updatedCustomizations[agentId] = { ...updatedCustomizations[agentId], isActive };
-      }
+    getVoiceConfig: () => {
+      const config = get().config;
+      if (!config) return null;
 
-      // If activating this agent, also set it as the active agent
-      if (isActive) {
-        return {
-          activeAgentId: agentId,
-          agentCustomizations: updatedCustomizations
-        };
-      }
+      const voice = config.channel_settings?.voice;
+      return {
+        system_prompt: voice?.system_prompt,
+        first_response: voice?.first_response,
+        voice_model: voice?.voice_model,
+      };
+    },
 
-      return { agentCustomizations: updatedCustomizations };
-    });
-  },
+    getPublishState: () => {
+      const config = get().config;
+      if (!config) return null;
 
-  testAgentVoice: async (agentId: string) => {
-    set({ isLoading: true, error: null });
+      return {
+        is_active: config.is_active,
+        config_version: config.config_version,
+        last_published_at: config.last_published_at,
+      };
+    },
+  }))
+);
 
-    try {
-      const response = await (brain as any).test_agent_voice({ agentId });
-      const data = await response.json();
+// ==============================================================================
+// HOOKS FOR SPECIFIC USE CASES
+// ==============================================================================
 
-      if (!data.success) {
-        throw new Error(data.message || 'Voice test failed');
-      }
-    } catch (error) {
-      console.error('Error testing agent voice:', error);
-      set({
-        error: error instanceof Error ? error.message : 'Voice test failed'
-      });
-    } finally {
-      set({ isLoading: false });
-    }
-  }
-}));
+/**
+ * Hook to get agent identity (name, role, avatar)
+ * Only re-renders when identity fields change
+ */
+export function useAgentIdentity() {
+  return useAgentConfigStore((state) => state.getIdentity());
+}
+
+/**
+ * Hook to get chat-specific config
+ * Only re-renders when chat config changes
+ */
+export function useAgentChatConfig() {
+  return useAgentConfigStore((state) => state.getChatConfig());
+}
+
+/**
+ * Hook to get voice-specific config
+ * Only re-renders when voice config changes
+ */
+export function useAgentVoiceConfig() {
+  return useAgentConfigStore((state) => state.getVoiceConfig());
+}
+
+/**
+ * Hook to get publish state
+ * Only re-renders when publish state changes
+ */
+export function useAgentPublishState() {
+  return useAgentConfigStore((state) => state.getPublishState());
+}
+
+/**
+ * Hook to get config version (for cache busting)
+ */
+export function useConfigVersion() {
+  return useAgentConfigStore((state) => state.config?.config_version ?? 0);
+}
+
+// ==============================================================================
+// EXPORTS
+// ==============================================================================
+
+export default useAgentConfigStore;

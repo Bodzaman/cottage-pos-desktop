@@ -11,8 +11,14 @@ import { useChatStore } from './chat-store';
 export type SimpleUser = {
   id: string;
   email?: string;
+  name?: string; // Convenience property for display
+  first_name?: string; // Convenience property
+  last_name?: string; // Convenience property
+  phone?: string; // Convenience property
   user_metadata?: {
     full_name?: string;
+    first_name?: string;
+    last_name?: string;
     phone?: string;
     image_url?: string;
     avatar_url?: string;

@@ -208,12 +208,12 @@ export function AIVoiceSetupWizard({
                         <div className="flex-1">
                           <h4 className="font-bold text-white">{agent.name}</h4>
                           <p className="text-sm text-gray-400">{agent.description || 'Voice agent for customer interactions'}</p>
-                          {agent.voiceType && (
+                          {agent.voice_type && (
                             <Badge variant="secondary" className="text-xs mt-1" style={{
                               backgroundColor: 'rgba(124, 93, 250, 0.2)',
                               color: colors.brand.purpleLight
                             }}>
-                              {agent.voiceType}
+                              {agent.voice_type}
                             </Badge>
                           )}
                         </div>

@@ -81,23 +81,25 @@ export function TimeSlotSelector({
         
         // Get restaurant settings
         const settingsResponse = await brain.get_restaurant_settings();
-        if (settingsResponse.success && settingsResponse.settings) {
-          setRestaurantHours(settingsResponse.settings);
-          
+        const settingsData = await settingsResponse.json();
+        if (settingsData.success && settingsData.settings) {
+          setRestaurantHours(settingsData.settings);
+
           // Validate current opening hours
           const validationResponse = await brain.validate_opening_hours({
             delivery_date: futureDate || undefined,
           });
+          const validationData = await validationResponse.json();
 
-          if (!validationResponse.valid && selectedSlotType === 'ASAP') {
-            toast.error(validationResponse.message || 'Restaurant is currently closed');
+          if (!validationData.valid && selectedSlotType === 'ASAP') {
+            toast.error(validationData.message || 'Restaurant is currently closed');
           }
-          
+
           // Generate slots for today or selected date
           const targetDate = futureDate || new Date().toISOString().split('T')[0];
           const dayName = new Date(targetDate).toLocaleDateString('en-US', { weekday: 'long' });
-          
-          const dayHours = settingsResponse.settings.opening_hours?.find(
+
+          const dayHours = settingsData.settings.opening_hours?.find(
             (hours: any) => hours.day.toLowerCase() === dayName.toLowerCase()
           );
           

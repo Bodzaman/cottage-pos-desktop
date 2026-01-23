@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import brain from 'brain';
-import { CreateAuthenticatedVoiceCartSessionRequest } from '../brain/data-contracts';
+import { CreateAuthenticatedVoiceCartSessionRequest } from 'types';
 import { toast } from 'sonner';
 
 interface VoiceOrderingInterfaceProps {

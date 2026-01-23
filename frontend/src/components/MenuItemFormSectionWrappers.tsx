@@ -101,14 +101,14 @@ export const MenuItemFormBasicInfoSectionWrapper = React.memo<BasicInfoSectionWr
       </CardHeader>
       <CardContent>
         <BasicInformationSection
-          register={register}
-          control={control}
-          setValue={setValue}
+          register={register as any}
+          control={control as any}
+          setValue={setValue as any}
           errors={errors}
           categories={categories}
           itemType={itemType}
           hasVariants={hasVariants}
-          watch={watch}
+          watch={watch as any}
           onMediaChange={onMediaChange}
         />
       </CardContent>
@@ -182,27 +182,26 @@ export const MenuItemFormTypeSpecificSectionWrapper = React.memo<TypeSpecificSec
       <CardContent>
         {itemType === 'food' && (
           <FoodSpecificFields
-            register={register}
-            watch={watch}
-            setValue={setValue}
-            control={control}
+            register={register as any}
+            watch={watch as any}
+            setValue={setValue as any}
+            control={control as any}
             errors={errors}
             itemType={itemType}
           />
         )}
         {itemType === 'drinks_wine' && (
           <DrinksWineFields
-            register={register}
-            watch={watch}
-            setValue={setValue}
+            register={register as any}
+            watch={watch as any}
             errors={errors}
           />
         )}
         {itemType === 'coffee_desserts' && (
           <CoffeeDessertsFields
-            register={register}
-            watch={watch}
-            setValue={setValue}
+            register={register as any}
+            watch={watch as any}
+            setValue={setValue as any}
             errors={errors}
           />
         )}

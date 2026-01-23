@@ -132,6 +132,9 @@ export interface TableOrderItem extends OrderItem {
   customerNumber?: number;
   sentToKitchen?: boolean;
   sentAt?: string;
+  // Kitchen-related fields
+  variations?: string[];
+  specialInstructions?: string;
 }
 
 // ================================

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import brain from 'brain';
-import { MenuItemFormData, MenuCategory, ProteinType, MenuVariant } from './masterTypes';
+import { MenuItemFormData, MenuCategory, ProteinType, MenuItemVariant as MenuVariant } from './masterTypes';
 import { validateItemPricing } from './variantPricing';
 
 /**

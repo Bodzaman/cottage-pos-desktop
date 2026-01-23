@@ -1012,7 +1012,8 @@ export const prepareImageForUpload = async (
 };
 
 // Enhanced display functions for smart naming system
-export const getSmartDisplayName = (item: MediaItem): string => {
+// Accepts Partial<MediaItem> to allow usage with AssetUsageInfo and similar types
+export const getSmartDisplayName = (item: Partial<MediaItem> & { name: string }): string => {
   // Priority 1: Use friendlyName if explicitly set
   if (item.friendlyName && item.friendlyName.trim() !== '') {
     return item.friendlyName;

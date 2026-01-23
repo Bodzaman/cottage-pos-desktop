@@ -42,15 +42,21 @@ export interface MenuCategory {
 export interface MenuItem {
   id: string;
   name: string;
+  description?: string | null; // CamelCase alias for compatibility
   menu_item_description?: string | null; // Unified description field
+  long_description?: string | null; // Extended description
   image_url?: string | null;
   spice_indicators?: string | null;
   category_id: string;
+  categoryId?: string; // CamelCase alias
   featured: boolean;
   dietary_tags?: string[] | null;
   item_code?: string | null;
   menu_order: number; // Unified ordering field - replaces display_order
+  display_order?: number; // Alias for menu_order
+  menuOrder?: number; // CamelCase alias
   active: boolean; // Internal standard
+  is_active?: boolean; // Snake_case alias
   inherit_category_print_settings?: boolean;
 
   // Set meal properties
@@ -59,14 +65,21 @@ export interface MenuItem {
   set_meal_code?: string | null;
 
   // Pricing fields
+  price?: number; // Base price alias
   base_price?: number;
+  basePrice?: number; // CamelCase alias
   price_dine_in?: number;
+  priceDineIn?: number; // CamelCase alias
+  dine_in_price?: number; // Alternative alias
   price_delivery?: number;
+  priceDelivery?: number; // CamelCase alias
   price_takeaway?: number;
+  priceTakeaway?: number; // CamelCase alias
 
   // Variants and pricing
   variants: MenuItemVariant[];
   has_variants?: boolean; // Computed property
+  hasVariants?: boolean; // CamelCase alias
   item_type?: 'food' | 'drinks_wine' | 'coffee_desserts'; // Item classification
 
   // Draft/Publish workflow

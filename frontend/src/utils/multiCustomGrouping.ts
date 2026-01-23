@@ -58,7 +58,7 @@ export function groupMultiCustomItems(orderItems: OrderItem[]): {
             menuItemId: item.menu_item_id,
             variantId: item.variant_id,
             name: item.name,
-            variantName: item.variant_name || '',
+            variantName: item.variantName || '',
             items: [],
             totalQuantity: 0,
             totalPrice: 0,

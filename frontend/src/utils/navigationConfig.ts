@@ -1,7 +1,7 @@
 
 
 
-import { User } from "../utils/simple-auth-context";
+import { SimpleUser as User } from "../utils/simple-auth-context";
 
 export type NavigationContext = 'PUBLIC_NAV' | 'AUTH_NAV' | 'ORDERING_NAV';
 

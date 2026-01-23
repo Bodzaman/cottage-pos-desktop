@@ -527,12 +527,13 @@ export default function CustomerPortal() {
       // Add each item from the order to the cart
       for (const item of order.order_items) {
         try {
-          addItem({
+          const menuItemInput = {
             id: item.menu_item_id || `item-${Date.now()}-${addedCount}`,
             name: item.menu_item_name,
-            price: item.price || 0,
-            quantity: item.quantity || 1,
-          });
+            price: item.price || 0
+          };
+          const variant = { id: `v-${item.menu_item_id}`, name: 'Standard', price: item.price || 0 };
+          addItem(menuItemInput, variant, item.quantity || 1);
           addedCount++;
         } catch (error) {
           warnings.push(`Could not add ${item.menu_item_name}`);
@@ -639,19 +640,20 @@ export default function CustomerPortal() {
 
   const handleAddToCart = (favorite: EnrichedFavoriteItem) => {
     try {
-      const cartItem = {
+      const menuItem = {
         id: favorite.menu_item_id,
         name: favorite.display_name,
         price: favorite.display_price || 0,
-        image: favorite.display_image_url || '/placeholder-food.jpg',
         description: favorite.display_description || '',
-        spiceLevel: favorite.display_spice_level,
-        dietary: favorite.dietary_info || [],
-        variantId: favorite.variant_id || null,
-        variantName: favorite.variant_name || null
+        imageUrl: favorite.display_image_url || '/placeholder-food.jpg'
       };
-      
-      addItem(cartItem, 1);
+      const variant = {
+        id: favorite.variant_id || `v-${favorite.menu_item_id}`,
+        name: favorite.variant_name || 'Standard',
+        price: favorite.display_price || 0
+      };
+
+      addItem(menuItem, variant, 1);
       toast.success(`${favorite.display_name} added to cart!`);
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -992,8 +994,7 @@ export default function CustomerPortal() {
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:ring-2 focus:ring-offset-2"
         style={{
           backgroundColor: AuthTheme.colors.primary,
-          color: '#FFFFFF',
-          ringColor: AuthTheme.colors.primary
+          color: '#FFFFFF'
         }}
       >
         Skip to main content
@@ -1060,7 +1061,6 @@ export default function CustomerPortal() {
                   background: `${AuthTheme.colors.cardBg} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23B7BDC6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 0.75rem center/1.5em 1.5em`,
                   borderColor: AuthTheme.colors.border,
                   color: AuthTheme.colors.textPrimary,
-                  ringColor: AuthTheme.colors.primary,
                   minHeight: '44px' // Accessibility: touch target
                 }}
                 aria-label="Select account section to view"
@@ -1102,8 +1102,7 @@ export default function CustomerPortal() {
                     style={{
                       background: activeSection === id ? AuthTheme.colors.primary : 'transparent',
                       color: activeSection === id ? '#FFFFFF' : AuthTheme.colors.textSecondary,
-                      boxShadow: activeSection === id ? AuthTheme.shadows.glow : 'none',
-                      ringColor: AuthTheme.colors.primary
+                      boxShadow: activeSection === id ? AuthTheme.shadows.glow : 'none'
                     }}
                     role="tab"
                     aria-selected={activeSection === id}

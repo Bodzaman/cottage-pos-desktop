@@ -189,8 +189,8 @@ export function CompactMenuList({
     if (isMultiVariant && state.selectedVariant) {
       // ✅ FIX: Pass complete variant object instead of creating stripped-down version
       // This preserves variant_name, price_delivery, and all other fields
-      addItem(item, state.selectedVariant, state.quantity, '');
-      
+      addItem(item, state.selectedVariant, state.quantity, [], undefined, '');
+
       const displayName = state.selectedVariant.variant_name || state.selectedVariant.name || 'Option';
       toast.success(`${item.name} added to cart`, {
         description: `${displayName} • Qty: ${state.quantity} • £${(price * state.quantity).toFixed(2)}`
@@ -203,8 +203,8 @@ export function CompactMenuList({
         name: item.name,
         price: price
       };
-      
-      addItem(item, singleVariant, state.quantity, '');
+
+      addItem(item, singleVariant, state.quantity, [], undefined, '');
       
       toast.success(`${item.name} added to cart`, {
         description: `Quantity: ${state.quantity} • £${(price * state.quantity).toFixed(2)}`
@@ -276,7 +276,15 @@ export function CompactMenuList({
     });
 
     // ✅ FIX: Correct parameter order: item, variant, qty, customizations, mode, notes
-    addItem(item, variantForCart, quantity, customizations || [], mode, notes || '');
+    // Map SelectedCustomization to CartCustomization (ensure price is set)
+    const cartCustomizations = (customizations || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      price: c.price ?? c.price_adjustment,
+      price_adjustment: c.price_adjustment,
+      group: c.group
+    }));
+    addItem(item, variantForCart, quantity, cartCustomizations, mode, notes || '');
     
     updateItemState(item.id, {
       isCustomizationModalOpen: false,

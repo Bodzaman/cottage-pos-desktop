@@ -48,6 +48,13 @@ export interface RestaurantSettings {
   delivery: DeliverySettings;
   kitchen_status: KitchenStatus;
   ai_messages: AIMessages;
+  // General settings for backward compatibility
+  general?: {
+    name?: string;
+    currency?: string;
+    timezone?: string;
+    locale?: string;
+  };
 }
 
 // Default values

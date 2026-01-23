@@ -15,7 +15,7 @@ import { Printer, Banknote, RotateCcw, Play, Download, AlertTriangle, Plus, Chec
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useSimpleAuth } from 'utils/simple-auth-context';
-import { Order } from 'utils/orderManagementService';
+import { CompletedOrder as Order } from 'utils/orderManagementService';
 import { formatCurrency } from 'utils/formatters';
 import { useMountedRef, useSafeTimeout } from 'utils/safeHooks';
 import { QSAITheme } from 'utils/QSAIDesign';
@@ -46,9 +46,9 @@ const statusColors = {
 };
 
 // Helper function to format dates
-const formatDate = (dateString: string): string => {
+const formatDate = (dateValue: string | Date): string => {
   try {
-    const date = new Date(dateString);
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
     return format(date, 'PPP p'); // e.g., "January 1, 2025 at 2:30 PM"
   } catch {
     return 'Unknown date';
@@ -177,7 +177,7 @@ export const DetailedOrderDialog: React.FC<Props> = ({
         `).join('\n')}
         ===============================
         Subtotal: ${formatCurrency(order.subtotal)}
-        ${order.discounts > 0 ? `Discount: -${formatCurrency(order.discounts)}` : ''}
+        ${order.discount > 0 ? `Discount: -${formatCurrency(order.discount)}` : ''}
         ${order.delivery_fee > 0 ? `Delivery: ${formatCurrency(order.delivery_fee)}` : ''}
         Tax: ${formatCurrency(order.tax)}
         Total: ${formatCurrency(order.total)}
@@ -586,11 +586,11 @@ export const DetailedOrderDialog: React.FC<Props> = ({
                              historyItem.action === 'CANCELLED' ? 'Order cancelled' :
                              historyItem.action === 'REFUNDED' ? 'Order refunded' :
                              historyItem.action}
-                             {historyItem.user && ` by ${historyItem.user}`}
+                             {historyItem.user_name && ` by ${historyItem.user_name}`}
                           </p>
                           <p className="text-gray-400 text-xs">{format(new Date(historyItem.timestamp), "MMM d, yyyy 'at' h:mm a")}</p>
-                          {historyItem.note && (
-                            <p className="text-gray-400 text-xs mt-1 italic">Note: {historyItem.note}</p>
+                          {historyItem.notes && (
+                            <p className="text-gray-400 text-xs mt-1 italic">Note: {historyItem.notes}</p>
                           )}
                         </div>
                       </div>

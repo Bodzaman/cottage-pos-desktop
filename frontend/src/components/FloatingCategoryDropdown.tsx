@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppApisMenuManagementCategory } from '../brain/data-contracts';
+import { MenuCategory } from 'types';
 import { PremiumTheme } from 'utils/premiumTheme';
 
 interface FloatingCategoryDropdownProps {
-  categories: AppApisMenuManagementCategory[];
+  categories: MenuCategory[];
   sectionName: string;
   position: { top: number; left: number };
   onCategoryClick: (categoryId: string) => void;

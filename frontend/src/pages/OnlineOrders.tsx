@@ -78,7 +78,12 @@ export default function OnlineOrders() {
   
   // **PHASE 1 FIX: Single data source eliminates race conditions**
   // Note: customerProfile is available as 'profile' from useSimpleAuth
-  const { user, isAuthenticated, signOut, profile: customerProfile } = useSimpleAuth();
+  // Guard against null during async auth initialization
+  const _auth = useSimpleAuth();
+  const user = _auth?.user ?? null;
+  const isAuthenticated = _auth?.isAuthenticated ?? false;
+  const signOut = _auth?.signOut ?? (() => Promise.resolve());
+  const customerProfile = _auth?.profile ?? null;
   const {
     items: cartItems,
     totalItems: cartCount,

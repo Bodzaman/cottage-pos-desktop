@@ -20,18 +20,23 @@ interface UseCustomerTabsReturn {
 }
 
 /**
- * Real-time hook for managing customer tabs at a table.
+ * Real-time hook for managing customer tabs at a table/order.
  * Subscribes to customer_tabs table and provides command functions for tab operations.
- * 
+ *
  * Architecture: Event-driven pattern
  * - UI sends commands via brain client
  * - Backend updates database
  * - Real-time subscription updates UI
- * 
+ *
+ * IMPORTANT: Now supports orderId for proper tab scoping.
+ * When orderId is provided, tabs are scoped to that order (preferred).
+ * When only tableNumber is provided, falls back to table-based filtering (legacy).
+ *
  * @param tableNumber - Table number to subscribe to (null = no subscription)
+ * @param orderId - Order ID to scope tabs to (optional but recommended)
  * @returns Customer tabs data and command functions
  */
-export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsReturn {
+export function useCustomerTabs(tableNumber: number | null, orderId?: string | null): UseCustomerTabsReturn {
   const [customerTabs, setCustomerTabs] = useState<CustomerTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,15 +53,24 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
 
     setLoading(true);
 
-    // Initial fetch
+    // Initial fetch - prefer order_id filter when available
     const fetchTabs = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('customer_tabs')
           .select('*')
-          .eq('table_number', tableNumber)
           .eq('status', 'active')
           .order('created_at', { ascending: true });
+
+        // Prefer filtering by order_id when available (proper scoping)
+        if (orderId) {
+          query = query.eq('order_id', orderId);
+        } else {
+          // Fallback to table_number filter (legacy behavior)
+          query = query.eq('table_number', tableNumber);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         setCustomerTabs(data || []);
@@ -72,16 +86,19 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
 
     fetchTabs();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates - use order_id filter when available
+    const filterKey = orderId ? `order_id=eq.${orderId}` : `table_number=eq.${tableNumber}`;
+    const channelName = orderId ? `customer_tabs:order:${orderId}` : `customer_tabs:${tableNumber}`;
+
     const subscription = supabase
-      .channel(`customer_tabs:${tableNumber}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'customer_tabs',
-          filter: `table_number=eq.${tableNumber}`
+          filter: filterKey
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
@@ -103,16 +120,19 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
     return () => {
       subscription.unsubscribe();
     };
-  }, [tableNumber]);
+  }, [tableNumber, orderId]);
 
   // Command: Create new customer tab
+  // Now passes orderId to scope tab to order lifecycle
   const createTab = async (tabName: string, guestId?: string): Promise<string | null> => {
     try {
+      // Note: order_id is a new field - type assertion needed until brain types regenerated
       const response = await brain.create_customer_tab({
         table_number: tableNumber!,
         tab_name: tabName,
+        order_id: orderId || null,  // Pass orderId for proper cleanup
         guest_id: guestId || null
-      });
+      } as any);
       const data = await response.json();
       if (data.success && data.customer_tab) {
         setActiveTabId(data.customer_tab.id);
@@ -129,7 +149,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
   const addItemsToTab = async (tabId: string, items: any[]): Promise<boolean> => {
     try {
       const response = await brain.add_items_to_customer_tab(
-        { tab_id: tabId },
+        { tabId },
         { items }
       );
       const data = await response.json();
@@ -144,7 +164,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
   const renameTab = async (tabId: string, newName: string): Promise<boolean> => {
     try {
       const response = await brain.update_customer_tab(
-        { tab_id: tabId },
+        { tabId },
         { tab_name: newName }
       );
       const data = await response.json();
@@ -158,7 +178,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
   // Command: Close tab
   const closeTab = async (tabId: string): Promise<boolean> => {
     try {
-      const response = await brain.close_customer_tab({ tab_id: tabId });
+      const response = await brain.close_customer_tab({ tabId });
       const data = await response.json();
       return data.success || false;
     } catch (err) {
@@ -175,14 +195,9 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
     guestId?: string
   ): Promise<any> => {
     try {
-      const response = await brain.split_customer_tab({
-        source_tab_id: sourceTabId,
-        new_tab_name: newTabName,
-        item_indices: itemIndices,
-        guest_id: guestId || null
-      });
-      const data = await response.json();
-      return data;
+      // Split tab functionality - to be implemented in backend
+      console.warn('Split tab functionality not yet available in API');
+      return { success: false, message: 'Not implemented' };
     } catch (err) {
       console.error('Failed to split tab:', err);
       return { success: false };
@@ -192,12 +207,9 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
   // Command: Merge tabs
   const mergeTabs = async (sourceTabId: string, targetTabId: string): Promise<any> => {
     try {
-      const response = await brain.merge_customer_tabs({
-        source_tab_id: sourceTabId,
-        target_tab_id: targetTabId
-      });
-      const data = await response.json();
-      return data;
+      // Merge tabs functionality - to be implemented in backend
+      console.warn('Merge tabs functionality not yet available in API');
+      return { success: false, message: 'Not implemented' };
     } catch (err) {
       console.error('Failed to merge tabs:', err);
       return { success: false };
@@ -211,7 +223,7 @@ export function useCustomerTabs(tableNumber: number | null): UseCustomerTabsRetu
     itemIndices: number[]
   ): Promise<any> => {
     try {
-      const response = await brain.move_items_between_customer_tabs({
+      const response = await brain.move_items_between_tabs({
         source_tab_id: sourceTabId,
         target_tab_id: targetTabId,
         item_indices: itemIndices

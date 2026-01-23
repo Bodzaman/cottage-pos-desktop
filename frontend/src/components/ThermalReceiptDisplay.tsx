@@ -19,6 +19,7 @@ interface OrderItem {
   basePrice?: number;
   price?: number;
   quantity: number;
+  total?: number; // Calculated total for the item
   // Section divider support - these fields enable ThermalPreview to group items by section
   category_id?: string;
   menu_item_id?: string;

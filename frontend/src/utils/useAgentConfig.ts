@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import brain from 'brain';
+import { useAgentConfigStore } from './agentConfigStore';
 
 /**
  * Dynamic Agent Configuration Hook
- * 
- * Fetches and manages dynamic branding for both chat and voice interfaces.
- * 
+ *
+ * Phase 6: Updated to use agentConfigStore for reactive agent config updates.
+ *
  * Data Sources:
  * - Restaurant name: restaurant_settings.business_profile.name
- * - Agent profile: unified_agent_config (name, role, avatar)
- * 
+ * - Agent profile: agentConfigStore (Zustand + Supabase Realtime)
+ *
  * Used by:
  * - ChatLargeModal (chat interface branding)
  * - VoiceCallOverlay (voice interface branding)
@@ -45,16 +46,19 @@ const DEFAULT_CONFIG: AgentConfig = {
 };
 
 /**
- * Hook to fetch dynamic agent configuration from Supabase
- * 
+ * Hook to fetch dynamic agent configuration
+ *
+ * Phase 6: Uses agentConfigStore for agent data with realtime updates.
+ * Restaurant name is still fetched separately.
+ *
  * @returns AgentConfig object with restaurant and agent branding data
- * 
+ *
  * @example
  * ```tsx
  * const { restaurantName, agentName, agentAvatar, isLoading } = useAgentConfig();
- * 
+ *
  * if (isLoading) return <Skeleton />;
- * 
+ *
  * return (
  *   <div>
  *     <img src={agentAvatar} alt={agentName} />
@@ -64,63 +68,75 @@ const DEFAULT_CONFIG: AgentConfig = {
  * ```
  */
 export function useAgentConfig(): AgentConfig {
-  const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
+  const [restaurantName, setRestaurantName] = useState<string>(DEFAULT_CONFIG.restaurantName);
+  const [restaurantLoading, setRestaurantLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Phase 6: Get agent config from the unified store (with realtime updates)
+  const agentConfig = useAgentConfigStore((state) => state.config);
+  const fetchConfig = useAgentConfigStore((state) => state.fetchConfig);
+  const subscribeToChanges = useAgentConfigStore((state) => state.subscribeToChanges);
+  const storeIsLoading = useAgentConfigStore((state) => state.isLoading);
+  const storeError = useAgentConfigStore((state) => state.error);
+
+  // Fetch agent config from store on mount
+  useEffect(() => {
+    fetchConfig();
+
+    // Subscribe to realtime updates
+    const unsubscribe = subscribeToChanges();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchConfig, subscribeToChanges]);
+
+  // Fetch restaurant name separately (still from API)
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchConfig() {
+    async function fetchRestaurantName() {
       try {
-        // Fetch both configs in parallel for better performance
-        const [settingsRes, agentRes] = await Promise.all([
-          brain.get_restaurant_settings(),
-          brain.get_unified_agent_config(),
-        ]);
-
+        const settingsRes = await brain.get_restaurant_settings();
         const settings = await settingsRes.json();
-        const agentData = await agentRes.json();
 
         if (!isMounted) return;
 
-        // Extract restaurant name with fallback
-        const restaurantName = settings?.business_profile?.name || DEFAULT_CONFIG.restaurantName;
-
-        // Extract agent config with fallbacks
-        const agentName = agentData?.agent_name || DEFAULT_CONFIG.agentName;
-        const agentRole = agentData?.agent_role || DEFAULT_CONFIG.agentRole;
-        const agentAvatar = agentData?.agent_avatar_url || DEFAULT_CONFIG.agentAvatar;
-
-        setConfig({
-          restaurantName,
-          agentName,
-          agentRole,
-          agentAvatar,
-          isLoading: false,
-          error: null,
-        });
-
-      } catch (error) {
-        console.error('Failed to fetch agent config:', error);
-
+        const name = settings?.business_profile?.name || DEFAULT_CONFIG.restaurantName;
+        setRestaurantName(name);
+        setRestaurantLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch restaurant settings:', err);
         if (!isMounted) return;
 
-        // On error, use defaults but mark as loaded
-        setConfig({
-          ...DEFAULT_CONFIG,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load agent config',
-        });
+        setError(err instanceof Error ? err.message : 'Failed to load restaurant settings');
+        setRestaurantLoading(false);
       }
     }
 
-    fetchConfig();
+    fetchRestaurantName();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  return config;
+  // Combine loading states
+  const isLoading = restaurantLoading || storeIsLoading;
+
+  // Extract agent data from store with defaults
+  const agentName = agentConfig?.agent_name || DEFAULT_CONFIG.agentName;
+  const agentRole = agentConfig?.agent_role || DEFAULT_CONFIG.agentRole;
+  const agentAvatar = agentConfig?.agent_avatar_url || DEFAULT_CONFIG.agentAvatar;
+
+  return {
+    restaurantName,
+    agentName,
+    agentRole,
+    agentAvatar,
+    isLoading,
+    error: error || storeError,
+  };
 }
 
 /**

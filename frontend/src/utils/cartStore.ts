@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
-import type { MenuItem, OrderMode, CartState, CartCustomization, CartItem } from 'types';
+import type { OrderMode, CartState, CartCustomization, CartItem, MenuItemInput } from 'types';
 import { getPriceForMode, calculateTotalItems, calculateTotalAmount } from 'types';
 import { trackItemAdded, trackItemRemoved, trackModeSwitch, trackCartCleared, trackCartEvent } from './cartAnalytics';
 import { getOrCreateSessionId } from './session-manager';
@@ -303,17 +303,17 @@ export const useCartStore = create<CartState>()(persist(
     },
 
     // LOCAL-ONLY: Add item to cart (no backend sync)
-    addItem: async (item: MenuItem, variant: any, quantity: number, customizations?: CartCustomization[], orderMode?: OrderMode, notes?: string) => {
+    addItem: async (item: MenuItemInput, variant: any, quantity: number, customizations?: CartCustomization[], orderMode?: OrderMode, notes?: string) => {
       const currentMode = get().currentOrderMode;
       const finalMode = orderMode || currentMode || 'collection';
 
-      // Calculate price based on order mode
-      const price = getPriceForMode(
-        finalMode,
-        item.priceDelivery ?? variant?.priceDelivery ?? variant?.price_delivery,
-        item.priceTakeaway ?? item.priceCollection ?? variant?.price,
-        variant?.price ?? item.basePrice ?? item.price ?? 0
-      );
+      // Calculate price based on order mode (handle both camelCase and snake_case)
+      const deliveryPrice = item.priceDelivery ?? item.price_delivery ?? variant?.priceDelivery ?? variant?.price_delivery;
+      const collectionPrice = item.priceTakeaway ?? item.price_takeaway ?? item.priceCollection ?? variant?.price;
+      const basePrice = variant?.price ?? item.basePrice ?? item.base_price ?? item.price ?? 0;
+      const imageUrl = item.imageUrl ?? item.image_url;
+
+      const price = getPriceForMode(finalMode, deliveryPrice, collectionPrice, basePrice);
 
       // Create cart item with camelCase properties
       const cartItem: CartItem = {
@@ -322,8 +322,8 @@ export const useCartStore = create<CartState>()(persist(
         name: item.name,
         description: item.description || '',
         price: price,
-        priceDelivery: item.priceDelivery ?? variant?.priceDelivery ?? variant?.price_delivery,
-        priceCollection: item.priceTakeaway ?? item.priceCollection ?? variant?.price,
+        priceDelivery: deliveryPrice,
+        priceCollection: collectionPrice,
         quantity: quantity,
         variant: variant ? {
           id: variant.id,
@@ -331,7 +331,7 @@ export const useCartStore = create<CartState>()(persist(
         } : undefined,
         customizations: customizations || [],
         notes: notes || '',
-        imageUrl: item.imageUrl,
+        imageUrl: imageUrl,
         orderMode: finalMode
       };
 
