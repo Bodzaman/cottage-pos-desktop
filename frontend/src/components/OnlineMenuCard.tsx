@@ -411,14 +411,14 @@ export function OnlineMenuCard({
         onMouseLeave={variantImages.length > 1 ? handleMouseLeave : undefined}
       >
         {/* ✅ Carousel Animation Wrapper (matches POS pattern) */}
-        <AnimatePresence initial={false}>
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentIndex}
             initial={{ opacity: 0, scale: 1.05 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 1.5, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full"
+            className="w-full h-full"
             drag={variantImages.length > 1 ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}

@@ -522,11 +522,10 @@ export const useChatStore = create<ChatState>()(
           // Process streaming events with line buffering
           // (large JSON payloads like structured_data can span multiple chunks)
           let lineBuffer = '';
-          let streamComplete = false;
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done || streamComplete) break;
+            if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
             lineBuffer += chunk;
@@ -621,10 +620,8 @@ export const useChatStore = create<ChatState>()(
                         bufferTimer = null;
                       }, BUFFER_INTERVAL);
                     } else if (event.type === 'structured_data' && event.items) {
-                      // Handle structured menu data with images from backend
-                      console.log(`[chat-store] Received structured_data: ${event.items.length} items`,
-                        event.items.map((i: any) => i.name));
-
+                      // ✅ NEW: Handle structured menu data with images from backend
+                      
                       // Flush text buffer immediately before adding structured data
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
                       
@@ -657,7 +654,6 @@ export const useChatStore = create<ChatState>()(
                             : msg
                         )
                       }));
-                      console.log(`[chat-store] menuCards updated: ${structuredMenuCards.length} cards for message ${botMessageId}`);
                     } else if (event.type === 'ui_element' && event.element === 'menu_card') {
                       // Flush buffer immediately before adding menu card
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
@@ -817,7 +813,6 @@ export const useChatStore = create<ChatState>()(
                         isTyping: false,
                         abortController: null
                       }));
-                      streamComplete = true;
                       break;
                     }
                   }

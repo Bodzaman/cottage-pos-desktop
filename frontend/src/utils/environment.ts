@@ -19,8 +19,8 @@ export enum Mode {
 export const mode = (import.meta.env.MODE === "production" ? Mode.PROD : Mode.DEV) as Mode;
 
 // API URL for backend communication
-// In dev mode, use local backend if VITE_API_URL is set; otherwise use production Databutton API
-export const API_URL = import.meta.env.VITE_API_URL || "https://api.databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
+// In Electron production builds, this points to the live Databutton API
+export const API_URL = "https://api.databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
 
 // WebSocket API URL (if needed in future)
 export const WS_API_URL = "wss://api.databutton.com/_projects/88a315b0-faa2-491d-9215-cf1e283cdee2/dbtn/prodx/app/routes";
