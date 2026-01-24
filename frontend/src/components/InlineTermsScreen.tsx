@@ -23,7 +23,7 @@ export default function InlineTermsScreen({
   const [isTyping, setIsTyping] = useState(false);
   const [displayText, setDisplayText] = useState('');
   
-  const { setShowVoiceTCScreen } = useChatStore();
+  const setShowVoiceTCScreen = useChatStore((state) => state.setShowVoiceTCScreen);
   const { agentName, agentAvatar, isLoading: isLoadingConfig } = useAgentConfig();
   const { user } = useSimpleAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);

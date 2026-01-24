@@ -232,6 +232,19 @@ class OfflineFirstManager {
   }
 
   /**
+   * Clear all saved sessions
+   */
+  async clearAllSessions(): Promise<void> {
+    try {
+      await SessionPersistence.clearAll();
+      this.sessionRestored = false;
+      this.notifyListeners();
+    } catch (error) {
+      console.error('❌ [OfflineFirst] Failed to clear all sessions:', error);
+    }
+  }
+
+  /**
    * Subscribe to status changes
    */
   subscribe(listener: StatusChangeListener): () => void {
@@ -398,6 +411,11 @@ export const OfflineFirst = {
    * Clear session
    */
   clearSession: (sessionId: string) => offlineFirstManager.clearSession(sessionId),
+
+  /**
+   * Clear all sessions
+   */
+  clearAllSessions: () => offlineFirstManager.clearAllSessions(),
 
   /**
    * Subscribe to status changes

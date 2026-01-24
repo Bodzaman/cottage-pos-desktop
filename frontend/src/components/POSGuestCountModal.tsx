@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Users, CheckCircle2, ChevronRight, Info, Link2, Utensils, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { styles, effects, QSAITheme } from '../utils/QSAIDesign';
+import { POSButton } from './POSButton';
 import { getTables } from '../utils/supabaseQueries';
 import { PosTableResponse } from 'types';
 
@@ -451,116 +452,55 @@ export function POSGuestCountModal({
           )}
         </div>
 
-        {/* BOTTOM SECTION: Enhanced Action Buttons */}
-        <div className="pt-6" style={{ borderTop: `1px solid ${QSAITheme.border.medium}` }}>
+        {/* BOTTOM SECTION: Action Buttons - Cancel (left) | Continue (center) | Confirm (right) */}
+        <div className="pt-6" style={{ borderTop: `1px solid rgba(255, 255, 255, 0.06)` }}>
           {exceedsCapacity ? (
-            // Enhanced buttons when capacity exceeded
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-2">
-                <Button
-                  onClick={() => handleAction('link')}
-                  disabled={isLoading || selectedLinkedTables.length === 0 || !hasValidCapacity}
-                  className={`w-full h-12 font-medium transition-all duration-200 border-0 ${
-                    selectedLinkedTables.length > 0 && hasValidCapacity
-                      ? 'opacity-100'
-                      : 'opacity-50'
-                  }`}
-                  style={{
-                    background: selectedLinkedTables.length > 0 && hasValidCapacity
-                      ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`
-                      : `rgba(124, 93, 250, 0.3)`,
-                    border: 'none',
-                    borderRadius: '12px',
-                    color: QSAITheme.text.primary,
-                    textShadow: effects.textShadow('subtle')
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Link2 className="h-4 w-4" />
-                    <span>
-                      {selectedLinkedTables.length === 0 
-                        ? '🔗 Select Tables to Link'
-                        : hasValidCapacity
-                        ? `🔗 Confirm Linked Tables (${selectedLinkedTables.length})`
-                        : '🔗 Need More Tables'
-                      }
-                    </span>
-                  </div>
-                </Button>
-                
-                <Button
-                  onClick={() => handleAction('continue_anyway')}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="w-full h-12 border-0"
-                  style={{
-                    background: QSAITheme.background.secondary,
-                    border: `1px solid ${QSAITheme.border.medium}`,
-                    color: QSAITheme.text.secondary,
-                    borderRadius: '12px'
-                  }}
-                >
-                  <span>Continue Anyway</span>
-                </Button>
-                
-                <Button
-                  onClick={onClose}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="w-full h-12 border-0"
-                  style={{
-                    background: QSAITheme.background.secondary,
-                    border: `1px solid ${QSAITheme.border.medium}`,
-                    color: QSAITheme.text.secondary,
-                    borderRadius: '12px'
-                  }}
-                >
-                  <span>Cancel</span>
-                </Button>
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <POSButton variant="tertiary" onClick={onClose} disabled={isLoading}>
+                Cancel
+              </POSButton>
+
+              <POSButton
+                variant="secondary"
+                onClick={() => handleAction('continue_anyway')}
+                disabled={isLoading}
+              >
+                Continue
+              </POSButton>
+
+              <POSButton
+                variant="primary"
+                onClick={() => handleAction('link')}
+                disabled={isLoading || selectedLinkedTables.length === 0 || !hasValidCapacity}
+                icon={<Link2 className="w-5 h-5 text-white" />}
+                showChevron={false}
+              >
+                {selectedLinkedTables.length === 0
+                  ? 'Select Tables to Link'
+                  : hasValidCapacity
+                  ? `Confirm Linked Tables (${selectedLinkedTables.length})`
+                  : 'Need More Tables'
+                }
+              </POSButton>
             </div>
           ) : (
-            // Normal two-button layout when within capacity
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={isLoading}
-                className="flex-1 h-12 border-0"
-                style={{
-                  background: QSAITheme.background.secondary,
-                  border: `1px solid ${QSAITheme.border.medium}`,
-                  color: QSAITheme.text.secondary,
-                  borderRadius: '12px'
-                }}
-              >
+            <div className="flex items-center justify-between gap-3">
+              <POSButton variant="tertiary" onClick={onClose} disabled={isLoading}>
                 Cancel
-              </Button>
-              
-              <Button
+              </POSButton>
+
+              <POSButton
+                variant="primary"
                 onClick={() => handleAction('normal')}
                 disabled={isLoading || guestCount < 1}
-                className="flex-1 h-12 font-medium border-0"
-                style={{
-                  background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
-                  border: 'none',
-                  borderRadius: '12px',
-                  color: QSAITheme.text.primary,
-                  textShadow: effects.textShadow('subtle')
-                }}
+                icon={isLoading
+                  ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  : <CheckCircle2 className="w-5 h-5 text-white" />
+                }
+                showChevron={!isLoading}
               >
-                <div className="flex items-center gap-2">
-                  {isLoading ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  <span>
-                    {isLoading ? 'Processing...' : 'Confirm Seating'}
-                  </span>
-                  {!isLoading && <ChevronRight className="h-4 w-4" />}
-                </div>
-              </Button>
+                {isLoading ? 'Processing...' : 'Confirm Seating'}
+              </POSButton>
             </div>
           )}
         </div>

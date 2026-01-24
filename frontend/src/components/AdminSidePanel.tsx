@@ -34,22 +34,12 @@ export function AdminSidePanel({ isOpen, onClose, defaultTab = 'menu' }: AdminSi
 
   return (
     <>
-      {/* Backdrop overlay */}
+      {/* Full-screen overlay panel */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-200"
-        onClick={onClose}
-        style={{
-          animation: 'fadeIn 200ms ease-out',
-        }}
-      />
-
-      {/* Side panel */}
-      <div
-        className="fixed top-0 right-0 h-full w-[80vw] z-50 shadow-2xl overflow-hidden"
+        className="fixed inset-0 z-50 overflow-hidden"
         style={{
           background: `linear-gradient(135deg, ${colors.background.primary} 0%, ${colors.background.secondary} 100%)`,
-          borderLeft: `2px solid ${colors.brand.purple}`,
-          animation: 'slideInRight 300ms ease-out',
+          animation: 'fadeScaleIn 250ms ease-out',
         }}
       >
         {/* Header with close button */}
@@ -80,23 +70,17 @@ export function AdminSidePanel({ isOpen, onClose, defaultTab = 'menu' }: AdminSi
 
       {/* CSS animations */}
       <style>{`
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes fadeIn {
+        @keyframes fadeScaleIn {
           from {
             opacity: 0;
+            transform: scale(0.97);
           }
           to {
             opacity: 1;
+            transform: scale(1);
           }
         }
+
       `}</style>
     </>
   );

@@ -93,7 +93,7 @@ export default function POSLogin() {
 
   return (
     <div 
-      className="h-screen w-screen flex items-center justify-center relative overflow-hidden"
+      className="h-dvh w-screen flex items-center justify-center relative overflow-hidden"
       style={{
         background: `linear-gradient(135deg, ${QSAITheme.background.dark} 0%, ${QSAITheme.background.primary} 50%, ${QSAITheme.background.dark} 100%)`,
         backgroundImage: `

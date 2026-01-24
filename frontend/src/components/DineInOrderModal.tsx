@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Plus, Users, User, Edit2, Save, Trash2, Check, XCircle, Link2, Receipt } from 'lucide-react';
+import { X, Plus, Users, User, Edit2, Save, Trash2, Check, XCircle, Link2, Receipt, Send } from 'lucide-react';
 import { OrderItem, Category, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/menuTypes';
 import { MenuItem, ItemVariant, SelectedCustomization } from 'types';
 import type { CustomerTab as TypesCustomerTab, OrderItem as TypesOrderItem } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
+import { POSButton } from './POSButton';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useTableOrdersStore, tableOrdersStore } from 'utils/tableOrdersStore';
 import { DineInCategoryPillsHorizontal } from 'components/DineInCategoryPillsHorizontal';
@@ -1742,7 +1743,7 @@ export function DineInOrderModal({
                   )}
                 </div>
                 
-                {/* Right: New Customer Button */}
+                {/* Right: Add Customer Button */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1757,7 +1758,7 @@ export function DineInOrderModal({
                   }}
                 >
                   <Plus size={14} />
-                  New Customer
+                  Add Customer
                 </Button>
               </div>
               
@@ -1912,44 +1913,26 @@ export function DineInOrderModal({
                 </div>
                 
                 {/* Primary CTA */}
-                <Button
-                  onClick={handleSave}
-                  disabled={stagingItems.length === 0}
-                  className="w-full mb-2"
-                  style={{
-                    height: '44px',
-                    borderRadius: '10px',
-                    background: stagingItems.length === 0 
-                      ? QSAITheme.background.tertiary
-                      : `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
-                    color: stagingItems.length === 0 ? QSAITheme.text.muted : 'white',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    opacity: stagingItems.length === 0 ? 0.5 : 1,
-                    cursor: stagingItems.length === 0 ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  Preview & Save
-                </Button>
-                
-                {/* Clear Order Link */}
-                <button
+                <div className="mb-2">
+                  <POSButton
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={stagingItems.length === 0}
+                    icon={<Send className="w-5 h-5 text-white" />}
+                    showChevron={false}
+                  >
+                    Review & Send
+                  </POSButton>
+                </div>
+
+                {/* Clear Order */}
+                <POSButton
+                  variant="tertiary"
                   onClick={handleCancelOrder}
-                  className="text-left"
-                  style={{
-                    color: QSAITheme.status.error,
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                  destructive
                 >
                   Clear Order
-                </button>
+                </POSButton>
               </div>
             </div>
           </div>

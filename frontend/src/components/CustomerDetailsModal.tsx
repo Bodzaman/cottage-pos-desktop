@@ -3,7 +3,6 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { globalColors } from 'utils/QSAIDesign';
 import { EnhancedDeliveryAddressForm } from './EnhancedDeliveryAddressForm';
-import { MapPin, X, User, Users } from 'lucide-react';
+import { POSButton } from './POSButton';
+import { MapPin, X, User, Users, ArrowRight } from 'lucide-react';
 import brain from 'brain';
 import { toast } from 'sonner';
 
@@ -363,55 +363,25 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
         </div>
         
         {/* Footer */}
-        <div 
-          className="px-6 py-4 border-t flex justify-end gap-3"
+        <div
+          className="px-6 py-4 border-t flex items-center justify-between"
           style={{
-            borderTopColor: 'rgba(255, 255, 255, 0.1)',
+            borderTopColor: 'rgba(255, 255, 255, 0.06)',
             background: `linear-gradient(135deg, ${globalColors.background.secondary} 0%, ${globalColors.background.primary} 100%)`
           }}
         >
-          <Button
-            variant="ghost"
-            onClick={onClose}
-            className="text-gray-300 hover:text-white hover:bg-white/10"
-          >
+          <POSButton variant="tertiary" onClick={onClose}>
             Cancel
-          </Button>
-          
-          <Button
+          </POSButton>
+
+          <POSButton
+            variant="primary"
             onClick={handleSave}
-            className="text-white font-bold px-8 py-3 text-lg transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-2xl active:scale-95"
-            style={{
-              background: `linear-gradient(135deg, ${globalColors.purple.primary} 0%, ${globalColors.purple.dark} 100%)`,
-              boxShadow: `0 6px 20px ${globalColors.purple.primary}40, 0 2px 4px rgba(0,0,0,0.1)`,
-              border: `1px solid ${globalColors.purple.light}20`,
-              borderRadius: '12px',
-              letterSpacing: '0.05em',
-              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-              minWidth: '160px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = `linear-gradient(135deg, ${globalColors.purple.light} 0%, ${globalColors.purple.primary} 100%)`;
-              e.currentTarget.style.boxShadow = `0 8px 25px ${globalColors.purple.primary}50, 0 4px 8px rgba(0,0,0,0.15)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = `linear-gradient(135deg, ${globalColors.purple.primary} 0%, ${globalColors.purple.dark} 100%)`;
-              e.currentTarget.style.boxShadow = `0 6px 20px ${globalColors.purple.primary}40, 0 2px 4px rgba(0,0,0,0.1)`;
-            }}
+            icon={<ArrowRight className="w-5 h-5 text-white" />}
+            showChevron={false}
           >
-            <span className="relative z-10">TAKE ORDER</span>
-            {/* Animated background overlay */}
-            <div 
-              className="absolute inset-0 opacity-0 transition-opacity duration-300 hover:opacity-100"
-              style={{
-                background: `linear-gradient(45deg, transparent 0%, ${globalColors.purple.glow} 50%, transparent 100%)`,
-                transform: 'translateX(-100%)',
-                animation: 'shimmer 2s infinite'
-              }}
-            />
-          </Button>
+            Continue
+          </POSButton>
         </div>
       </div>
     </div>

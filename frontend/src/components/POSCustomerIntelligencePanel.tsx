@@ -12,6 +12,7 @@ interface POSCustomerIntelligencePanelProps {
   onOrderAgain: (order: RecentOrder) => void;
   onViewOrders?: () => void;
   onClear?: () => void;
+  hideHeader?: boolean;
   className?: string;
 }
 
@@ -36,6 +37,7 @@ export function POSCustomerIntelligencePanel({
   onOrderAgain,
   onViewOrders,
   onClear,
+  hideHeader = false,
   className = ''
 }: POSCustomerIntelligencePanelProps) {
   const { viewMode, isSearching, customerProfile, orderHistory, searchError, clearCustomer } = usePOSCustomerIntelligence();
@@ -73,21 +75,23 @@ export function POSCustomerIntelligencePanel({
       style={{ maxHeight: '100%' }}
     >
       {/* Panel Header */}
-      <div 
-        className="px-4 py-3 border-2 border-white/20 rounded-t-lg"
-        style={{
-          background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 50%, ${QSAITheme.purple.primary} 100%)`,
-        }}
-      >
-        <div className="flex flex-col items-center justify-center text-center">
-          <h3 className="text-white font-bold text-lg tracking-wide">Search Customer</h3>
-          {orderType !== 'DINE-IN' && (
-            <span className="text-white/70 text-sm font-medium uppercase tracking-wider mt-0.5">
-              ({orderType})
-            </span>
-          )}
+      {!hideHeader && (
+        <div
+          className="px-4 py-3 border-2 border-white/20 rounded-t-lg"
+          style={{
+            background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 50%, ${QSAITheme.purple.primary} 100%)`,
+          }}
+        >
+          <div className="flex flex-col items-center justify-center text-center">
+            <h3 className="text-white font-bold text-lg tracking-wide">Search Customer</h3>
+            {orderType !== 'DINE-IN' && (
+              <span className="text-white/70 text-sm font-medium uppercase tracking-wider mt-0.5">
+                ({orderType})
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Panel Content */}
       <div className="p-4 overflow-y-auto flex-1 min-h-0">

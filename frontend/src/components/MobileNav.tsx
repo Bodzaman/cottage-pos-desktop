@@ -79,7 +79,7 @@ export default function MobileNav({ activeSection }: MobileNavProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 300 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-0 right-0 z-40 h-screen w-[80%] max-w-sm bg-black/95 backdrop-blur-lg mobile-nav-container shadow-2xl"
+            className="fixed top-0 right-0 z-40 h-dvh w-[80%] max-w-sm bg-black/95 backdrop-blur-lg mobile-nav-container shadow-2xl"
           >
             <div className="p-6 h-full flex flex-col">
               <div className="flex justify-between items-center mb-8">

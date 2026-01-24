@@ -450,7 +450,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
       case 'SET_READY_TIME':
         return { icon: <Clock className="h-4 w-4" />, label: 'Set Ready Time' };
       case 'MARK_COMPLETED':
-        return { icon: <Package className="h-4 w-4" />, label: 'Mark Completed' };
+        return { icon: <Package className="h-4 w-4" />, label: 'Complete Order' };
       default:
         return { icon: <MoreHorizontal className="h-4 w-4" />, label: action };
     }

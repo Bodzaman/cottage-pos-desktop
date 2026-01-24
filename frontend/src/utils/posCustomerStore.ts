@@ -29,6 +29,8 @@ export interface CustomerData {
   city: string;
   postcode: string;
   deliveryNotes: string;
+  customerRef?: string;
+  recentOrderCount?: number;
 }
 
 export interface CustomerStore {

@@ -7,6 +7,7 @@ import { RouteObject } from "react-router-dom";
 
 
 const AIStaffManagementHub = lazy(() => import("./pages/AIStaffManagementHub.tsx"));
+const AppDeployment = lazy(() => import("./pages/AppDeployment.tsx"));
 const About = lazy(() => import("./pages/About.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
 const AllOrders = lazy(() => import("./pages/AllOrders.tsx"));
@@ -39,6 +40,8 @@ export const userRoutes: RouteObject[] = [
 
 
 	{ path: "/ai-staff-management-hub", element: <AIStaffManagementHub />},
+	{ path: "/app-deployment", element: <AppDeployment />},
+	{ path: "/appdeployment", element: <AppDeployment />},
 	{ path: "/aistaffmanagementhub", element: <AIStaffManagementHub />},
 	{ path: "/about", element: <About />},
 	{ path: "/admin", element: <Admin />},

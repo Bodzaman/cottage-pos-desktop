@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import brain from 'brain';
 import { API_PREFIX_PATH, API_PATH, API_URL } from '../constants';
 import { useCartStore } from './cartStore';
@@ -1204,17 +1205,17 @@ export const useIsAISpeaking = () => useChatStore((state) => state.isAISpeaking)
 export const usePendingCartProposal = () => useChatStore((state) => state.pendingCartProposal);
 export const useIsCartConfirmOpen = () => useChatStore((state) => state.isCartConfirmOpen);
 
-// NEW: Cart proposal actions hook
-export const useCartProposalActions = () => useChatStore((state) => ({
+// NEW: Cart proposal actions hook (useShallow prevents re-renders when unrelated state changes)
+export const useCartProposalActions = () => useChatStore(useShallow((state) => ({
   setPendingCartProposal: state.setPendingCartProposal,
   openCartConfirmDialog: state.openCartConfirmDialog,
   closeCartConfirmDialog: state.closeCartConfirmDialog,
   confirmCartProposal: state.confirmCartProposal,
   cancelCartProposal: state.cancelCartProposal,
-}));
+})));
 
-// Actions hook
-export const useChatActions = () => useChatStore((state) => ({
+// Actions hook (useShallow prevents re-renders when unrelated state changes)
+export const useChatActions = () => useChatStore(useShallow((state) => ({
   toggleChat: state.toggleChat,
   openChat: state.openChat,
   closeChat: state.closeChat,
@@ -1232,13 +1233,11 @@ export const useChatActions = () => useChatStore((state) => ({
   setVoiceCallId: state.setVoiceCallId,
   updateVoiceStatus: state.updateVoiceStatus,
   setShowVoiceTCScreen: state.setShowVoiceTCScreen,
-  // Stop generation
   stopGeneration: state.stopGeneration,
-  // NEW: Cart proposal actions
   confirmCartProposal: state.confirmCartProposal,
   cancelCartProposal: state.cancelCartProposal,
   handleStructuredEvent: state.handleStructuredEvent,
-}));
+})));
 
 // Helper functions
 export const getChatStats = () => {

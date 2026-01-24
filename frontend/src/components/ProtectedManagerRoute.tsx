@@ -66,7 +66,7 @@ const ProtectedManagerRoute: React.FC<ProtectedManagerRouteProps> = ({ children 
   // Show loading state if auth state is still loading
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-black">
+      <div className="h-dvh w-full flex items-center justify-center bg-black">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
       </div>
     );

@@ -16,10 +16,13 @@ import { create } from 'zustand';
 // UI STORE TYPES
 // ============================================================================
 
+export type POSViewMode = 'DINE_IN' | 'TAKE_AWAY' | 'ONLINE' | 'RESERVATIONS';
+
 export interface UIStore {
   // View Management
   activeView: string;
   previousView: string;
+  posViewMode: POSViewMode;
   
   // Modal State
   showCustomerModal: boolean;
@@ -38,11 +41,12 @@ export interface UIStore {
   // UI Actions
   setActiveView: (view: string) => void;
   setPreviousView: (view: string) => void;
+  setPosViewMode: (mode: POSViewMode) => void;
   
   // Modal Actions
-  openModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>) => void;
-  closeModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>) => void;
-  setModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>, value: boolean) => void;
+  openModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'posViewMode' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'setPosViewMode' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>) => void;
+  closeModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'posViewMode' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'setPosViewMode' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>) => void;
+  setModal: (modalName: keyof Omit<UIStore, 'activeView' | 'previousView' | 'posViewMode' | 'pendingOrderConfirmation' | 'queuedJobsCount' | 'setActiveView' | 'setPreviousView' | 'setPosViewMode' | 'openModal' | 'closeModal' | 'setModal' | 'closeAllModals' | 'setPendingOrderConfirmation' | 'setQueuedJobsCount'>, value: boolean) => void;
   closeAllModals: () => void;
   
   // Pending Actions
@@ -64,6 +68,7 @@ export const usePOSUIStore = create<UIStore>((set) => ({
   // View Management
   activeView: 'pos',
   previousView: 'pos',
+  posViewMode: 'DINE_IN',
   
   // Modal State
   showCustomerModal: false,
@@ -92,6 +97,10 @@ export const usePOSUIStore = create<UIStore>((set) => ({
   
   setPreviousView: (view) => {
     set({ previousView: view });
+  },
+
+  setPosViewMode: (mode) => {
+    set({ posViewMode: mode });
   },
   
   // ============================================================================

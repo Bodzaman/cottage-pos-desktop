@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Shepherd from 'shepherd.js';
 import 'shepherd.js/dist/css/shepherd.css';
+import '../styles/shepherd-theme.css';
 import { useOnboardingStore } from 'utils/onboardingStore';
 
 interface Props {

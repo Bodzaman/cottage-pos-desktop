@@ -1,7 +1,15 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CanvasElement } from 'utils/visualTemplateTypes';
-import { debounce } from 'lodash';
+function debounce<T extends (...args: any[]) => void>(fn: T, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const debounced = (...args: Parameters<T>) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+  debounced.cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  return debounced;
+}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

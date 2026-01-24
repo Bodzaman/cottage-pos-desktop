@@ -49,6 +49,7 @@ import { POSCategoryPills } from '../components/POSCategoryPills';
 import { POSMenuSelector } from '../components/POSMenuSelector';
 import { OrderSummaryPanel } from '../components/OrderSummaryPanel';
 import { OrderCustomerCard } from '../components/OrderCustomerCard';
+import { POSButton } from '../components/POSButton';
 import { CustomerDetailsModal } from 'components/CustomerDetailsModal';
 import { CustomerOrderHistoryModal } from 'components/CustomerOrderHistoryModal';
 import { POSGuestCountModal } from 'components/POSGuestCountModal';
@@ -196,6 +197,8 @@ export default function POSDesktop() {
   const clearCustomer = usePOSCustomerStore(state => state.clearCustomer);
   
   const activeView = usePOSUIStore(state => state.activeView);
+  const posViewMode = usePOSUIStore(state => state.posViewMode);
+  const setPosViewMode = usePOSUIStore(state => state.setPosViewMode);
   const showDineInModal = usePOSUIStore(state => state.showDineInModal);
   const showGuestCountModal = usePOSUIStore(state => state.showGuestCountModal);
   const showCustomerModal = usePOSUIStore(state => state.showCustomerModal);
@@ -209,7 +212,7 @@ export default function POSDesktop() {
   const { tables: restaurantTables, loading: tablesLoading, refetch: refetchTables } = useRestaurantTables();
 
   // Customer intelligence for order history
-  const { customerProfile } = usePOSCustomerIntelligence();
+  const { customerProfile, clearCustomer: clearIntelligenceCustomer } = usePOSCustomerIntelligence();
   
   const selectedTableUuid = useMemo(() => {
     if (orderType !== 'DINE-IN' || !selectedTableNumber) return null;
@@ -284,31 +287,67 @@ export default function POSDesktop() {
   const initialization = usePOSInitialization({ onViewChange: (view: any) => setActiveView(view) });
 
   // ============================================================================
-  // SESSION PERSISTENCE & RESTORATION
+  // CRASH DETECTION: Clean Exit Flag (localStorage)
+  // Only show session restore dialog after unexpected termination (crash)
   // ============================================================================
 
-  // Load saved session on mount
+  // Set crash marker when order becomes active
+  useEffect(() => {
+    if (orderItems.length > 0 && orderType !== 'DINE-IN') {
+      localStorage.setItem('pos_clean_exit', 'false');
+    }
+  }, [orderItems.length, orderType]);
+
+  // Register beforeunload + unmount cleanup to mark clean exit
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.setItem('pos_clean_exit', 'true');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      localStorage.setItem('pos_clean_exit', 'true'); // SPA navigation = clean exit
+    };
+  }, []);
+
+  // ============================================================================
+  // SESSION PERSISTENCE & RESTORATION (crash recovery only)
+  // ============================================================================
+
+  // Load saved session on mount - only restore if crash detected
   useEffect(() => {
     const loadSavedSession = async () => {
       if (isLoadingSession) {
-        if (isDev) console.log('⏭️ [POSDesktop] Session load already in progress, skipping');
+        if (isDev) console.log('[POSDesktop] Session load already in progress, skipping');
         return;
       }
 
       setIsLoadingSession(true);
 
       try {
+        // Check crash detection flag - only restore after unexpected termination
+        const cleanExit = localStorage.getItem('pos_clean_exit');
+
+        if (cleanExit !== 'false') {
+          // Last exit was clean (or flag never set) - clear any stale IndexedDB data
+          if (isDev) console.log('[POSDesktop] Clean exit detected, clearing stale session data');
+          await OfflineFirst.clearAllSessions();
+          return;
+        }
+
+        // Crash detected (pos_clean_exit === 'false') - check for recoverable session
         const savedSession = await OfflineFirst.loadSession();
 
         if (savedSession && savedSession.orderItems?.length > 0) {
-          if (isDev) console.log('📦 [POSDesktop] Found saved session:', savedSession);
+          if (isDev) console.log('[POSDesktop] Crash detected - found recoverable session:', savedSession);
           setPendingSession(savedSession);
           setModal('showSessionRestoreDialog', true);
         } else {
-          if (isDev) console.log('✅ [POSDesktop] No saved session found, starting fresh');
+          if (isDev) console.log('[POSDesktop] Crash flag set but no session data, resetting');
+          localStorage.setItem('pos_clean_exit', 'true');
         }
       } catch (error) {
-        console.error('❌ [POSDesktop] Failed to load saved session:', error);
+        console.error('[POSDesktop] Failed to load saved session:', error);
       } finally {
         setIsLoadingSession(false);
       }
@@ -319,20 +358,19 @@ export default function POSDesktop() {
 
   // Handle session discard (user chooses to start fresh)
   const handleSessionDiscard = useCallback(async () => {
-    if (isDev) console.log('🗑️ [POSDesktop] User discarded saved session');
+    if (isDev) console.log('[POSDesktop] User discarded saved session');
 
     try {
-      if (pendingSession?.sessionId) {
-        await OfflineFirst.clearSession(pendingSession.sessionId);
-      }
+      await OfflineFirst.clearAllSessions();
+      localStorage.setItem('pos_clean_exit', 'true');
       setPendingSession(null);
       setModal('showSessionRestoreDialog', false);
       toast.success('Starting fresh order');
     } catch (error) {
-      console.error('❌ [POSDesktop] Failed to discard session:', error);
+      console.error('[POSDesktop] Failed to discard session:', error);
       toast.error('Failed to clear saved session');
     }
-  }, [pendingSession]);
+  }, []);
 
   // Handle session restore (user chooses to restore saved order)
   const handleSessionRestore = useCallback(async () => {
@@ -393,10 +431,27 @@ export default function POSDesktop() {
   const handleLogout = useCallback(async () => { await logout(); navigate('/pos-login', { replace: true }); }, [logout, navigate]);
   const handleManagementAuthSuccess = useCallback(() => { setManagerOverrideGranted(true); if (managerApprovalResolverRef.current) managerApprovalResolverRef.current(true); setIsManagementDialogOpen(false); setShowAdminPanel(true); }, []);
 
-  const handleOrderTypeChange = useCallback((orderType: any) => {
-    setOrderType(orderType);
-    setActiveView(orderType === 'ONLINE_ORDERS' ? 'online-orders' : 'pos');
-  }, []);
+  const handleViewModeChange = useCallback((mode: 'DINE_IN' | 'TAKE_AWAY' | 'ONLINE' | 'RESERVATIONS') => {
+    setPosViewMode(mode);
+    switch (mode) {
+      case 'DINE_IN':
+        setOrderType('DINE-IN');
+        setActiveView('pos');
+        break;
+      case 'TAKE_AWAY':
+        if (!['COLLECTION', 'DELIVERY', 'WAITING'].includes(orderType)) {
+          setOrderType('COLLECTION');
+        }
+        setActiveView('pos');
+        break;
+      case 'ONLINE':
+        setActiveView('pos');
+        break;
+      case 'RESERVATIONS':
+        setActiveView('pos');
+        break;
+    }
+  }, [orderType]);
   
   const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
     const table = restaurantTables.find((t: any) => parseInt(t.table_number) === tableNumber);
@@ -446,21 +501,6 @@ export default function POSDesktop() {
     }
   }, [createOrder, createTableOrder, refetchTables, selectedTableNumber]);
 
-  const handleCustomerIntelligenceSelected = useCallback((customer: any) => {
-    const data = {
-      firstName: customer.first_name || '',
-      lastName: customer.last_name || '',
-      phone: customer.phone || '',
-      email: customer.email || '',
-      address: customer.default_address?.address_line1 || '',
-      street: customer.default_address?.address_line1 || '',
-      city: customer.default_address?.city || '',
-      postcode: customer.default_address?.postal_code || '',
-    };
-    updateCustomer(data as any);
-    setCustomerData(data as any);
-  }, [setCustomerData]);
-
   const handleLoadPastOrder = useCallback(async (order: any) => {
     const data = await getOrderItems(order.order_id);
     if (data.success && data.items) {
@@ -503,7 +543,12 @@ export default function POSDesktop() {
     else orderManagement.handleAddToOrder(item);
   }, [orderType, addItemToDineIn, orderManagement]);
 
-  const handleClearOrder = useCallback(() => { orderManagement.handleClearOrder(); clearOrder(); }, [orderManagement]);
+  const handleClearOrder = useCallback(async () => {
+    orderManagement.handleClearOrder();
+    clearOrder();
+    await OfflineFirst.clearAllSessions();
+    localStorage.setItem('pos_clean_exit', 'true');
+  }, [orderManagement]);
 
   const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
     const subtotal = calculateOrderTotal();
@@ -513,6 +558,8 @@ export default function POSDesktop() {
     await printing.handlePrintReceipt(finalTotal);
     clearOrder();
     clearCustomer();
+    await OfflineFirst.clearAllSessions();
+    localStorage.setItem('pos_clean_exit', 'true');
   }, [calculateOrderTotal, orderProcessing, printing]);
 
   const handleSendToKitchen = useCallback(async () => {
@@ -595,6 +642,8 @@ export default function POSDesktop() {
 
     clearOrder();
     clearCustomer();
+    await OfflineFirst.clearAllSessions();
+    localStorage.setItem('pos_clean_exit', 'true');
     setModal('showPaymentFlow', false);
   }, [printing, clearOrder, clearCustomer]);
 
@@ -615,7 +664,7 @@ export default function POSDesktop() {
 
   const renderMainPOSView = () => {
     // Full-width table dashboard for DINE-IN mode
-    if (orderType === 'DINE-IN') {
+    if (posViewMode === 'DINE_IN') {
       return (
         <DineInTableDashboard
           tables={restaurantTables}
@@ -628,13 +677,23 @@ export default function POSDesktop() {
       );
     }
 
+    // Online Orders mode - render inline
+    if (posViewMode === 'ONLINE') {
+      return <OnlineOrderManagement />;
+    }
+
+    // Reservations mode - render inline
+    if (posViewMode === 'RESERVATIONS') {
+      return <ReservationsPlaceholder />;
+    }
+
     // Existing 3-panel layout for takeaway modes
     return (
       <ResponsivePOSShell zones={{
         customer: (
           <POSZoneErrorBoundary zoneName="Customer" onReset={() => {}} showHomeButton>
             <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5 p-3">
-              <OrderCustomerCard orderType={orderType} onTakeOrder={() => setModal('showCustomerModal', true)} onCustomerSelected={handleCustomerIntelligenceSelected} onOrderAgain={handleLoadPastOrder} onViewOrders={() => setShowOrderHistoryModal(true)} onClear={() => { clearCustomer(); clearCustomerData(); }} />
+              <OrderCustomerCard orderType={orderType as 'COLLECTION' | 'DELIVERY' | 'WAITING'} onModeChange={(mode) => setOrderType(mode)} onTakeOrder={() => setModal('showCustomerModal', true)} onEdit={() => setModal('showCustomerModal', true)} onViewOrders={() => setShowOrderHistoryModal(true)} onClear={() => { clearCustomer(); clearCustomerData(); clearIntelligenceCustomer(); }} />
             </div>
           </POSZoneErrorBoundary>
         ),
@@ -705,15 +764,15 @@ export default function POSDesktop() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen]);
 
-  if (authLoading) return <div className="h-screen w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
+  if (authLoading) return <div className="h-dvh w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
   if (!isAuthenticated) return null;
 
   return (
     <CustomizeOrchestratorProvider>
-      <div className="grid grid-rows-[auto_1fr_auto] h-screen bg-black overflow-hidden">
+      <div className="grid grid-rows-[auto_1fr_auto] h-dvh bg-black overflow-hidden">
         <ManagementHeader title="POS" onAdminSuccess={handleManagementAuthSuccess} onLogout={handleLogout} />
-        <POSNavigation activeView={(activeView as any)} currentOrderType={orderType} onOrderTypeChange={handleOrderTypeChange} />
-        <div className="flex-1 overflow-hidden">{activeView === 'pos' ? renderMainPOSView() : activeView === 'online-orders' ? <OnlineOrderManagement onBack={() => setActiveView('pos')} /> : <ReservationsPlaceholder onBack={() => setActiveView('pos')} />}</div>
+        <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} />
+        <div className="flex-1 overflow-hidden">{renderMainPOSView()}</div>
         <POSFooter currentOrderType={orderType} />
         
         <DineInOrderModal isOpen={showDineInModal} onClose={() => setModal('showDineInModal', false)} tableId={selectedTableUuid} tableNumber={selectedTableNumber as any} tableCapacity={selectedTableCapacity} linkedTables={linkedTableContext.linkedTableNumbers} isPrimaryTable={linkedTableContext.isPrimaryTable} totalLinkedCapacity={linkedTableContext.totalLinkedCapacity} restaurantTables={restaurantTables} eventDrivenOrder={orderType === 'DINE-IN' ? (dineInOrder as any) : null} eventDrivenCustomerTabs={customerTabsData} eventDrivenActiveTabId={activeTabId} onEventDrivenSetActiveTabId={setActiveTabId} onEventDrivenAddItem={addItemToDineIn} onEventDrivenRemoveItem={removeItemFromDineIn} onEventDrivenUpdateItemQuantity={updateItemQuantity} onEventDrivenUpdateGuestCount={updateGuestCount} onEventDrivenSendToKitchen={sendDineInToKitchen} onEventDrivenCreateTab={createTab} onEventDrivenAddItemsToTab={addItemsToTab} onEventDrivenRenameTab={renameTab} onEventDrivenCloseTab={closeTab} onEventDrivenSplitTab={splitTab} onEventDrivenMergeTabs={mergeTabs} onEventDrivenMoveItemsBetweenTabs={moveItemsBetweenTabs} stagingItems={dineInStagingItems} onAddToStaging={addToStagingCart} onRemoveFromStaging={removeFromStagingCart} onClearStaging={clearStagingCart} onPersistStaging={persistStagingCart as any} enrichedItems={dineInEnrichedItems} enrichedLoading={dineInEnrichedLoading} enrichedError={dineInEnrichedError} />
@@ -780,14 +839,14 @@ export default function POSDesktop() {
                 )}
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" onClick={handleSessionDiscard}>
+            <div className="flex items-center justify-between gap-3 pt-4">
+              <POSButton variant="secondary" onClick={handleSessionDiscard}>
                 Start Fresh
-              </Button>
-              <Button onClick={handleSessionRestore}>
+              </POSButton>
+              <POSButton variant="primary" onClick={handleSessionRestore} showChevron={false}>
                 Restore Order
-              </Button>
-            </DialogFooter>
+              </POSButton>
+            </div>
           </DialogContent>
         </Dialog>
         {/* Lock Screen Overlay */}

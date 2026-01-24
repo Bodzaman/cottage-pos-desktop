@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import brain from 'brain';
 import { CustomerProfile, CustomerProfileResponse, AppApisCustomerProfileApiCustomerAddress, RecentOrder } from '@/brain/data-contracts';
 import { toast } from 'sonner';
+import { usePOSCustomerStore } from './posCustomerStore';
+import { useCustomerDataStore } from './customerDataStore';
 
 // Extended types for our store
 export interface CustomerIntelligenceProfile extends CustomerProfile {
@@ -35,6 +37,24 @@ interface CustomerIntelligenceState {
   clearSearch: () => void;
   clearCustomer: () => void;
   setViewMode: (mode: ViewMode) => void;
+}
+
+// Bridge a found profile directly to the customer stores (auto-select)
+function bridgeProfileToStores(profile: CustomerIntelligenceProfile) {
+  const bridgeData = {
+    firstName: profile.first_name || '',
+    lastName: profile.last_name || '',
+    phone: profile.phone || '',
+    email: profile.email || '',
+    address: profile.default_address?.address_line1 || '',
+    street: profile.default_address?.address_line1 || '',
+    city: profile.default_address?.city || '',
+    postcode: profile.default_address?.postal_code || '',
+    customerRef: profile.customer_reference_number || '',
+    recentOrderCount: profile.recent_orders?.length || 0,
+  };
+  usePOSCustomerStore.getState().updateCustomer(bridgeData);
+  useCustomerDataStore.getState().setCustomerData(bridgeData as any);
 }
 
 export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set, get) => ({
@@ -96,12 +116,12 @@ export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set
       if (data.success && data.customer) {
         // Now fetch comprehensive data (addresses, orders, favorites)
         try {
-          const comprehensiveResponse = await brain.get_customer_profile({ 
+          const comprehensiveResponse = await brain.get_customer_profile({
             customer_id: data.customer.id,
-            comprehensive: true 
+            comprehensive: true
           });
           const comprehensiveData: CustomerProfileResponse = await comprehensiveResponse.json();
-          
+
           if (comprehensiveData.success) {
             // Merge data
             const enrichedProfile: CustomerIntelligenceProfile = {
@@ -109,19 +129,25 @@ export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set
               default_address: comprehensiveData.default_address,
               recent_orders: comprehensiveData.recent_orders || [],
             };
-            
-            set({ 
+
+            // Auto-bridge: write to customer stores immediately
+            bridgeProfileToStores(enrichedProfile);
+
+            set({
               customerProfile: enrichedProfile,
               isSearching: false,
               searchError: null,
               viewMode: 'profile'
             });
-            
-            toast.success(`✅ Found ${enrichedProfile.first_name || ''} ${enrichedProfile.last_name || 'customer'}`);
+
+            toast.success(`Found ${enrichedProfile.first_name || ''} ${enrichedProfile.last_name || 'customer'}`);
           } else {
             // Fallback to basic profile if comprehensive fails
-            set({ 
-              customerProfile: { ...data.customer, recent_orders: [] },
+            const basicProfile: CustomerIntelligenceProfile = { ...data.customer, recent_orders: [] };
+            bridgeProfileToStores(basicProfile);
+
+            set({
+              customerProfile: basicProfile,
               isSearching: false,
               searchError: null,
               viewMode: 'profile'
@@ -131,8 +157,11 @@ export const usePOSCustomerIntelligence = create<CustomerIntelligenceState>((set
         } catch (compError) {
           console.warn('⚠️ [CustomerIntelligence] Could not load comprehensive data:', compError);
           // Still show basic profile
-          set({ 
-            customerProfile: { ...data.customer, recent_orders: [] },
+          const basicProfile: CustomerIntelligenceProfile = { ...data.customer, recent_orders: [] };
+          bridgeProfileToStores(basicProfile);
+
+          set({
+            customerProfile: basicProfile,
             isSearching: false,
             searchError: null,
             viewMode: 'profile'

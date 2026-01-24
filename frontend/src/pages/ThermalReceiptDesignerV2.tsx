@@ -548,7 +548,7 @@ export default function ThermalReceiptDesignerV2() {
 
   const renderEditingState = () => (
     <div
-      className="flex flex-col h-screen"
+      className="flex flex-col h-dvh"
       style={{ backgroundColor: QSAITheme.background.primary }}
     >
       {/* Header - Fixed */}

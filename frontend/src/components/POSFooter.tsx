@@ -11,7 +11,7 @@ import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
 
 interface POSFooterProps {
   className?: string;
-  currentOrderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
+  currentOrderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
 }
 
 /**
@@ -198,8 +198,7 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
       'DINE-IN': { label: 'DINE-IN', color: QSAITheme.purple.primary },
       'DELIVERY': { label: 'DELIVERY', color: '#10B981' },
       'COLLECTION': { label: 'COLLECTION', color: '#F59E0B' },
-      'WAITING': { label: 'WAITING', color: '#8B5CF6' },
-      'ONLINE_ORDERS': { label: 'ONLINE', color: QSAITheme.purple.dark }
+      'WAITING': { label: 'WAITING', color: '#8B5CF6' }
     };
     
     return configs[orderType as keyof typeof configs] || { label: orderType, color: QSAITheme.text.muted };

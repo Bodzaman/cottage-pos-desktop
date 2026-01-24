@@ -12,16 +12,14 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ChefHat, Printer, Save, Clock, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { POSButton } from './POSButton';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { OrderItem } from '../utils/menuTypes';
@@ -286,66 +284,31 @@ export function DineInKitchenPreviewModal({
           )}
         </div>
 
-        {/* Footer with Action Buttons */}
-        <DialogFooter className="flex gap-3 pt-6 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="px-6 h-12 font-medium transition-all"
-            style={{
-              borderColor: QSAITheme.border.medium,
-              color: QSAITheme.text.secondary,
-              backgroundColor: 'transparent'
-            }}
-          >
+        {/* Footer with Action Buttons: Cancel (left) | Save Order (center) | Send to Kitchen (right) */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}>
+          <POSButton variant="tertiary" onClick={onClose}>
             Cancel
-          </Button>
+          </POSButton>
 
-          <div className="flex-1 flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={handleSaveOnly}
-              disabled={pendingItems.length === 0}
-              className="flex-1 h-12 font-semibold transition-all"
-              style={{
-                background: pendingItems.length > 0
-                  ? QSAITheme.background.highlight
-                  : QSAITheme.background.tertiary,
-                color: pendingItems.length > 0 ? 'white' : QSAITheme.text.muted,
-                border: `1px solid ${pendingItems.length > 0 ? QSAITheme.border.medium : QSAITheme.border.light}`,
-              }}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Order
-            </Button>
+          <POSButton
+            variant="secondary"
+            onClick={handleSaveOnly}
+            disabled={pendingItems.length === 0}
+            icon={<Save className="w-4 h-4" />}
+          >
+            Save Order
+          </POSButton>
 
-            <Button
-              onClick={handlePrint}
-              disabled={pendingItems.length === 0 || isPrinting}
-              className="flex-1 h-12 text-base font-bold transition-all"
-              style={{
-                background: pendingItems.length > 0 && !isPrinting
-                  ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`
-                  : QSAITheme.background.tertiary,
-                color: 'white',
-                boxShadow: pendingItems.length > 0 && !isPrinting ? `0 0 30px ${QSAITheme.purple.glow}` : 'none',
-                opacity: pendingItems.length > 0 && !isPrinting ? 1 : 0.5
-              }}
-            >
-              {isPrinting ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Printing...
-                </>
-              ) : (
-                <>
-                  <Printer className="w-5 h-5 mr-2" />
-                  Send to Kitchen
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogFooter>
+          <POSButton
+            variant="primary"
+            onClick={handlePrint}
+            disabled={pendingItems.length === 0 || isPrinting}
+            icon={isPrinting ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Printer className="w-5 h-5 text-white" />}
+            showChevron={false}
+          >
+            {isPrinting ? 'Printing...' : 'Send to Kitchen'}
+          </POSButton>
+        </div>
       </DialogContent>
     </Dialog>
   );

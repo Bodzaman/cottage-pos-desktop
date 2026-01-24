@@ -157,8 +157,8 @@ export function useCategories(options?: Partial<Omit<UseQueryOptions<Category[]>
     queryFn: async () => {
       return await fetchCategoriesOrdered();
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes (more aggressive than old 5min TTL)
-    gcTime: 10 * 60 * 1000, // 10 minutes cache time (formerly cacheTime)
+    staleTime: 10 * 60 * 1000, // 10 minutes — menu changes rarely; mutations invalidate explicitly
+    gcTime: 30 * 60 * 1000, // 30 minutes cache retention
     refetchOnWindowFocus: true, // Replaces polling
     retry: 2, // Production safety
     ...options,
@@ -182,8 +182,8 @@ export function useMenuItems(options?: Partial<Omit<UseQueryOptions<MenuItem[]>,
       console.log('✅ [React Query] Menu items fetched:', items.length);
       return items;
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,
@@ -211,8 +211,8 @@ export function useMenuItemsByCategory(
       console.log(`✅ [React Query] Category items fetched: ${filtered.length}`);
       return filtered;
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     enabled: Boolean(categoryId), // Only fetch if categoryId provided
@@ -230,8 +230,8 @@ export function useProteinTypes(options?: Partial<Omit<UseQueryOptions<ProteinTy
     queryFn: async () => {
       return await fetchProteinTypesOrdered();
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,
@@ -270,8 +270,8 @@ export function useItemVariants(options?: Partial<Omit<UseQueryOptions<ItemVaria
       console.log('✅ [React Query] Item variants fetched:', mapped.length);
       return mapped;
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,
@@ -294,8 +294,8 @@ export function useCustomizations(options?: Partial<Omit<UseQueryOptions<Customi
       console.log('✅ [React Query] Customizations fetched:', data?.length || 0);
       return data || [];
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,
@@ -422,8 +422,8 @@ export function useSetMeals(activeOnly: boolean = false, options?: UseQueryOptio
       console.log('✅ [React Query] Set meals fetched:', data?.length || 0);
       return (data || []) as SetMeal[];
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,
@@ -584,8 +584,8 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
       
       return result;
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     ...options,

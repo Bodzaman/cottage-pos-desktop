@@ -2,15 +2,16 @@
 
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { POSButton } from './POSButton';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Banknote, Smartphone, CheckCircle, Calculator, Minus, Plus, AlertTriangle } from "lucide-react";
-import { QSAITheme, styles, effects } from "../utils/QSAIDesign";
+import { styles } from "../utils/QSAIDesign";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { OrderItem } from "../utils/menuTypes";
@@ -482,7 +483,7 @@ export function POSPaymentSelector({
               {paymentMethods.map((method) => {
                 const Icon = method.icon;
                 const isSelected = selectedMethod === method.type;
-                
+
                 return (
                   <motion.div
                     key={method.type}
@@ -490,27 +491,54 @@ export function POSPaymentSelector({
                     whileTap={{ scale: 0.98 }}
                   >
                     <Card
-                      className={`cursor-pointer transition-all duration-200 ${
-                        isSelected 
-                          ? `${method.borderColor} ${method.bgColor} border-2` 
-                          : 'border-white/10 hover:border-white/20'
-                      }`}
-                      style={isSelected ? undefined : styles.frostedGlassStyle}
+                      className="cursor-pointer outline-none"
+                      style={{
+                        borderRadius: '8px',
+                        border: isSelected
+                          ? undefined
+                          : '1px solid rgba(255, 255, 255, 0.15)',
+                        background: isSelected
+                          ? undefined
+                          : 'rgba(255, 255, 255, 0.06)',
+                        transition: 'all 150ms ease',
+                        ...(isSelected ? {} : {}),
+                      }}
+                      tabIndex={0}
                       onClick={() => handleMethodSelect(method.type)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleMethodSelect(method.type); } }}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <Icon className={`h-6 w-6 ${isSelected ? method.color : 'text-white/60'}`} />
-                          <div>
-                            <div className={`font-medium ${isSelected ? 'text-white' : 'text-white/80'}`}>
-                              {method.label}
-                            </div>
-                            <div className="text-xs text-white/50">
-                              {method.description}
+                      {/* Selected state overlay */}
+                      <div
+                        className="rounded-lg"
+                        style={{
+                          ...(isSelected ? {
+                            border: '2px solid currentColor',
+                            boxShadow: '0 0 12px rgba(255, 255, 255, 0.1)',
+                          } : {}),
+                        }}
+                      >
+                        <CardContent
+                          className={`p-4 rounded-lg ${isSelected ? method.bgColor : ''}`}
+                          style={isSelected ? { borderColor: 'currentColor' } : {}}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className={`h-6 w-6 ${isSelected ? method.color : 'text-white/60'}`} />
+                            <div>
+                              <div className={`font-medium ${isSelected ? 'text-white' : 'text-white/80'}`}>
+                                {method.label}
+                              </div>
+                              <div className="text-xs text-white/50">
+                                {method.description}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </CardContent>
+                          {isSelected && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle className={`h-4 w-4 ${method.color}`} />
+                            </div>
+                          )}
+                        </CardContent>
+                      </div>
                     </Card>
                   </motion.div>
                 );
@@ -581,22 +609,26 @@ export function POSPaymentSelector({
           )}
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
+        {/* Footer: Cancel (left) | Process Payment (right) */}
+        <div
+          className="flex items-center justify-between pt-4"
+          style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}
+        >
+          <POSButton
+            variant="tertiary"
             onClick={onClose}
-            className="border-white/10 text-white/80 hover:bg-white/10"
           >
             Cancel
-          </Button>
-          <Button
+          </POSButton>
+          <POSButton
+            variant="primary"
+            colorScheme="green"
             onClick={handleConfirmPayment}
             disabled={!selectedMethod || (selectedMethod === 'CASH' && !isValidCash) || isProcessing}
-            className="bg-green-600 hover:bg-green-700 text-white"
           >
             {isProcessing ? 'Processing...' : `Process Payment £${finalTotal.toFixed(2)}`}
-          </Button>
-        </DialogFooter>
+          </POSButton>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -10,16 +10,14 @@
  * ✅ WYSIWYG Thermal Printing: Prints exact preview to Epson TM-T20III
  */
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Receipt, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { POSButton } from './POSButton';
 import { useState, useEffect, useRef } from 'react';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
@@ -243,47 +241,22 @@ export function DineInBillPreviewModal({
           </div>
         </div>
 
-        {/* Footer with Action Buttons */}
-        <DialogFooter className="flex gap-3 pt-6 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isPrinting}
-            className="flex-1 h-12 font-medium transition-all"
-            style={{
-              borderColor: QSAITheme.border.medium,
-              color: QSAITheme.text.secondary,
-              backgroundColor: 'transparent'
-            }}
-          >
+        {/* Footer: Cancel (left) | Print Bill (right) */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}>
+          <POSButton variant="tertiary" onClick={onClose} disabled={isPrinting}>
             Cancel
-          </Button>
-          <Button
+          </POSButton>
+
+          <POSButton
+            variant="primary"
             onClick={handlePrint}
             disabled={isPrinting || orderItems.length === 0}
-            className="flex-1 h-12 text-base font-bold transition-all"
-            style={{
-              background: !isPrinting && orderItems.length > 0
-                ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`
-                : QSAITheme.background.tertiary,
-              color: 'white',
-              boxShadow: !isPrinting && orderItems.length > 0 ? `0 0 30px ${QSAITheme.purple.glow}` : 'none',
-              opacity: !isPrinting && orderItems.length > 0 ? 1 : 0.5
-            }}
+            icon={isPrinting ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Receipt className="w-5 h-5 text-white" />}
+            showChevron={false}
           >
-            {isPrinting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Printing...
-              </>
-            ) : (
-              <>
-                <Receipt className="h-5 w-5 mr-2" />
-                Print Bill
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+            {isPrinting ? 'Printing...' : 'Print Bill'}
+          </POSButton>
+        </div>
       </DialogContent>
     </Dialog>
   );

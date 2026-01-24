@@ -664,7 +664,7 @@ export function POSOrderSummary({
       case "DINE-IN": return "Send to Kitchen";
       case "COLLECTION": return "Process Order";
       case "DELIVERY": return "Process Order";
-      case "WAITING": return "Process Order - Customer Waiting";
+      case "WAITING": return "Process Order";
       default: return "Checkout";
     }
   };
@@ -1122,7 +1122,7 @@ export function POSOrderSummary({
                 }}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Clear
+                Clear Order
               </Button>
             )}
           </div>
@@ -1741,7 +1741,7 @@ export function POSOrderSummary({
                 ) : (
                   <span className="flex items-center">
                     <Receipt className="h-4 w-4 mr-2" style={{ filter: 'drop-shadow(0 0 3px rgba(0, 0, 0, 0.5))' }} />
-                    Process Order • {formatCurrency(total)}
+                    Process Order {formatCurrency(total)}
                   </span>
                 )}
               </motion.button>
