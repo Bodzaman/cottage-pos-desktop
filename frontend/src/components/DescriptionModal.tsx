@@ -24,7 +24,7 @@ export const DescriptionModal: React.FC<DescriptionModalProps> = ({
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[85dvh] p-0 overflow-hidden flex flex-col">
         {/* Header with Item Name */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
           <DialogTitle className="text-2xl font-bold text-foreground">

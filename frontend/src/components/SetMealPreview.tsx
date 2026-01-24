@@ -44,7 +44,7 @@ export function SetMealPreview({ setMeal, isOpen, onClose }: SetMealPreviewProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] bg-[#1E1E1E] border-gray-600 text-white overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90dvh] bg-[#1E1E1E] border-gray-600 text-white overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-600">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-2xl font-bold text-white">{setMeal.name}</DialogTitle>

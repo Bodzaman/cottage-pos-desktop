@@ -223,7 +223,7 @@ export function POSSendToKitchenDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" style={styles.glassCard}>
+        <DialogContent className="max-w-2xl max-h-[80dvh] flex flex-col" style={styles.glassCard}>
           {/* Header - Fixed at top */}
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">

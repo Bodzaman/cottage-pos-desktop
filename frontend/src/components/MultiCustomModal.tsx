@@ -227,7 +227,7 @@ export function MultiCustomModal({ isOpen, onClose, item, variants, onAddToOrder
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-black/90 backdrop-blur-xl border border-white/20 text-white">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto bg-black/90 backdrop-blur-xl border border-white/20 text-white">
           <DialogHeader className="border-b border-white/10 pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl text-white font-semibold">
               🔧 Multi-Custom: {item.name}

@@ -508,7 +508,7 @@ export function ReceiptDesigner({ onRefresh }: ReceiptDesignerProps) {
       </div>
 
       {/* Three-Panel Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 min-h-[calc(100vh-140px)]">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 min-h-[calc(100dvh-140px)]">
         {/* Left Panel - Settings & Template Management */}
         <div className="xl:col-span-4 space-y-6">
           <SettingsPanel

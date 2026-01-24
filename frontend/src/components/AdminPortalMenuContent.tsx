@@ -567,7 +567,7 @@ export default function AdminPortalMenuContent() {
           handleCancelDialog();
         }
       }}>
-        <DialogContent className="max-w-full sm:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-[98vw] sm:w-[95vw] max-h-[95vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6">
+        <DialogContent className="max-w-full sm:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-[98vw] sm:w-[95vw] max-h-[95dvh] sm:max-h-[90dvh] flex flex-col p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">{editingItem?.id ? 'Edit Menu Item' : 'Create New Menu Item'}</DialogTitle>
             <DialogDescription className="text-sm">

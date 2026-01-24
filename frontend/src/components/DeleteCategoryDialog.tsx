@@ -85,7 +85,7 @@ export const DeleteCategoryDialog = React.memo(({
   
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-black/95 backdrop-blur-sm border-red-500/30 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+      <AlertDialogContent className="bg-black/95 backdrop-blur-sm border-red-500/30 text-white max-w-2xl max-h-[90dvh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-white text-2xl flex items-center gap-2">
             <AlertCircle className="h-6 w-6 text-red-500" />

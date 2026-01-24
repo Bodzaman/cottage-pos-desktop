@@ -302,7 +302,7 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
         }}
       >
         {/* Three-panel layout for order management */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 h-[calc(100vh-220px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 h-[calc(100dvh-220px)]">
           {/* Left Panel: Order Queue */}
           <div className="bg-card rounded-lg overflow-hidden">
             <OrderQueuePanel

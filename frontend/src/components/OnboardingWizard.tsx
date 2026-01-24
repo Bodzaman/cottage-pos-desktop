@@ -345,7 +345,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onNavigateToSection
 
       <Dialog open={isOpen} onOpenChange={dismissWizard}>
         <DialogContent 
-          className="max-w-2xl max-h-[90vh] p-0 gap-0 border-0 flex flex-col"
+          className="max-w-2xl max-h-[90dvh] p-0 gap-0 border-0 flex flex-col"
           style={{ 
             backgroundColor: 'rgba(15, 15, 15, 0.85)',
             boxShadow: PremiumTheme.shadows.elevation.xl,

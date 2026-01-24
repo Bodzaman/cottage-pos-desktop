@@ -295,7 +295,7 @@ export function OrderModeAssignmentModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className={`max-w-4xl h-[80vh] p-0 ${className}`}
+        className={`max-w-4xl h-[80dvh] p-0 ${className}`}
         style={styles.frostedGlassStyle}
       >
         <DialogHeader className="p-6 pb-0">

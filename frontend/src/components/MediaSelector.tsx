@@ -400,7 +400,7 @@ const MediaSelector = ({ isOpen, onClose, onSelectMedia, mediaType = 'all', aspe
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="bg-[#0A0A0A] text-[#F0F0F5] border-[#2A2A2A] max-w-5xl max-h-[90vh] p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="bg-[#0A0A0A] text-[#F0F0F5] border-[#2A2A2A] max-w-5xl max-h-[90dvh] p-0 overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 border-b border-[#2A2A2A] bg-[#141414]">
           <DialogTitle className="text-2xl font-bold text-[#F0F0F5] flex items-center">
             <div className="w-8 h-8 rounded-lg bg-[#5B21B6]/10 flex items-center justify-center mr-3">

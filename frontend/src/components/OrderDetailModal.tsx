@@ -174,7 +174,7 @@ export function OrderDetailModal({ order, isOpen, onClose, onReorder }: OrderDet
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-4xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold">

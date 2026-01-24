@@ -1957,7 +1957,7 @@ const AIStaffManagementHub: React.FC = () => {
 
       {/* Avatar Picker Dialog */}
       <Dialog open={showAvatarGallery} onOpenChange={setShowAvatarGallery}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden p-0">
+        <DialogContent className="max-w-6xl max-h-[90dvh] overflow-hidden p-0">
           <DialogHeader className="p-6 pb-4">
             <DialogTitle>Choose Avatar</DialogTitle>
             <DialogDescription>

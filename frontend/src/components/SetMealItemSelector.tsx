@@ -178,7 +178,7 @@ export default function SetMealItemSelector({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl h-[85vh] bg-[#1E1E1E] border-gray-700">
+      <DialogContent className="max-w-7xl h-[85dvh] bg-[#1E1E1E] border-gray-700">
         <DialogHeader className="pb-4">
           <DialogTitle className="text-white text-xl">Select Menu Items for Set Meal</DialogTitle>
           <DialogDescription className="text-gray-400">

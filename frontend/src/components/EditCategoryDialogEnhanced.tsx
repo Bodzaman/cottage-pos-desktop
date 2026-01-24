@@ -156,7 +156,7 @@ export const EditCategoryDialogEnhanced = React.memo(({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-black/90 backdrop-blur-sm border-[#7C5DFA]/30 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-black/90 backdrop-blur-sm border-[#7C5DFA]/30 text-white max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Category: {editForm.name}</DialogTitle>
             <DialogDescription className="text-gray-400">

@@ -1942,7 +1942,7 @@ const AdminPortalMenu: React.FC<AdminPortalMenuProps> = ({ activeSubsection }) =
       {isEditDialogOpen && !isCreateDialogOpen && (
         <StrictDialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) handleCancelDialog(); }}>
           <div 
-            className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto p-2 rounded-lg"
+            className="max-w-6xl w-[95vw] max-h-[90dvh] overflow-y-auto p-2 rounded-lg"
             style={{ backgroundColor: '#1E1E1E', border: '1px solid rgba(255, 255, 255, 0.03)' }}
           >
             <DialogHeader>
@@ -1974,7 +1974,7 @@ const AdminPortalMenu: React.FC<AdminPortalMenuProps> = ({ activeSubsection }) =
       {isCreateDialogOpen && (
         <StrictDialog open={isCreateDialogOpen} onOpenChange={(open) => { if (!open) handleCancelDialog(); }}>
           <div 
-            className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto p-2 rounded-lg"
+            className="max-w-6xl w-[95vw] max-h-[90dvh] overflow-y-auto p-2 rounded-lg"
             style={{ backgroundColor: '#1E1E1E', border: '1px solid rgba(255, 255, 255, 0.03)' }}
           >
             <DialogHeader>

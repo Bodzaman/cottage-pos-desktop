@@ -185,7 +185,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="max-w-7xl h-[80vh] border-0 flex flex-col [&>button]:hidden"
+        className="max-w-7xl h-[80dvh] border-0 flex flex-col [&>button]:hidden"
         style={{
           backgroundColor: QSAITheme.background.primary,
           border: `1px solid ${QSAITheme.border.medium}`,

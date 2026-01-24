@@ -475,7 +475,7 @@ export const DetailedOrderDialog: React.FC<Props> = ({
           </div>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[70vh] pr-4">
+        <ScrollArea className="max-h-[70dvh] pr-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <div className="md:col-span-2 space-y-4">
               {/* Order Items */}

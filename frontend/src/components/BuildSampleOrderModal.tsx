@@ -439,7 +439,7 @@ export function BuildSampleOrderModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-7xl h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-7xl h-[90dvh] p-0 overflow-hidden">
         {currentStep === 1 ? (
           // Step 1: Table Initialization
           <div className="flex flex-col h-full">

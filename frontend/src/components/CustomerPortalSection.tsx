@@ -230,7 +230,7 @@ export function CustomerPortalSection({ isOpen, onClose, className = '' }: Custo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90dvh] overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Customer Account Portal</DialogTitle>
           <DialogDescription>
@@ -258,7 +258,7 @@ export function CustomerPortalSection({ isOpen, onClose, className = '' }: Custo
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="p-6 overflow-y-auto max-h-[calc(90dvh-120px)]">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="overview" className="flex items-center space-x-2">

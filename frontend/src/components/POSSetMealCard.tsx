@@ -126,7 +126,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
         {/* Details Dialog */}
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
           <DialogContent 
-            className="max-w-md max-h-[90vh] overflow-hidden"
+            className="max-w-md max-h-[90dvh] overflow-hidden"
             style={{
               ...styles.glassCard,
               background: QSAITheme.background.secondary,
@@ -139,7 +139,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
               </DialogTitle>
             </DialogHeader>
             
-            <ScrollArea className="max-h-[60vh] pr-4">
+            <ScrollArea className="max-h-[60dvh] pr-4">
               {/* Hero Image */}
               <div className="mb-4 rounded-lg overflow-hidden">
                 <OptimizedImage
@@ -372,7 +372,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
       {/* Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent 
-          className="max-w-md max-h-[90vh] overflow-hidden"
+          className="max-w-md max-h-[90dvh] overflow-hidden"
           style={{
             ...styles.glassCard,
             background: QSAITheme.background.secondary,
@@ -385,7 +385,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
             </DialogTitle>
           </DialogHeader>
           
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <ScrollArea className="max-h-[60dvh] pr-4">
             {/* Hero Image */}
             <div className="mb-4 rounded-lg overflow-hidden">
               <OptimizedImage

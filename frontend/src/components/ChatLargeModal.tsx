@@ -24,6 +24,7 @@ import { WelcomeScreen, useWelcomeScreen } from 'components/WelcomeScreen';
 import { VoiceSignupPrompt } from './VoiceSignupPrompt';
 import { VoiceMaintenanceModal } from './VoiceMaintenanceModal';
 import { InlineMenuCard } from 'components/InlineMenuCard';
+import { ChatMenuCardScroller } from 'components/ChatMenuCardScroller';
 import { toast } from 'sonner';
 import { useAgentConfig } from '../utils/useAgentConfig';
 import brain from 'brain';
@@ -118,6 +119,48 @@ const processInlineMenuCards = (content: string, orderMode: string) => {
 
 // NEW: Render structured content parts directly
 const renderStructuredContent = (message: ChatMessage, orderMode: string) => {
+  // Handle menuCards from structured_data events (highest priority)
+  if (message.menuCards && message.menuCards.length > 0) {
+    return (
+      <>
+        <ReactMarkdown
+          className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
+          components={{
+            p: ({ children }) => <p className="mb-2">{children}</p>,
+            strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
+            em: ({ children }) => <em className="text-orange-200">{children}</em>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+            li: ({ children }) => <li className="text-gray-300">{children}</li>,
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+        <ChatMenuCardScroller items={message.menuCards} messageId={message.id} />
+      </>
+    );
+  }
+
+  // Handle menuRefs from menu_refs events
+  if (message.menuRefs && message.menuRefs.length > 0) {
+    return (
+      <>
+        <ReactMarkdown
+          className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
+          components={{
+            p: ({ children }) => <p className="mb-2">{children}</p>,
+            strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
+            em: ({ children }) => <em className="text-orange-200">{children}</em>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+            li: ({ children }) => <li className="text-gray-300">{children}</li>,
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+        <ChatMenuCardScroller menuRefs={message.menuRefs} messageId={message.id} />
+      </>
+    );
+  }
+
   // Use structuredParts if available (new protocol)
   if (message.structuredParts && message.structuredParts.length > 0) {
     // Combine consecutive text parts to avoid vertical rendering
@@ -228,208 +271,25 @@ const renderStructuredContent = (message: ChatMessage, orderMode: string) => {
   );
 };
 
-// Process inline menu cards for enhanced message content
-const renderMessageContent = ({ message }: { message: ChatMessage }) => {
-  // NEW: Handle structured streaming format with menuCards array
-  if (message.menuCards && message.menuCards.length > 0) {
-    // Render content with menu cards below
-    return (
-      <>
-        {/* Main message content */}
-        <ReactMarkdown
-          className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
-          components={{
-            p: ({ children }) => <p className="mb-2">{children}</p>,
-            strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
-            em: ({ children }) => <em className="text-orange-200">{children}</em>,
-            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-            li: ({ children }) => <li className="text-gray-300">{children}</li>,
-            h1: ({ children }) => <h1 className="text-xl font-bold text-orange-300 mb-2">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-lg font-semibold text-orange-300 mb-2">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-base font-medium text-orange-300 mb-1">{children}</h3>,
-            blockquote: ({ children }) => (
-              <blockquote className="border-l-4 border-orange-500 pl-4 italic text-orange-200 my-2">
-                {children}
-              </blockquote>
-            ),
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
 
-        {/* Render menu cards */}
-        <div className="mt-3 space-y-2">
-          {message.menuCards.map((menuItem, index) => (
-            <InlineMenuCard
-              key={`${message.id}-menu-${menuItem.id}-${index}`}
-              itemId={menuItem.id}
-              itemData={menuItem}
-              animationDelay={index * 150}
-            />
-          ))}
-        </div>
-      </>
+// Memoized bot message content — prevents ReactMarkdown re-parsing for completed messages
+const MemoizedBotContent = React.memo(
+  ({ message, orderMode }: { message: ChatMessage; orderMode: string }) => {
+    return <>{renderStructuredContent(message, orderMode)}</>;
+  },
+  (prev, next) => {
+    // Only re-render if these fields changed
+    if (prev.message.isStreaming || next.message.isStreaming) return false; // Always re-render streaming messages
+    return (
+      prev.message.content === next.message.content &&
+      prev.message.menuCards === next.message.menuCards &&
+      prev.message.menuRefs === next.message.menuRefs &&
+      prev.message.structuredParts === next.message.structuredParts &&
+      prev.message.suggestedActions === next.message.suggestedActions &&
+      prev.orderMode === next.orderMode
     );
   }
-
-  // Phase 7: Handle menuRefs from structured events (model structured output)
-  if (message.menuRefs && message.menuRefs.length > 0) {
-    return (
-      <>
-        {/* Main message content */}
-        <ReactMarkdown
-          className="prose prose-invert prose-orange max-w-none text-white leading-relaxed"
-          components={{
-            p: ({ children }) => <p className="mb-2">{children}</p>,
-            strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
-            em: ({ children }) => <em className="text-orange-200">{children}</em>,
-            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-            li: ({ children }) => <li className="text-gray-300">{children}</li>,
-            h1: ({ children }) => <h1 className="text-xl font-bold text-orange-300 mb-2">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-lg font-semibold text-orange-300 mb-2">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-base font-medium text-orange-300 mb-1">{children}</h3>,
-            blockquote: ({ children }) => (
-              <blockquote className="border-l-4 border-orange-500 pl-4 italic text-orange-200 my-2">
-                {children}
-              </blockquote>
-            ),
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
-
-        {/* Render menu refs from structured events - smooth layout expansion */}
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          className="flex flex-wrap gap-2 mt-3 overflow-hidden"
-        >
-          {message.menuRefs.map((ref, index) => (
-            <InlineMenuCard
-              key={`${message.id}-ref-${ref.menu_item_id}-${index}`}
-              itemId={ref.menu_item_id}
-              animationDelay={index * 150}
-            />
-          ))}
-        </motion.div>
-      </>
-    );
-  }
-  
-  // Legacy: Process old format with {{MENU_CARD:id}} markers
-  if (message.structuredParts && message.structuredParts.length > 0) {
-    // Handle old structured parts format
-    let currentTextContent = '';
-    const combinedParts: Array<{type: 'text', content: string} | {type: 'menu_card', itemId: string, key: string}> = [];
-    
-    for (const part of message.structuredParts) {
-      if (part.type === 'text') {
-        currentTextContent += part.content;
-      } else if (part.type === 'menu_card') {
-        // Add accumulated text before menu card
-        if (currentTextContent.trim()) {
-          combinedParts.push({ type: 'text', content: currentTextContent });
-          currentTextContent = '';
-        }
-        
-        // Add menu card
-        combinedParts.push({
-          type: 'menu_card',
-          itemId: part.itemId!,
-          key: part.key || `menu_${Date.now()}`
-        });
-      }
-    }
-    
-    // Add any remaining text content
-    if (currentTextContent.trim()) {
-      combinedParts.push({ type: 'text', content: currentTextContent });
-    }
-    
-    return (
-      <>
-        {combinedParts.map((part, index) => {
-          if (part.type === 'text') {
-            return (
-              <ReactMarkdown 
-                key={`combined_text_${index}`}
-                className="prose prose-invert prose-orange max-w-none text-white leading-relaxed inline"
-                components={{
-                  p: ({ children }) => <span className="inline">{children}</span>,
-                  strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
-                  em: ({ children }) => <em className="text-orange-200">{children}</em>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                  li: ({ children }) => <li className="text-gray-300">{children}</li>,
-                  h1: ({ children }) => <h1 className="text-xl font-bold text-orange-300 mb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-lg font-semibold text-orange-300 mb-2">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-base font-medium text-orange-300 mb-1">{children}</h3>,
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-orange-500 pl-4 italic text-orange-200 my-2">
-                      {children}
-                    </blockquote>
-                  ),
-                }}
-              >
-                {part.content}
-              </ReactMarkdown>
-            );
-          } else if (part.type === 'menu_card' && part.itemId) {
-            return (
-              <span key={part.key} className="inline-flex mx-1 my-1 align-top">
-                <InlineMenuCard
-                  itemId={part.itemId}
-                  animationDelay={index * 150} // ✅ Stagger: 0ms, 150ms, 300ms, etc.
-                />
-              </span>
-            );
-          }
-          return null;
-        })}
-      </>
-    );
-  }
-
-  // Fallback to legacy marker processing for old messages
-  const { parts } = processInlineMenuCards(message.content, 'collection');
-  return (
-    <>
-      {parts.map((part, index) => (
-        <React.Fragment key={index}>
-          {part.type === 'text' ? (
-            <ReactMarkdown
-              className="prose prose-invert prose-orange max-w-none text-white leading-relaxed inline"
-              components={{
-                p: ({ children }) => <span className="inline">{children}</span>,
-                strong: ({ children }) => <strong className="text-orange-300 font-semibold">{children}</strong>,
-                em: ({ children }) => <em className="text-orange-200">{children}</em>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                li: ({ children }) => <li className="text-gray-300">{children}</li>,
-                h1: ({ children }) => <h1 className="text-xl font-bold text-orange-300 mb-2">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-lg font-semibold text-orange-300 mb-2">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-base font-medium text-orange-300 mb-1">{children}</h3>,
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-orange-500 pl-4 italic text-orange-200 my-2">
-                    {children}
-                  </blockquote>
-                ),
-              }}
-            >
-              {part.content}
-            </ReactMarkdown>
-          ) : (
-            <span className="inline-flex mx-1 my-1 align-top">
-              <InlineMenuCard
-                itemId={part.itemId!}
-                animationDelay={index * 150} // ✅ Stagger: 0ms, 150ms, 300ms, etc.
-              />
-            </span>
-          )}
-        </React.Fragment>
-      ))}
-    </>
-  );
-};
+);
 
 interface ChatLargeModalProps {
   onStartVoiceOrder?: () => void;
@@ -1057,15 +917,14 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
           <div
             className={cn(
               "bg-card rounded-2xl shadow-2xl flex flex-col overflow-hidden",
-              "w-full max-w-4xl mx-auto",
-              "h-[80vh]",
-              "pointer-events-auto", // Enable clicks on the chat panel itself
-              // Mobile: Full screen
-              "md:h-[80vh] md:max-w-4xl md:rounded-2xl",
-              "sm:h-screen sm:max-h-screen sm:max-w-full sm:rounded-none",
-              // Tablet: Slightly smaller
-              "lg:h-[80vh] lg:max-w-4xl",
-              "md:h-[85vh] md:max-w-2xl"
+              "w-full mx-auto",
+              "pointer-events-auto",
+              // Mobile: Full screen with safe-area
+              "h-[100dvh] max-h-[100dvh] max-w-full rounded-none",
+              // Tablet: Constrained modal
+              "md:h-[85dvh] md:max-h-[85dvh] md:max-w-2xl md:rounded-2xl",
+              // Desktop: Wider
+              "lg:h-[80dvh] lg:max-h-[80dvh] lg:max-w-4xl"
             )}
             style={{
               borderColor: PremiumTheme.colors.border.medium,
@@ -1477,8 +1336,8 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                                           {message.content}
                                         </ReactMarkdown>
                                       ) : (
-                                        // NEW: Use structured content rendering
-                                        renderStructuredContent(message, currentOrderMode)
+                                        // Memoized: completed messages skip re-render
+                                        <MemoizedBotContent message={message} orderMode={currentOrderMode} />
                                       )}
 
                                       {/* Phase 7: Render suggested actions (quick-reply chips) with stagger animation */}
@@ -1540,12 +1399,13 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                             );
                           })}
                         
-                        {/* NEW: Show thinking state when loading and not streaming yet */}
+                        {/* Show thinking state when loading and not streaming yet */}
                         {isLoading && !isStreaming && (
                           <div className="flex gap-3 mt-4">
-                            <ThinkingMessageSkeleton 
-                              botAvatar={config.botAvatar} 
+                            <ThinkingMessageSkeleton
+                              botAvatar={config.botAvatar}
                               botName={config.botName}
+                              thinkingMessage={messages.find(msg => msg.isTyping)?.content || undefined}
                             />
                           </div>
                         )}
@@ -1606,9 +1466,9 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                 </div>
                 
                 {/* Input Area */}
-                <div 
-                  className="flex-shrink-0 border-t"
-                  style={{ 
+                <div
+                  className="flex-shrink-0 border-t pb-[env(safe-area-inset-bottom,0px)]"
+                  style={{
                     borderColor: PremiumTheme.colors.border.medium,
                     backgroundColor: PremiumTheme.colors.background.secondary
                   }}

@@ -494,7 +494,7 @@ export function DeliveryMap({ address, className = "" }: DeliveryMapProps) {
           onClick={closeFullscreenMap}
         >
           <div 
-            className="bg-slate-900 w-[95vw] h-[90vh] max-w-6xl rounded-lg overflow-hidden flex flex-col relative"
+            className="bg-slate-900 w-[95vw] h-[90dvh] max-w-6xl rounded-lg overflow-hidden flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

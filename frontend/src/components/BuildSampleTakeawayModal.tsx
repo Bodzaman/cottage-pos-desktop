@@ -186,7 +186,7 @@ export function BuildSampleTakeawayModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-7xl h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-7xl h-[90dvh] p-0 overflow-hidden">
         <CustomizeOrchestratorProvider>
           <ModalShell3Col
             header={

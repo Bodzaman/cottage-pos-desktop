@@ -6,6 +6,7 @@ import { PremiumTheme } from 'utils/premiumTheme';
 interface ThinkingMessageSkeletonProps {
   botAvatar?: string;
   botName?: string;
+  thinkingMessage?: string;
   className?: string;
 }
 
@@ -14,10 +15,11 @@ interface ThinkingMessageSkeletonProps {
  * Shows avatar with breathing glow + "thinking..." animated dots
  * Appears when AI is processing before streaming begins
  */
-export function ThinkingMessageSkeleton({ 
-  botAvatar, 
+export function ThinkingMessageSkeleton({
+  botAvatar,
   botName = 'Uncle Raj',
-  className = '' 
+  thinkingMessage,
+  className = ''
 }: ThinkingMessageSkeletonProps) {
   return (
     <motion.div
@@ -66,28 +68,36 @@ export function ThinkingMessageSkeleton({
 
       {/* Thinking Message with Animated Dots */}
       <div className="flex items-center space-x-1 mt-1">
-        <span className="text-sm text-gray-400">
-          {botName} is thinking
-        </span>
-        <div className="flex space-x-1">
-          {[0, 1, 2].map((index) => (
-            <motion.span
-              key={index}
-              className="text-sm text-gray-400"
-              animate={{
-                opacity: [0.3, 1, 0.3],
-              }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: index * 0.2,
-              }}
-            >
-              .
-            </motion.span>
-          ))}
-        </div>
+        <motion.span
+          key={thinkingMessage || 'default'}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
+          className="text-sm text-gray-400"
+        >
+          {thinkingMessage || `${botName} is thinking`}
+        </motion.span>
+        {!thinkingMessage && (
+          <div className="flex space-x-1">
+            {[0, 1, 2].map((index) => (
+              <motion.span
+                key={index}
+                className="text-sm text-gray-400"
+                animate={{
+                  opacity: [0.3, 1, 0.3],
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: index * 0.2,
+                }}
+              >
+                .
+              </motion.span>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );

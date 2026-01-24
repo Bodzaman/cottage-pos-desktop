@@ -782,7 +782,7 @@ export function OnlineOrderManagement({ onBack, autoApproveEnabled = false, onAu
           </DialogHeader>
           
           {selectedOrder && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[70dvh] overflow-y-auto">
               {/* Left Panel - Order Details */}
               <div className="space-y-6">
                 {/* Customer Information */}

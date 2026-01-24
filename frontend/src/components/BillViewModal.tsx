@@ -116,7 +116,7 @@ export function BillViewModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-2xl border-0 p-0 overflow-hidden max-h-[90vh]"
+        className="max-w-2xl border-0 p-0 overflow-hidden max-h-[90dvh]"
         style={{
           background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
           border: `1px solid ${QSAITheme.border.medium}`,
@@ -161,7 +161,7 @@ export function BillViewModal({
         </DialogHeader>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-280px)]">
+        <div className="overflow-y-auto max-h-[calc(90dvh-280px)]">
           <div className="p-6 space-y-6">
             {/* Customer breakdowns */}
             {billSummary.customerBreakdowns.map((breakdown, index) => (

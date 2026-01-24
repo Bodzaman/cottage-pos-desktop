@@ -59,7 +59,7 @@ export function HeroCarousel({ images, interval = 6000 }: HeroCarouselProps) {
 
   if (!loaded) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-900">
+      <div className="h-full flex items-center justify-center bg-[#0f0f0f]">
         <div className="animate-pulse p-8 bg-black bg-opacity-50 rounded-lg text-center">
           <div className="text-gray-300 text-lg font-medium mb-2">
             Loading stunning visuals...

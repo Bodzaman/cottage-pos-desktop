@@ -53,7 +53,7 @@ export const TableDashboardCard = memo(function TableDashboardCard({
       }
     : baseCardStyles;
   const isOccupied = data.status !== 'AVAILABLE';
-  const showStatusBadge = data.status === 'AWAITING_ORDER' || data.status === 'FOOD_SENT';
+  const showStatusBadge = data.status === 'SEATED' || data.status === 'AWAITING_ORDER' || data.status === 'FOOD_SENT';
   const badgeStyles = showStatusBadge ? getStatusBadgeStyles(data.status) : null;
 
   return (
@@ -118,7 +118,10 @@ export const TableDashboardCard = memo(function TableDashboardCard({
       <div className="flex-1 flex flex-col items-center justify-center py-1">
         <div
           className="text-3xl font-bold tracking-tight"
-          style={{ color: cardStyles.tableNumberColor }}
+          style={{
+            color: cardStyles.tableNumberColor,
+            textShadow: cardStyles.tableNumberGlow
+          }}
         >
           T{data.tableNumber}
         </div>

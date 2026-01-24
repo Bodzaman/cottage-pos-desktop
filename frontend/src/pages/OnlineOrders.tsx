@@ -1663,7 +1663,7 @@ export default function OnlineOrders() {
         {/* **FIXED: Floating Back to Top Button - Z-INDEX: 20 */}
         <button
           onClick={handleBackToTop}
-          className="fixed bottom-6 right-6 z-20 bg-[#8B1538] hover:bg-[#7A1230] text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+          className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-20 bg-[#8B1538] hover:bg-[#7A1230] text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
           title="Back to Top"
         >
           <ChevronUp className="w-5 h-5" />

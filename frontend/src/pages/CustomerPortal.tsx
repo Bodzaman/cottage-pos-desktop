@@ -976,7 +976,7 @@ export default function CustomerPortal() {
   if (isLoading) {
     return (
       <AuthLayout>
-        <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="min-h-[60dvh] flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: AuthTheme.colors.primary }}></div>
             <p style={{ color: AuthTheme.colors.textSecondary }}>Loading your account...</p>

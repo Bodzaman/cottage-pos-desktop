@@ -181,7 +181,7 @@ export function POSGuestCountModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto backdrop-blur-xl border-0"
+        className="sm:max-w-2xl max-h-[90dvh] overflow-y-auto backdrop-blur-xl border-0"
         style={{
           background: QSAITheme.background.panel, // #1E1E1E - consistent with POS
           boxShadow: `0 25px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px ${QSAITheme.border.accent}`,

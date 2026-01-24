@@ -302,7 +302,7 @@ export function CustomerCustomizationModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col"
         style={{
           background: `linear-gradient(135deg, ${PremiumTheme.colors.dark[900]} 0%, ${PremiumTheme.colors.dark[850]} 100%)`,
           borderColor: PremiumTheme.colors.burgundy[500],
@@ -313,7 +313,7 @@ export function CustomerCustomizationModal({
         onKeyDown={handleKeyDown}
       >
         {/* Header */}
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle 
             className="text-2xl font-semibold flex items-center gap-2"
             style={{ color: PremiumTheme.colors.text.primary }}
@@ -652,7 +652,7 @@ export function CustomerCustomizationModal({
         <Separator style={{ background: PremiumTheme.colors.dark[700] }} />
 
         {/* Footer - Quantity and Confirm */}
-        <div className="space-y-4 pt-4">
+        <div className="flex-shrink-0 space-y-4 pt-4 border-t border-white/10 pb-[env(safe-area-inset-bottom,0px)]">
           {/* Quantity Selector */}
           <div className="flex items-center justify-between">
             <span 

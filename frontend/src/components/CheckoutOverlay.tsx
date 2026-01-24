@@ -465,14 +465,14 @@ export default function CheckoutOverlay({ isOpen, orderMode, onClose, onBack }: 
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl"
+      <div className="w-full max-w-4xl max-h-[90dvh] overflow-hidden rounded-2xl shadow-2xl flex flex-col"
            style={{
              background: `linear-gradient(135deg, ${PremiumTheme.colors.dark[900]} 0%, ${PremiumTheme.colors.charcoal[800]} 100%)`,
              color: PremiumTheme.colors.text.primary
            }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b"
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b"
              style={{ borderColor: PremiumTheme.colors.border.medium }}>
           <div className="flex items-center space-x-4">
             <Button
@@ -576,7 +576,7 @@ export default function CheckoutOverlay({ isOpen, orderMode, onClose, onBack }: 
         </div>
 
         {/* Main Content */}
-        <div className="flex h-[calc(90vh-120px)]">
+        <div className="flex h-[calc(90dvh-120px)]">
           {/* Left Side - Form Content */}
           <div className="flex-1 p-6 overflow-y-auto">
             {currentStep === 'details' && (

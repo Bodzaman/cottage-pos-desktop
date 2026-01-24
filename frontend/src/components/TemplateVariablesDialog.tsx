@@ -11,7 +11,7 @@ interface TemplateVariablesDialogProps {
 
 const TemplateVariablesDialog = ({ variables = {} }: TemplateVariablesDialogProps) => {
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+    <div className="space-y-4 max-h-[70dvh] overflow-y-auto">
       <h3 className="text-lg font-semibold">Template Variables Reference</h3>
       <p className="text-sm text-muted-foreground">
         Use these variables in your template header, body, and footer to include dynamic data.

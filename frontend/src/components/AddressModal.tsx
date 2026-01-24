@@ -299,8 +299,8 @@ export const AddressModal: React.FC<Props> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#0F1014] border-[#2A2E36] text-[#EAECEF] max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="bg-[#0F1014] border-[#2A2E36] text-[#EAECEF] max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-[#EAECEF] text-xl font-medium flex items-center gap-2">
             <MapPin className="h-6 w-6 text-[#8B1538]" />
             {title || (address?.id ? "Edit Address" : "Add New Address")}
@@ -312,7 +312,7 @@ export const AddressModal: React.FC<Props> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 space-y-6 py-4">
           {/* Step 1: Postcode Validation for New Addresses */}
           {!address?.id && showAddressLookup && (
             <div className="space-y-4">
@@ -707,7 +707,7 @@ export const AddressModal: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex-shrink-0 grid grid-cols-2 gap-4 pt-4 border-t border-[#2A2E36] pb-[env(safe-area-inset-bottom,0px)]">
           <Button
             variant="outline"
             onClick={onClose}

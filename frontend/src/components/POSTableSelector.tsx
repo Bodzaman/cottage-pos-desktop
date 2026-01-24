@@ -214,7 +214,7 @@ export function POSTableSelector({ selectedTable, onTableSelect, tableOrders = {
           </button>
         </div>
       ) : (
-        <div className="h-[calc(100vh-24rem)] overflow-y-auto">
+        <div className="h-[calc(100dvh-24rem)] overflow-y-auto">
           <div className="grid grid-cols-4 gap-2">
             {tablesWithLocalStatus.map((table) => {
               const statusStyle = getStatusStyle(table.status);

@@ -75,10 +75,10 @@ export interface DashboardPersistedOrder {
 // ================================
 
 export const STATUS_COLORS: Record<TableCardStatus, string> = {
-  AVAILABLE: '#10B981',      // Emerald green
+  AVAILABLE: '#B8D4C8',      // Muted sage/mint
   SEATED: '#7C5DFA',         // Purple
-  AWAITING_ORDER: '#F59E0B', // Amber
-  FOOD_SENT: '#9277FF'       // Light purple
+  AWAITING_ORDER: '#F59E0B', // Muted amber
+  FOOD_SENT: '#D4A017'       // Warm gold/amber
 };
 
 export const STATUS_LABELS: Record<TableCardStatus, string> = {
@@ -223,55 +223,110 @@ export interface CardStyles {
   boxShadow: string;
   background: string;
   tableNumberColor: string;
+  tableNumberGlow: string;
 }
 
 /**
- * Get card styles based on status
+ * Get card styles based on status.
+ * Three-layer lighting: (1) thin neon ring on edge, (2) diffused backlight for depth,
+ * (3) faint internal radial gradient for surface richness.
  */
 export function getCardStyles(status: TableCardStatus, isSelected: boolean = false): CardStyles {
-  const color = STATUS_COLORS[status];
+  const BASE_BG = 'rgba(24, 24, 27, 0.95)';
 
   if (isSelected) {
-    return {
-      border: `2px solid ${color}`,
-      boxShadow: `0 0 0 1px ${color}40, 0 0 20px ${color}30`,
-      background: `linear-gradient(135deg, rgba(18, 18, 18, 0.95), ${color}15)`,
-      tableNumberColor: color
-    };
+    switch (status) {
+      case 'AVAILABLE':
+        return {
+          border: '2px solid rgba(160, 200, 180, 0.50)',
+          boxShadow: '0 0 5px rgba(160, 200, 180, 0.40), 0 0 22px rgba(160, 200, 180, 0.12)',
+          background: `radial-gradient(ellipse at 35% 25%, rgba(160, 200, 180, 0.08) 0%, transparent 60%), ${BASE_BG}`,
+          tableNumberColor: '#D0EAE0',
+          tableNumberGlow: '0 0 8px rgba(160, 200, 180, 0.40)'
+        };
+      case 'SEATED':
+        return {
+          border: '2px solid rgba(124, 93, 250, 0.50)',
+          boxShadow: '0 0 5px rgba(124, 93, 250, 0.40), 0 0 22px rgba(124, 93, 250, 0.15)',
+          background: `radial-gradient(ellipse at 35% 25%, rgba(124, 93, 250, 0.08) 0%, transparent 60%), ${BASE_BG}`,
+          tableNumberColor: '#7C5DFA',
+          tableNumberGlow: '0 0 10px rgba(124, 93, 250, 0.50)'
+        };
+      case 'AWAITING_ORDER':
+        return {
+          border: '2px solid rgba(245, 158, 11, 0.50)',
+          boxShadow: '0 0 5px rgba(245, 158, 11, 0.40), 0 0 22px rgba(245, 158, 11, 0.12)',
+          background: `radial-gradient(ellipse at 35% 25%, rgba(245, 158, 11, 0.08) 0%, transparent 60%), ${BASE_BG}`,
+          tableNumberColor: '#F59E0B',
+          tableNumberGlow: '0 0 10px rgba(245, 158, 11, 0.45)'
+        };
+      case 'FOOD_SENT':
+        return {
+          border: '2px solid rgba(212, 160, 23, 0.50)',
+          boxShadow: '0 0 5px rgba(212, 160, 23, 0.40), 0 0 22px rgba(212, 160, 23, 0.12)',
+          background: `radial-gradient(ellipse at 35% 25%, rgba(212, 160, 23, 0.08) 0%, transparent 60%), ${BASE_BG}`,
+          tableNumberColor: '#D4A017',
+          tableNumberGlow: '0 0 10px rgba(212, 160, 23, 0.45)'
+        };
+      default:
+        return {
+          border: '2px solid rgba(255, 255, 255, 0.25)',
+          boxShadow: '0 0 5px rgba(255, 255, 255, 0.20), 0 0 18px rgba(255, 255, 255, 0.06)',
+          background: BASE_BG,
+          tableNumberColor: '#E0E0E0',
+          tableNumberGlow: 'none'
+        };
+    }
   }
 
   switch (status) {
     case 'AVAILABLE':
+      // Muted sage/mint — calm, ready, with subtle depth
       return {
-        border: '2px solid rgba(16, 185, 129, 0.3)',
-        boxShadow: '0 0 16px rgba(16, 185, 129, 0.25)',
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.12))',
-        tableNumberColor: '#10B981'
+        border: '1px solid rgba(160, 200, 180, 0.15)',
+        boxShadow: '0 0 3px rgba(160, 200, 180, 0.12), 0 0 15px rgba(160, 200, 180, 0.05)',
+        background: `radial-gradient(ellipse at 35% 25%, rgba(160, 200, 180, 0.035) 0%, transparent 60%), ${BASE_BG}`,
+        tableNumberColor: '#B8D4C8',
+        tableNumberGlow: '0 0 6px rgba(160, 200, 180, 0.20)'
       };
 
     case 'SEATED':
-    case 'FOOD_SENT':
+      // Purple neon ring — activated, strongest presence
       return {
-        border: '2px solid rgba(124, 93, 250, 0.3)',
-        boxShadow: '0 0 16px rgba(124, 93, 250, 0.25)',
-        background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.08), rgba(124, 93, 250, 0.12))',
-        tableNumberColor: '#7C5DFA'
+        border: '1px solid rgba(124, 93, 250, 0.35)',
+        boxShadow: '0 0 4px rgba(124, 93, 250, 0.30), 0 0 18px rgba(124, 93, 250, 0.10)',
+        background: `radial-gradient(ellipse at 35% 25%, rgba(124, 93, 250, 0.05) 0%, transparent 60%), ${BASE_BG}`,
+        tableNumberColor: '#7C5DFA',
+        tableNumberGlow: '0 0 8px rgba(124, 93, 250, 0.35)'
       };
 
     case 'AWAITING_ORDER':
+      // Amber neon ring — urgency
       return {
-        border: '2px solid rgba(245, 158, 11, 0.3)',
-        boxShadow: '0 0 16px rgba(245, 158, 11, 0.25)',
-        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.12))',
-        tableNumberColor: '#F59E0B'
+        border: '1px solid rgba(245, 158, 11, 0.30)',
+        boxShadow: '0 0 4px rgba(245, 158, 11, 0.25), 0 0 16px rgba(245, 158, 11, 0.08)',
+        background: `radial-gradient(ellipse at 35% 25%, rgba(245, 158, 11, 0.04) 0%, transparent 60%), ${BASE_BG}`,
+        tableNumberColor: '#F59E0B',
+        tableNumberGlow: '0 0 8px rgba(245, 158, 11, 0.30)'
+      };
+
+    case 'FOOD_SENT':
+      // Warm gold neon ring
+      return {
+        border: '1px solid rgba(212, 160, 23, 0.30)',
+        boxShadow: '0 0 4px rgba(212, 160, 23, 0.25), 0 0 16px rgba(212, 160, 23, 0.08)',
+        background: `radial-gradient(ellipse at 35% 25%, rgba(212, 160, 23, 0.04) 0%, transparent 60%), ${BASE_BG}`,
+        tableNumberColor: '#D4A017',
+        tableNumberGlow: '0 0 8px rgba(212, 160, 23, 0.30)'
       };
 
     default:
       return {
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
         boxShadow: 'none',
-        background: 'rgba(18, 18, 18, 0.8)',
-        tableNumberColor: '#E0E0E0'
+        background: BASE_BG,
+        tableNumberColor: '#E0E0E0',
+        tableNumberGlow: 'none'
       };
   }
 }

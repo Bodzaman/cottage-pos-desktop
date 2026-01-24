@@ -347,7 +347,7 @@ const OnlineMenuModal: React.FC<OnlineMenuModalProps> = ({ isOpen, onClose }) =>
           </div>
           
           {/* Modal Body - Menu Content */}
-          <div className="flex-1 overflow-auto p-6 h-[calc(100vh-140px)]">
+          <div className="flex-1 overflow-auto p-6 h-[calc(100dvh-140px)]">
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">

@@ -190,7 +190,7 @@ export function StaffVariantSelector({
 
           {/* Variant Selection Grid */}
           <div
-            className="space-y-4 max-h-[60vh] overflow-y-auto p-2 rounded-lg"
+            className="space-y-4 max-h-[60dvh] overflow-y-auto p-2 rounded-lg"
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: `${POS_COLORS.primary} ${POS_COLORS.surface}`

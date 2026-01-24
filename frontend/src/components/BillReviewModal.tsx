@@ -127,7 +127,7 @@ export function BillReviewModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-lg border-0 p-0 overflow-hidden max-h-[90vh]"
+        className="max-w-lg border-0 p-0 overflow-hidden max-h-[90dvh]"
         style={{
           background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
           border: `1px solid ${QSAITheme.border.medium}`,
@@ -163,7 +163,7 @@ export function BillReviewModal({
           </div>
         </DialogHeader>
         
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="overflow-y-auto max-h-[calc(90dvh-120px)]">
           {/* Order Summary */}
           <div className="p-6 space-y-4">
             {/* Items List */}

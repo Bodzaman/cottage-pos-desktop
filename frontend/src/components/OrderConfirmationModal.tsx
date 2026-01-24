@@ -215,7 +215,7 @@ export function OrderConfirmationModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className="max-w-4xl max-h-[90vh] overflow-hidden border-gray-700 text-white [&>button]:hidden flex flex-col p-0"
+        className="max-w-4xl max-h-[90dvh] overflow-hidden border-gray-700 text-white [&>button]:hidden flex flex-col p-0"
         style={{
           background: '#1E1E1E',
           backdropFilter: 'blur(4px)',

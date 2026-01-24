@@ -1592,7 +1592,7 @@ export function DineInOrderModal({
     <>
       <Dialog open={isOpen} onOpenChange={() => {}}>
         <DialogContent 
-          className="!w-[94vw] !h-[92vh] !max-w-[94vw] !max-h-[92vh] border-0 flex flex-col p-[18px] rounded-[20px] [&>button]:hidden"
+          className="!w-[94vw] !h-[92dvh] !max-w-[94vw] !max-h-[92dvh] border-0 flex flex-col p-[18px] rounded-[20px] [&>button]:hidden"
           style={{
             backgroundColor: QSAITheme.background.primary,
             border: `1px solid ${QSAITheme.border.medium}`,

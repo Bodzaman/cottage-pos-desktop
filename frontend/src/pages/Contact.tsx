@@ -42,7 +42,7 @@ export default function Contact() {
       />
       
       {/* Hero Section */}
-      <section className="relative h-[40vh] md:h-[60vh] flex items-center pt-20">
+      <section className="relative h-[40dvh] md:h-[60dvh] flex items-center pt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-black opacity-60 z-10"></div>
           <img 

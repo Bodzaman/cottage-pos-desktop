@@ -79,7 +79,7 @@ export function SimpleVariantPicker({
         </DialogHeader>
 
         <div
-          className="space-y-3 max-h-[60vh] overflow-y-auto p-2"
+          className="space-y-3 max-h-[60dvh] overflow-y-auto p-2"
           style={{
             scrollbarWidth: 'thin',
             scrollbarColor: `${PremiumTheme.colors.burgundy[500]} ${PremiumTheme.colors.dark[800]}`

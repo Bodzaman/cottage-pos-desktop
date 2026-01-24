@@ -145,7 +145,7 @@ export function FlexibleBillingModal({
   return (
     <Dialog open={isOpen} onOpenChange={closeFlexibleBillingModal}>
       <DialogContent 
-        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="max-w-4xl max-h-[90dvh] overflow-y-auto"
         style={{
           background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(15, 13, 35, 0.98) 100%)',
           backdropFilter: 'blur(8px)',

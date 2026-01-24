@@ -107,7 +107,7 @@ export function AuthModal({
           />
           
           <DialogContent 
-            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] border-0 p-0 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden"
+            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] border-0 p-0 shadow-2xl max-w-lg w-full max-h-[90dvh] overflow-hidden"
             onPointerDownOutside={(e) => e.preventDefault()}
           >
             <motion.div

@@ -143,7 +143,7 @@ function FloorSummaryHeader({ enrichedTables }: FloorSummaryProps) {
 
       {/* Total Guests */}
       <div className="flex items-center gap-2">
-        <Users className="h-4 w-4" style={{ color: '#10B981' }} />
+        <Users className="h-4 w-4" style={{ color: '#7C5DFA' }} />
         <span className="text-sm" style={{ color: QSAITheme.text?.secondary || '#A0A0A0' }}>
           <span className="font-semibold" style={{ color: '#FFFFFF' }}>
             {metrics.totalGuests}

@@ -61,6 +61,22 @@
     --status-warning: 245 158 11;             /* #F59E0B */
     --status-error: 239 68 68;                /* #EF4444 */
     --status-info: 59 130 246;                /* #3B82F6 */
+
+    /* Dynamic Viewport Height (dvh with fallback) */
+    --app-dvh: 1dvh;
+
+    /* Safe Area Insets (require viewport-fit=cover) */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 1dvh) {
+    :root {
+      --app-dvh: 1vh;
+    }
   }
 
   /* Theme class - Internal (Staff/Admin) */
@@ -237,7 +253,7 @@ select:focus-visible,
 
 @layer base {
   :root {
-    --background: #0A1128;
+    --background: #0F0F0F;
     --foreground: #ffffff;
 
     --card: rgba(37, 45, 74, 0.6);
@@ -577,7 +593,7 @@ select:focus-visible,
 
 /* Hero Carousel Styles */
 .hero-carousel-container {
-  @apply relative h-screen w-full overflow-hidden;
+  @apply relative h-dvh w-full overflow-hidden;
   background-color: #0f0f0f;
 }
 
@@ -586,7 +602,7 @@ select:focus-visible,
 }
 
 .hero-carousel-loading, .hero-carousel-error {
-  @apply h-screen w-full flex items-center justify-center;
+  @apply h-dvh w-full flex items-center justify-center;
   background-color: #0f0f0f;
 }
 
@@ -788,7 +804,7 @@ select:focus-visible,
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .mobile-bag {
-    height: 50vh !important;
+    height: 50dvh !important;
     max-width: 85vw !important;
   }
   
@@ -877,9 +893,18 @@ select:focus-visible,
   }
 }
 
-/* Safe area support for mobile sticky bars */
+/* Safe area utilities (require viewport-fit=cover in viewport meta) */
+.safe-area-padding-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
 .safe-area-padding-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-area-padding-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.safe-area-padding-right {
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* ===== Shepherd.js Tour - Premium Burgundy/Silver Theme ===== */

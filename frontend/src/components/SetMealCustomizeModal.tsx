@@ -208,7 +208,7 @@ export function SetMealCustomizeModal({ isOpen, onClose, setMealItem, onSave }: 
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" style={{
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto" style={{
         backgroundColor: '#1F1F1F', // Same as EditOrderItemModal
         border: `1px solid ${globalColors.purple.primaryTransparent}40`,
         boxShadow: `0 20px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(91, 33, 182, 0.15)`,

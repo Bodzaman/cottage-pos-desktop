@@ -143,7 +143,7 @@ export function ReorderConfirmationModal({
 
   return (
     <StrictDialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <div className="bg-gray-900 border-gray-800 text-white max-w-4xl max-h-[90vh] overflow-y-auto p-6 rounded-lg">
+      <div className="bg-gray-900 border-gray-800 text-white max-w-4xl max-h-[90dvh] overflow-y-auto p-6 rounded-lg">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">

@@ -122,7 +122,7 @@ export default function Gallery() {
       
       {/* Hero header with parallax effect */}
       <div 
-        className="h-[50vh] md:h-[60vh] relative flex items-center justify-center overflow-hidden pt-20"
+        className="h-[50dvh] md:h-[60dvh] relative flex items-center justify-center overflow-hidden pt-20"
         style={{
           backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/BAR%202.jpg")`,
           backgroundPosition: `center ${50 + offset * 0.1}%`,

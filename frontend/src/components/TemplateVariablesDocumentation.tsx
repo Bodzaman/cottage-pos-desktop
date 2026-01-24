@@ -221,7 +221,7 @@ const TemplateVariablesDocumentation: React.FC<TemplateVariablesDocumentationPro
             Template Variables
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90dvh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -267,7 +267,7 @@ const TemplateVariablesDocumentation: React.FC<TemplateVariablesDocumentationPro
             
             <div className="col-span-4 overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto">
-                <ScrollArea className="h-[60vh]">
+                <ScrollArea className="h-[60dvh]">
                   {filteredCategories.map((category) => (
                     <div 
                       key={category.id} 

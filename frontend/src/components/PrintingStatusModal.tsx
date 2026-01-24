@@ -69,7 +69,7 @@ export default function PrintingStatusModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] bg-gray-900/95 border-gray-700">
+      <DialogContent className="max-w-2xl max-h-[80dvh] bg-gray-900/95 border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Printer className="w-5 h-5 text-purple-400" />

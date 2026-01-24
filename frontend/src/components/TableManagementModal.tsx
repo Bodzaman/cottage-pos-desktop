@@ -217,7 +217,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent 
-          className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+          className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col"
           style={{
             background: globalColors.background.card,
             border: `1px solid ${globalColors.border.light}`,

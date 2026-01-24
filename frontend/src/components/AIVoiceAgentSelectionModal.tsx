@@ -97,7 +97,7 @@ export function AIVoiceAgentSelectionModal({ open, onClose }: AIVoiceAgentSelect
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" style={{
+      <DialogContent className="max-w-6xl max-h-[90dvh] overflow-y-auto" style={{
         backgroundColor: 'rgba(20, 20, 20, 0.95)',
         borderColor: 'rgba(124, 93, 250, 0.3)',
         backdropFilter: 'blur(20px)'

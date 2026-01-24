@@ -442,7 +442,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
       {/* Management Modal with Tabs */}
       <Dialog open={showManagementModal} onOpenChange={setShowManagementModal}>
         <DialogContent 
-          className="max-w-4xl max-h-[90vh] overflow-hidden"
+          className="max-w-4xl max-h-[90dvh] overflow-hidden"
           style={{
             backgroundColor: globalColors.background.secondary,
             borderColor: globalColors.border.light
@@ -463,7 +463,7 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
               <TabsTrigger value="ai-staff">AI Staff</TabsTrigger>
             </TabsList>
             
-            <div className="mt-4 max-h-[60vh] overflow-y-auto">
+            <div className="mt-4 max-h-[60dvh] overflow-y-auto">
               <TabsContent value="business-profile" className="space-y-4">
                 <RestaurantSettingsManager />
               </TabsContent>

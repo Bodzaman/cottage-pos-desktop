@@ -70,6 +70,7 @@ export interface GeminiVoiceClientOptions {
   onError?: (err: string) => void;
   onCartUpdate?: (action: 'add' | 'remove', item: any) => void;
   onFunctionCall?: (name: string, args: any) => void;
+  onSessionWarning?: (message: string) => void;
   
   // Cart operation callbacks (user-aware)
   cartOperations?: {
@@ -94,10 +95,14 @@ export class GeminiVoiceClient {
   private state: GeminiVoiceState = "idle";
   private options: GeminiVoiceClientOptions;
   private menuContext: string = "";
+  private assembledSystemPrompt: string = "";
   private apiKey: string = "";
 
   // Flag to track if we should send audio (pause when Gemini is responding)
   private shouldSendAudio: boolean = true;
+
+  // VAD gating: only send audio when speech is detected (when VAD is enabled)
+  private vadSpeaking: boolean = true;
 
   // Phase 2.1: Retry state for exponential backoff
   private retryCount: number = 0;
@@ -106,6 +111,13 @@ export class GeminiVoiceClient {
   private readonly maxDelay: number = 60000; // 60 seconds
   private readonly jitter: number = 500; // ±500ms random jitter
   private reconnectTimeout: number | null = null;
+
+  // Session timeout to prevent runaway costs
+  private sessionTimer: number | null = null;
+  private sessionWarningTimer: number | null = null;
+  private sessionTimedOut: boolean = false;
+  private readonly SESSION_MAX_MS = 10 * 60 * 1000; // 10 minutes
+  private readonly SESSION_WARNING_MS = 8 * 60 * 1000; // 8 minutes
 
   // Streaming audio playback state (ring buffer pattern)
   private outputSampleRate = 24000; // Gemini native audio output rate
@@ -132,8 +144,8 @@ export class GeminiVoiceClient {
     try {
       this.setState("requesting-token");
 
-      // 1) Fetch menu context
-      await this.fetchMenuContext();
+      // 1) Fetch assembled system prompt from backend (includes menu context)
+      await this.fetchSystemPrompt();
 
       // 2) Get ephemeral token from backend (Phase 2.2)
       const resp = await brain.create_gemini_voice_session({});
@@ -422,8 +434,8 @@ export class GeminiVoiceClient {
           contextWindowCompression: {
             slidingWindow: {} // ✅ Enable unlimited session length for continuous conversation
           },
-          proactivity: { 
-            proactiveAudio: true // ✅ Official solution: AI speaks first without user input
+          proactivity: {
+            proactiveAudio: false // Greeting sent via sendClientContent; no unprompted speech after
           },
           realtimeInputConfig: {
             automaticActivityDetection: {
@@ -434,26 +446,7 @@ export class GeminiVoiceClient {
           },
           systemInstruction: {
             parts: [{
-              text: (this.options.systemPrompt || `You are the AI voice assistant for Cottage Tandoori restaurant. Be friendly, concise, and help customers order food.
-
-IMPORTANT GUIDELINES:
-- Always confirm items, quantities, and any special requests
-- Check for allergens when requested
-- Use the add_to_cart function when customer orders items
-- Use check_allergens function when asked about allergens
-- Keep responses brief and natural
-- If unsure about an item, check the menu
-
-MENU:
-${this.menuContext}
-
-You have access to these functions:
-- add_to_cart(item_name, quantity, notes) - Add items to cart
-- remove_from_cart(item_name) - Remove items
-- check_allergens(item_name) - Check allergen information
-
-Always use functions to perform cart operations.`) +
-              (this.options.firstResponse ? `\n\nIMPORTANT: When the session starts, immediately greet the user by saying: "${this.options.firstResponse}"` : '')
+              text: this.options.systemPrompt || this.assembledSystemPrompt || this.buildFallbackPrompt()
             }]
           },
           speechConfig: {
@@ -580,6 +573,7 @@ Always use functions to perform cart operations.`) +
       await this.startMic();
 
       this.setState("listening");
+      this.startSessionTimers();
 
       // Send greeting trigger after session is established
       if (this.session) {
@@ -618,6 +612,12 @@ Always use functions to perform cart operations.`) +
         this.reconnectTimeout = null;
       }
 
+      // Reset VAD state for next session
+      this.vadSpeaking = true;
+
+      // Clear session timers
+      this.clearSessionTimers();
+
       // Stop audio capture FIRST (via unified pipeline)
       this.teardownAudio();
 
@@ -638,7 +638,54 @@ Always use functions to perform cart operations.`) +
     }
   }
 
-  private async fetchMenuContext(): Promise<void> {
+  private startSessionTimers() {
+    this.clearSessionTimers();
+    this.sessionTimedOut = false;
+
+    this.sessionWarningTimer = window.setTimeout(() => {
+      this.options.onSessionWarning?.("Session will end in 2 minutes");
+    }, this.SESSION_WARNING_MS);
+
+    this.sessionTimer = window.setTimeout(() => {
+      this.sessionTimedOut = true;
+      this.stop();
+    }, this.SESSION_MAX_MS);
+  }
+
+  private clearSessionTimers() {
+    if (this.sessionWarningTimer) {
+      clearTimeout(this.sessionWarningTimer);
+      this.sessionWarningTimer = null;
+    }
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+  }
+
+  private async fetchSystemPrompt(): Promise<void> {
+    try {
+      // Fetch assembled system prompt from backend (includes menu context, identity, safety, etc.)
+      const resp = await fetch('/routes/gemini-voice/system-prompt');
+      const data = await resp.json();
+      if (data?.success && data?.system_prompt) {
+        this.assembledSystemPrompt = data.system_prompt;
+        // Use first_response from backend config if not overridden via options
+        if (data.first_response && !this.options.firstResponse) {
+          this.options.firstResponse = data.first_response;
+        }
+        console.log(`[Voice] Fetched system prompt from backend (${data.layer_count} layers, ${data.total_chars} chars)`);
+      } else {
+        console.warn("[Voice] Backend returned unsuccessful, using fallback prompt");
+        await this.fetchMenuContextFallback();
+      }
+    } catch (e) {
+      console.warn("[Voice] Failed to fetch system prompt from backend, using fallback:", e);
+      await this.fetchMenuContextFallback();
+    }
+  }
+
+  private async fetchMenuContextFallback(): Promise<void> {
     try {
       const resp = await brain.get_menu_context();
       const data = await resp.json();
@@ -646,9 +693,36 @@ Always use functions to perform cart operations.`) +
         this.menuContext = data.menu_text;
       }
     } catch (e) {
-      console.warn("Failed to fetch menu context:", e);
       this.menuContext = "Menu currently unavailable. Please ask for available items.";
     }
+  }
+
+  private buildFallbackPrompt(): string {
+    // Fallback prompt used when backend /system-prompt endpoint is unavailable
+    const basePrompt = `You are the AI voice assistant for Cottage Tandoori restaurant. Be friendly, concise, and help customers order food.
+
+IMPORTANT GUIDELINES:
+- Always confirm items, quantities, and any special requests
+- Check for allergens when requested
+- Use the add_to_cart function when customer orders items
+- Use check_allergens function when asked about allergens
+- Keep responses brief and natural
+- If unsure about an item, check the menu
+
+MENU:
+${this.menuContext}
+
+You have access to these functions:
+- add_to_cart(item_name, quantity, notes) - Add items to cart
+- remove_from_cart(item_name) - Remove items
+- check_allergens(item_name) - Check allergen information
+
+Always use functions to perform cart operations.`;
+
+    if (this.options.firstResponse) {
+      return basePrompt + `\n\nIMPORTANT: When the session starts, immediately greet the user by saying: "${this.options.firstResponse}"`;
+    }
+    return basePrompt;
   }
 
   private async startMic() {
@@ -689,7 +763,7 @@ Always use functions to perform cart operations.`) +
 
       this.mic.onAudioFrame((input: Float32Array) => {
         const pcm16 = this.floatTo16BitPCM(input);
-        if (pcm16.length > 0 && this.session && this.shouldSendAudio) {
+        if (pcm16.length > 0 && this.session && this.shouldSendAudio && this.vadSpeaking) {
           const b64 = this.pcm16ToBase64(pcm16);
           try {
             audioChunkCount++;
@@ -708,11 +782,12 @@ Always use functions to perform cart operations.`) +
       });
 
       if (useVAD) {
+        this.vadSpeaking = false; // VAD active: start gated until speech detected
         this.mic.onSpeechEvent((ev) => {
           if (ev === 'speechStart') {
-            // Optionally mark speech start; keep behavior unchanged (no gating here)
+            this.vadSpeaking = true;
           } else if (ev === 'speechEnd') {
-            // Optionally mark speech end
+            this.vadSpeaking = false;
           }
         });
       }
@@ -1468,6 +1543,12 @@ Always use functions to perform cart operations.`) +
 
   // Phase 2.1: Exponential backoff reconnect logic
   private handleReconnect(reason: string): void {
+    // Don't reconnect if session timed out (cost control)
+    if (this.sessionTimedOut) {
+      console.log('⏱️ Session timed out — not reconnecting');
+      return;
+    }
+
     // Don't reconnect if we've exceeded max retries
     if (this.retryCount >= this.maxRetries) {
       console.error(`❌ Max reconnect attempts (${this.maxRetries}) exceeded. Please refresh.`);

@@ -288,7 +288,7 @@ export function MenuSetupWizard({ setupStatus, onStepComplete, onClose, isOpen, 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="w-[95vw] max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto" 
+        className="w-[95vw] max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90dvh] overflow-y-auto" 
         style={{
           ...cardStyle,
           backgroundColor: "rgba(26, 26, 26, 0.95)",

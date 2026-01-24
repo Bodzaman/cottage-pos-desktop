@@ -9,7 +9,7 @@ type FlagKey =
   | 'personalization_v1';
 
 const DEFAULT_FLAGS: Record<FlagKey, boolean> = {
-  voice_pipeline_v1: false,
+  voice_pipeline_v1: true,
   voice_gateway_v1: false,       // Phase 3: WebSocket voice gateway
   structured_responses_v1: true, // Phase 1: Unified structured events
   personalization_v1: true,      // Phase 2: Customer history and reorder

@@ -195,7 +195,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
         )}
       </DialogTrigger>
       
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Avatar Image Browser</DialogTitle>
           <DialogDescription>

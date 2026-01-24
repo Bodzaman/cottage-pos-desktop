@@ -73,7 +73,7 @@ export const MenuSettingsModal: React.FC<MenuSettingsModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-3xl w-[95vw] max-h-[85vh] flex flex-col"
+        className="max-w-3xl w-[95vw] max-h-[85dvh] flex flex-col"
         style={{
           backgroundColor: colors.background.primary,
           border: `1px solid ${colors.border.accent}`,

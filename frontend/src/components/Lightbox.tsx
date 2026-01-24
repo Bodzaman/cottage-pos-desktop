@@ -100,7 +100,7 @@ export function Lightbox({ images, currentIndex, onClose, onNavigate }: Props) {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="relative max-w-7xl max-h-[90vh] mx-4"
+          className="relative max-w-7xl max-h-[90dvh] mx-4"
           onClick={(e) => e.stopPropagation()}
         >
           <img

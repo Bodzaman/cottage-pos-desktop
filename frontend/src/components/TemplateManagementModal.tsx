@@ -256,7 +256,7 @@ export function TemplateManagementModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className={`max-w-5xl h-[80vh] p-0 ${className}`}
+        className={`max-w-5xl h-[80dvh] p-0 ${className}`}
         style={styles.frostedGlassStyle}
       >
         <DialogHeader className="p-6 pb-0">
@@ -639,7 +639,7 @@ export function TemplateManagementModal({
           {showFullPreview && selectedTemplate && (
             <Dialog open={showFullPreview} onOpenChange={setShowFullPreview}>
               <DialogContent 
-                className="max-w-4xl h-[85vh] p-0"
+                className="max-w-4xl h-[85dvh] p-0"
                 style={styles.frostedGlassStyle}
               >
                 <DialogHeader className="p-6 pb-0">

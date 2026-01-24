@@ -41,7 +41,7 @@ export default function About() {
         />
       </div>
       {/* Hero Section */}
-      <section className="relative h-[40vh] md:h-[60vh] flex items-center">
+      <section className="relative h-[40dvh] md:h-[60dvh] flex items-center">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}></div>
           <img 
@@ -261,7 +261,7 @@ export default function About() {
       {/* Modal for viewing newspaper articles */}
       {selectedArticle !== null && (
         <div className="fixed inset-0 z-50 backdrop-blur-xl flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}>
-          <div className="rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative" style={{
+          <div className="rounded-lg w-full max-w-4xl max-h-[90dvh] overflow-hidden relative" style={{
             backgroundColor: PremiumTheme.colors.background.secondary,
             backdropFilter: 'blur(12px)',
             border: `1px solid ${PremiumTheme.colors.border.light}`,
@@ -322,7 +322,7 @@ export default function About() {
               </button>
             </div>
             
-            <div className="p-6 overflow-auto max-h-[calc(90vh-4rem)]" style={{
+            <div className="p-6 overflow-auto max-h-[calc(90dvh-4rem)]" style={{
               backgroundColor: PremiumTheme.colors.background.tertiary,
               backdropFilter: 'blur(8px)'
             }}>

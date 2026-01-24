@@ -217,7 +217,7 @@ export default function App() {
       />
       
       {/* Hero Section with Image Carousel and Frosted Glass Overlay */}
-      <div className="relative h-screen">
+      <div className="relative h-dvh">
         <HeroCarousel images={heroImages} />
         
         {/* Frosted Glass Welcome Overlay */}

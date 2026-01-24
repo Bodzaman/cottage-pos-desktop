@@ -403,7 +403,7 @@ export function CustomerVariantSelector({
 
           {/* Variant Selection as Premium Cards */}
           {isMultiVariant && (
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto p-1 rounded-lg"
+            <div className="space-y-3 max-h-[55dvh] overflow-y-auto p-1 rounded-lg"
               style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: `${PremiumTheme.colors.royal[500]} ${PremiumTheme.colors.dark[800]}`

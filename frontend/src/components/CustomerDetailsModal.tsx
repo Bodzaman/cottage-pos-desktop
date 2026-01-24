@@ -236,7 +236,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
         </div>
         
         {/* Content */}
-        <div className="px-6 py-6 max-h-[70vh] overflow-y-auto">
+        <div className="px-6 py-6 max-h-[70dvh] overflow-y-auto">
           <div className="space-y-6">
             
             {/* Dine-in specific fields */}

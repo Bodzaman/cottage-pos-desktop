@@ -442,7 +442,7 @@ export default function CheckoutPayment() {
         
         <div className="relative z-10">
           <UniversalHeader context="AUTH_NAV" />
-          <div className="flex min-h-screen items-center justify-center px-4 py-8 pt-24">
+          <div className="flex min-h-dvh items-start justify-center px-4 py-8 pt-24">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-[#8B1538]/30 border-t-[#8B1538] rounded-full animate-spin mx-auto mb-4" />
               <p className="text-[#B7BDC6]">Loading payment...</p>
@@ -469,7 +469,7 @@ export default function CheckoutPayment() {
         
         <div className="relative z-10">
           <UniversalHeader context="AUTH_NAV" />
-          <div className="flex min-h-screen items-center justify-center px-4 py-8 pt-24">
+          <div className="flex min-h-dvh items-start justify-center px-4 py-8 pt-24">
             <div className="w-full max-w-md">
               <Card className="bg-[#17191D]/60 backdrop-blur-xl border border-white/20">
                 <CardHeader>
@@ -510,7 +510,7 @@ export default function CheckoutPayment() {
           
           <div className="relative z-10">
             <UniversalHeader context="AUTH_NAV" />
-            <div className="flex min-h-screen items-center justify-center px-4 py-8 pt-24">
+            <div className="flex min-h-dvh items-start justify-center px-4 py-8 pt-24">
               <Card className="w-full max-w-md bg-[#17191D]/80 backdrop-blur-xl border-rose-900/30">
                 <CardContent className="pt-6 text-center space-y-4">
                   <div className="mx-auto w-12 h-12 rounded-full bg-rose-900/20 flex items-center justify-center">
@@ -562,7 +562,7 @@ export default function CheckoutPayment() {
         
         <div className="relative z-10">
           <UniversalHeader context="AUTH_NAV" />
-          <div className="flex min-h-screen items-center justify-center px-4 py-8 pt-24">
+          <div className="flex min-h-dvh items-start justify-center px-4 py-8 pt-24">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-[#8B1538]/30 border-t-[#8B1538] rounded-full animate-spin mx-auto mb-4" />
               <p className="text-[#B7BDC6]">
@@ -604,7 +604,7 @@ export default function CheckoutPayment() {
         <UniversalHeader context="AUTH_NAV" />
 
         {/* Main Content */}
-        <div className="flex min-h-screen items-center justify-center px-4 py-8 pt-24">
+        <div className="flex min-h-dvh items-start justify-center px-4 py-8 pt-24">
           <div className="w-full max-w-7xl mx-auto space-y-8">
             {/* Page title and description */}
             <div className="text-center mb-8">

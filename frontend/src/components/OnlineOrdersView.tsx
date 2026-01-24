@@ -818,7 +818,7 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
                 
           <TabsContent value="orders" className="space-y-6">
           {/* Three-panel layout for order management */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-220px)]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100dvh-220px)]">
             {/* Left Panel: Order Queue */}
             <div className="bg-card rounded-lg overflow-hidden">
               <OrderQueuePanel

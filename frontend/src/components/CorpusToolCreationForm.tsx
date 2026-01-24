@@ -515,7 +515,7 @@ export function CorpusToolCreationForm({ isOpen, onClose, onSuccess, editingTool
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card 
-        className="w-full max-w-4xl max-h-[90vh] overflow-hidden"
+        className="w-full max-w-4xl max-h-[90dvh] overflow-hidden"
         style={{
           ...cardStyle,
           borderColor: 'rgba(124, 93, 250, 0.3)',
@@ -538,7 +538,7 @@ export function CorpusToolCreationForm({ isOpen, onClose, onSuccess, editingTool
           </div>
         </CardHeader>
         
-        <CardContent className="overflow-y-auto max-h-[calc(90vh-120px)]">
+        <CardContent className="overflow-y-auto max-h-[calc(90dvh-120px)]">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-[rgba(30,30,30,0.5)]">
               <TabsTrigger 

@@ -199,7 +199,7 @@ export function DineInKitchenPreviewModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-3xl max-h-[90vh] flex flex-col"
+        className="max-w-3xl max-h-[90dvh] flex flex-col"
         style={{
           background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
           border: `1px solid ${QSAITheme.border.accent}`,

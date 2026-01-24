@@ -307,7 +307,7 @@ export function StaffCustomizationModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col"
         style={{
           background: `linear-gradient(135deg, ${POS_THEME.background} 0%, ${POS_THEME.backgroundLight} 100%)`,
           borderColor: POS_THEME.primary,

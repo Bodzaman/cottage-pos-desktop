@@ -207,7 +207,7 @@ const SetMealForm: React.FC<SetMealFormProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent 
-          className="max-w-4xl max-h-[90vh] overflow-y-auto border-white/10 backdrop-blur-md"
+          className="max-w-4xl max-h-[90dvh] overflow-y-auto border-white/10 backdrop-blur-md"
           style={{ background: '#1E1E1E' }}
         >
           <DialogHeader className="border-b border-white/10 pb-4">

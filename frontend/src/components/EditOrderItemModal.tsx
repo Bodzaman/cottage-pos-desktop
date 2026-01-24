@@ -138,7 +138,7 @@ export function EditOrderItemModal({ isOpen, orderItem, onClose, onSave }: EditO
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" style={{
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" style={{
         backgroundColor: '#1F1F1F', // Improved backdrop color for better contrast
         border: `1px solid ${globalColors.purple.primaryTransparent}40`,
         boxShadow: `0 20px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(91, 33, 182, 0.15)`,

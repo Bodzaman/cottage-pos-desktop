@@ -233,16 +233,10 @@ export async function createTableOrder(
   try {
     const newOrder = {
       table_number: tableNumber,
-      table_name: `Table ${tableNumber}`,
       order_items: [],
       status: 'active',
       guest_count: guestCount,
       linked_tables: linkedTables,
-      subtotal: 0,
-      tax: 0,
-      total: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase

@@ -41,21 +41,19 @@ export default function POSLogin() {
 
   // ✅ ENABLED: Redirect to POSDesktop if already authenticated
   useEffect(() => {
-    if (hasRedirectedRef.current) {
-      return;
-    }
-    
+    if (hasRedirectedRef.current) return;
     const now = Date.now();
-    if (now - lastRedirectTimeRef.current < REDIRECT_COOLDOWN) {
-      return;
-    }
-    
+    if (now - lastRedirectTimeRef.current < REDIRECT_COOLDOWN) return;
+
+    // Don't redirect during PIN setup
+    if (view === 'pin-setup') return;
+
     if (!isLoading && isAuthenticated) {
       hasRedirectedRef.current = true;
       lastRedirectTimeRef.current = now;
       navigate('/pos-desktop', { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, view]);
   
   // ✅ ENABLED: Reset redirect guard
   useEffect(() => {
@@ -75,20 +73,15 @@ export default function POSLogin() {
       // If PIN not yet configured, prompt to set one
       if (!pinEnabled) {
         setLoginSuccess(true);
-        toast.success('Login successful');
-        setTimeout(() => {
-          setView('pin-setup');
-          setLoginSuccess(false);
-        }, 800);
+        toast.success('Login successful — set a quick PIN');
+        setView('pin-setup');
         return;
       }
 
       // PIN already configured — go straight to POS
       setLoginSuccess(true);
-      toast.success('Login successful');
-      setTimeout(() => {
-        navigate('/pos-desktop', { replace: true });
-      }, 1000);
+      toast.success('Welcome back!');
+      navigate('/pos-desktop', { replace: true });
     } catch (err) {
       console.error('Login failed:', err);
       toast.error(err instanceof Error ? err.message : 'Invalid username or password');

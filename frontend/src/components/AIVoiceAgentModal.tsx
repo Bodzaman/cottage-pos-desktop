@@ -474,7 +474,7 @@ export function AIVoiceAgentModal({ open, onClose }: AIVoiceAgentModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" style={{
+      <DialogContent className="max-w-6xl max-h-[90dvh] overflow-y-auto p-0" style={{
         backgroundColor: 'rgba(18, 18, 18, 0.95)',
         border: '1px solid rgba(124, 93, 250, 0.3)',
         backdropFilter: 'blur(20px)'

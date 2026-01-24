@@ -120,7 +120,7 @@ export const ItemInfoModal: React.FC<Props> = ({ isOpen, onClose, item, itemVari
           <DialogTitle className="text-2xl font-bold">{item.name}</DialogTitle>
           <DialogDescription className="sr-only">Detailed information about {item.name}</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[75vh] pr-2">
+        <ScrollArea className="max-h-[75dvh] pr-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Image */}
             <div className="rounded-lg overflow-hidden border border-border bg-card">

@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Users, ChefHat, Heart, ArrowRight, X } from 'lucide-react';
 import { toast } from 'sonner';
-import brain from '../brain';
+import { getSetMeals } from '../utils/supabaseQueries';
+import { supabase } from '../utils/supabaseClient';
 import { SetMeal } from '../utils/menuTypes';
 import { AnimatedSection } from '../components/AnimatedSection';
 import { PremiumTheme } from '../utils/premiumTheme';
@@ -40,15 +41,10 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
   const loadSetMeals = async () => {
     try {
       setLoading(true);
-      const response = await brain.list_set_meals({ active_only: true });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSetMeals(data || []);
-      }
+      const data = await getSetMeals(true);
+      setSetMeals(data);
     } catch (error) {
       console.error('Error loading set meals:', error);
-      toast.error('Failed to load set meals');
     } finally {
       setLoading(false);
     }
@@ -57,13 +53,36 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
   const loadSetMealDetails = async (setMealId: string) => {
     try {
       setLoadingDetails(true);
-      const response = await brain.get_set_meal({ setMealId });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedSetMeal(data.set_meal);
-        setShowDetails(true);
+      const { data: setMeal, error: mealError } = await supabase
+        .from('set_meals')
+        .select('*, set_meal_items(id, menu_item_id, quantity, menu_items(name, description, image_url, price))')
+        .eq('id', setMealId)
+        .single();
+
+      if (mealError || !setMeal) {
+        toast.error('Failed to load set meal details');
+        return;
       }
+
+      const items = (setMeal.set_meal_items || []).map((item: any) => ({
+        id: item.id,
+        name: item.menu_items?.name || 'Unknown item',
+        description: item.menu_items?.description,
+        image_url: item.menu_items?.image_url,
+        quantity: item.quantity || 1,
+      }));
+
+      const totalIndividualPrice = (setMeal.set_meal_items || []).reduce(
+        (sum: number, item: any) => sum + (item.menu_items?.price || 0) * (item.quantity || 1),
+        0
+      );
+
+      setSelectedSetMeal({
+        ...setMeal,
+        items,
+        total_individual_price: totalIndividualPrice,
+      });
+      setShowDetails(true);
     } catch (error) {
       console.error('Error loading set meal details:', error);
       toast.error('Failed to load set meal details');
@@ -226,7 +245,7 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
       {/* Set Meal Details Dialog */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent 
-          className="max-w-4xl max-h-[90vh] overflow-y-auto border"
+          className="max-w-4xl max-h-[90dvh] overflow-y-auto border"
           style={{
             background: PremiumTheme.colors.background.primary,
             borderColor: PremiumTheme.colors.border.medium,

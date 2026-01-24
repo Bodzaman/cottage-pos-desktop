@@ -54,7 +54,9 @@ const generateMessageId = (): string => {
 // ✅ STREAMING BUFFER: Batch updates to prevent per-character re-renders
 let streamBuffer = '';
 let bufferTimer: NodeJS.Timeout | null = null;
-const BUFFER_INTERVAL = 30; // Update every 30ms for near real-time ~33fps streaming
+const INITIAL_BUFFER_MS = 10;   // First chunks: aggressive for fast first-paint
+const SUSTAINED_BUFFER_MS = 30; // After warmup: smooth 33fps streaming
+let streamChunkCount = 0;       // Reset per message
 
 // Helper function to flush the streaming buffer
 const flushStreamBuffer = (messageId: string, accumulatedContent: string, set: any) => {
@@ -390,16 +392,15 @@ export const useChatStore = create<ChatState>()(
           // Build conversation history for context
           const conversationHistory = get().messages
             .filter(msg => !msg.isStreaming && !msg.isTyping)
-            .slice(-6)
+            .slice(-4)
             .map(msg => ({
               role: msg.sender === 'user' ? 'user' : 'assistant',
               content: msg.content
             }));
-          // ✅ PHASE 1 (MYA-1549): Fetch latest cart from Supabase BEFORE sending message
-          // This ensures AI always has real-time cart knowledge, even if cart changed
-          // during the conversation (e.g., user added item, then asks "what's in my cart?")
+          // Fetch latest cart in background (non-blocking for faster response)
+          // Uses current in-memory cart state for the request — at most 1 message stale
           const cartStore = useCartStore.getState();
-          await cartStore.fetchCartFromSupabase();
+          cartStore.fetchCartFromSupabase().catch(() => {});
 
           // 🛡️ SAFE VARIANT EXTRACTION: Avoid touching circular React/DOM objects
           const safeVariantExtract = (variant: any) => {
@@ -479,8 +480,10 @@ export const useChatStore = create<ChatState>()(
           const abortController = new AbortController();
           set({ abortController });
 
-          // Make streaming chat request (Phase 8: Using correct Phase 6 compliant endpoint)
-          // NOTE: Backend uses /routes prefix for all API endpoints (see backend/main.py)
+          // Performance: track time to first token
+          const sendTimestamp = performance.now();
+
+          // Make streaming chat request
           const response = await fetch(`${API_URL}/routes/streaming-chat/chat`, {
             method: 'POST',
             headers: {
@@ -522,10 +525,11 @@ export const useChatStore = create<ChatState>()(
           // Process streaming events with line buffering
           // (large JSON payloads like structured_data can span multiple chunks)
           let lineBuffer = '';
+          let streamComplete = false;
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done || streamComplete) break;
 
             const chunk = decoder.decode(value, { stream: true });
             lineBuffer += chunk;
@@ -540,13 +544,25 @@ export const useChatStore = create<ChatState>()(
                   const cleanLine = line.replace(/^data: /, '').trim();
                   if (cleanLine && cleanLine !== '[DONE]') {
                     const event = JSON.parse(cleanLine);
-                    
-                    if (event.type === 'content' && event.text) {
-                      // ✅ On first content chunk:
-                      // - Transition typing indicator into streaming message (same DOM element)
-                      // - This prevents abrupt swap and enables smooth crossfade
+
+                    // Handle progress/thinking events — update typing indicator text
+                    if (event.type === 'thinking' && event.message) {
+                      set((state) => ({
+                        messages: state.messages.map(msg =>
+                          msg.id === typingMessageId && msg.isTyping
+                            ? { ...msg, content: event.message }
+                            : msg
+                        )
+                      }));
+                    } else if (event.type === 'content' && event.text) {
+                      // On first content chunk: transition typing → streaming (same DOM element)
                       if (isFirstChunk) {
-                        botMessageId = typingMessageId; // Reuse same message ID for smooth transition
+                        botMessageId = typingMessageId;
+                        streamChunkCount = 0;
+
+                        // Log time to first visible token
+                        const ttft = performance.now() - sendTimestamp;
+                        console.log(`[PERF] Time to first token: ${ttft.toFixed(0)}ms`);
 
                         set((state) => ({
                           messages: state.messages.map(msg =>
@@ -561,14 +577,16 @@ export const useChatStore = create<ChatState>()(
 
                         isFirstChunk = false;
                       }
-                      
+
                       accumulatedContent += event.text;
-                      
-                      // ✅ FIX: Clear existing timer and restart with latest content
+                      streamChunkCount++;
+
+                      // Adaptive buffer: fast first-paint, then smooth sustained rate
+                      const bufferMs = streamChunkCount < 5 ? INITIAL_BUFFER_MS : SUSTAINED_BUFFER_MS;
                       if (bufferTimer) {
                         clearTimeout(bufferTimer);
                       }
-                      
+
                       bufferTimer = setTimeout(() => {
                         const fullContent = accumulatedContent;
                         set((state) => ({
@@ -579,13 +597,18 @@ export const useChatStore = create<ChatState>()(
                           )
                         }));
                         bufferTimer = null;
-                      }, BUFFER_INTERVAL);
+                      }, bufferMs);
                     } else if (event.type === 'text' && (event.text || event.content)) {
                       // Handle 'text' event from /streaming-chat/chat endpoint
                       // Backend sends { type: "text", content: "..." } so handle both properties
                       const textContent = event.text || event.content;
                       if (isFirstChunk) {
-                        botMessageId = typingMessageId; // Reuse same message ID for smooth transition
+                        botMessageId = typingMessageId;
+                        streamChunkCount = 0;
+
+                        // Log time to first visible token
+                        const ttft = performance.now() - sendTimestamp;
+                        console.log(`[PERF] Time to first token: ${ttft.toFixed(0)}ms`);
 
                         set((state) => ({
                           messages: state.messages.map(msg =>
@@ -602,8 +625,10 @@ export const useChatStore = create<ChatState>()(
                       }
 
                       accumulatedContent += textContent;
+                      streamChunkCount++;
 
-                      // Throttled update for smooth streaming
+                      // Adaptive buffer: fast first-paint, then smooth sustained rate
+                      const bufferMs2 = streamChunkCount < 5 ? INITIAL_BUFFER_MS : SUSTAINED_BUFFER_MS;
                       if (bufferTimer) {
                         clearTimeout(bufferTimer);
                       }
@@ -618,10 +643,12 @@ export const useChatStore = create<ChatState>()(
                           )
                         }));
                         bufferTimer = null;
-                      }, BUFFER_INTERVAL);
+                      }, bufferMs2);
                     } else if (event.type === 'structured_data' && event.items) {
-                      // ✅ NEW: Handle structured menu data with images from backend
-                      
+                      // Handle structured menu data with images from backend
+                      console.log(`[chat-store] Received structured_data: ${event.items.length} items`,
+                        event.items.map((i: any) => i.name));
+
                       // Flush text buffer immediately before adding structured data
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
                       
@@ -654,6 +681,7 @@ export const useChatStore = create<ChatState>()(
                             : msg
                         )
                       }));
+                      console.log(`[chat-store] menuCards updated: ${structuredMenuCards.length} cards for message ${botMessageId}`);
                     } else if (event.type === 'ui_element' && event.element === 'menu_card') {
                       // Flush buffer immediately before adding menu card
                       accumulatedContent = flushStreamBuffer(botMessageId, accumulatedContent, set);
@@ -813,6 +841,7 @@ export const useChatStore = create<ChatState>()(
                         isTyping: false,
                         abortController: null
                       }));
+                      streamComplete = true;
                       break;
                     }
                   }

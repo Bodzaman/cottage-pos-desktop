@@ -174,7 +174,7 @@ export function POSSplitBillModal({ isOpen, onClose, tableNumber, orderItems, on
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className="sm:max-w-[800px] max-h-[90vh] overflow-hidden text-white animate-in fade-in-90 zoom-in-90 duration-200" 
+        className="sm:max-w-[800px] max-h-[90dvh] overflow-hidden text-white animate-in fade-in-90 zoom-in-90 duration-200" 
         style={{
           background: 'linear-gradient(145deg, #121212 0%, #1a1a1a 100%)',
           backdropFilter: 'blur(4px)',
@@ -206,7 +206,7 @@ export function POSSplitBillModal({ isOpen, onClose, tableNumber, orderItems, on
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex flex-col md:flex-row h-[70vh] gap-4 overflow-hidden">
+        <div className="flex flex-col md:flex-row h-[70dvh] gap-4 overflow-hidden">
           {/* Left side - Bills */}
           <div className="md:w-1/3 flex flex-col h-full pr-4" 
             style={{ 

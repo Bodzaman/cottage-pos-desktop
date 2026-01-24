@@ -136,7 +136,7 @@ export function TableSelectionModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-4xl max-h-[80vh] overflow-hidden rounded-2xl"
+          className="w-full max-w-4xl max-h-[80dvh] overflow-hidden rounded-2xl"
           style={{
             background: `linear-gradient(135deg, ${QSAITheme.background.card} 0%, ${QSAITheme.background.tertiary} 100%)`,
             border: `1px solid ${QSAITheme.purple.primary}40`,
@@ -156,7 +156,7 @@ export function TableSelectionModal({
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div className="p-6 overflow-y-auto max-h-[60dvh]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">

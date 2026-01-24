@@ -230,7 +230,7 @@ export function MenuItemMediaSelectorDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-7xl h-[90dvh] flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b border-border/50">
           <div className="flex items-center justify-between">

@@ -526,7 +526,7 @@ export function AIVoiceSetupWizard({
       backgroundColor: 'rgba(0, 0, 0, 0.8)',
       backdropFilter: 'blur(8px)'
     }}>
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto" style={{
+      <Card className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto" style={{
         backgroundColor: 'rgba(26, 26, 26, 0.95)',
         borderColor: 'rgba(124, 93, 250, 0.3)',
         backdropFilter: 'blur(20px)'

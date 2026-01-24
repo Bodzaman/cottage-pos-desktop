@@ -342,7 +342,7 @@ export default function CategoryForm({ onSuccess, initialData, isEditing = false
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="bg-[rgba(21, 25, 42, 0.95)] text-white border-[rgba(124, 93, 250, 0.2)] max-w-2xl backdrop-blur-md max-h-[90vh] flex flex-col">
+        <DialogContent className="bg-[rgba(21, 25, 42, 0.95)] text-white border-[rgba(124, 93, 250, 0.2)] max-w-2xl backdrop-blur-md max-h-[90dvh] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-[#7C5DFA]">
               {isEditing ? 'Edit Category' : 'Add New Category'}

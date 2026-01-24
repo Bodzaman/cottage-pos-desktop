@@ -71,7 +71,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       <DialogContent 
         className="
           max-w-4xl 
-          h-[90vh]
+          h-[90dvh]
           bg-gradient-to-br from-zinc-900/98 to-zinc-800/98
           backdrop-blur-md
           border border-purple-500/30

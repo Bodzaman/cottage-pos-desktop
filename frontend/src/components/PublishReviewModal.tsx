@@ -143,7 +143,7 @@ export default function PublishReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col bg-gray-900 border-[#7C5DFA]/30">
+      <DialogContent className="max-w-2xl max-h-[80dvh] overflow-hidden flex flex-col bg-gray-900 border-[#7C5DFA]/30">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
             <FileEdit className="h-5 w-5 text-[#7C5DFA]" />

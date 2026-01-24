@@ -436,7 +436,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
   
   return (
     <div 
-      className={cn("flex-1 flex flex-col max-h-[100vh] relative overflow-hidden", className)}
+      className={cn("flex-1 flex flex-col max-h-[100dvh] relative overflow-hidden", className)}
       style={{
         background: '#0B0C0E',
         minHeight: '100vh'

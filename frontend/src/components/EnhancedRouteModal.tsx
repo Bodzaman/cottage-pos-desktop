@@ -547,7 +547,7 @@ export const EnhancedRouteModal: React.FC<Props> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-6xl h-[90vh] p-0 overflow-hidden"
+        className="max-w-6xl h-[90dvh] p-0 overflow-hidden"
         style={{
           background: `linear-gradient(135deg, ${globalColors.background.primary} 0%, ${globalColors.background.secondary} 100%)`,
           border: `1px solid ${globalColors.border.medium}`,

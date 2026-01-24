@@ -1116,7 +1116,7 @@ export default function DineInFullReviewModal({
       {/* Main Review Modal */}
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent
-          className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 flex flex-col overflow-hidden"
+          className="max-w-[95vw] max-h-[95dvh] w-full h-full p-0 flex flex-col overflow-hidden"
           style={{
             background: `linear-gradient(135deg, ${QSAITheme.background.primary} 0%, ${QSAITheme.background.secondary} 100%)`,
             border: `1px solid ${QSAITheme.border.accent}`,

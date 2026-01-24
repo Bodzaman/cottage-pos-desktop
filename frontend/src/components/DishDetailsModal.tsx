@@ -73,7 +73,7 @@ const DishDetailsModal: React.FC<Props> = ({ dish, isOpen, onClose }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-4xl w-full p-0"
+        className="max-w-4xl w-full p-0 overflow-hidden"
         style={{
           background: PremiumTheme.colors.background.card,
           borderColor: PremiumTheme.colors.border.light,
@@ -92,7 +92,7 @@ const DishDetailsModal: React.FC<Props> = ({ dish, isOpen, onClose }) => {
           </div>
 
           {/* Right side: Details */}
-          <div className="p-8 flex flex-col">
+          <div className="p-8 flex flex-col overflow-y-auto">
             <DialogHeader className="mb-4">
               <DialogTitle className="text-3xl font-playfair mb-2">{dish.title}</DialogTitle>
               <div className="flex items-center gap-4 text-sm">
@@ -136,7 +136,7 @@ const DishDetailsModal: React.FC<Props> = ({ dish, isOpen, onClose }) => {
                 </div>
             </div>
 
-            <DialogFooter className="mt-auto">
+            <DialogFooter className="mt-auto flex-shrink-0 pt-4 border-t border-white/10">
               <DialogClose asChild>
                 <Button variant="ghost" onClick={onClose}>Cancel</Button>
               </DialogClose>
