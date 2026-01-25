@@ -630,9 +630,10 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
         }}
       >
         {orderItems.length === 0 ? (
-          <div className="text-center py-8">
-            <Utensils className="w-8 h-8 mx-auto mb-2 opacity-50" style={{ color: QSAITheme.text.muted }} />
-            <p className="text-sm" style={{ color: QSAITheme.text.muted }}>No items in order</p>
+          <div className="text-center py-12 px-4">
+            <Utensils className="w-10 h-10 mx-auto mb-3 opacity-40" style={{ color: QSAITheme.text.muted }} />
+            <p className="text-sm font-medium mb-1" style={{ color: QSAITheme.text.secondary }}>No items in order</p>
+            <p className="text-xs" style={{ color: QSAITheme.text.muted }}>Select items from the menu to start building an order</p>
           </div>
         ) : (
           orderItems.map((item, index) => (
@@ -702,9 +703,10 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   </h4>
                   
                   {/* Variant and protein info */}
-                  {(item.variantName || item.protein_type) && (
+                  {/* ✅ FIX: Only show variant badge if it differs from item name (prevents duplication) */}
+                  {((item.variantName && item.variantName !== item.name && !item.name.includes(item.variantName)) || item.protein_type) && (
                     <div className="flex items-center space-x-2 mb-2">
-                      {item.variantName && (
+                      {item.variantName && item.variantName !== item.name && !item.name.includes(item.variantName) && (
                         <span
                           className="text-xs px-2 py-1 rounded"
                           style={{
@@ -781,9 +783,10 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   variant="ghost"
                   size="sm"
                   onClick={() => onRemoveItem?.(item.id)}
-                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10 flex-shrink-0"
+                  className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10 flex-shrink-0"
+                  aria-label="Remove item"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
               
@@ -795,13 +798,14 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-6 w-6 p-0"
+                    className="h-8 w-8 p-0"
+                    aria-label="Decrease quantity"
                     style={{
                       borderColor: QSAITheme.border.medium,
                       backgroundColor: QSAITheme.background.secondary
                     }}
                   >
-                    <Minus className="w-3 h-3" />
+                    <Minus className="w-3.5 h-3.5" />
                   </Button>
 
                   <span className="text-sm font-medium w-8 text-center" style={{ color: QSAITheme.text.primary }}>
@@ -812,13 +816,14 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-6 w-6 p-0"
+                    className="h-8 w-8 p-0"
+                    aria-label="Increase quantity"
                     style={{
                       borderColor: QSAITheme.border.medium,
                       backgroundColor: QSAITheme.background.secondary
                     }}
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                   </Button>
                 </div>
                 
@@ -904,7 +909,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                       }
                     }}
                     disabled={orderItems.length === 0}
-                    className="w-full text-xs h-9 font-medium"
+                    className="w-full text-sm h-11 font-medium"
                     style={{
                       backgroundColor: orderItems.length === 0 ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
                       borderColor: QSAITheme.purple.primary,
@@ -914,7 +919,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                       cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <Save className="w-3 h-3 mr-2" />
+                    <Save className="w-4 h-4 mr-2" />
                     Save Order
                   </Button>
 
@@ -946,7 +951,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                 <Button
                   size="sm"
                   onClick={handleProcessOrder}  // ✅ Always use internal handler to show modal
-                  className="w-full text-xs h-9 font-medium"
+                  className="w-full text-sm h-11 font-medium"
                   style={{
                     backgroundColor: QSAITheme.purple.primary,
                     borderColor: QSAITheme.purple.primary,
@@ -954,7 +959,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                     boxShadow: `0 4px 8px ${QSAITheme.purple.glow}`
                   }}
                 >
-                  <Receipt className="w-3 h-3 mr-2" />
+                  <Receipt className="w-4 h-4 mr-2" />
                   Process Order • {formatCurrency(total)}
                 </Button>
               )}
@@ -1140,6 +1145,38 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ✅ FIX: StaffCustomizationModal for editing existing order items */}
+      {customizingOrderItem && (() => {
+        // Look up the original MenuItem from store
+        const menuItem = menuItems.find(m => m.id === customizingOrderItem.menu_item_id);
+        // Look up the variant from store if variant_id exists
+        const variant = customizingOrderItem.variant_id
+          ? itemVariants.find(v => v.id === customizingOrderItem.variant_id) || null
+          : null;
+
+        if (!menuItem) {
+          // If menu item not found, close the modal
+          console.warn('[OrderSummaryPanel] Could not find menu item for customization:', customizingOrderItem.menu_item_id);
+          return null;
+        }
+
+        return (
+          <StaffCustomizationModal
+            item={menuItem}
+            variant={variant}
+            isOpen={isCustomizationModalOpen}
+            onClose={() => {
+              setIsCustomizationModalOpen(false);
+              setCustomizingOrderItem(null);
+              setCustomizingItemIndex(-1);
+            }}
+            onConfirm={handleCustomizationConfirm}
+            orderType={orderType}
+            initialQuantity={customizingOrderItem.quantity}
+          />
+        );
+      })()}
     </div>
   );
 });

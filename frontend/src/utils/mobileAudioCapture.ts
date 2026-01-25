@@ -336,13 +336,23 @@ export class MobileAudioCapture {
   // ==========================================================================
 
   private setupVisibilityHandling(): void {
-    this.visibilityHandler = () => {
+    this.visibilityHandler = async () => {
       if (document.visibilityState === 'visible') {
         // Tab/app became visible - resume if we were active
         if (this.audioContext?.state === 'suspended' && this.state === 'suspended') {
-          this.audioContext.resume().then(() => {
+          try {
+            await this.audioContext.resume();
             this.setState('active');
-          });
+          } catch (error) {
+            // AudioContext resume failed - requires user gesture on mobile
+            // This can happen if the user switched tabs during a voice call
+            this.options.onError({
+              code: 'capture_failed',
+              message: 'Microphone paused. Tap to resume.',
+              originalError: error as Error
+            });
+            this.setState('error');
+          }
         }
       } else {
         // Tab/app became hidden - mark as suspended

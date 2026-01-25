@@ -2,6 +2,11 @@
  * Receipt Template Supabase Service
  * Direct Supabase queries for template operations - no backend server required
  * This enables the web app to work like the Electron version
+ *
+ * Kitchen Variant System:
+ * - When a customer template is created, a kitchen variant is auto-created
+ * - Kitchen variants are linked via parent_template_id
+ * - Shared fields sync automatically when parent is updated
  */
 
 import { supabase } from './supabaseClient';
@@ -14,6 +19,43 @@ interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
+
+// Fields that should sync from parent to kitchen variant
+const SYNC_FIELDS: (keyof FormData)[] = [
+  'businessName', 'vatNumber', 'address', 'phone', 'email', 'website',
+  'showPhone', 'showEmail', 'showWebsite', 'showVatNumber', 'showCategorySubheadings',
+  'logoFile', 'logoUrl', 'logoImage', 'logoPosition', 'logoWidth', 'logoHeight',
+  'qrCodes', 'headerQRCodes', 'footerQRCodes',
+  'selectedFont', 'useItemsFont', 'useItemsThermalFont', 'receiptFont', 'itemsFont',
+  'footerMessage', 'terms', 'socialMedia', 'customFooterText', 'showCustomFooter'
+];
+
+/**
+ * Create kitchen variant design data from parent template
+ */
+const createKitchenVariantDesignData = (parentDesignData: FormData): FormData => {
+  return {
+    ...parentDesignData,
+    receiptFormat: 'kitchen_customer',
+    showKitchenTotals: true,
+    showContainerQtyField: true,
+    showCheckedField: true
+  };
+};
+
+/**
+ * Merge synced fields from parent to existing kitchen variant data
+ */
+const syncKitchenVariantDesignData = (
+  kitchenData: FormData,
+  parentData: FormData
+): FormData => {
+  const synced = { ...kitchenData };
+  for (const field of SYNC_FIELDS) {
+    (synced as any)[field] = (parentData as any)[field];
+  }
+  return synced;
+};
 
 interface TemplateAssignment {
   id?: string;
@@ -54,7 +96,8 @@ export const listReceiptTemplates = async (): Promise<ApiResponse<Template[]>> =
         description: t.description
       },
       design_data: t.design_data,
-      paper_width: t.paper_width || 80
+      paper_width: t.paper_width || 80,
+      parent_template_id: t.parent_template_id || null
     }));
 
     console.log(`✅ [Supabase Direct] Loaded ${templates.length} receipt templates`);
@@ -94,7 +137,8 @@ export const getReceiptTemplate = async (templateId: string): Promise<ApiRespons
         description: data.description
       },
       design_data: data.design_data,
-      paper_width: data.paper_width || 80
+      paper_width: data.paper_width || 80,
+      parent_template_id: data.parent_template_id || null
     };
 
     console.log('✅ [Supabase Direct] Loaded template:', template.metadata.name);
@@ -107,6 +151,7 @@ export const getReceiptTemplate = async (templateId: string): Promise<ApiRespons
 
 /**
  * Create a new receipt template
+ * Automatically creates a linked kitchen variant
  */
 export const createReceiptTemplate = async (
   name: string,
@@ -116,12 +161,19 @@ export const createReceiptTemplate = async (
 ): Promise<ApiResponse<Template>> => {
   console.log('💾 [Supabase Direct] create_receipt_template called:', name);
   try {
+    // Ensure we're creating a customer template (not a kitchen variant)
+    const customerDesignData = {
+      ...design_data,
+      receiptFormat: 'front_of_house' as const
+    };
+
+    // Create the customer (parent) template
     const { data, error } = await supabase
       .from('receipt_templates')
       .insert({
         name,
         description,
-        design_data,
+        design_data: customerDesignData,
         paper_width
       })
       .select()
@@ -132,6 +184,27 @@ export const createReceiptTemplate = async (
       return { success: false, error: error.message };
     }
 
+    // Auto-create the kitchen variant
+    const kitchenDesignData = createKitchenVariantDesignData(customerDesignData);
+    const kitchenName = `${name} - KITCHEN`;
+
+    const { error: kitchenError } = await supabase
+      .from('receipt_templates')
+      .insert({
+        name: kitchenName,
+        description: `Kitchen variant of ${name}`,
+        design_data: kitchenDesignData,
+        paper_width,
+        parent_template_id: data.id
+      });
+
+    if (kitchenError) {
+      console.warn('⚠️ [Supabase Direct] Failed to create kitchen variant:', kitchenError);
+      // Don't fail the whole operation - customer template was created successfully
+    } else {
+      console.log('✅ [Supabase Direct] Auto-created kitchen variant:', kitchenName);
+    }
+
     // Transform to frontend Template structure
     const template: Template = {
       id: data.id,
@@ -140,7 +213,8 @@ export const createReceiptTemplate = async (
         description: data.description
       },
       design_data: data.design_data,
-      paper_width: data.paper_width || 80
+      paper_width: data.paper_width || 80,
+      parent_template_id: null
     };
 
     console.log('✅ [Supabase Direct] Created template:', template.id);
@@ -153,6 +227,7 @@ export const createReceiptTemplate = async (
 
 /**
  * Update an existing receipt template
+ * Automatically syncs shared fields to linked kitchen variant
  */
 export const updateReceiptTemplate = async (
   templateId: string,
@@ -187,6 +262,49 @@ export const updateReceiptTemplate = async (
       return { success: false, error: error.message };
     }
 
+    // If this is a parent template (not a kitchen variant), sync to kitchen variant
+    if (!data.parent_template_id && updates.design_data) {
+      // Find the kitchen variant
+      const { data: kitchenVariant } = await supabase
+        .from('receipt_templates')
+        .select('*')
+        .eq('parent_template_id', templateId)
+        .single();
+
+      if (kitchenVariant) {
+        // Sync shared fields to kitchen variant
+        const syncedKitchenData = syncKitchenVariantDesignData(
+          kitchenVariant.design_data,
+          updates.design_data
+        );
+
+        const kitchenUpdateData: any = {
+          design_data: syncedKitchenData
+        };
+
+        // Sync name if changed
+        if (updates.name !== undefined) {
+          kitchenUpdateData.name = `${updates.name} - KITCHEN`;
+        }
+
+        // Sync paper width if changed
+        if (updates.paper_width !== undefined) {
+          kitchenUpdateData.paper_width = updates.paper_width;
+        }
+
+        const { error: syncError } = await supabase
+          .from('receipt_templates')
+          .update(kitchenUpdateData)
+          .eq('id', kitchenVariant.id);
+
+        if (syncError) {
+          console.warn('⚠️ [Supabase Direct] Failed to sync kitchen variant:', syncError);
+        } else {
+          console.log('✅ [Supabase Direct] Synced kitchen variant:', kitchenVariant.id);
+        }
+      }
+    }
+
     // Transform to frontend Template structure
     const template: Template = {
       id: data.id,
@@ -195,7 +313,8 @@ export const updateReceiptTemplate = async (
         description: data.description
       },
       design_data: data.design_data,
-      paper_width: data.paper_width || 80
+      paper_width: data.paper_width || 80,
+      parent_template_id: data.parent_template_id || null
     };
 
     console.log('✅ [Supabase Direct] Updated template:', template.id);
@@ -230,6 +349,90 @@ export const deleteReceiptTemplate = async (templateId: string): Promise<ApiResp
     return { success: true };
   } catch (error) {
     console.error('❌ [Supabase Direct] Exception deleting receipt template:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+};
+
+/**
+ * Get the kitchen variant for a parent template
+ */
+export const getKitchenVariant = async (parentTemplateId: string): Promise<ApiResponse<Template | null>> => {
+  console.log('🍳 [Supabase Direct] get_kitchen_variant called for parent:', parentTemplateId);
+  try {
+    if (!parentTemplateId) {
+      return { success: false, error: 'Parent template ID required' };
+    }
+
+    const { data, error } = await supabase
+      .from('receipt_templates')
+      .select('*')
+      .eq('parent_template_id', parentTemplateId)
+      .single();
+
+    if (error) {
+      // PGRST116 = no rows returned - means no kitchen variant exists
+      if (error.code === 'PGRST116') {
+        console.log('📋 [Supabase Direct] No kitchen variant found for parent:', parentTemplateId);
+        return { success: true, data: null };
+      }
+      console.error('❌ [Supabase Direct] Failed to fetch kitchen variant:', error);
+      return { success: false, error: error.message };
+    }
+
+    // Transform to frontend Template structure
+    const template: Template = {
+      id: data.id,
+      metadata: {
+        name: data.name,
+        description: data.description
+      },
+      design_data: data.design_data,
+      paper_width: data.paper_width || 80,
+      parent_template_id: data.parent_template_id
+    };
+
+    console.log('✅ [Supabase Direct] Found kitchen variant:', template.metadata.name);
+    return { success: true, data: template };
+  } catch (error) {
+    console.error('❌ [Supabase Direct] Exception fetching kitchen variant:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+};
+
+/**
+ * List only parent templates (exclude kitchen variants)
+ * Used by the simplified assignment modal
+ */
+export const listParentTemplates = async (): Promise<ApiResponse<Template[]>> => {
+  console.log('📋 [Supabase Direct] list_parent_templates called');
+  try {
+    const { data, error } = await supabase
+      .from('receipt_templates')
+      .select('*')
+      .is('parent_template_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ [Supabase Direct] Failed to fetch parent templates:', error);
+      return { success: false, error: error.message };
+    }
+
+    // Transform backend flat structure to frontend nested Template structure
+    const templates: Template[] = (data || []).map((t: any) => ({
+      id: t.id,
+      metadata: {
+        name: t.name,
+        description: t.description
+      },
+      design_data: t.design_data,
+      paper_width: t.paper_width || 80,
+      parent_template_id: null
+    }));
+
+    console.log(`✅ [Supabase Direct] Loaded ${templates.length} parent templates`);
+    return { success: true, data: templates };
+  } catch (error) {
+    console.error('❌ [Supabase Direct] Exception fetching parent templates:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
@@ -346,7 +549,9 @@ export const setTemplateAssignment = async (
 
 export const ReceiptTemplateSupabase = {
   listTemplates: listReceiptTemplates,
+  listParentTemplates: listParentTemplates,
   getTemplate: getReceiptTemplate,
+  getKitchenVariant: getKitchenVariant,
   createTemplate: createReceiptTemplate,
   updateTemplate: updateReceiptTemplate,
   deleteTemplate: deleteReceiptTemplate,

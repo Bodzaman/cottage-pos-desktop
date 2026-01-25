@@ -21,7 +21,7 @@ export function TakeawayModeToggle({ currentMode, onModeChange }: TakeawayModeTo
       className="relative flex w-full rounded-lg p-1 gap-1"
       style={{
         background: 'rgba(10, 10, 10, 0.8)',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
       }}
     >
       {modes.map(({ key, label, icon: Icon }) => {
@@ -30,7 +30,7 @@ export function TakeawayModeToggle({ currentMode, onModeChange }: TakeawayModeTo
           <button
             key={key}
             onClick={() => onModeChange(key)}
-            className="relative flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-md z-10 transition-colors duration-150"
+            className="relative flex-1 min-w-0 flex flex-col items-center justify-center gap-1 py-2.5 px-1 rounded-md z-10 transition-colors duration-150"
             style={{
               color: isActive ? 'white' : 'rgba(255, 255, 255, 0.55)',
             }}
@@ -46,8 +46,8 @@ export function TakeawayModeToggle({ currentMode, onModeChange }: TakeawayModeTo
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               />
             )}
-            <Icon className="relative z-10 w-3 h-3 flex-shrink-0" />
-            <span className="relative z-10 text-[11px] font-semibold truncate">{label}</span>
+            <Icon className="relative z-10 w-5 h-5 flex-shrink-0" />
+            <span className="relative z-10 text-xs font-semibold">{label}</span>
           </button>
         );
       })}

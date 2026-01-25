@@ -333,7 +333,9 @@ export function POSMenuItemCard({
     if (onCustomizeItem && variant) {
       const price = getVariantPrice(variant);
       const variantName = getVariantName(variant);
-      const displayName = isMultiVariant ? `${item.name} (${variantName})` : item.name;
+      // ✅ FIX: For multi-variant items, use variant name as display name (not concatenated)
+      // This matches the pattern in handleVariantClick and prevents name duplication
+      const displayName = isMultiVariant ? variantName : item.name;
 
       const orderItem: OrderItem = {
         id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -368,16 +370,20 @@ export function POSMenuItemCard({
       const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
       const totalPrice = (price + customizationsTotal) * quantity;
 
+      // ✅ FIX: For multi-variant items, use variant name as display name
+      const displayName = variant && isMultiVariant ? getVariantName(variant) : item.name;
+
       const orderItem: OrderItem = {
         id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         menu_item_id: item.id,
         variant_id: variant?.id || null,
-        name: item.name,
+        name: displayName,
         variantName: variant ? getVariantName(variant) : undefined,
         quantity: quantity,
         price: totalPrice,
         protein_type: variant?.protein_type_name,
-        image_url: item.image_url || '',
+        // ✅ FIX: Use variant image when available
+        image_url: variant?.display_image_url || variant?.image_url || item.image_url || '',
         notes: notes || '',
         customizations: customizations?.map(c => ({
           id: c.id,
@@ -538,16 +544,17 @@ export function POSMenuItemCard({
                       See More
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-80 p-4 border shadow-xl z-[100]"
+                  <PopoverContent
+                    className="w-80 p-4 border rounded-lg shadow-xl z-[9999]"
                     style={{
-                      backgroundColor: 'rgba(15, 15, 15, 0.98)',
+                      backgroundColor: '#0f0f0f',
                       borderColor: 'rgba(124, 93, 250, 0.4)',
-                      boxShadow: '0 0 40px rgba(124, 93, 250, 0.3)'
+                      boxShadow: '0 0 40px rgba(124, 93, 250, 0.3), 0 20px 60px rgba(0, 0, 0, 0.8)'
                     }}
                     side="top"
-                    sideOffset={8}
+                    sideOffset={12}
                     align="start"
+                    collisionPadding={16}
                     onMouseEnter={() => setShowDescriptionPopover(true)}
                     onMouseLeave={() => setShowDescriptionPopover(false)}
                   >
@@ -588,16 +595,17 @@ export function POSMenuItemCard({
                       Variant Details
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-96 max-h-96 overflow-y-auto p-4 border shadow-xl z-[100]"
+                  <PopoverContent
+                    className="w-96 max-h-96 overflow-y-auto p-4 border rounded-lg shadow-xl z-[9999]"
                     style={{
-                      backgroundColor: 'rgba(15, 15, 15, 0.98)',
+                      backgroundColor: '#0f0f0f',
                       borderColor: 'rgba(124, 93, 250, 0.4)',
-                      boxShadow: '0 0 40px rgba(124, 93, 250, 0.3)'
+                      boxShadow: '0 0 40px rgba(124, 93, 250, 0.3), 0 20px 60px rgba(0, 0, 0, 0.8)'
                     }}
                     side="top"
-                    sideOffset={8}
+                    sideOffset={12}
                     align="end"
+                    collisionPadding={16}
                     onMouseEnter={() => setShowVariantInfoPopover(true)}
                     onMouseLeave={() => setShowVariantInfoPopover(false)}
                   >

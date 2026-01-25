@@ -69,6 +69,8 @@ export interface KitchenTicketData {
   orderType?: string;
   timestamp?: string;
   serverName?: string;
+  // Payment status for PAID badge on takeaway kitchen tickets (doubles as customer receipt)
+  paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
 }
 
 export interface KitchenItem {

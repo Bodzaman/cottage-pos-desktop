@@ -59,12 +59,12 @@ import { DineInBillPreviewModal } from 'components/DineInBillPreviewModal';
 import { CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
 import { POSFooter } from 'components/POSFooter';
 import { POSLockScreen } from 'components/POSLockScreen';
+import { POSOfflineBanner } from 'components/POSOfflineBanner';
 import { AnimatePresence } from 'framer-motion';
 import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
-import { PaymentFlowResult, PaymentFlowMode } from 'utils/paymentFlowTypes';
-import { PaymentChoiceModal } from 'components/PaymentChoiceModal';
+import { PaymentFlowResult } from 'utils/paymentFlowTypes';
 import { Loader2 } from 'lucide-react';
 
 // View Components - Import from POSDesktop for parity
@@ -85,6 +85,7 @@ import { usePOSInitialization } from 'utils/usePOSInitialization';
 
 import { OfflineFirst } from '../utils/offlineFirstManager';
 import { type PersistedSession } from '../utils/sessionPersistence';
+import { startPOSHeartbeat } from '../utils/posHeartbeat';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -158,9 +159,24 @@ export default function POSDesktop() {
     };
   }, []);
 
+  // 🔄 POS HEARTBEAT: Send periodic heartbeat to backend
+  // This enables the customer website to detect when POS is offline
+  // and block online orders accordingly (industry-standard pattern)
+  useEffect(() => {
+    const stopHeartbeat = startPOSHeartbeat();
+    return stopHeartbeat;
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) navigate('/pos-login', { replace: true });
   }, [authLoading, isAuthenticated, navigate]);
+
+  // Admin users should not be on POSDesktop - redirect to Admin portal
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user?.role === 'admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, user?.role, navigate]);
 
   const [isManagementDialogOpen, setIsManagementDialogOpen] = useState(false);
   const managerApprovalResolverRef = useRef<((approved: boolean) => void) | null>(null);
@@ -569,22 +585,16 @@ export default function POSDesktop() {
     toast.success('🍽️ Sent to kitchen!');
   }, [calculateOrderTotal]);
 
-  const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
-  const [paymentFlowMode, setPaymentFlowMode] = useState<PaymentFlowMode>('payment');
   const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
   const [showKitchenPreviewModal, setShowKitchenPreviewModal] = useState(false);
   const [showBillPreviewModal, setShowBillPreviewModal] = useState(false);
 
   const handleShowPaymentModal = useCallback(async () => {
     if (orderType === 'DINE-IN') return await printing.handlePrintBill(orderTotal);
-    setShowPaymentChoiceModal(true);
-  }, [orderType, printing, orderTotal]);
-
-  const handleSelectPaymentMode = useCallback((mode: PaymentFlowMode) => {
-    setPaymentFlowMode(mode);
-    setShowPaymentChoiceModal(false);
+    // Skip PaymentChoiceModal - go directly to PaymentFlowOrchestrator
+    // User will choose "Take Payment Now" or "Pay on Collection" from the confirmation view
     setModal('showPaymentFlow', true);
-  }, []);
+  }, [orderType, printing, orderTotal]);
 
   const handlePaymentFlowComplete = useCallback(async (result: PaymentFlowResult) => {
     if (!result.success) {
@@ -635,9 +645,12 @@ export default function POSDesktop() {
     } else {
       // Fallback to queue-based printing if no captured images
       console.log('🖨️ [POSDesktop] Using queue-based printing (no captured images)...');
-      await printing.handlePrintKitchen();
-      await printing.handlePrintReceipt(result.orderTotal ?? 0);
-      toast.success('Order placed successfully!');
+      // Pass paymentStatus for PAID badge: 'PAID' if payment taken, undefined for pay-later
+      const paymentStatus = result.paymentStatus;
+      await printing.handlePrintKitchen(paymentStatus);
+      await printing.handlePrintReceipt(result.orderTotal ?? 0, paymentStatus);
+      const successMsg = paymentStatus === 'PAID' ? 'Payment complete - receipts printed' : 'Order placed - receipts printed';
+      toast.success(successMsg);
     }
 
     clearOrder();
@@ -737,7 +750,7 @@ export default function POSDesktop() {
         case 'F2':
           e.preventDefault();
           if (orderItems.length > 0) {
-            setShowPaymentChoiceModal(true);
+            setModal('showPaymentFlow', true);
           } else {
             toast.warning('Add items before checkout');
           }
@@ -770,6 +783,8 @@ export default function POSDesktop() {
   return (
     <CustomizeOrchestratorProvider>
       <div className="grid grid-rows-[auto_1fr_auto] h-dvh bg-black overflow-hidden">
+        {/* Offline/Online Status Banner */}
+        <POSOfflineBanner />
         <ManagementHeader title="POS" onAdminSuccess={handleManagementAuthSuccess} onLogout={handleLogout} />
         <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} />
         <div className="flex-1 overflow-hidden">{renderMainPOSView()}</div>
@@ -777,11 +792,10 @@ export default function POSDesktop() {
         
         <DineInOrderModal isOpen={showDineInModal} onClose={() => setModal('showDineInModal', false)} tableId={selectedTableUuid} tableNumber={selectedTableNumber as any} tableCapacity={selectedTableCapacity} linkedTables={linkedTableContext.linkedTableNumbers} isPrimaryTable={linkedTableContext.isPrimaryTable} totalLinkedCapacity={linkedTableContext.totalLinkedCapacity} restaurantTables={restaurantTables} eventDrivenOrder={orderType === 'DINE-IN' ? (dineInOrder as any) : null} eventDrivenCustomerTabs={customerTabsData} eventDrivenActiveTabId={activeTabId} onEventDrivenSetActiveTabId={setActiveTabId} onEventDrivenAddItem={addItemToDineIn} onEventDrivenRemoveItem={removeItemFromDineIn} onEventDrivenUpdateItemQuantity={updateItemQuantity} onEventDrivenUpdateGuestCount={updateGuestCount} onEventDrivenSendToKitchen={sendDineInToKitchen} onEventDrivenCreateTab={createTab} onEventDrivenAddItemsToTab={addItemsToTab} onEventDrivenRenameTab={renameTab} onEventDrivenCloseTab={closeTab} onEventDrivenSplitTab={splitTab} onEventDrivenMergeTabs={mergeTabs} onEventDrivenMoveItemsBetweenTabs={moveItemsBetweenTabs} stagingItems={dineInStagingItems} onAddToStaging={addToStagingCart} onRemoveFromStaging={removeFromStagingCart} onClearStaging={clearStagingCart} onPersistStaging={persistStagingCart as any} enrichedItems={dineInEnrichedItems} enrichedLoading={dineInEnrichedLoading} enrichedError={dineInEnrichedError} />
         {showGuestCountModal && <POSGuestCountModal isOpen={true} onClose={() => setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={selectedTableNumber || 0} tableCapacity={selectedTableCapacity} initialGuestCount={1} />}
-        {showCustomerModal && <CustomerDetailsModal isOpen={true} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={() => {}} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />}
+        {showCustomerModal && <CustomerDetailsModal isOpen={true} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={(newMode) => setOrderType(newMode)} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />}
         {showAdminPanel && <AdminSidePanel isOpen={true} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />}
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={customerProfile} orders={customerProfile?.recent_orders || []} onReorder={handleLoadPastOrder} />
-        <PaymentChoiceModal isOpen={showPaymentChoiceModal} onClose={() => setShowPaymentChoiceModal(false)} onSelectMode={handleSelectPaymentMode} orderTotal={orderTotal} orderType={orderType as any} />
-        <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} mode={paymentFlowMode} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
+        <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
 
         {/* Kitchen Preview Modal for DINE-IN staging items */}
         <DineInKitchenPreviewModal

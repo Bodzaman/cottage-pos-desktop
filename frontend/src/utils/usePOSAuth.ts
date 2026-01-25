@@ -11,10 +11,13 @@ async function hashPinLocally(pin: string, userId: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+export type UserRole = 'staff' | 'admin';
+
 interface POSStaffUser {
   userId: string;
   username: string;
   fullName: string;
+  role: UserRole;
 }
 
 interface POSAuthStore {
@@ -26,7 +29,13 @@ interface POSAuthStore {
   pinEnabled: boolean;
   lastUserId: string | null;
   lastUserName: string | null;
+  lastUserRole: UserRole | null;
   localPinHash: string | null;
+
+  // Role helpers
+  isAdmin: () => boolean;
+  isStaff: () => boolean;
+  getRole: () => UserRole | null;
 
   // Actions
   login: (username: string, password: string) => Promise<void>;
@@ -50,7 +59,13 @@ export const usePOSAuth = create<POSAuthStore>()(
       pinEnabled: false,
       lastUserId: null,
       lastUserName: null,
+      lastUserRole: null,
       localPinHash: null,
+
+      // Role helpers
+      isAdmin: () => get().user?.role === 'admin',
+      isStaff: () => get().user?.role === 'staff',
+      getRole: () => get().user?.role ?? null,
 
       login: async (username: string, password: string) => {
         set({ isLoading: true });
@@ -77,12 +92,14 @@ export const usePOSAuth = create<POSAuthStore>()(
             user: {
               userId: user.user_id,
               username: user.username,
-              fullName: user.full_name
+              fullName: user.full_name,
+              role: user.role || 'staff'
             },
             isAuthenticated: true,
             isLoading: false,
             lastUserId: user.user_id,
-            lastUserName: user.full_name
+            lastUserName: user.full_name,
+            lastUserRole: user.role || 'staff'
           });
         } catch (error) {
           set({ isLoading: false, isAuthenticated: false, user: null });
@@ -108,10 +125,12 @@ export const usePOSAuth = create<POSAuthStore>()(
               user: {
                 userId: data.user_id,
                 username: data.username,
-                fullName: data.full_name
+                fullName: data.full_name,
+                role: data.role || 'staff'
               },
               isAuthenticated: true,
-              isLoading: false
+              isLoading: false,
+              lastUserRole: data.role || 'staff'
             });
             return true;
           }
@@ -126,10 +145,19 @@ export const usePOSAuth = create<POSAuthStore>()(
         }
 
         // Offline fallback: verify against local SHA-256 hash
+        const { lastUserRole } = get();
         if (localPinHash && user) {
           const computedHash = await hashPinLocally(pin, lastUserId);
           if (computedHash === localPinHash) {
-            set({ isAuthenticated: true, isLoading: false });
+            // Restore user with persisted role for offline access
+            set({
+              isAuthenticated: true,
+              isLoading: false,
+              user: {
+                ...user,
+                role: lastUserRole || user.role || 'staff'
+              }
+            });
             return true;
           }
         }
@@ -192,6 +220,7 @@ export const usePOSAuth = create<POSAuthStore>()(
         pinEnabled: state.pinEnabled,
         lastUserId: state.lastUserId,
         lastUserName: state.lastUserName,
+        lastUserRole: state.lastUserRole,
         localPinHash: state.localPinHash
       })
     }
@@ -209,14 +238,21 @@ export function usePOSAuthHook() {
   const login = usePOSAuth(state => state.login);
   const logout = usePOSAuth(state => state.logout);
   const changePassword = usePOSAuth(state => state.changePassword);
+  const isAdmin = usePOSAuth(state => state.isAdmin);
+  const isStaff = usePOSAuth(state => state.isStaff);
+  const getRole = usePOSAuth(state => state.getRole);
 
   return {
     user,
     userId: user?.userId,
     username: user?.username,
     fullName: user?.fullName,
+    role: user?.role,
     isAuthenticated,
     isLoading,
+    isAdmin,
+    isStaff,
+    getRole,
     login,
     logout,
     changePassword

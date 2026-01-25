@@ -35,6 +35,7 @@ const ThermalReceiptDesignerV2 = lazy(() => import("./pages/ThermalReceiptDesign
 const Unauthorized = lazy(() => import("./pages/Unauthorized.tsx"));
 const UpdateKDS = lazy(() => import("./pages/UpdateKDS.tsx"));
 const UpdatePOSDesktop = lazy(() => import("./pages/UpdatePOSDesktop.tsx"));
+const WebsiteManagement = lazy(() => import("./pages/WebsiteManagement.tsx"));
 export const userRoutes: RouteObject[] = [
 
 
@@ -89,5 +90,6 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/updatekds", element: <UpdateKDS />},
 	{ path: "/update-pos-desktop", element: <UpdatePOSDesktop />},
 	{ path: "/updateposdesktop", element: <UpdatePOSDesktop />},
+	{ path: "/website-management", element: <WebsiteManagement />},
 
 ];

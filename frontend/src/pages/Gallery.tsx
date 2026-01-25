@@ -121,7 +121,8 @@ export default function Gallery() {
       <UniversalHeader context="PUBLIC_NAV" />
       
       {/* Hero header with parallax effect */}
-      <div 
+      {/* TODO: Static background image should be migrated to Supabase storage via Website CMS */}
+      <div
         className="h-[50dvh] md:h-[60dvh] relative flex items-center justify-center overflow-hidden pt-20"
         style={{
           backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/BAR%202.jpg")`,

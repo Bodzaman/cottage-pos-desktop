@@ -119,6 +119,9 @@ export class GeminiVoiceClient {
   private readonly SESSION_MAX_MS = 10 * 60 * 1000; // 10 minutes
   private readonly SESSION_WARNING_MS = 8 * 60 * 1000; // 8 minutes
 
+  // Network change detection for mobile WiFi/cellular transitions
+  private networkChangeHandler: (() => void) | null = null;
+
   // Streaming audio playback state (ring buffer pattern)
   private outputSampleRate = 24000; // Gemini native audio output rate
   private outputAudioContext: AudioContext | null = null;
@@ -575,6 +578,9 @@ export class GeminiVoiceClient {
       this.setState("listening");
       this.startSessionTimers();
 
+      // 7) Setup network change detection for mobile WiFi/cellular transitions
+      this.setupNetworkChangeDetection();
+
       // Send greeting trigger after session is established
       if (this.session) {
         const triggerText = this.options.firstResponse 
@@ -611,6 +617,9 @@ export class GeminiVoiceClient {
         clearTimeout(this.reconnectTimeout);
         this.reconnectTimeout = null;
       }
+
+      // Remove network change listeners
+      this.cleanupNetworkChangeDetection();
 
       // Reset VAD state for next session
       this.vadSpeaking = true;
@@ -660,6 +669,42 @@ export class GeminiVoiceClient {
     if (this.sessionTimer) {
       clearTimeout(this.sessionTimer);
       this.sessionTimer = null;
+    }
+  }
+
+  /**
+   * Setup network change detection for mobile WiFi/cellular transitions
+   * Automatically attempts reconnect when network is restored
+   */
+  private setupNetworkChangeDetection() {
+    this.networkChangeHandler = () => {
+      if (navigator.onLine) {
+        // Network restored - attempt reconnect if we were in error state
+        if (this.state === 'error' || this.state === 'closed') {
+          console.log('[Voice] Network restored - attempting reconnect');
+          this.handleReconnect('network_restored');
+        }
+      } else {
+        // Network lost - notify user
+        if (this.state === 'listening' || this.state === 'connected') {
+          console.log('[Voice] Network connection lost');
+          this.options.onError?.('Network connection lost. Waiting for reconnect...');
+        }
+      }
+    };
+
+    window.addEventListener('online', this.networkChangeHandler);
+    window.addEventListener('offline', this.networkChangeHandler);
+  }
+
+  /**
+   * Cleanup network change detection listeners
+   */
+  private cleanupNetworkChangeDetection() {
+    if (this.networkChangeHandler) {
+      window.removeEventListener('online', this.networkChangeHandler);
+      window.removeEventListener('offline', this.networkChangeHandler);
+      this.networkChangeHandler = null;
     }
   }
 

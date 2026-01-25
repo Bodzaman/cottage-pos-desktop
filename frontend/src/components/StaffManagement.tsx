@@ -8,17 +8,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, UserPlus, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { MoreVertical, UserPlus, Loader2, CheckCircle, XCircle, Eye, EyeOff, Shield, User } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { colors } from '../utils/InternalDesignSystem';
+import { colors, InternalTheme } from '../utils/InternalDesignSystem';
+import { UserRole } from '../utils/usePOSAuth';
 
 interface StaffUser {
   id: string;
   username: string;
   full_name: string;
   active: boolean;
+  role: UserRole;
+  pin_enabled?: boolean;
+  last_login_at?: string;
   created_at: string;
-  updated_at: string;
 }
 
 export function StaffManagement() {
@@ -31,8 +35,8 @@ export function StaffManagement() {
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
 
   // Form states
-  const [createForm, setCreateForm] = useState({ username: '', password: '', fullName: '' });
-  const [editForm, setEditForm] = useState({ username: '', fullName: '', active: true });
+  const [createForm, setCreateForm] = useState({ username: '', password: '', fullName: '', role: 'staff' as UserRole });
+  const [editForm, setEditForm] = useState({ username: '', fullName: '', active: true, role: 'staff' as UserRole });
   const [resetPasswordForm, setResetPasswordForm] = useState({ newPassword: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -88,12 +92,13 @@ export function StaffManagement() {
       const { data, error } = await supabase.rpc('pos_staff_create', {
         p_username: createForm.username.trim(),
         p_password: createForm.password,
-        p_full_name: createForm.fullName.trim()
+        p_full_name: createForm.fullName.trim(),
+        p_role: createForm.role
       });
 
       if (error) {
         console.error('Failed to create staff:', error);
-        
+
         // Check for common errors
         if (error.message.includes('duplicate') || error.message.includes('unique')) {
           toast.error('Username already exists');
@@ -103,8 +108,8 @@ export function StaffManagement() {
         return;
       }
 
-      toast.success(`Staff account created for ${createForm.username}`);
-      setCreateForm({ username: '', password: '', fullName: '' });
+      toast.success(`${createForm.role === 'admin' ? 'Admin' : 'Staff'} account created for ${createForm.username}`);
+      setCreateForm({ username: '', password: '', fullName: '', role: 'staff' });
       setIsCreateDialogOpen(false);
       await loadStaff();
     } catch (err) {
@@ -136,12 +141,13 @@ export function StaffManagement() {
         p_user_id: selectedStaff.id,
         p_username: editForm.username.trim(),
         p_full_name: editForm.fullName.trim(),
-        p_active: editForm.active
+        p_active: editForm.active,
+        p_role: editForm.role
       });
 
       if (error) {
         console.error('Failed to update staff:', error);
-        
+
         if (error.message.includes('duplicate') || error.message.includes('unique')) {
           toast.error('Username already exists');
         } else {
@@ -150,7 +156,7 @@ export function StaffManagement() {
         return;
       }
 
-      toast.success('Staff account updated');
+      toast.success('Account updated');
       setIsEditDialogOpen(false);
       setSelectedStaff(null);
       await loadStaff();
@@ -251,7 +257,8 @@ export function StaffManagement() {
     setEditForm({
       username: user.username,
       fullName: user.full_name,
-      active: user.active
+      active: user.active,
+      role: user.role || 'staff'
     });
     setIsEditDialogOpen(true);
   };
@@ -288,13 +295,7 @@ export function StaffManagement() {
       </div>
 
       {/* Staff Table */}
-      <Card
-        className="backdrop-blur-sm rounded-lg shadow-lg"
-        style={{
-          backgroundColor: 'rgba(26, 26, 26, 0.6)',
-          border: `1px solid ${colors.border.light}`,
-        }}
-      >
+      <Card className={InternalTheme.classes.surfacePanel}>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
@@ -316,6 +317,7 @@ export function StaffManagement() {
                 >
                   <TableHead style={{ color: colors.text.secondary }}>Username</TableHead>
                   <TableHead style={{ color: colors.text.secondary }}>Full Name</TableHead>
+                  <TableHead style={{ color: colors.text.secondary }}>Role</TableHead>
                   <TableHead style={{ color: colors.text.secondary }}>Status</TableHead>
                   <TableHead style={{ color: colors.text.secondary }}>Created</TableHead>
                   <TableHead className="text-right" style={{ color: colors.text.secondary }}>Actions</TableHead>
@@ -330,6 +332,29 @@ export function StaffManagement() {
                   >
                     <TableCell className="font-medium" style={{ color: colors.text.primary }}>{user.username}</TableCell>
                     <TableCell style={{ color: colors.text.secondary }}>{user.full_name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="gap-1"
+                        style={{
+                          backgroundColor: user.role === 'admin' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                          color: user.role === 'admin' ? '#A78BFA' : '#60A5FA',
+                          border: `1px solid ${user.role === 'admin' ? 'rgba(124, 58, 237, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                        }}
+                      >
+                        {user.role === 'admin' ? (
+                          <>
+                            <Shield className="h-3 w-3" />
+                            Admin
+                          </>
+                        ) : (
+                          <>
+                            <User className="h-3 w-3" />
+                            Staff
+                          </>
+                        )}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={user.active ? 'default' : 'secondary'}
@@ -497,6 +522,51 @@ export function StaffManagement() {
                 disabled={isSubmitting}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-role" style={{ color: colors.text.secondary }}>Role</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(value: UserRole) => setCreateForm({ ...createForm, role: value })}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger
+                  className="transition-all duration-200 focus:border-[#7C3AED]"
+                  style={{
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.light,
+                    color: colors.text.primary,
+                  }}
+                >
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent
+                  style={{
+                    backgroundColor: 'rgba(15, 15, 15, 0.98)',
+                    border: `1px solid ${colors.border.accent}`,
+                  }}
+                >
+                  <SelectItem value="staff" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" style={{ color: '#60A5FA' }} />
+                      <span>Staff</span>
+                      <span className="text-xs" style={{ color: colors.text.muted }}>- POS access only</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" style={{ color: '#A78BFA' }} />
+                      <span>Admin</span>
+                      <span className="text-xs" style={{ color: colors.text.muted }}>- Full admin portal access</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs" style={{ color: colors.text.muted }}>
+                {createForm.role === 'admin'
+                  ? 'Admin users have access to the Admin Portal for managing website, menu, media, and settings.'
+                  : 'Staff users have access to POS Desktop for processing orders.'}
+              </p>
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -581,6 +651,44 @@ export function StaffManagement() {
                 }}
                 disabled={isSubmitting}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-role" style={{ color: colors.text.secondary }}>Role</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(value: UserRole) => setEditForm({ ...editForm, role: value })}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger
+                  className="transition-all duration-200 focus:border-[#7C3AED]"
+                  style={{
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.light,
+                    color: colors.text.primary,
+                  }}
+                >
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent
+                  style={{
+                    backgroundColor: 'rgba(15, 15, 15, 0.98)',
+                    border: `1px solid ${colors.border.accent}`,
+                  }}
+                >
+                  <SelectItem value="staff" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" style={{ color: '#60A5FA' }} />
+                      <span>Staff</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" style={{ color: '#A78BFA' }} />
+                      <span>Admin</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center space-x-2">
               <input

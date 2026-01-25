@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { convertSpiceIndicatorsToEmoji } from '../utils/spiceLevelUtils';
-import { Minus, Plus, Info, Star, Heart, Sliders } from 'lucide-react';
+import { Minus, Plus, Info, Star, Heart, Sliders, X } from 'lucide-react';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { cn } from '../utils/cn';
 import { PremiumMenuCard } from './PremiumMenuCard';
@@ -359,9 +359,9 @@ export function CustomerVariantSelector({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent 
-          className="max-w-2xl w-full"
-          style={{ 
+        <DialogContent
+          className="max-w-2xl w-full max-h-[90dvh] flex flex-col overflow-hidden"
+          style={{
             backgroundColor: PremiumTheme.colors.dark[900],
             borderColor: PremiumTheme.colors.dark[700],
             boxShadow: PremiumTheme.shadows.glow.tandoori,
@@ -370,24 +370,33 @@ export function CustomerVariantSelector({
           aria-labelledby="variant-selector-title"
           aria-describedby="variant-selector-description"
         >
-          <DialogHeader>
-            <DialogTitle 
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle
               id="variant-selector-title"
-              className="text-2xl font-bold"
+              className="text-2xl font-bold pr-8"
               style={{ color: PremiumTheme.colors.text.primary }}
             >
               {item?.name}
             </DialogTitle>
-            <DialogDescription 
+            <DialogDescription
               id="variant-selector-description"
               style={{ color: PremiumTheme.colors.text.muted }}
             >
-              {isMultiVariant && variants.length > 1 
+              {isMultiVariant && variants.length > 1
                 ? `Available in ${variants.length} options`
                 : (item?.menu_item_description || 'Customize your selection.')
               }
             </DialogDescription>
           </DialogHeader>
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 rounded-full h-8 w-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
           {/* Price Range Display - Outside DialogHeader to avoid Radix Slot ref issues */}
           {isMultiVariant && variants.length > 1 && (
@@ -403,7 +412,7 @@ export function CustomerVariantSelector({
 
           {/* Variant Selection as Premium Cards */}
           {isMultiVariant && (
-            <div className="space-y-3 max-h-[55dvh] overflow-y-auto p-1 rounded-lg"
+            <div className="space-y-3 flex-1 min-h-0 overflow-y-auto p-1 rounded-lg"
               style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: `${PremiumTheme.colors.royal[500]} ${PremiumTheme.colors.dark[800]}`

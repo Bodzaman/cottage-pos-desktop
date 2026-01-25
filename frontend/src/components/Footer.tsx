@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaFacebook, FaInstagram, FaTwitter } from "react-icons/fa";
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { PremiumTheme } from "../utils/premiumTheme";
+import { useWebsiteData } from "../utils/useWebsiteData";
+import { useBrandFont } from "../utils/useBrandFont";
 
 // Opening hours data
 const openingHours = [
@@ -19,6 +21,13 @@ interface FooterProps {
 
 export function Footer({ variant = 'full' }: FooterProps) {
   const { isAdmin } = useSimpleAuth();
+  const contactData = useWebsiteData<{ opening_hours?: any[]; phones?: string[]; emails?: string[]; address?: string }>('contact');
+  const { titleFontFamily } = useBrandFont();
+
+  const activeOpeningHours = contactData?.opening_hours || openingHours;
+  const activeAddress = contactData?.address || '25 West Street, Storrington, West Sussex, RH20 4DZ';
+  const activePhone = contactData?.phones?.[0] || '01903 743605';
+  const activeEmail = contactData?.emails?.[0] || 'info@cottagetandoori.com';
   
   // Minimal footer for auth pages
   if (variant === 'minimal') {
@@ -32,9 +41,13 @@ export function Footer({ variant = 'full' }: FooterProps) {
       >
         <div className="container mx-auto px-4">
           <div className="text-center">
-            <h3 
-              className="text-xl font-serif mb-4"
-              style={{ color: PremiumTheme.colors.text.primary }}
+            <h3
+              className="mb-4"
+              style={{
+                fontFamily: titleFontFamily,
+                fontSize: '2rem',
+                color: '#8B1538'
+              }}
             >Cottage Tandoori</h3>
             <p 
               className="mb-6"
@@ -105,9 +118,13 @@ export function Footer({ variant = 'full' }: FooterProps) {
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           <div>
-            <h3 
-              className="text-xl font-serif mb-6"
-              style={{ color: PremiumTheme.colors.text.primary }}
+            <h3
+              className="mb-6"
+              style={{
+                fontFamily: titleFontFamily,
+                fontSize: '2rem',
+                color: '#8B1538'
+              }}
             >Cottage Tandoori</h3>
             <p 
               className="mb-6"
@@ -174,7 +191,7 @@ export function Footer({ variant = 'full' }: FooterProps) {
               style={{ color: PremiumTheme.colors.text.primary }}
             >Opening Hours</h3>
             <ul className="space-y-3">
-              {openingHours.map((item, index) => (
+              {activeOpeningHours.map((item, index) => (
                 <li key={index} style={{ color: PremiumTheme.colors.text.muted }}>
                   <div 
                     className="font-medium"
@@ -198,21 +215,21 @@ export function Footer({ variant = 'full' }: FooterProps) {
                   className="w-5 h-5 mt-1 mr-3" 
                   style={{ color: PremiumTheme.colors.burgundy[500] }}
                 />
-                <span style={{ color: PremiumTheme.colors.text.muted }}>25 West Street, Storrington, West Sussex, RH20 4DZ</span>
+                <span style={{ color: PremiumTheme.colors.text.muted }}>{activeAddress}</span>
               </li>
               <li className="flex items-center">
                 <FaPhone 
                   className="w-5 h-5 mr-3" 
                   style={{ color: PremiumTheme.colors.burgundy[500] }}
                 />
-                <span style={{ color: PremiumTheme.colors.text.muted }}>01903 743605</span>
+                <span style={{ color: PremiumTheme.colors.text.muted }}>{activePhone}</span>
               </li>
               <li className="flex items-center">
                 <FaEnvelope 
                   className="w-5 h-5 mr-3" 
                   style={{ color: PremiumTheme.colors.burgundy[500] }}
                 />
-                <span style={{ color: PremiumTheme.colors.text.muted }}>info@cottagetandoori.com</span>
+                <span style={{ color: PremiumTheme.colors.text.muted }}>{activeEmail}</span>
               </li>
             </ul>
           </div>

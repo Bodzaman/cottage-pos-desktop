@@ -16,9 +16,13 @@ import { HeroCarousel } from "../components/HeroCarousel";
 import { AnimatedSection } from "../components/AnimatedSection";
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { PremiumTheme } from "../utils/premiumTheme";
+import { useChatIsOpen } from "../utils/chat-store";
+import { useWebsiteData } from "../utils/useWebsiteData";
+import { loadFont, getFontFamily, DEFAULT_TITLE_FONT, DEFAULT_BODY_FONT } from "../utils/cmsFonts";
 import brain from "brain";
 
 // Restaurant images for the hero carousel
+// TODO: Migrate to Supabase storage via Website CMS image upload
 const heroImages = [
   "https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/MAIN%20RESTAURANT%20EXTERIOR%20.jpg",
   "https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/BAR%202.jpg",
@@ -144,6 +148,10 @@ function TickerBanner() {
 
 // Mobile Sticky Call Bar Component
 function MobileStickyCallBar() {
+  const isChatOpen = useChatIsOpen();
+
+  if (isChatOpen) return null;
+
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 safe-area-padding-bottom">
       <div 
@@ -185,7 +193,24 @@ export default function App() {
   const navigate = useNavigate();
   const { scrollY, shouldAnimate } = useParallax();
   const { user } = useSimpleAuth();
-  
+
+  // Load website content from DB (falls back to hardcoded constants above)
+  const heroData = useWebsiteData<{ title?: string; subtitle?: string; images?: string[]; title_font?: string; body_font?: string }>('hero');
+  const testimonialsData = useWebsiteData<{ reviews?: any[] }>('testimonials');
+  const contactData = useWebsiteData<{ opening_hours?: any[]; phones?: string[]; emails?: string[]; address?: string }>('contact');
+  const storyData = useWebsiteData<{ title?: string; paragraphs?: string[] }>('story');
+
+  // Load CMS-selected fonts dynamically
+  useEffect(() => {
+    loadFont(heroData?.title_font || DEFAULT_TITLE_FONT);
+    loadFont(heroData?.body_font || DEFAULT_BODY_FONT);
+  }, [heroData?.title_font, heroData?.body_font]);
+
+  // Use DB data with hardcoded fallbacks
+  const activeHeroImages = heroData?.images || heroImages;
+  const activeTestimonials = testimonialsData?.reviews || testimonials;
+  const activeOpeningHours = contactData?.opening_hours || openingHours;
+
   const [activeSection, setActiveSection] = useState<string | null>("home");
 
   // Auth-aware navigation function
@@ -200,11 +225,12 @@ export default function App() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen"
       style={{
         background: PremiumTheme.colors.background.primary,
-        color: PremiumTheme.colors.text.primary
+        color: PremiumTheme.colors.text.primary,
+        fontFamily: getFontFamily(heroData?.body_font, DEFAULT_BODY_FONT),
       }}
     >
       {/* Enhanced Universal Header with Glassmorphism */}
@@ -218,7 +244,7 @@ export default function App() {
       
       {/* Hero Section with Image Carousel and Frosted Glass Overlay */}
       <div className="relative h-dvh">
-        <HeroCarousel images={heroImages} />
+        <HeroCarousel images={activeHeroImages} />
         
         {/* Frosted Glass Welcome Overlay */}
         <div className="absolute inset-0 z-[5] flex items-center justify-center px-4">
@@ -246,15 +272,14 @@ export default function App() {
               >
                 Welcome to
               </span>
-              <span 
-                className="block mt-2 font-oldenglish font-bold relative text-5xl md:text-7xl lg:text-8xl"
+              <span
+                className="block mt-2 font-bold relative text-5xl md:text-7xl lg:text-8xl"
                 style={{
+                  fontFamily: getFontFamily(heroData?.title_font, DEFAULT_TITLE_FONT),
                   fontWeight: '800',
                   lineHeight: '1.1',
                   letterSpacing: '0.02em',
-                  color: '#8B1538', // Fill remains premium burgundy
-                  // H2 — Micro-specular platinum: top-left white micro highlight + charcoal edge + depth
-                  // No full stroke for maximum clarity and cross-browser stability
+                  color: '#8B1538',
                   textShadow: '-0.5px -0.5px 0 rgba(255, 255, 255, 0.20), 0 1px 0 rgba(0, 0, 0, 0.44), 0 2px 6px rgba(0, 0, 0, 0.55)',
                   marginBottom: '0.25rem'
                 }}
@@ -409,11 +434,11 @@ export default function App() {
                 {/* Left column - Story text */}
                 <div className="md:w-3/5 space-y-6">
                   <div>
-                    <h2 
+                    <h2
                       className="text-4xl font-serif uppercase tracking-[1.5px] text-shadow"
                       style={{ color: PremiumTheme.colors.text.secondary }}
                     >
-                      Our Story
+                      {storyData?.title || 'Our Story'}
                     </h2>
                     <div 
                       className="w-24 h-[1px] mt-4 mb-6"
@@ -424,10 +449,14 @@ export default function App() {
                     className="space-y-4 font-lora text-lg leading-[1.7] tracking-wide"
                     style={{ color: PremiumTheme.colors.text.secondary }}
                   >
-                    <p>Nestled in the heart of Storrington, Cottage Tandoori has been a beloved culinary destination since 1980.</p>
-                    <p>Blending rich Indian heritage with modern presentation, our menu is a celebration of timeless recipes passed down through generations.</p>
-                    <p>From our tandoor-fired breads to our signature curries, every dish is a tribute to tradition, craftsmanship, and locally sourced ingredients.</p>
-                    <p>We invite you to taste the soul of Indian cuisine — refined for today's palate.</p>
+                    {(storyData?.paragraphs || [
+                      'Nestled in the heart of Storrington, Cottage Tandoori has been a beloved culinary destination since 1980.',
+                      'Blending rich Indian heritage with modern presentation, our menu is a celebration of timeless recipes passed down through generations.',
+                      'From our tandoor-fired breads to our signature curries, every dish is a tribute to tradition, craftsmanship, and locally sourced ingredients.',
+                      'We invite you to taste the soul of Indian cuisine — refined for today\'s palate.',
+                    ]).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
                   </div>
                   <button 
                     className="mt-8 px-7 py-3 backdrop-blur-sm border rounded tracking-wider transition-all duration-300 text-base uppercase group flex items-center relative overflow-hidden before:absolute before:inset-0 before:opacity-0 hover:before:opacity-100 before:transition-opacity"
@@ -457,7 +486,7 @@ export default function App() {
                       style={{ color: PremiumTheme.colors.text.primary }}
                     >Opening Hours</h3>
                     <div className="space-y-6">
-                      {openingHours.map((item, index) => (
+                      {activeOpeningHours.map((item, index) => (
                         <div key={index} className="space-y-2">
                           <h4 
                             className="font-sans font-medium tracking-wide"
@@ -523,7 +552,7 @@ export default function App() {
             >Read what our valued guests have to say about their dining experience at Cottage Tandoori.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {testimonials.map((testimonial, index) => (
+              {activeTestimonials.map((testimonial, index) => (
                 <div 
                   key={testimonial.id} 
                   className="p-8 rounded-lg border transition-all duration-300 flex flex-col h-full"
@@ -789,7 +818,7 @@ export default function App() {
                   >Opening Hours</h3>
                 </div>
                 <ul className="space-y-2">
-                  {openingHours.map((item, index) => (
+                  {activeOpeningHours.map((item, index) => (
                     <li key={index} className="flex justify-between">
                       <span 
                         style={{ color: PremiumTheme.colors.text.secondary }}

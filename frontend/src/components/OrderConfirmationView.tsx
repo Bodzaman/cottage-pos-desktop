@@ -2,11 +2,12 @@
  * OrderConfirmationView - Order review step in unified payment flow
  * Shows THERMAL RECEIPT PREVIEW (WYSIWYG) before processing payment
  * Part of PaymentFlowOrchestrator state machine
- * 
+ *
  * This is a VIEW component (not a modal), designed to live inside the orchestrator
- * Supports two modes:
- * - "payment": Shows "Continue to Payment" CTA → proceeds to payment flow
- * - "pay-later": Shows "Confirm Pay on Collection" CTA → prints receipt directly
+ * Shows 3 CTAs:
+ * - "Take Payment Now" → proceeds to Stripe payment flow
+ * - "Pay on Collection/Delivery/at Counter" → prints receipt directly (no payment)
+ * - "Back to Cart" → closes modal and returns to cart
  */
 
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,8 @@ import {
   Home,
   Users,
   ArrowRight,
-  Edit,
+  ArrowLeft,
+  CreditCard,
   Printer
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -34,7 +36,6 @@ import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { generateDisplayNameForReceipt } from '../utils/menuHelpers';
 
 export function OrderConfirmationView({
-  mode,
   orderItems,
   orderType,
   orderTotal,
@@ -42,9 +43,8 @@ export function OrderConfirmationView({
   guestCount,
   customerData,
   deliveryFee = 0,
-  onContinueToPayment,
-  onAddToOrder,
-  onMakeChanges,
+  onTakePaymentNow,
+  onPayOnCollection,
   onBack
 }: OrderConfirmationViewProps) {
   
@@ -73,29 +73,19 @@ export function OrderConfirmationView({
     return 'Customer';
   };
 
-  // Get CTA text based on mode
-  const getCTAText = () => {
-    if (mode === 'pay-later') {
-      switch (orderType) {
-        case 'COLLECTION':
-          return 'Confirm Pay on Collection';
-        case 'DELIVERY':
-          return 'Confirm Pay on Delivery';
-        case 'WAITING':
-          return 'Confirm Pay When Ready';
-        default:
-          return 'Confirm Pay Later';
-      }
+  // Get label for "Pay Later" button based on order type
+  const getPayLaterLabel = () => {
+    switch (orderType) {
+      case 'COLLECTION':
+        return 'Pay on Collection';
+      case 'DELIVERY':
+        return 'Pay on Delivery';
+      case 'WAITING':
+        return 'Pay at Counter';
+      default:
+        return 'Pay Later';
     }
-    return 'Continue to Payment';
   };
-
-  // Get CTA icon based on mode
-  const getCTAIcon = () => {
-    return mode === 'pay-later' ? Printer : ArrowRight;
-  };
-
-  const CTAIcon = getCTAIcon();
 
   // Map order data to receipt format for ThermalReceiptDisplay
   const mapToReceiptOrderData = () => {
@@ -234,12 +224,12 @@ export function OrderConfirmationView({
       </div>
 
       {/* ============================================ */}
-      {/* FIXED FOOTER - ACTION BUTTONS */}
+      {/* FIXED FOOTER - 3 CTA BUTTONS */}
       {/* ============================================ */}
       <div className="flex-none space-y-3 pt-4 border-t border-white/10">
-        {/* Primary Action: Continue to Payment OR Confirm Pay Later */}
+        {/* Primary: Take Payment Now (Stripe) */}
         <Button
-          onClick={onContinueToPayment}
+          onClick={onTakePaymentNow}
           className="w-full h-14 text-white font-bold text-lg"
           style={{
             ...styles.frostedGlassStyle,
@@ -247,19 +237,29 @@ export function OrderConfirmationView({
             boxShadow: effects.outerGlow('medium')
           }}
         >
-          {getCTAText()}
-          <CTAIcon className="h-5 w-5 ml-2" />
+          <CreditCard className="h-5 w-5 mr-2" />
+          Take Payment Now
         </Button>
 
-        {/* Secondary Action: Edit Order */}
+        {/* Secondary: Pay on Collection/Delivery/at Counter */}
         <Button
+          onClick={onPayOnCollection}
           variant="outline"
-          onClick={onMakeChanges}
-          className="w-full h-12 border-white/20 text-white/80 hover:bg-white/10 hover:border-purple-500/50"
+          className="w-full h-12 border-white/30 text-white hover:bg-white/10 hover:border-purple-500/50"
           style={styles.frostedGlassStyle}
         >
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Order
+          <Clock className="h-4 w-4 mr-2" />
+          {getPayLaterLabel()}
+        </Button>
+
+        {/* Tertiary: Back to Cart */}
+        <Button
+          onClick={onBack}
+          variant="ghost"
+          className="w-full h-10 text-white/60 hover:text-white hover:bg-white/5"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Cart
         </Button>
       </div>
     </motion.div>

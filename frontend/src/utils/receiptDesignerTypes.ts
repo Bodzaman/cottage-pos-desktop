@@ -200,6 +200,7 @@ export interface Template {
   metadata: TemplateMetadata;
   design_data: FormData;
   paper_width?: number;
+  parent_template_id?: string | null; // Links kitchen variants to parent customer template
 }
 
 // ==================== Store State ====================

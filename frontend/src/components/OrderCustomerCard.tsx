@@ -94,15 +94,22 @@ export function OrderCustomerCard({
         </h2>
       </div>
 
-      {/* B. Segmented Control */}
-      <div className="px-3 pt-3 pb-2 flex-shrink-0">
+      {/* B. Customer Search (compact, subtle - only in empty state) */}
+      {!hasCustomerData && (
+        <div className="px-3 pt-3 pb-2 flex-shrink-0">
+          <POSCustomerSearchForm />
+        </div>
+      )}
+
+      {/* C. Segmented Control (prominent) */}
+      <div className="px-3 pt-2 pb-3 flex-shrink-0">
         <TakeawayModeToggle
           currentMode={orderType}
           onModeChange={onModeChange}
         />
       </div>
 
-      {/* C. Customer Section */}
+      {/* D. Customer Section */}
       <div className="px-3 flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Section header with mode chip */}
         <div className="flex items-center justify-between mb-2 flex-shrink-0">
@@ -135,21 +142,18 @@ export function OrderCustomerCard({
               onViewOrders={onViewOrders}
             />
           ) : (
-            /* Empty state: search + Start Order */
-            <div className="space-y-3">
-              <POSCustomerSearchForm />
-              <POSButton
-                variant="primary"
-                colorScheme={config.colorScheme}
-                fullWidth
-                onClick={onTakeOrder}
-                icon={<ModeIcon className="w-8 h-8 text-white" />}
-                subtitle={config.subtitle}
-                hint="Tap to start"
-              >
-                {config.label}
-              </POSButton>
-            </div>
+            /* Empty state: Start Order */
+            <POSButton
+              variant="primary"
+              colorScheme={config.colorScheme}
+              fullWidth
+              onClick={onTakeOrder}
+              icon={<ModeIcon className="w-8 h-8 text-white" />}
+              subtitle={config.subtitle}
+              hint="Tap to start"
+            >
+              {config.label}
+            </POSButton>
           )}
         </div>
       </div>

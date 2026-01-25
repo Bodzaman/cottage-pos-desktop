@@ -223,16 +223,18 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
     const variantName = variant.name || proteinType?.name || variant.variant_name || variant.protein_type_name || 'Standard';
 
     // Construct order item
+    // ✅ FIX: Use variantName directly (already contains the full generated name)
+    // Don't concatenate with item.name to avoid duplication like "TIKKA (starter) (KING PRAWN TIKKA (starter))"
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       menu_item_id: item.id,
       variant_id: variant.id,
-      name: `${item.name} (${variantName})`,
+      name: variantName,  // Use variant's generated name directly
       variantName: variantName,
       quantity: qty,
       price: price,
       protein_type: variant.protein_type_name,
-      image_url: item.image_url || '',
+      image_url: variant.display_image_url || variant.image_url || item.image_url || '',  // ✅ Also use variant image
       modifiers: [],
       customizations: undefined,
       item_type: 'menu_item'

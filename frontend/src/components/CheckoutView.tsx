@@ -37,6 +37,7 @@ import { useCustomerData } from '../utils/useCustomerData';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
 import brain from '../brain';
+import { useRestaurantAvailability } from '../hooks/useRestaurantAvailability';
 
 interface CheckoutViewProps {
   onNavigateToMenu: () => void;
@@ -55,6 +56,9 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
   const navigate = useNavigate();
   const { user, isAuthenticated } = useSimpleAuth();
   const { items, totalItems, totalAmount, removeItem, updateQuantityDebounced, clearCart } = useCartStore();
+
+  // Check restaurant availability (POS heartbeat system)
+  const { isAcceptingOrders, customMessage, isLoading: isCheckingAvailability } = useRestaurantAvailability();
   
   // ✅ NEW: Use proper customer data management
   const {
@@ -323,7 +327,16 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
       toast.error('Your cart is empty');
       return;
     }
-    
+
+    // Check restaurant availability (POS heartbeat system)
+    if (!isAcceptingOrders) {
+      toast.error(customMessage || 'Restaurant is temporarily unavailable', {
+        description: 'Please try again in a few minutes.',
+        duration: 5000
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {

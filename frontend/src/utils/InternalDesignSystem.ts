@@ -68,6 +68,19 @@ export const InternalTheme = {
 
     // Text
     textGradient: 'bg-gradient-to-r from-white to-internal-primary-light bg-clip-text text-transparent',
+
+    // Admin surfaces (consistent glass treatments)
+    surfacePanel: 'bg-[rgba(26,26,26,0.6)] backdrop-blur-xl border border-white/[0.05] rounded-xl shadow-lg',
+    surfaceCard: 'bg-[rgba(26,26,26,0.8)] backdrop-blur-md border border-white/[0.07] rounded-lg',
+    surfaceInset: 'bg-[rgba(15,15,15,0.4)] border border-white/[0.05] rounded-lg',
+    surfaceToolbar: 'bg-[rgba(15,15,15,0.85)] backdrop-blur-2xl border-b border-white/[0.05]',
+
+    // Focus ring (purple, offset for dark backgrounds)
+    focusRingInternal: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0F0F]',
+
+    // Motion tokens (respect reduced-motion via Tailwind's motion-safe)
+    hoverLift: 'motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-[1px]',
+    pressedScale: 'motion-safe:active:scale-[0.97] motion-safe:transition-transform motion-safe:duration-100',
   },
 };
 

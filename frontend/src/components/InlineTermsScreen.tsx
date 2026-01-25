@@ -317,7 +317,7 @@ export default function InlineTermsScreen({
           
           {/* Terms and Conditions */}
           <div className="space-y-4">
-            <div className="flex items-start space-x-3 p-4 rounded-2xl" style={{
+            <label htmlFor="terms" className="flex items-center gap-3 p-4 rounded-2xl min-h-[44px] cursor-pointer" style={{
               background: `${PremiumTheme.colors.dark[800]}60`,
               border: `1px solid ${PremiumTheme.colors.border.light}`,
               backdropFilter: 'blur(8px)'
@@ -326,20 +326,19 @@ export default function InlineTermsScreen({
                 id="terms"
                 checked={agreedToTerms}
                 onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
-                className="mt-1 flex-shrink-0"
+                className="flex-shrink-0"
                 style={{
                   borderColor: PremiumTheme.colors.burgundy[600],
                   backgroundColor: agreedToTerms ? PremiumTheme.colors.burgundy[600] : 'transparent'
                 }}
               />
-              <label 
-                htmlFor="terms" 
-                className="text-sm leading-relaxed cursor-pointer"
+              <span
+                className="text-sm leading-relaxed"
                 style={{ color: PremiumTheme.colors.text.secondary }}
               >
                 By continuing, I accept the Voice Ordering Terms and consent to recording for quality and training. Audio may vary; orders are confirmed before processing, and technical issues may require manual ordering.
-              </label>
-            </div>
+              </span>
+            </label>
           </div>
           
           {/* Call Button or Connection Status */}

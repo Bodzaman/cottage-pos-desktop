@@ -9,6 +9,7 @@ import {
   ChefHat,
   LayoutDashboard,
   Printer,
+  Globe,
 } from "lucide-react";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Separator } from '@/components/ui/separator';
@@ -33,13 +34,15 @@ const AIStaffManagementHub = lazy(() => import("../pages/AIStaffManagementHub"))
 const ThermalReceiptDesignerV2 = lazy(() => import("../pages/ThermalReceiptDesignerV2"));
 const RestaurantSettingsManager = lazy(() => import("../components/RestaurantSettingsManager"));
 const StaffManagement = lazy(() => import("../components/StaffManagement").then(module => ({ default: module.StaffManagement })));
+const WebsiteCMSContent = lazy(() => import("../components/WebsiteCMSContent"));
 
 // Define the tab types
-type TabType = "dashboard" | "menu" | "media" | "ai-management" | "print-designs" | "settings";
+type TabType = "dashboard" | "website" | "menu" | "media" | "ai-management" | "print-designs" | "settings";
 
 // Tab display names for document title and announcements
 const TAB_LABELS: Record<TabType, string> = {
   "dashboard": "Dashboard",
+  "website": "Website Management",
   "menu": "Menu Management",
   "media": "Media Library",
   "ai-management": "AI Staff Management",
@@ -86,6 +89,7 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
   
   // Refs for focus management
   const dashboardContentRef = useRef<HTMLDivElement>(null);
+  const websiteContentRef = useRef<HTMLDivElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
   const mediaContentRef = useRef<HTMLDivElement>(null);
   const aiContentRef = useRef<HTMLDivElement>(null);
@@ -99,7 +103,7 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
     
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab') as TabType;
-    return tabParam && ['dashboard', 'menu', 'media', 'ai-management', 'print-designs', 'settings'].includes(tabParam)
+    return tabParam && ['dashboard', 'website', 'menu', 'media', 'ai-management', 'print-designs', 'settings'].includes(tabParam)
       ? tabParam
       : defaultTab;
   };
@@ -119,6 +123,7 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
     // Move focus to content area for keyboard navigation
     const contentRefs: Record<TabType, React.RefObject<HTMLDivElement>> = {
       dashboard: dashboardContentRef,
+      website: websiteContentRef,
       menu: menuContentRef,
       media: mediaContentRef,
       "ai-management": aiContentRef,
@@ -148,11 +153,11 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && !e.ctrlKey && !e.shiftKey) {
-        const tabs: TabType[] = ['dashboard', 'menu', 'media', 'ai-management', 'print-designs', 'settings'];
+        const tabs: TabType[] = ['dashboard', 'website', 'menu', 'media', 'ai-management', 'print-designs', 'settings'];
         const key = e.key;
 
-        // Map Alt+1 to Alt+6 to tabs
-        if (key >= '1' && key <= '6') {
+        // Map Alt+1 to Alt+7 to tabs
+        if (key >= '1' && key <= '7') {
           e.preventDefault();
           const index = parseInt(key) - 1;
           setActiveTab(tabs[index]);
@@ -183,7 +188,7 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
         {/* Navigation landmark for tab list (WCAG 2.4.1) */}
         <nav role="navigation" aria-label="Dashboard tabs">
           <TabsList
-            className="grid w-full grid-cols-3 md:grid-cols-6"
+            className="grid w-full grid-cols-4 md:grid-cols-7"
             style={{
               backgroundColor: 'rgba(26, 26, 26, 0.6)',
               backdropFilter: 'blur(12px)',
@@ -200,49 +205,58 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
               <span className="text-xs ml-1 opacity-50">Alt+1</span>
             </TabsTrigger>
             <TabsTrigger
+              value="website"
+              className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
+              title="Website Management (Alt+2)"
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Website</span>
+              <span className="text-xs ml-1 opacity-50">Alt+2</span>
+            </TabsTrigger>
+            <TabsTrigger
               value="menu"
               className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
-              title="Menu Management (Alt+2)"
+              title="Menu Management (Alt+3)"
             >
               <ChefHat className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Menu</span>
-              <span className="text-xs ml-1 opacity-50">Alt+2</span>
+              <span className="text-xs ml-1 opacity-50">Alt+3</span>
             </TabsTrigger>
             <TabsTrigger
               value="media"
               className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
-              title="Media Library (Alt+3)"
+              title="Media Library (Alt+4)"
             >
               <ImageIcon className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Media</span>
-              <span className="text-xs ml-1 opacity-50">Alt+3</span>
+              <span className="text-xs ml-1 opacity-50">Alt+4</span>
             </TabsTrigger>
             <TabsTrigger
               value="ai-management"
               className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
-              title="AI Staff Management (Alt+4)"
+              title="AI Staff Management (Alt+5)"
             >
               <Bot className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">AI Staff</span>
-              <span className="text-xs ml-1 opacity-50">Alt+4</span>
+              <span className="text-xs ml-1 opacity-50">Alt+5</span>
             </TabsTrigger>
             <TabsTrigger
               value="print-designs"
               className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
-              title="Print Designs Studio (Alt+5)"
+              title="Print Designs Studio (Alt+6)"
             >
               <Printer className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Print Designs</span>
-              <span className="text-xs ml-1 opacity-50">Alt+5</span>
+              <span className="text-xs ml-1 opacity-50">Alt+6</span>
             </TabsTrigger>
             <TabsTrigger
               value="settings"
               className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] text-[rgba(255,255,255,0.87)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
-              title="Restaurant Settings (Alt+6)"
+              title="Restaurant Settings (Alt+7)"
             >
               <Cog className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Settings</span>
-              <span className="text-xs ml-1 opacity-50">Alt+6</span>
+              <span className="text-xs ml-1 opacity-50">Alt+7</span>
             </TabsTrigger>
           </TabsList>
         </nav>
@@ -273,6 +287,29 @@ export function AdminTabsContent({ defaultTab = "dashboard", syncWithUrl = true 
               <ErrorBoundary fallbackMessage="Failed to load dashboard. Please refresh the page.">
                 <Suspense fallback={<TabLoadingFallback />}>
                   <AdminDashboardContent onTabChange={handleTabChange} />
+                </Suspense>
+              </ErrorBoundary>
+            </motion.div>
+          </TabsContent>
+        </section>
+
+        <section aria-labelledby="website-tab">
+          <TabsContent
+            value="website"
+            className="space-y-6"
+            ref={websiteContentRef}
+            tabIndex={-1}
+          >
+            <motion.div
+              key="website-content"
+              variants={tabContentVariants}
+              initial="initial"
+              animate="animate"
+              transition={tabTransition}
+            >
+              <ErrorBoundary fallbackMessage="Failed to load website management. Please refresh the page.">
+                <Suspense fallback={<TabLoadingFallback />}>
+                  <WebsiteCMSContent />
                 </Suspense>
               </ErrorBoundary>
             </motion.div>

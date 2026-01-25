@@ -58,6 +58,8 @@ interface OrderData {
   specialInstructions?: string;
   timestamp?: string;
   guestCount?: number;
+  // Payment status for PAID badge display
+  paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
 }
 
 interface ThermalReceiptDisplayProps {
@@ -79,6 +81,9 @@ interface ThermalReceiptDisplayProps {
   // 'kitchen' or 'kitchen_customer' -> uses kitchen_template_id
   // 'front_of_house' or undefined -> uses customer_template_id
   receiptFormat?: 'front_of_house' | 'kitchen' | 'kitchen_customer';
+
+  // Payment status for PAID badge (can override orderData.paymentStatus)
+  paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
 }
 
 // ==================== Helper Functions ====================
@@ -185,7 +190,10 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
 
     // Receipt format - always FOH
     receiptFormat: 'front_of_house',
-    
+
+    // Payment status for PAID badge
+    paymentStatus: orderData.paymentStatus,
+
     // Footer messages from template
     footerMessage: baseFormData.footerMessage || '',
     terms: baseFormData.terms || '',
@@ -239,7 +247,8 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
   paperWidth = 80,
   showZoomControls = false,
   className = '',
-  receiptFormat = 'front_of_house'
+  receiptFormat = 'front_of_house',
+  paymentStatus // Optional override for PAID badge
 }, ref) => {
   const { user } = useSimpleAuth();
   const { userId } = usePOSAuth();
@@ -257,9 +266,13 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
   useEffect(() => {
     if (template) {
       const mappedData = mapOrderToFormData(orderData, template, receiptFormat);
+      // Apply paymentStatus override if provided via prop
+      if (paymentStatus) {
+        mappedData.paymentStatus = paymentStatus;
+      }
       setFormData(mappedData);
     }
-  }, [template, orderData]);
+  }, [template, orderData, paymentStatus]);
   
   /**
    * Load template by ID or order mode

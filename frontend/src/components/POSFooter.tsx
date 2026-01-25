@@ -8,6 +8,7 @@ import { useSystemStatus } from 'utils/pollingService';
 import { getOfflineStatus, onOfflineStatusChange } from '../utils/serviceWorkerManager';
 import { outboxSyncManager } from '../utils/outboxSyncManager';
 import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
+import { useOfflineBannerStore } from '../utils/offlineBannerStore';
 
 interface POSFooterProps {
   className?: string;
@@ -234,14 +235,20 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
     </div>
   );
   
-  // NEW: Offline mode indicator
+  // NEW: Offline mode indicator - clickable to reopen banner
+  const { reopenBanner } = useOfflineBannerStore();
+
   const OfflineModeIndicator = () => {
     if (!isOffline) return null;
-    
+
     const pendingOps = offlineSyncStatus?.pendingOperations || 0;
-    
+
     return (
-      <div className="flex items-center gap-1.5 group relative">
+      <button
+        onClick={reopenBanner}
+        className="flex items-center gap-1.5 group relative cursor-pointer hover:opacity-80 transition-opacity"
+        aria-label="Show offline status banner"
+      >
         <span className="text-sm">📵</span>
         <span className="text-xs font-bold text-orange-400 bg-orange-400/20 px-1.5 py-0.5 rounded text-center min-w-[20px]">
           {pendingOps}
@@ -254,8 +261,9 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
               {pendingOps} orders queued
             </div>
           )}
+          <div className="text-gray-400 text-[10px] mt-1">Click to show banner</div>
         </div>
-      </div>
+      </button>
     );
   };
   

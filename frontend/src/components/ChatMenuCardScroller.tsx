@@ -112,7 +112,7 @@ export function ChatMenuCardScroller({ items, menuRefs, messageId }: ChatMenuCar
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: (MAX_VISIBLE_CARDS * 100) / 1000 }}
-              className="flex-shrink-0 w-[172px] snap-start rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors"
+              className="flex-shrink-0 min-w-[140px] w-[min(172px,45vw)] snap-start rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors touch-manipulation"
               onClick={() => {
                 // Trigger a "show more" message in chat
                 const input = document.querySelector<HTMLTextAreaElement>('[data-chat-input]');

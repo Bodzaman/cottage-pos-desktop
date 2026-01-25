@@ -33,7 +33,7 @@ import {
 import { toast } from 'sonner';
 
 import { colors } from 'utils/designSystem';
-import { styles } from 'utils/QSAIDesign';
+import { styles, InternalTheme } from 'utils/QSAIDesign';
 import { injectAnimationStyles } from 'utils/animations';
 import {
   getUnifiedAgentConfig,
@@ -917,7 +917,7 @@ const AIStaffManagementHub: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6" style={{ backgroundColor: colors.background.primary }}>
+    <div className="p-4 sm:p-6">
       {/* Success Feedback Overlays */}
       {showSaveSuccess && (
         <SuccessFeedback 
@@ -955,7 +955,7 @@ const AIStaffManagementHub: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* LEFT PANEL: Configuration */}
         <div className="space-y-4 sm:space-y-6">
-          <Card style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.medium }}>
+          <Card className={InternalTheme.classes.surfaceCard}>
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg sm:text-xl" style={{ color: colors.text.primary }}>
                 {currentStage === 'identity' && 'Agent Identity'}
@@ -1612,7 +1612,7 @@ const AIStaffManagementHub: React.FC = () => {
           {previewPanelOpen && (
             <div className="lg:hidden space-y-4 sm:space-y-6 border-t pt-4 sm:pt-6" style={{ borderColor: colors.border.medium }}>
               {/* Persistent Passport Card */}
-              <Card className="card-stagger card-stagger-1" style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.medium }}>
+              <Card className={`card-stagger card-stagger-1 ${InternalTheme.classes.surfaceCard}`}>
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="text-base sm:text-lg" style={{ color: colors.text.primary }}>Live Agent Preview</CardTitle>
                 </CardHeader>
@@ -1624,7 +1624,7 @@ const AIStaffManagementHub: React.FC = () => {
               </Card>
 
               {/* Contextual Preview */}
-              <Card className="card-stagger card-stagger-2" style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.medium }}>
+              <Card className={`card-stagger card-stagger-2 ${InternalTheme.classes.surfaceCard}`}>
                 <CardContent className="p-4 sm:p-6">
                   {currentStage === 'identity' && (
                     <div className="space-y-4">
@@ -1797,7 +1797,7 @@ const AIStaffManagementHub: React.FC = () => {
         {/* RIGHT PANEL: Live Preview */}
         <div className="space-y-6">
           {/* Persistent Passport Card */}
-          <Card className="card-stagger card-stagger-1" style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.medium }}>
+          <Card className={`card-stagger card-stagger-1 ${InternalTheme.classes.surfaceCard}`}>
             <CardHeader>
               <CardTitle style={{ color: colors.text.primary }}>Live Agent Preview</CardTitle>
             </CardHeader>
@@ -1809,7 +1809,7 @@ const AIStaffManagementHub: React.FC = () => {
           </Card>
 
           {/* Contextual Preview */}
-          <Card className="card-stagger card-stagger-2" style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.medium }}>
+          <Card className={`card-stagger card-stagger-2 ${InternalTheme.classes.surfaceCard}`}>
             <CardContent className="p-6">
               {currentStage === 'identity' && (
                 <IdentityPreview

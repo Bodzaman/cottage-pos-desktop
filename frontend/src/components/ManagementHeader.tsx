@@ -32,6 +32,8 @@ import { OrderModel } from "types";
 import { usePOSAuth } from "../utils/usePOSAuth";
 import { AvatarDropdown } from "./AvatarDropdown";
 import { APP_BASE_PATH } from '../utils/environment';
+import { POSOnlineStatusControl } from "./POSOnlineStatusControl";
+import { useBrandFont } from "../utils/useBrandFont";
 
 
 export interface Props {
@@ -59,7 +61,8 @@ export const ManagementHeader: React.FC<Props> = ({
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showMenuManagementModal, setShowMenuManagementModal] = useState(false);
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
-  
+  const { titleFontFamily } = useBrandFont();
+
   // Get auth info for dropdown
   const { user, isAuthenticated } = usePOSAuth();
   
@@ -226,19 +229,20 @@ export const ManagementHeader: React.FC<Props> = ({
         <div className="flex-shrink-0">
           <div className="flex flex-col">
             {/* Primary Restaurant Brand */}
-            <h1 
-              className="text-2xl font-oldenglish font-bold" 
+            <h1
+              className="text-2xl font-bold"
               style={{
+                fontFamily: titleFontFamily,
                 fontSize: '2.4rem',
                 fontWeight: '800',
                 lineHeight: '1.1',
                 letterSpacing: '0.02em',
-                backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #B91C1C 100%)', // White to dark ruby red
+                backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #B91C1C 100%)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                textShadow: '0 0 20px rgba(185, 28, 28, 0.4)', // Ruby glow
-                filter: 'drop-shadow(0 2px 4px rgba(185, 28, 28, 0.3))', // Ruby shadow
+                textShadow: '0 0 20px rgba(185, 28, 28, 0.4)',
+                filter: 'drop-shadow(0 2px 4px rgba(185, 28, 28, 0.3))',
                 marginBottom: '0.25rem'
               }}
             >
@@ -309,6 +313,11 @@ export const ManagementHeader: React.FC<Props> = ({
 
         {/* Right: Settings & Tools Group - Anchored Right */}
         <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Online Orders Status Control (POS Only) */}
+          {isPOSEnvironment && (
+            <POSOnlineStatusControl />
+          )}
+
           {/* Settings & Quick Tools Group */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{
             backgroundColor: 'rgba(255, 255, 255, 0.05)',

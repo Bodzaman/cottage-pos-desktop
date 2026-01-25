@@ -39,7 +39,7 @@ import DeliverySettings from "./DeliverySettings";
 import { MediaItem, uploadMedia } from "../utils/mediaLibraryUtils";
 import brain from "brain";
 import type { POSSettings as BrainPOSSettings, PosTableResponse, CreateTableRequest, UpdateTableRequest } from "../brain/data-contracts";
-import { colors } from "../utils/InternalDesignSystem";
+import { colors, InternalTheme } from "../utils/InternalDesignSystem";
 import { Separator } from "@/components/ui/separator";
 
 // Interface for POS settings (local form state - maps to BrainPOSSettings)
@@ -692,16 +692,10 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: colors.background.primary }}>
+    <div>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <div
-            className="rounded-lg p-6 shadow-lg backdrop-blur-sm"
-            style={{
-              backgroundColor: 'rgba(26, 26, 26, 0.6)',
-              border: `1px solid ${colors.border.light}`,
-            }}
-          >
+          <div className={`p-6 ${InternalTheme.classes.surfacePanel}`}>
             <h1
               className="text-2xl font-bold mb-6"
               style={{ color: colors.text.primary }}
@@ -710,7 +704,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
             </h1>
             
             {/* Settings Navigation */}
-            <div className="flex space-x-1 mb-8 p-1 rounded-lg" style={{ backgroundColor: colors.background.secondary }}>
+            <div className={`flex space-x-1 mb-8 p-1 ${InternalTheme.classes.surfaceInset}`}>
               {[
                 { id: "profile", label: "Restaurant Profile", icon: Building },
                 { id: "pos", label: "POS Settings", icon: CreditCard },
@@ -743,11 +737,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
               <div className="space-y-6">
                 {/* Basic Restaurant Information */}
                 <div
-                  className="rounded-lg p-6 backdrop-blur-sm shadow-lg"
-                  style={{
-                    backgroundColor: 'rgba(26, 26, 26, 0.6)',
-                    border: `1px solid ${colors.border.light}`,
-                  }}
+                  className={`p-6 ${InternalTheme.classes.surfaceCard}`}
                 >
                   <div className="flex items-center mb-4">
                     <Building className="h-5 w-5 mr-2" style={{ color: colors.purple.primary }} />
@@ -1131,11 +1121,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
             {activeSection === "pos" && (
               <div className="space-y-6">
                 <div
-                  className="rounded-lg p-6 backdrop-blur-sm shadow-lg"
-                  style={{
-                    backgroundColor: 'rgba(26, 26, 26, 0.6)',
-                    border: `1px solid ${colors.border.light}`,
-                  }}
+                  className={`p-6 ${InternalTheme.classes.surfaceCard}`}
                 >
                   <div className="flex items-center mb-4">
                     <CreditCard className="h-5 w-5 mr-2" style={{ color: colors.purple.primary }} />
@@ -1462,11 +1448,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
               <div className="space-y-6">
                 {/* Password Management */}
                 <div
-                  className="rounded-lg p-6 backdrop-blur-sm shadow-lg"
-                  style={{
-                    backgroundColor: 'rgba(26, 26, 26, 0.6)',
-                    border: `1px solid ${colors.border.light}`,
-                  }}
+                  className={`p-6 ${InternalTheme.classes.surfaceCard}`}
                 >
                   <div className="flex items-center mb-4">
                     <KeyRound className="h-5 w-5 mr-2" style={{ color: colors.purple.primary }} />
@@ -1583,11 +1565,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                 
                 {/* Account Information */}
                 <div
-                  className="rounded-lg p-6 backdrop-blur-sm shadow-lg"
-                  style={{
-                    backgroundColor: 'rgba(26, 26, 26, 0.6)',
-                    border: `1px solid ${colors.border.light}`,
-                  }}
+                  className={`p-6 ${InternalTheme.classes.surfaceCard}`}
                 >
                   <div className="flex items-center mb-4">
                     <SettingsIcon className="h-5 w-5 mr-2" style={{ color: colors.purple.primary }} />

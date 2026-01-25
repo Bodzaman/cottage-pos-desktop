@@ -7,12 +7,15 @@ import { PremiumTheme } from "utils/premiumTheme";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useSimpleAuth } from "utils/simple-auth-context";
+import { useWebsiteData } from "utils/useWebsiteData";
 
 export default function About() {
   const { isAdmin } = useSimpleAuth();
   const navigate = useNavigate();
   const [selectedArticle, setSelectedArticle] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+
+  const heritageData = useWebsiteData<{ title?: string; paragraphs?: string[] }>('about_heritage');
 
   useEffect(() => {
     // Scroll to top when component mounts
@@ -41,10 +44,11 @@ export default function About() {
         />
       </div>
       {/* Hero Section */}
+      {/* TODO: Static images below should be migrated to Supabase storage via Website CMS */}
       <section className="relative h-[40dvh] md:h-[60dvh] flex items-center">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}></div>
-          <img 
+          <img
             src="https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/MAIN RESTAURANT EXTERIOR .jpg" 
             alt="Cottage Tandoori Restaurant" 
             className="w-full h-full object-cover"
@@ -65,23 +69,22 @@ export default function About() {
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1">
-              <h2 className="text-3xl font-serif mb-4" style={{ color: PremiumTheme.colors.text.primary }}>Our Heritage</h2>
+              <h2 className="text-3xl font-serif mb-4" style={{ color: PremiumTheme.colors.text.primary }}>{heritageData?.title || 'Our Heritage'}</h2>
               <div className="w-20 h-1 mb-6" style={{ backgroundColor: PremiumTheme.colors.burgundy[500] }}></div>
-              <p className="mb-6" style={{ color: PremiumTheme.colors.text.secondary }}>
-                Nestled in the charming village of Storrington West Sussex, we at The Cottage Tandoori have been proudly serving authentic Indian cuisine since 1980.
-              </p>
-              <p className="mb-6" style={{ color: PremiumTheme.colors.text.secondary }}>
-                As a family-owned and operated restaurant, our goal has always been to bring the vibrant flavours of the Indian subcontinent to our community, all from our charming period flint cottage.
-              </p>
-              <p className="mb-6" style={{ color: PremiumTheme.colors.text.secondary }}>
-                As one of the first Indian restaurants in the area, we take pride in being pioneers, introducing our guests to diverse Indian flavours and traditional cooking methods.
-              </p>
-              <p style={{ color: PremiumTheme.colors.text.secondary }}>
-                Over the past four decades, we have been honoured with numerous accolades, a testament to both the quality of our menu and our commitment to excellent service. Today, we continue to be a cherished part of Storrington's dining scene, welcoming guests to experience the authentic tastes of India in a warm and inviting atmosphere.
-              </p>
+              {(heritageData?.paragraphs || [
+                'Nestled in the charming village of Storrington West Sussex, we at The Cottage Tandoori have been proudly serving authentic Indian cuisine since 1980.',
+                'As a family-owned and operated restaurant, our goal has always been to bring the vibrant flavours of the Indian subcontinent to our community, all from our charming period flint cottage.',
+                'As one of the first Indian restaurants in the area, we take pride in being pioneers, introducing our guests to diverse Indian flavours and traditional cooking methods.',
+                'Over the past four decades, we have been honoured with numerous accolades, a testament to both the quality of our menu and our commitment to excellent service. Today, we continue to be a cherished part of Storrington\'s dining scene, welcoming guests to experience the authentic tastes of India in a warm and inviting atmosphere.',
+              ]).map((para, i, arr) => (
+                <p key={i} className={i < arr.length - 1 ? 'mb-6' : ''} style={{ color: PremiumTheme.colors.text.secondary }}>
+                  {para}
+                </p>
+              ))}
             </div>
+            {/* TODO: Heritage images to be migrated to Supabase storage via Website CMS */}
             <div className="order-1 md:order-2 grid grid-cols-2 gap-4">
-              <img 
+              <img
                 src="https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/INSIDE RESTAURANT IMAGE 1.png" 
                 alt="Cottage Tandoori in the 1980s" 
                 className="rounded-lg shadow-2xl w-full h-auto"

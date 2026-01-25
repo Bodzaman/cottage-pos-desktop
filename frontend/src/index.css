@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Cloister Black';
+  src: url('/fonts/OldeEnglish%203.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -775,6 +783,41 @@ select:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee {
     animation-play-state: paused !important;
+  }
+}
+
+/* ============================================
+   OFFLINE BANNER MARQUEE
+   Seamless looping for offline status banner
+   ============================================ */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee-scroll 25s linear infinite;
+}
+
+/* Pause on hover for accessibility */
+.marquee-container:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-content {
+    animation: none;
   }
 }
 

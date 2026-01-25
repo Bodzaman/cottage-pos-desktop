@@ -2,7 +2,7 @@ import React from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { UploadIcon, RefreshCw, CheckSquare, X, Trash2, ListChecks, Loader2, FolderOpen } from 'lucide-react';
-import { colors } from '../utils/InternalDesignSystem';
+import { colors, InternalTheme } from '../utils/InternalDesignSystem';
 import MenuImagesTab from 'components/MenuImagesTab';
 import AIAvatarTab from 'components/AIAvatarTab';
 import GeneralMediaTab from 'components/GeneralMediaTab';
@@ -288,11 +288,7 @@ export function MediaLibraryContent({
       {/* NEW: Batch Selection Toolbar */}
       {selectionMode !== 'pick' && (
         <div
-          className="flex items-center justify-between gap-4 p-4 rounded-lg"
-          style={{
-            backgroundColor: 'rgba(26, 26, 26, 0.6)',
-            border: `1px solid ${colors.border.light}`,
-          }}
+          className={`flex items-center justify-between gap-4 p-4 ${InternalTheme.classes.surfaceCard}`}
         >
           {!batchSelection.isSelectionMode ? (
             <div className="flex items-center gap-3">
@@ -415,11 +411,7 @@ export function MediaLibraryContent({
               style={{ backgroundColor: 'rgba(15, 15, 15, 0.8)' }}
             >
               <div
-                className="rounded-lg p-6 shadow-xl flex items-center gap-3"
-                style={{
-                  backgroundColor: colors.background.secondary,
-                  border: `1px solid ${colors.border.accent}`,
-                }}
+                className={`p-6 shadow-xl flex items-center gap-3 ${InternalTheme.classes.surfaceCard}`}
               >
                 <Loader2 className="h-5 w-5 animate-spin" style={{ color: colors.purple.primary }} />
                 <span className="text-sm font-medium" style={{ color: colors.text.primary }}>Filtering...</span>
@@ -429,11 +421,7 @@ export function MediaLibraryContent({
 
           {/* Gallery Content - Unified display of filtered assets */}
           <div
-            className="rounded-lg p-6"
-            style={{
-              backgroundColor: 'rgba(26, 26, 26, 0.6)',
-              border: `1px solid ${colors.border.light}`,
-            }}
+            className={`p-6 ${InternalTheme.classes.surfacePanel}`}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-24">

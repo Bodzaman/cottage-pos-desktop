@@ -1,76 +1,76 @@
-import React, { useCallback, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { usePOSAuth } from "utils/usePOSAuth";
+import { AnimatePresence, motion } from "framer-motion";
+import { WifiOff } from "lucide-react";
 import { colors } from "../utils/InternalDesignSystem";
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useAdminAppRouting } from "../hooks/useAdminAppRouting";
+import { AdminAppLauncher } from "../components/AdminAppLauncher";
+import { AdminAppShell } from "../components/AdminAppShell";
 
-// Import static components
-import AdminHeader from "../components/AdminHeader";
-import { AdminTabsContent } from "../components/AdminTabsContent";
+const launcherVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] } },
+};
 
-// Main Admin Component
+const appShellVariants = {
+  initial: { opacity: 0, y: 20, scale: 0.98 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: [0.2, 0.8, 0.2, 1] } },
+  exit: { opacity: 0, y: 20, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } },
+};
+
 function Admin() {
-  const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading, logout } = usePOSAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'menu';
-  const selectedItemId = searchParams.get('item');
-  const { 
-    menuItems, 
-    categories, 
-    itemVariants,
-    refreshData, 
-    isLoading: menuLoading 
-  } = useRealtimeMenuStore();
+  const { user, isLauncherView, activeApp, openApp, backToLauncher, backToPOS, logout, isOnline, isAdminUser } = useAdminAppRouting();
 
-  // ============================================================================
-  // AUTHENTICATION GUARD - PHASE 7
-  // ============================================================================
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/pos-login', { replace: true });
-    }
-  }, [isLoading, isAuthenticated, navigate]);
-
-  // Show nothing while checking authentication
-  if (isLoading || !isAuthenticated || !user) {
-    return null;
-  }
-
-  // Memoized handlers for better performance
-  const handleBackToHome = useCallback(() => {
-    navigate("/pos-desktop");
-  }, [navigate]);
-
-  const handleLogout = useCallback(() => {
-    logout();
-    navigate("/pos-login");
-  }, [logout, navigate]);
+  if (!user) return null;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ backgroundColor: colors.background.primary }}
-    >
-      <div className="container mx-auto p-6">
-        {/* Header with semantic banner role */}
-        <header role="banner">
-          <AdminHeader
-            userEmail={user.username}
-            onBackToPOS={handleBackToHome}
-            onLogout={handleLogout}
-            showBackButton={true}
-            isStandalone={true}
-          />
-        </header>
+    <div className="min-h-screen" style={{ backgroundColor: colors.background.primary }}>
+      {/* Offline Banner */}
+      <AnimatePresence>
+        {!isOnline && (
+          <motion.div
+            initial={{ opacity: 0, y: -40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -40 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 py-2 px-4"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
+              backdropFilter: 'blur(8px)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <WifiOff className="w-4 h-4 text-white" />
+            <span className="text-sm font-medium text-white">
+              You're offline. Some features may be unavailable.
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Main content with semantic main role */}
-        <main role="main" aria-label="Admin Dashboard">
-          {/* Main Tabs - single source of truth */}
-          <AdminTabsContent syncWithUrl={true} />
-        </main>
-      </div>
+      <AnimatePresence mode="wait">
+        {isLauncherView ? (
+          <motion.div key="launcher" variants={launcherVariants} initial="initial" animate="animate" exit="exit">
+            <AdminAppLauncher
+              onOpenApp={openApp}
+              userEmail={user.username}
+              onLogout={logout}
+              onBackToPOS={isAdminUser ? undefined : backToPOS}
+              isOnline={isOnline}
+            />
+          </motion.div>
+        ) : (
+          <motion.div key={`app-${activeApp}`} variants={appShellVariants} initial="initial" animate="animate" exit="exit">
+            <AdminAppShell
+              activeApp={activeApp!}
+              onBack={backToLauncher}
+              userEmail={user.username}
+              onLogout={logout}
+              onBackToPOS={isAdminUser ? undefined : backToPOS}
+              isOnline={isOnline}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

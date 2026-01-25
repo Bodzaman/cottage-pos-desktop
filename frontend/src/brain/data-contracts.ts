@@ -2320,6 +2320,12 @@ export interface CreatePaymentIntentRequest {
    * Payment description
    */
   description?: string | null;
+  /**
+   * Pos Mode
+   * If true, restrict to card payments only (for POS)
+   * @default false
+   */
+  pos_mode?: boolean;
 }
 
 /**

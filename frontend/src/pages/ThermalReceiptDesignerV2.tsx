@@ -15,7 +15,7 @@
 
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { QSAITheme } from 'utils/QSAIDesign';
+import { QSAITheme, InternalTheme } from 'utils/QSAIDesign';
 import { useReceiptDesignerStoreV2, selectFormData, selectFormatToggle, selectHasUnsavedChanges, selectCurrentTemplate, selectTemplatesList } from 'utils/receiptDesignerStoreV2';
 import { ReceiptDesignerService } from 'utils/receiptDesignerService';
 import { EmptyStateCard } from 'components/EmptyStateCard';
@@ -412,17 +412,8 @@ export default function ThermalReceiptDesignerV2() {
   // ==================== Render Helpers ====================
 
   const renderLoadingState = () => (
-    <div 
-      className="min-h-screen flex items-center justify-center"
-      style={{ backgroundColor: QSAITheme.background.primary }}
-    >
-      <Card
-        className="p-8 text-center"
-        style={{
-          backgroundColor: QSAITheme.background.panel,
-          border: `1px solid ${QSAITheme.border.light}`
-        }}
-      >
+    <div className="flex items-center justify-center py-24">
+      <Card className={`p-8 text-center ${InternalTheme.classes.surfaceCard}`}>
         <CardContent className="flex flex-col items-center gap-4 pt-6">
           <Loader2 
             className="h-12 w-12 animate-spin" 
@@ -440,10 +431,7 @@ export default function ThermalReceiptDesignerV2() {
   );
 
   const renderEmptyState = () => (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ backgroundColor: QSAITheme.background.primary }}
-    >
+    <div className="flex items-center justify-center py-24">
       <EmptyStateCard
         onCreateBlank={handleCreateBlank}
         onLoadFromLibrary={handleLoadFromLibrary}
@@ -453,17 +441,8 @@ export default function ThermalReceiptDesignerV2() {
   );
 
   const renderBrowsingState = () => (
-    <div 
-      className="min-h-screen flex items-center justify-center p-8"
-      style={{ backgroundColor: QSAITheme.background.primary }}
-    >
-      <Card
-        className="max-w-2xl w-full text-center p-8"
-        style={{
-          backgroundColor: QSAITheme.background.panel,
-          border: `1px solid ${QSAITheme.border.light}`
-        }}
-      >
+    <div className="flex items-center justify-center p-8 py-24">
+      <Card className={`max-w-2xl w-full text-center p-8 ${InternalTheme.classes.surfaceCard}`}>
         <CardContent className="flex flex-col items-center gap-6 pt-6">
           <div className="flex items-center justify-center w-20 h-20 rounded-full" style={{ backgroundColor: `${QSAITheme.purple.primary}20` }}>
             <FolderOpen className="h-10 w-10" style={{ color: QSAITheme.purple.primary }} />
@@ -547,10 +526,7 @@ export default function ThermalReceiptDesignerV2() {
   );
 
   const renderEditingState = () => (
-    <div
-      className="flex flex-col h-dvh"
-      style={{ backgroundColor: QSAITheme.background.primary }}
-    >
+    <div className="flex flex-col h-dvh">
       {/* Header - Fixed */}
       <ReceiptDesignerHeader
         currentTemplate={currentTemplate}
@@ -569,13 +545,7 @@ export default function ThermalReceiptDesignerV2() {
       />
 
       {/* Template Format Indicator Badge */}
-      <div
-        className="px-6 py-2 border-b"
-        style={{
-          backgroundColor: QSAITheme.background.secondary,
-          borderColor: QSAITheme.border.light
-        }}
-      >
+      <div className={`px-6 py-2 ${InternalTheme.classes.surfaceToolbar}`}>
         <div className="flex items-center gap-2">
           <span className="text-white/60 text-sm">Template Format:</span>
           <span
@@ -611,7 +581,7 @@ export default function ThermalReceiptDesignerV2() {
         </div>
 
         {/* Right Column: Preview (50%, sticky) */}
-        <div className="w-1/2 border-l" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="w-1/2 border-l border-white/[0.07]">
           <ReceiptPreviewV2
             formData={formData}
             formatToggle={formatToggle}

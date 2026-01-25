@@ -3,7 +3,7 @@ import React, { forwardRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { colors } from 'utils/designSystem';
+import { InternalTheme } from '../utils/InternalDesignSystem';
 
 interface AdminInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -38,10 +38,10 @@ export const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
         case 'purple':
           return {
             background: 'rgba(26, 26, 26, 0.8)',
-            border: '1px solid rgba(124, 93, 250, 0.3)',
-            focusBorder: 'rgba(124, 93, 250, 0.8)',
-            shadow: '0 0 0 3px rgba(124, 93, 250, 0.1)',
-            glow: '0 0 8px rgba(124, 93, 250, 0.2)'
+            border: '1px solid rgba(124, 58, 237, 0.3)',
+            focusBorder: 'rgba(124, 58, 237, 0.8)',
+            shadow: '0 0 0 3px rgba(124, 58, 237, 0.1)',
+            glow: '0 0 8px rgba(124, 58, 237, 0.2)'
           };
         case 'teal':
           return {
@@ -63,9 +63,9 @@ export const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
           return {
             background: 'rgba(26, 26, 26, 0.8)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            focusBorder: 'rgba(124, 93, 250, 0.6)',
-            shadow: '0 0 0 3px rgba(124, 93, 250, 0.1)',
-            glow: '0 0 8px rgba(124, 93, 250, 0.15)'
+            focusBorder: 'rgba(124, 58, 237, 0.6)',
+            shadow: '0 0 0 3px rgba(124, 58, 237, 0.1)',
+            glow: '0 0 8px rgba(124, 58, 237, 0.15)'
           };
       }
     };
@@ -121,9 +121,8 @@ export const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
               "transition-all duration-300 ease-in-out",
               "backdrop-blur-sm",
               "text-white placeholder:text-gray-400",
-              "border-0 outline-none ring-0",
-              // Focus states with enhanced styling
-              "focus:outline-none focus:ring-0",
+              "border-0 outline-none",
+              InternalTheme.classes.focusRingInternal,
               // Error states
               error && "border-red-500/50 bg-red-900/10",
               className

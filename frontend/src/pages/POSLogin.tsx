@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, AlertTriangle, Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePOSAuth } from 'utils/usePOSAuth';
+import { usePOSAuth, UserRole } from 'utils/usePOSAuth';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { AnimatedNucleus } from 'components/AnimatedNucleus';
 import { PINPad } from 'components/PINPad';
@@ -25,12 +25,17 @@ export default function POSLogin() {
   const [shakeError, setShakeError] = useState(false);
 
   const navigate = useNavigate();
-  const { login, loginWithPin, setPin, isAuthenticated, isLoading, pinEnabled, lastUserId, lastUserName } = usePOSAuth();
+  const { login, loginWithPin, setPin, isAuthenticated, isLoading, pinEnabled, lastUserId, lastUserName, lastUserRole, user } = usePOSAuth();
 
   // Determine initial view: PIN login if previously configured, otherwise password
   const [view, setView] = useState<LoginView>(
     pinEnabled && lastUserId ? 'pin-login' : 'password'
   );
+
+  // Helper function to get redirect destination based on role
+  const getRedirectPath = (role: UserRole | null | undefined): string => {
+    return role === 'admin' ? '/admin' : '/pos-desktop';
+  };
   
   // ============================================================================
   // NAVIGATION GUARDS - PREVENT REDIRECT LOOPS
@@ -39,7 +44,7 @@ export default function POSLogin() {
   const lastRedirectTimeRef = useRef(0);
   const REDIRECT_COOLDOWN = 1000; // 1 second cooldown between redirects
 
-  // ✅ ENABLED: Redirect to POSDesktop if already authenticated
+  // ✅ ENABLED: Redirect based on role if already authenticated
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     const now = Date.now();
@@ -48,12 +53,13 @@ export default function POSLogin() {
     // Don't redirect during PIN setup
     if (view === 'pin-setup') return;
 
-    if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated && user) {
       hasRedirectedRef.current = true;
       lastRedirectTimeRef.current = now;
-      navigate('/pos-desktop', { replace: true });
+      const redirectPath = getRedirectPath(user.role);
+      navigate(redirectPath, { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, view]);
+  }, [isAuthenticated, isLoading, navigate, view, user]);
   
   // ✅ ENABLED: Reset redirect guard
   useEffect(() => {
@@ -70,18 +76,28 @@ export default function POSLogin() {
     try {
       await login(username, password);
 
+      // Get current user from store after login
+      const currentUser = usePOSAuth.getState().user;
+      const userRole = currentUser?.role;
+      const redirectPath = getRedirectPath(userRole);
+
       // If PIN not yet configured, prompt to set one
+      // For admin users, PIN is MANDATORY (no skip option)
       if (!pinEnabled) {
         setLoginSuccess(true);
-        toast.success('Login successful — set a quick PIN');
+        if (userRole === 'admin') {
+          toast.success('Login successful — PIN setup required for offline access');
+        } else {
+          toast.success('Login successful — set a quick PIN');
+        }
         setView('pin-setup');
         return;
       }
 
-      // PIN already configured — go straight to POS
+      // PIN already configured — redirect based on role
       setLoginSuccess(true);
       toast.success('Welcome back!');
-      navigate('/pos-desktop', { replace: true });
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       console.error('Login failed:', err);
       toast.error(err instanceof Error ? err.message : 'Invalid username or password');
@@ -188,7 +204,10 @@ export default function POSLogin() {
                 const success = await loginWithPin(pin);
                 if (success) {
                   toast.success('Welcome back!');
-                  setTimeout(() => navigate('/pos-desktop', { replace: true }), 300);
+                  // Redirect based on role (use lastUserRole for offline, or current user role)
+                  const currentUser = usePOSAuth.getState().user;
+                  const redirectPath = getRedirectPath(currentUser?.role || lastUserRole);
+                  setTimeout(() => navigate(redirectPath, { replace: true }), 300);
                 }
                 return success;
               }}
@@ -234,21 +253,40 @@ export default function POSLogin() {
                 const success = await setPin(pin);
                 if (success) {
                   toast.success('PIN set successfully!');
-                  setTimeout(() => navigate('/pos-desktop', { replace: true }), 500);
+                  // Redirect based on role after PIN setup
+                  const currentUser = usePOSAuth.getState().user;
+                  const redirectPath = getRedirectPath(currentUser?.role);
+                  setTimeout(() => navigate(redirectPath, { replace: true }), 500);
                 }
                 return success;
               }}
               isLoading={isLoading}
             />
-            <button
-              onClick={() => navigate('/pos-desktop', { replace: true })}
-              className="w-full text-center text-xs mt-4 transition-colors duration-200"
-              style={{ color: QSAITheme.text.muted }}
-              onMouseEnter={(e) => e.currentTarget.style.color = QSAITheme.purple.light}
-              onMouseLeave={(e) => e.currentTarget.style.color = QSAITheme.text.muted}
-            >
-              Skip for now
-            </button>
+            {/* Skip button only available for staff - Admin PIN is mandatory for offline access */}
+            {user?.role !== 'admin' && (
+              <button
+                onClick={() => {
+                  const currentUser = usePOSAuth.getState().user;
+                  const redirectPath = getRedirectPath(currentUser?.role);
+                  navigate(redirectPath, { replace: true });
+                }}
+                className="w-full text-center text-xs mt-4 transition-colors duration-200"
+                style={{ color: QSAITheme.text.muted }}
+                onMouseEnter={(e) => e.currentTarget.style.color = QSAITheme.purple.light}
+                onMouseLeave={(e) => e.currentTarget.style.color = QSAITheme.text.muted}
+              >
+                Skip for now
+              </button>
+            )}
+            {/* Admin PIN mandatory notice */}
+            {user?.role === 'admin' && (
+              <p
+                className="w-full text-center text-xs mt-4"
+                style={{ color: QSAITheme.text.muted }}
+              >
+                PIN is required for Admin offline access
+              </p>
+            )}
           </motion.div>
         )}
 

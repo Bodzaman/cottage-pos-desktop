@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, PhoneOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { triggerHaptic } from 'utils/haptics';
 
 interface VoiceCallOverlayProps {
   agentName: string;
@@ -102,11 +103,15 @@ export function VoiceCallOverlay({
         </div>
       )}
 
-      {/* Hang Up Button */}
+      {/* Hang Up Button - Touch optimized with haptic feedback */}
       <Button
-        onClick={onHangUp}
+        onClick={() => {
+          triggerHaptic('heavy'); // Provide tactile feedback for critical action
+          onHangUp();
+        }}
+        onTouchStart={() => triggerHaptic('light')} // Light feedback on initial touch
         size="lg"
-        className="bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-6 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
+        className="bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-6 rounded-full shadow-lg transition-all duration-200 hover:scale-105 min-h-[56px] min-w-[120px] touch-manipulation active:scale-95"
       >
         <PhoneOff className="h-6 w-6 mr-2" />
         Hang Up

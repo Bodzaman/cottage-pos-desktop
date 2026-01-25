@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { colors } from 'utils/designSystem';
+import { InternalTheme } from '../utils/InternalDesignSystem';
 
 interface AdminButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'success';
@@ -33,13 +33,13 @@ export const AdminButton = forwardRef<HTMLButtonElement, AdminButtonProps>(
       switch (variant) {
         case 'primary':
           return {
-            background: 'linear-gradient(145deg, rgba(124, 93, 250, 0.9), rgba(124, 93, 250, 0.7))',
-            border: '1px solid rgba(124, 93, 250, 0.5)',
+            background: 'linear-gradient(145deg, rgba(124, 58, 237, 0.9), rgba(124, 58, 237, 0.7))',
+            border: '1px solid rgba(124, 58, 237, 0.5)',
             color: '#FFFFFF',
-            hoverBg: 'linear-gradient(145deg, rgba(124, 93, 250, 1), rgba(124, 93, 250, 0.9))',
-            hoverBorder: '1px solid rgba(124, 93, 250, 0.8)',
-            shadow: '0 4px 12px rgba(124, 93, 250, 0.3)',
-            hoverShadow: '0 6px 20px rgba(124, 93, 250, 0.4)'
+            hoverBg: 'linear-gradient(145deg, rgba(124, 58, 237, 1), rgba(124, 58, 237, 0.9))',
+            hoverBorder: '1px solid rgba(124, 58, 237, 0.8)',
+            shadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+            hoverShadow: '0 6px 20px rgba(124, 58, 237, 0.4)'
           };
         case 'secondary':
           return {
@@ -54,12 +54,12 @@ export const AdminButton = forwardRef<HTMLButtonElement, AdminButtonProps>(
         case 'outline':
           return {
             background: 'transparent',
-            border: '1px solid rgba(124, 93, 250, 0.5)',
-            color: 'rgba(124, 93, 250, 0.9)',
-            hoverBg: 'rgba(124, 93, 250, 0.1)',
-            hoverBorder: '1px solid rgba(124, 93, 250, 0.8)',
-            shadow: '0 2px 8px rgba(124, 93, 250, 0.1)',
-            hoverShadow: '0 4px 12px rgba(124, 93, 250, 0.2)'
+            border: '1px solid rgba(124, 58, 237, 0.5)',
+            color: 'rgba(124, 58, 237, 0.9)',
+            hoverBg: 'rgba(124, 58, 237, 0.1)',
+            hoverBorder: '1px solid rgba(124, 58, 237, 0.8)',
+            shadow: '0 2px 8px rgba(124, 58, 237, 0.1)',
+            hoverShadow: '0 4px 12px rgba(124, 58, 237, 0.2)'
           };
         case 'ghost':
           return {
@@ -145,9 +145,9 @@ export const AdminButton = forwardRef<HTMLButtonElement, AdminButtonProps>(
         className={cn(
           // Base styling
           "relative overflow-hidden transition-all duration-300 ease-in-out",
-          "backdrop-blur-sm border-0 outline-none ring-0",
-          "focus:outline-none focus:ring-0",
-          "transform hover:scale-[1.02] active:scale-[0.98]",
+          "backdrop-blur-sm border-0 outline-none",
+          InternalTheme.classes.focusRingInternal,
+          "motion-safe:transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.97]",
           // Full width
           fullWidth && "w-full",
           // Disabled state

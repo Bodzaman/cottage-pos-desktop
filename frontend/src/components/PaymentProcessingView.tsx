@@ -8,7 +8,9 @@
 import { useState, useEffect } from 'react';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
-  PaymentElement,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
   Elements,
   useStripe,
   useElements,
@@ -39,13 +41,19 @@ enum ProcessingState {
 function StripePaymentForm({
   orderId,
   totalAmount,
+  clientSecret,
+  customerName,
   onPaymentSuccess,
   onPaymentFailed,
+  onBack,
 }: {
   orderId: string;
   totalAmount: number;
+  clientSecret: string;
+  customerName?: string;
   onPaymentSuccess: (data: { method: 'STRIPE'; amount: number; pspReference?: string }) => void;
   onPaymentFailed: (errorMessage: string) => void;
+  onBack: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -65,13 +73,20 @@ function StripePaymentForm({
     try {
       console.log('💳 [Stripe] Confirming payment...');
 
-      // Confirm the payment
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/pos-desktop`,
+      // Get the CardNumberElement (individual element)
+      const cardNumberElement = elements.getElement(CardNumberElement);
+      if (!cardNumberElement) {
+        throw new Error('Card number element not found');
+      }
+
+      // Confirm the payment using CardNumberElement
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardNumberElement,
+          billing_details: {
+            name: customerName || 'POS Customer',
+          },
         },
-        redirect: 'if_required', // Only redirect if 3DS is required
       });
 
       if (error) {
@@ -132,16 +147,52 @@ function StripePaymentForm({
     }
   };
 
+  // Shared style for all card elements
+  // disableLink: true prevents Link autofill button from appearing
+  // This is for POS staff use - customers should not save cards via POS terminal
+  const cardElementStyle = {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#FFFFFF',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        '::placeholder': {
+          color: '#9CA3AF',
+        },
+        iconColor: '#A78BFA',
+      },
+      invalid: {
+        color: '#EF4444',
+        iconColor: '#EF4444',
+      },
+    },
+    disableLink: true,
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Payment Element */}
-      <div className="min-h-[200px]">
-        <PaymentElement
-          options={{
-            layout: 'tabs',
-            paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
-          }}
-        />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Card Number */}
+      <div className="space-y-1">
+        <label className="text-sm text-white/70">Card Number</label>
+        <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+          <CardNumberElement options={cardElementStyle} />
+        </div>
+      </div>
+
+      {/* Expiry and CVC side by side */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-sm text-white/70">Expiry Date</label>
+          <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+            <CardExpiryElement options={cardElementStyle} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm text-white/70">CVC</label>
+          <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+            <CardCvcElement options={cardElementStyle} />
+          </div>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -159,25 +210,34 @@ function StripePaymentForm({
         </Card>
       )}
 
-      {/* Submit Button */}
+      {/* Pay Button */}
       <Button
         type="submit"
         disabled={!stripe || isProcessing}
-        className="w-full h-14 text-white font-bold text-lg"
+        className="w-full h-14 text-lg font-semibold text-white"
         style={{
-          ...styles.frostedGlassStyle,
-          background: QSAITheme.purple.primary,
+          background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.dark} 100%)`,
+          border: 'none',
+          boxShadow: `0 0 20px ${QSAITheme.purple.glow}`,
         }}
       >
         {isProcessing ? (
           <>
-            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
             Processing...
           </>
         ) : (
-          `Pay ${safeCurrency(totalAmount)}`
+          <>
+            <CheckCircle2 className="h-5 w-5 mr-2" />
+            Pay {safeCurrency(totalAmount)}
+          </>
         )}
       </Button>
+
+      {/* Keyboard hint */}
+      <p className="text-xs text-white/40 text-center mt-3">
+        Enter card details using keyboard • Press Enter to pay
+      </p>
 
       {/* Processing Overlay */}
       {isProcessing && (
@@ -257,6 +317,7 @@ export function PaymentProcessingView({
         customer_email: undefined,
         customer_name: customerName || 'POS Customer',
         description: `POS Order - ${orderType}`,
+        pos_mode: true, // POS: Restrict to card-only (no Klarna, Revolut, etc.)
       });
       
       const intentData = await intentResponse.json();
@@ -406,7 +467,7 @@ export function PaymentProcessingView({
       >
         <CardContent className="p-6 text-center">
           <div className="text-sm text-white/60 mb-2">Amount to Pay</div>
-          <div className="text-4xl font-bold" style={{ color: QSAITheme.purple.primary }}>
+          <div className="text-5xl font-black text-white drop-shadow-lg">
             {safeCurrency(totalAmount)}
           </div>
         </CardContent>
@@ -444,8 +505,11 @@ export function PaymentProcessingView({
                   <StripePaymentForm
                     orderId={orderId}
                     totalAmount={totalAmount}
+                    clientSecret={clientSecret}
+                    customerName={customerName}
                     onPaymentSuccess={handleStripeSuccess}
                     onPaymentFailed={handleStripeError}
+                    onBack={onBack}
                   />
                 </Elements>
               </CardContent>
@@ -557,10 +621,41 @@ export function PaymentProcessingView({
             disabled={processingState === ProcessingState.INITIALIZING}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Payment Method
+            Back to Order
           </Button>
         </div>
       )}
+
+      {/* SaaS Branding Footer */}
+      <div className="text-center pt-6">
+        {/* "powered by" - smaller */}
+        <div
+          className="text-[10px] font-medium tracking-wide mb-0.5"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.5) 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '0.05em'
+          }}
+        >
+          powered by
+        </div>
+        {/* "QuickServe AI Merchant Services" - larger */}
+        <div
+          className="text-xs font-medium tracking-wide"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.7) 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            textShadow: '0 0 10px rgba(124, 93, 250, 0.2)',
+            letterSpacing: '0.02em'
+          }}
+        >
+          QuickServe AI Merchant Services
+        </div>
+      </div>
     </motion.div>
   );
 }

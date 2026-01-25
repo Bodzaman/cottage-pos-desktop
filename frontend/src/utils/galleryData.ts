@@ -1,6 +1,9 @@
 /**
  * Gallery images data for Cottage Tandoori Restaurant
  * Categories: food, venue
+ *
+ * TODO: These static images should be migrated to Supabase storage
+ * via the Website CMS image upload once the migration is completed.
  */
 
 export interface GalleryImage {

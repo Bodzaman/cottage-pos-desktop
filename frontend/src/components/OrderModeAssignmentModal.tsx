@@ -5,17 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Settings, Save, RefreshCw, Eye, Users, Car, Phone, Globe, Clock, ChefHat, CheckCircle, AlertCircle, FileText, ArrowRight, Utensils } from 'lucide-react';
+import { Save, RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle, FileText, ArrowRight, Utensils, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { QSAITheme, styles } from 'utils/QSAIDesign';
 import {
-  listReceiptTemplates,
+  listParentTemplates,
   getTemplateAssignments,
-  setTemplateAssignment
+  setTemplateAssignment,
+  getKitchenVariant
 } from 'utils/receiptTemplateSupabase';
 
 // Order mode definitions
@@ -29,11 +28,9 @@ interface OrderMode {
 
 interface TemplateAssignment {
   order_mode: string;
-  kitchen_template_id: string | null;
-  kitchen_template_name?: string | null;
-  customer_template_id: string | null;
-  customer_template_name?: string | null;
-  is_default: boolean;
+  template_id: string | null;  // Parent template ID (simplified from dual-select)
+  template_name?: string | null;
+  kitchen_variant_id?: string | null;  // Auto-resolved kitchen variant
 }
 
 interface Template {
@@ -112,13 +109,13 @@ export function OrderModeAssignmentModal({
     try {
       setIsLoading(true);
 
-      // Load templates and assignments concurrently using Supabase direct
+      // Load only parent templates (excludes kitchen variants) and assignments
       const [templatesResult, assignmentsResult] = await Promise.all([
-        listReceiptTemplates(),
+        listParentTemplates(),
         getTemplateAssignments()
       ]);
 
-      // Process templates
+      // Process templates - only parent templates shown in dropdown
       let templatesList: Template[] = [];
       if (templatesResult.success && templatesResult.data) {
         // Transform from nested structure to flat Template structure
@@ -129,32 +126,25 @@ export function OrderModeAssignmentModal({
           created_at: ''
         }));
         setTemplates(templatesList);
-        templatesRef.current = templatesList; // Store in ref for immediate access
+        templatesRef.current = templatesList;
       }
 
       if (assignmentsResult.success && assignmentsResult.data) {
-        // Handle assignments as object with UPPERCASE keys from Supabase
+        // Handle assignments - use customer_template_id as the primary template
         const existingAssignments = assignmentsResult.data;
         const fullAssignments = ORDER_MODES.map(mode => {
-          // Convert mode.id to uppercase to match backend storage format
           const orderModeUpper = mode.id.toUpperCase();
           const assignmentData = existingAssignments[orderModeUpper];
 
-          // Load SEPARATE template IDs for kitchen and customer
-          const kitchenTemplateId = assignmentData?.kitchen_template_id || null;
-          const customerTemplateId = assignmentData?.customer_template_id || null;
-
-          // Find template names for display
-          const kitchenTemplate = templatesList.find(t => t.id === kitchenTemplateId);
-          const customerTemplate = templatesList.find(t => t.id === customerTemplateId);
+          // Use customer_template_id as the single template reference
+          const templateId = assignmentData?.customer_template_id || null;
+          const template = templatesList.find(t => t.id === templateId);
 
           return {
             order_mode: mode.id,
-            kitchen_template_id: kitchenTemplateId,
-            kitchen_template_name: kitchenTemplate?.name || null,
-            customer_template_id: customerTemplateId,
-            customer_template_name: customerTemplate?.name || null,
-            is_default: false
+            template_id: templateId,
+            template_name: template?.name || null,
+            kitchen_variant_id: assignmentData?.kitchen_template_id || null
           };
         });
         setAssignments(fullAssignments);
@@ -162,11 +152,9 @@ export function OrderModeAssignmentModal({
         // Initialize empty assignments if no data
         setAssignments(ORDER_MODES.map(mode => ({
           order_mode: mode.id,
-          kitchen_template_id: null,
-          kitchen_template_name: null,
-          customer_template_id: null,
-          customer_template_name: null,
-          is_default: false
+          template_id: null,
+          template_name: null,
+          kitchen_variant_id: null
         })));
       }
     } catch (error) {
@@ -177,35 +165,26 @@ export function OrderModeAssignmentModal({
     }
   };
   
-  // Update KITCHEN template assignment
-  const updateKitchenAssignment = (orderMode: string, templateId: string | null) => {
-    // Use templatesRef instead of templates state to avoid race condition
+  // Update template assignment (simplified single-select)
+  const updateAssignment = async (orderMode: string, templateId: string | null) => {
     const template = templatesRef.current.find(t => t.id === templateId);
+
+    // Get the kitchen variant ID for this template
+    let kitchenVariantId: string | null = null;
+    if (templateId) {
+      const kitchenResult = await getKitchenVariant(templateId);
+      if (kitchenResult.success && kitchenResult.data) {
+        kitchenVariantId = kitchenResult.data.id;
+      }
+    }
 
     setAssignments(prev => prev.map(assignment =>
       assignment.order_mode === orderMode
         ? {
             ...assignment,
-            kitchen_template_id: templateId,
-            kitchen_template_name: template?.name || null
-          }
-        : assignment
-    ));
-
-    setHasChanges(true);
-  };
-
-  // Update CUSTOMER (Front of House) template assignment
-  const updateCustomerAssignment = (orderMode: string, templateId: string | null) => {
-    // Use templatesRef instead of templates state to avoid race condition
-    const template = templatesRef.current.find(t => t.id === templateId);
-
-    setAssignments(prev => prev.map(assignment =>
-      assignment.order_mode === orderMode
-        ? {
-            ...assignment,
-            customer_template_id: templateId,
-            customer_template_name: template?.name || null
+            template_id: templateId,
+            template_name: template?.name || null,
+            kitchen_variant_id: kitchenVariantId
           }
         : assignment
     ));
@@ -217,16 +196,15 @@ export function OrderModeAssignmentModal({
     try {
       setIsSaving(true);
 
-      // Save ALL assignments using Supabase direct - includes those with at least one template and those being cleared
+      // Save ALL assignments - uses template_id for customer, kitchen_variant_id for kitchen
       const savePromises = assignments.map(assignment => {
-        // Convert order mode to uppercase format (DINE_IN, COLLECTION, DELIVERY, WAITING)
         const orderModeUpper = assignment.order_mode.toUpperCase();
 
-        // Save SEPARATE values for kitchen and customer templates
+        // Save customer template as customer_template_id, kitchen variant as kitchen_template_id
         return setTemplateAssignment(
           orderModeUpper,
-          assignment.customer_template_id,
-          assignment.kitchen_template_id
+          assignment.template_id,           // Customer template
+          assignment.kitchen_variant_id     // Auto-resolved kitchen variant
         );
       });
 
@@ -235,10 +213,7 @@ export function OrderModeAssignmentModal({
       const failures = results.filter(r => !r.success);
 
       if (failures.length === 0) {
-        // Count how many assignments were made
-        const assignedCount = assignments.filter(
-          a => a.kitchen_template_id || a.customer_template_id
-        ).length;
+        const assignedCount = assignments.filter(a => a.template_id).length;
 
         toast.success('Template assignments saved successfully!', {
           description: `${assignedCount} order mode${assignedCount !== 1 ? 's' : ''} configured`
@@ -248,7 +223,7 @@ export function OrderModeAssignmentModal({
         // Auto-close modal on success
         onClose();
 
-        // Trigger parent callback to refresh/reopen Template Management Modal
+        // Trigger parent callback to refresh
         onAssignmentUpdate?.();
       } else {
         throw new Error(`Failed to save ${failures.length} assignments`);
@@ -271,23 +246,12 @@ export function OrderModeAssignmentModal({
   };
   
   const getAssignmentStatus = () => {
-    // Count based on BOTH templates being assigned
-    const fullyAssigned = assignments.filter(
-      a => a.kitchen_template_id && a.customer_template_id
-    ).length;
-
-    const partiallyAssigned = assignments.filter(
-      a => (a.kitchen_template_id || a.customer_template_id) &&
-           !(a.kitchen_template_id && a.customer_template_id)
-    ).length;
-
-    const unassigned = assignments.filter(
-      a => !a.kitchen_template_id && !a.customer_template_id
-    ).length;
-
+    // Simplified: assigned if template_id is set (kitchen variant is auto-resolved)
+    const assigned = assignments.filter(a => a.template_id).length;
+    const unassigned = assignments.filter(a => !a.template_id).length;
     const total = assignments.length;
 
-    return { fullyAssigned, partiallyAssigned, unassigned, total };
+    return { assigned, unassigned, total };
   };
   
   const status = getAssignmentStatus();
@@ -313,18 +277,14 @@ export function OrderModeAssignmentModal({
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-400" />
-              <span className="text-sm">{status.fullyAssigned} Fully Assigned</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400" />
-              <span className="text-sm">{status.partiallyAssigned} Partial</span>
+              <span className="text-sm">{status.assigned} Assigned</span>
             </div>
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400" />
               <span className="text-sm">{status.unassigned} Unassigned</span>
             </div>
             <Badge variant="secondary" className="ml-auto">
-              {status.fullyAssigned}/{status.total} Complete
+              {status.assigned}/{status.total} Complete
             </Badge>
           </div>
         </DialogHeader>
@@ -346,10 +306,7 @@ export function OrderModeAssignmentModal({
                     if (!modeConfig) return null;
 
                     const IconComponent = modeConfig.icon;
-                    const hasKitchenTemplate = !!assignment.kitchen_template_id;
-                    const hasCustomerTemplate = !!assignment.customer_template_id;
-                    const isFullyAssigned = hasKitchenTemplate && hasCustomerTemplate;
-                    const isPartiallyAssigned = hasKitchenTemplate || hasCustomerTemplate;
+                    const isAssigned = !!assignment.template_id;
 
                     return (
                       <motion.div
@@ -359,7 +316,7 @@ export function OrderModeAssignmentModal({
                         transition={{ delay: index * 0.1 }}
                       >
                         <Card
-                          className={`transition-all duration-200 ${isFullyAssigned ? 'ring-2 ring-green-500/20' : isPartiallyAssigned ? 'ring-2 ring-amber-500/20' : ''}`}
+                          className={`transition-all duration-200 ${isAssigned ? 'ring-2 ring-green-500/20' : ''}`}
                           style={styles.glassCard}
                         >
                           <CardHeader className="pb-3">
@@ -383,15 +340,10 @@ export function OrderModeAssignmentModal({
                               </div>
 
                               <div className="flex items-center gap-2">
-                                {isFullyAssigned ? (
+                                {isAssigned ? (
                                   <Badge variant="secondary" className="bg-green-600/20 text-green-300">
                                     <CheckCircle className="w-3 h-3 mr-1" />
-                                    Fully Assigned
-                                  </Badge>
-                                ) : isPartiallyAssigned ? (
-                                  <Badge variant="secondary" className="bg-amber-600/20 text-amber-300">
-                                    <AlertCircle className="w-3 h-3 mr-1" />
-                                    Partial
+                                    Assigned
                                   </Badge>
                                 ) : (
                                   <Badge variant="secondary" className="bg-red-600/20 text-red-300">
@@ -404,87 +356,50 @@ export function OrderModeAssignmentModal({
                           </CardHeader>
 
                           <CardContent>
-                            {/* Two-column grid: FOH (left) and Kitchen (right) */}
-                            <div className="grid grid-cols-2 gap-4">
-                              {/* LEFT: Front of House (Customer) Template */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <FileText className="w-4 h-4" style={{ color: '#a78bfa' }} />
-                                  Front of House (Customer)
-                                </Label>
-                                <Select
-                                  value={assignment.customer_template_id || 'none'}
-                                  onValueChange={(value) =>
-                                    updateCustomerAssignment(assignment.order_mode, value === 'none' ? null : value)
-                                  }
-                                >
-                                  <SelectTrigger className="w-full" style={styles.glassCard}>
-                                    <SelectValue placeholder="Select template..." />
-                                  </SelectTrigger>
-                                  <SelectContent style={styles.frostedGlassStyle}>
-                                    <SelectItem value="none">
+                            {/* Single template select - kitchen variant is auto-resolved */}
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <FileText className="w-4 h-4" style={{ color: '#a78bfa' }} />
+                                Receipt Template
+                              </Label>
+                              <Select
+                                value={assignment.template_id || 'none'}
+                                onValueChange={(value) =>
+                                  updateAssignment(assignment.order_mode, value === 'none' ? null : value)
+                                }
+                              >
+                                <SelectTrigger className="w-full" style={styles.glassCard}>
+                                  <SelectValue placeholder="Select template..." />
+                                </SelectTrigger>
+                                <SelectContent style={styles.frostedGlassStyle}>
+                                  <SelectItem value="none">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                      No template assigned
+                                    </div>
+                                  </SelectItem>
+                                  {templates.map((template) => (
+                                    <SelectItem key={template.id} value={template.id}>
                                       <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                                        No template assigned
+                                        <FileText className="w-4 h-4" />
+                                        <span className="font-medium">{template.name}</span>
                                       </div>
                                     </SelectItem>
-                                    {templates.map((template) => (
-                                      <SelectItem key={template.id} value={template.id}>
-                                        <div className="flex items-center gap-2">
-                                          <FileText className="w-4 h-4" />
-                                          <span className="font-medium">{template.name}</span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">Receipt given to customers</p>
-                                {assignment.customer_template_name && (
-                                  <div className="text-xs text-purple-400">
-                                    Current: {assignment.customer_template_name}
-                                  </div>
-                                )}
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Info about auto-resolved kitchen variant */}
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-amber-500/10 rounded-md p-2">
+                                <ChefHat className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                <span>Kitchen variant will be used automatically for kitchen prints</span>
                               </div>
 
-                              {/* RIGHT: Kitchen Copy Template */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <ChefHat className="w-4 h-4" style={{ color: '#fbbf24' }} />
-                                  Kitchen Copy
-                                </Label>
-                                <Select
-                                  value={assignment.kitchen_template_id || 'none'}
-                                  onValueChange={(value) =>
-                                    updateKitchenAssignment(assignment.order_mode, value === 'none' ? null : value)
-                                  }
-                                >
-                                  <SelectTrigger className="w-full" style={styles.glassCard}>
-                                    <SelectValue placeholder="Select template..." />
-                                  </SelectTrigger>
-                                  <SelectContent style={styles.frostedGlassStyle}>
-                                    <SelectItem value="none">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                                        No template assigned
-                                      </div>
-                                    </SelectItem>
-                                    {templates.map((template) => (
-                                      <SelectItem key={template.id} value={template.id}>
-                                        <div className="flex items-center gap-2">
-                                          <ChefHat className="w-4 h-4" />
-                                          <span className="font-medium">{template.name}</span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">Ticket for kitchen staff</p>
-                                {assignment.kitchen_template_name && (
-                                  <div className="text-xs text-amber-400">
-                                    Current: {assignment.kitchen_template_name}
-                                  </div>
-                                )}
-                              </div>
+                              {assignment.template_name && (
+                                <div className="text-xs text-purple-400">
+                                  Current: {assignment.template_name}
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -502,7 +417,7 @@ export function OrderModeAssignmentModal({
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-400">
               {hasChanges ? (
-                <span className="text-amber-400">• You have unsaved changes</span>
+                <span className="text-amber-400">Unsaved changes</span>
               ) : (
                 <span>All changes saved</span>
               )}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   FaMapMarkerAlt,
@@ -16,9 +16,33 @@ import { UniversalHeader } from "components/UniversalHeader";
 import { Footer } from "components/Footer";
 import { PremiumTheme } from "utils/premiumTheme";
 import { Card, CardContent } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom"; // FIXED: Add useNavigate import
+import { useNavigate } from "react-router-dom";
+import { useWebsiteData } from "utils/useWebsiteData";
 
 export default function Contact() {
+  const contactData = useWebsiteData<{ opening_hours?: any[]; phones?: string[]; emails?: string[]; address?: string }>('contact');
+
+  const activePhone = contactData?.phones?.[0] || '01903 743605';
+  const activeEmail = contactData?.emails?.[0] || 'info@cottagetandoori.com';
+  const activeAddress = contactData?.address || '25 West Street\nStorrington\nPulborough\nWest Sussex\nRH20 4DZ';
+
+  const defaultWeekdayHours = [
+    { day: "Monday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
+    { day: "Tuesday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
+    { day: "Wednesday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
+    { day: "Thursday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
+  ];
+  const defaultWeekendHours = [
+    { day: "Friday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:30 PM" },
+    { day: "Saturday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:30 PM" },
+    { day: "Sunday", hours: "12:00 PM - 3:00 PM | 5:00 PM - 10:00 PM" },
+  ];
+
+  // If CMS has detailed_hours (individual day entries), use those; otherwise use defaults
+  const detailedHours = (contactData as any)?.detailed_hours as { day: string; hours: string }[] | undefined;
+  const weekdayHours = detailedHours?.slice(0, 4) || defaultWeekdayHours;
+  const weekendHours = detailedHours?.slice(4) || defaultWeekendHours;
+
   useEffect(() => {
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
@@ -42,10 +66,11 @@ export default function Contact() {
       />
       
       {/* Hero Section */}
+      {/* TODO: Static image below should be migrated to Supabase storage via Website CMS */}
       <section className="relative h-[40dvh] md:h-[60dvh] flex items-center pt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-black opacity-60 z-10"></div>
-          <img 
+          <img
             src="https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/MAIN RESTAURANT EXTERIOR .jpg" 
             alt="Cottage Tandoori Restaurant" 
             className="w-full h-full object-cover"
@@ -111,10 +136,10 @@ export default function Contact() {
                       >
                         Call us now
                       </p>
-                      <a 
-                        href="tel:01903743605" 
+                      <a
+                        href={`tel:${activePhone.replace(/\s/g, '')}`}
                         className="text-2xl font-bold transition-colors duration-300"
-                        style={{ 
+                        style={{
                           color: PremiumTheme.colors.text.primary,
                           fontFamily: PremiumTheme.typography.fontFamily.serif
                         }}
@@ -125,7 +150,7 @@ export default function Contact() {
                           e.currentTarget.style.color = PremiumTheme.colors.text.primary;
                         }}
                       >
-                        01903 743605
+                        {activePhone}
                       </a>
                     </div>
                   </div>
@@ -139,7 +164,7 @@ export default function Contact() {
                   {/* Action Buttons */}
                   <div className="flex items-center space-x-4">
                     <a 
-                      href="tel:01903743605"
+                      href={`tel:${activePhone.replace(/\s/g, '')}`}
                       className="px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2 text-white"
                       style={{
                         backgroundColor: PremiumTheme.colors.burgundy[500]
@@ -252,15 +277,13 @@ export default function Contact() {
                   >
                     Visit Us
                   </h3>
-                  <p 
+                  <p
                     className="leading-relaxed"
                     style={{ color: PremiumTheme.colors.text.secondary }}
                   >
-                    25 West Street<br />
-                    Storrington<br />
-                    Pulborough<br />
-                    West Sussex<br />
-                    RH20 4DZ
+                    {activeAddress.split('\n').map((line, i, arr) => (
+                      <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
+                    ))}
                   </p>
                   <a 
                     href="https://www.google.com/maps/dir//25+West+St,+Storrington,+Pulborough+RH20+4DZ"
@@ -319,8 +342,8 @@ export default function Contact() {
                     className="text-2xl font-bold mb-2"
                     style={{ color: PremiumTheme.colors.text.primary }}
                   >
-                    <a 
-                      href="tel:01903743605" 
+                    <a
+                      href={`tel:${activePhone.replace(/\s/g, '')}`}
                       className="transition-colors"
                       style={{ color: PremiumTheme.colors.text.primary }}
                       onMouseEnter={(e) => {
@@ -330,17 +353,17 @@ export default function Contact() {
                         e.currentTarget.style.color = PremiumTheme.colors.text.primary;
                       }}
                     >
-                      01903 743605
+                      {activePhone}
                     </a>
                   </p>
-                  <p 
+                  <p
                     className="mb-4"
                     style={{ color: PremiumTheme.colors.text.muted }}
                   >
                     For reservations & takeaway orders
                   </p>
                   <a 
-                    href="tel:01903743605"
+                    href={`tel:${activePhone.replace(/\s/g, '')}`}
                     className="inline-block px-6 py-2 rounded-lg transition-all duration-300"
                     style={{
                       backgroundColor: PremiumTheme.colors.burgundy[500],
@@ -395,7 +418,7 @@ export default function Contact() {
                     style={{ color: PremiumTheme.colors.text.primary }}
                   >
                     <a 
-                      href="mailto:info@cottagetandoori.com" 
+                      href={`mailto:${activeEmail}`} 
                       className="transition-colors"
                       style={{ color: PremiumTheme.colors.text.primary }}
                       onMouseEnter={(e) => {
@@ -405,7 +428,7 @@ export default function Contact() {
                         e.currentTarget.style.color = PremiumTheme.colors.text.primary;
                       }}
                     >
-                      info@cottagetandoori.com
+                      {activeEmail}
                     </a>
                   </p>
                   <p 
@@ -415,7 +438,7 @@ export default function Contact() {
                     General inquiries & feedback
                   </p>
                   <a 
-                    href="mailto:info@cottagetandoori.com"
+                    href={`mailto:${activeEmail}`}
                     className="inline-block px-6 py-2 rounded-lg transition-all duration-300"
                     style={{
                       backgroundColor: PremiumTheme.colors.burgundy[500],
@@ -533,12 +556,7 @@ export default function Contact() {
                 <CardContent className="p-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      {[
-                        { day: "Monday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
-                        { day: "Tuesday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
-                        { day: "Wednesday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" },
-                        { day: "Thursday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:00 PM" }
-                      ].map((item, index, array) => (
+                      {weekdayHours.map((item, index, array) => (
                         <div 
                           key={index}
                           className={`flex items-center justify-between py-3 ${index !== array.length - 1 ? 'border-b' : ''}`}
@@ -556,11 +574,7 @@ export default function Contact() {
                     </div>
                     
                     <div className="space-y-4">
-                      {[
-                        { day: "Friday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:30 PM" },
-                        { day: "Saturday", hours: "12:00 PM - 2:00 PM | 5:00 PM - 10:30 PM" },
-                        { day: "Sunday", hours: "12:00 PM - 3:00 PM | 5:00 PM - 10:00 PM" }
-                      ].map((item, index, array) => (
+                      {weekendHours.map((item, index, array) => (
                         <div 
                           key={index}
                           className={`flex items-center justify-between py-3 ${index !== array.length - 1 ? 'border-b' : ''}`}

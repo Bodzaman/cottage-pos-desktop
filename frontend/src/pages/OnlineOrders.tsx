@@ -48,6 +48,7 @@ import { KeyboardShortcutsHelp } from 'components/KeyboardShortcutsHelp';
 import { ErrorBoundary } from 'components/ErrorBoundary';
 import { OnlineOrdersErrorFallback } from 'components/OnlineOrdersErrorFallback';
 import { logError, createCartErrorContext } from 'utils/errorLogger';
+import { RestaurantStatusBanner } from 'components/RestaurantStatusBanner';
 
 // Add view mode type
 type ViewMode = 'gallery' | 'compact';
@@ -1118,11 +1119,11 @@ export default function OnlineOrders() {
         }}
       >
         {/* Universal Header with PUBLIC_NAV context for full navigation - Z-INDEX: 50 */}
-        <div 
+        <div
           ref={headerRef}
           className="sticky top-0 z-50"
         >
-          <UniversalHeader 
+          <UniversalHeader
             context="ORDERING_NAV"
             overrideConfig={true}
             transparent={false}
@@ -1130,6 +1131,8 @@ export default function OnlineOrders() {
             showCart={true}
             onCartClick={openCart}
           />
+          {/* Restaurant Status Banner - Shows when POS is offline, sticky on mobile */}
+          <RestaurantStatusBanner sticky={true} />
         </div>
         
         {/* **UPDATED: Sticky Category Tabs Bar - Z-INDEX: 40 (Above AI panel) */}

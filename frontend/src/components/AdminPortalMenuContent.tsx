@@ -28,7 +28,7 @@ import {
   getPublishedSnapshot,
   getItemsWithSnapshots
 } from "../utils/supabaseQueries";
-import { colors } from "../utils/InternalDesignSystem";
+import { colors, InternalTheme } from "../utils/InternalDesignSystem";
 import { useQueryClient } from '@tanstack/react-query';
 import { useCategories, useMenuItems, useProteinTypes, menuKeys } from '../utils/menuQueries';
 import { useRealtimeMenuStore } from "../utils/realtimeMenuStore";
@@ -472,11 +472,7 @@ export default function AdminPortalMenuContent() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div
-          className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-md"
-          style={{
-            backgroundColor: 'rgba(26, 26, 26, 0.8)',
-            borderBottom: `1px solid ${colors.border.light}`,
-          }}
+          className={`flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 ${InternalTheme.classes.surfaceToolbar}`}
         >
           <div className="flex flex-wrap gap-2 sm:gap-3 items-center justify-between">
             <h2

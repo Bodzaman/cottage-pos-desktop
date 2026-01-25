@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Maximize2, Minimize2, X, Bot, Send, Loader2, Phone, PhoneOff, Mic, MicOff, User, Copy, Trash2, RotateCcw, ShoppingCart, Check, Square } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -680,7 +680,38 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   
   // NEW (MYA-1581): Voice maintenance modal state
   const [showVoiceMaintenanceModal, setShowVoiceMaintenanceModal] = useState(false);
-  
+
+  // iOS keyboard-aware height: track visual viewport shrinking when keyboard opens
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setViewportHeight(null);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleResize = () => {
+      // Only apply on mobile-width screens where the modal is full-screen
+      if (window.innerWidth < 768) {
+        setViewportHeight(viewport.height);
+      }
+    };
+
+    viewport.addEventListener('resize', handleResize, { passive: true });
+    viewport.addEventListener('scroll', handleResize, { passive: true });
+
+    // Set initial value
+    handleResize();
+
+    return () => {
+      viewport.removeEventListener('resize', handleResize);
+      viewport.removeEventListener('scroll', handleResize);
+    };
+  }, [isOpen]);
+
   // NEW: Get global cart actions
   const toggleChatCart = useCartStore((state) => state.toggleChatCart);
   const isChatCartOpen = useCartStore((state) => state.isChatCartOpen);
@@ -742,43 +773,65 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     }
   }, [messages, isNearBottom]);
   
-  // NEW: Handle scroll position tracking
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const element = e.currentTarget;
-    const scrollTop = element.scrollTop;
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
-    
-    // Calculate distance from bottom
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
-    // User is near bottom if within 100px
-    const nearBottom = distanceFromBottom < 100;
-    setIsNearBottom(nearBottom);
-    
-    // Show scroll button if scrolled up more than 200px
-    setShowScrollButton(distanceFromBottom > 200);
-  };
-  
-  // NEW: Scroll to bottom function
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // NEW: Debounced scroll position tracking for better mobile performance
+  // Uses useMemo to create a stable debounced handler that prevents jank on low-end devices
+  const handleScroll = useMemo(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    return (e: React.UIEvent<HTMLDivElement>) => {
+      // Clear pending timeout to debounce rapid scroll events
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const element = e.currentTarget;
+        if (!element) return;
+
+        const scrollTop = element.scrollTop;
+        const scrollHeight = element.scrollHeight;
+        const clientHeight = element.clientHeight;
+
+        // Calculate distance from bottom
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+        // User is near bottom if within 100px
+        const nearBottom = distanceFromBottom < 100;
+        setIsNearBottom(nearBottom);
+
+        // Show scroll button if scrolled up more than 200px
+        setShowScrollButton(distanceFromBottom > 200);
+      }, 16); // ~60fps debounce
+    };
+  }, []);
+
+  // Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  // NEW: Scroll to bottom function with reduced motion support
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth'
+    });
+  }, [prefersReducedMotion]);
   
   // Auto-resize textarea based on content
+  // NOTE: Uses requestAnimationFrame to batch DOM measurements and avoid
+  // interfering with iOS virtual keyboard, autocorrect, and predictive text
   useEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) return;
-    
-    // Reset height to auto to get the correct scrollHeight
-    textarea.style.height = 'auto';
-    
-    // Set height to scrollHeight, capped at max-height (200px)
-    const newHeight = Math.min(textarea.scrollHeight, 200);
-    textarea.style.height = `${newHeight}px`;
-    
-    // Auto-scroll to cursor position (keeps active line visible)
-    textarea.scrollTop = textarea.scrollHeight;
+
+    requestAnimationFrame(() => {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+
+      // Set height to scrollHeight, capped at max-height (200px)
+      const newHeight = Math.min(textarea.scrollHeight, 200);
+      textarea.style.height = `${newHeight}px`;
+
+      // REMOVED: textarea.scrollTop assignment - let browser handle cursor visibility
+      // This was causing issues with iOS keyboard behavior and predictive text
+    });
   }, [inputValue]);
   
   // Use the config from the store instead of hardcoded defaults
@@ -805,10 +858,13 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
-    
+
     const messageText = inputValue.trim();
     setInputValue('');
-    
+
+    // Blur input to dismiss mobile keyboard after sending
+    inputRef.current?.blur();
+
     try {
       await sendMessage(messageText);
     } catch (error) {
@@ -909,7 +965,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', duration: 0.4 }}
           className={cn(
-            "fixed inset-0 z-[40] flex items-center justify-center p-4",
+            "fixed inset-0 z-[60] flex items-center justify-center p-4",
             "pointer-events-none" // Allow clicks through to background
           )}
         >
@@ -928,7 +984,9 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
             )}
             style={{
               borderColor: PremiumTheme.colors.border.medium,
-              backgroundColor: PremiumTheme.colors.background.secondary
+              backgroundColor: PremiumTheme.colors.background.secondary,
+              // iOS keyboard-aware: override height when visual viewport shrinks
+              ...(viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : {})
             }}
           >
             {/* Header */}
@@ -1019,11 +1077,14 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                 }}
               >
                 {/* Messages Container */}
-                <div 
+                <div
                   ref={messagesContainerRef}
                   onScroll={handleScroll}
-                  className="flex-1 overflow-y-auto relative"
-                  style={{ backgroundColor: PremiumTheme.colors.background.primary }}
+                  className="flex-1 overflow-y-auto relative overscroll-contain"
+                  style={{
+                    backgroundColor: PremiumTheme.colors.background.primary,
+                    WebkitOverflowScrolling: 'touch', // iOS momentum scrolling
+                  }}
                 >
                   {/* Normal chat messages view */}
                   <div className={cn(
@@ -1121,7 +1182,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                           </motion.p>
                         </div>
                         
-                        {/* Feature Pills */}
+                        {/* Feature Pills - Touch optimized with 44px minimum height */}
                         <motion.div
                           initial={{ y: 20, opacity: 0 }}
                           animate={{ y: 0, opacity: 1 }}
@@ -1135,16 +1196,25 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                             <motion.button
                               key={feature}
                               onClick={() => handlePillClick(feature)}
+                              onTouchStart={(e) => {
+                                // Provide immediate visual feedback on touch
+                                e.currentTarget.style.transform = 'scale(0.97)';
+                              }}
+                              onTouchEnd={(e) => {
+                                // Reset transform on touch end
+                                e.currentTarget.style.transform = '';
+                              }}
                               disabled={isLoading}
                               initial={{ scale: 0, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
                               transition={{ delay: 0.4 + idx * 0.1, type: "spring", bounce: 0.5 }}
                               className={cn(
                                 "rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 text-orange-300 font-medium backdrop-blur-sm",
-                                "px-4 py-2 text-sm",
-                                "sm:px-3 sm:py-1.5 sm:text-xs", // Smaller on mobile
+                                "px-4 py-2 text-sm min-h-[44px]", // 44px minimum touch target
+                                "sm:px-3 sm:py-1.5 sm:text-xs sm:min-h-[44px]", // Maintain touch target on mobile
                                 "cursor-pointer hover:from-orange-500/20 hover:to-red-500/20 hover:border-orange-500/30 hover:scale-105 transition-all duration-200",
-                                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                                "touch-manipulation active:scale-95" // Better touch response
                               )}
                             >
                               {feature}
@@ -1520,6 +1590,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                           disabled={isVoiceCallActive || isLoading}
                           className={cn(
                             "flex-shrink-0 flex items-center gap-2",
+                            "min-h-[44px] min-w-[44px] justify-center",
                             "text-green-500 hover:text-green-400",
                             "disabled:opacity-50 disabled:cursor-not-allowed",
                             "transition-all duration-200",
@@ -1540,7 +1611,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                         <button
                           onClick={stopGeneration}
                           className={cn(
-                            "flex-shrink-0 h-9 w-9 rounded-full",
+                            "flex-shrink-0 h-11 w-11 rounded-full",
                             "flex items-center justify-center",
                             "transition-all duration-200 shadow-md hover:shadow-lg hover:scale-110",
                             "bg-gray-600 hover:bg-gray-500"
@@ -1555,7 +1626,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                           onClick={handleSendMessage}
                           disabled={!inputValue.trim() || isLoading || isVoiceCallActive}
                           className={cn(
-                            "flex-shrink-0 h-9 w-9 rounded-full",
+                            "flex-shrink-0 h-11 w-11 rounded-full",
                             "flex items-center justify-center",
                             "disabled:opacity-50 disabled:cursor-not-allowed",
                             "transition-all duration-200 shadow-md hover:shadow-lg hover:scale-110"
@@ -1592,8 +1663,8 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       {showVoiceTCScreen && (
         <div 
           className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ 
-            zIndex: 9999,
+          style={{
+            zIndex: 70,
             backgroundColor: 'rgba(0, 0, 0, 0.85)',
             backdropFilter: 'blur(8px)'
           }}

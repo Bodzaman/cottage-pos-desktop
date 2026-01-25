@@ -327,12 +327,15 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
       >
         <div className="p-4">
           <div className="flex items-start gap-4">
-            {/* ✅ E1: 90x90px Image with Carousel */}
+            {/* ✅ E1: Responsive Image with Carousel */}
+            {/* Uses clamp() for responsive sizing: min 70px on small screens, max 90px on larger */}
             <div
-              className="w-[90px] h-[90px] rounded-lg bg-gray-700 flex-shrink-0 cursor-pointer ring-1 ring-[#8B1538]/40 transition-transform duration-300 relative overflow-hidden"
+              className="rounded-lg bg-gray-700 flex-shrink-0 cursor-pointer ring-1 ring-[#8B1538]/40 transition-transform duration-300 relative overflow-hidden"
               onMouseEnter={() => setCarouselPaused(true)}
               onMouseLeave={() => setCarouselPaused(false)}
               style={{
+                width: 'clamp(70px, 20vw, 90px)',
+                height: 'clamp(70px, 20vw, 90px)',
                 boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.06), 0 2px 10px rgba(0,0,0,0.35)'
               }}
             >

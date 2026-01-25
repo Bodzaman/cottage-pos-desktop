@@ -163,7 +163,9 @@ export function usePrintingOperations(
   // ============================================================================
   // PRINT KITCHEN TICKET (HYBRID: Electron ESC/POS → Supabase Queue)
   // ============================================================================
-  const handlePrintKitchen = useCallback(async () => {
+  const handlePrintKitchen = useCallback(async (
+    paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'
+  ) => {
     if (orderItems.length === 0) {
       toast.error('No items to print');
       return false;
@@ -201,7 +203,8 @@ export function usePrintingOperations(
           }),
           orderNumber,
           orderType,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          paymentStatus // Include for PAID badge on takeaway kitchen tickets
         };
 
         const result = await printKitchenTicketESCPOS(kitchenData);

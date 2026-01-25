@@ -682,24 +682,24 @@ export function DineInOrderModal({
         // const billResult = await billResponse.json();
         console.log('✅ [AUTO-CLEAR] Print job skipped (apiClient removed)');
         
-        // Step 2: Mark as paid (payment method: EXTERNAL)
-        console.log('💳 [AUTO-CLEAR] Step 2: Marking as paid (EXTERNAL)...');
-        const { data: paidData, error: paidError } = await supabase
+        // Step 2: Mark as completed (payment handled externally)
+        console.log('✅ [AUTO-CLEAR] Step 2: Marking as completed (EXTERNAL)...');
+        const { data: completedData, error: completedError } = await supabase
           .from('orders')
           .update({
-            status: 'paid',
+            status: 'completed',
             payment_method: 'EXTERNAL',
             amount_paid: orderTotal,
-            payment_timestamp: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', eventDrivenOrder.id)
           .select()
           .single();
 
-        if (paidError) {
-          toast.error('Failed to mark order as paid');
-          console.error('Mark paid error:', paidError);
+        if (completedError) {
+          toast.error('Failed to complete order');
+          console.error('Complete order error:', completedError);
           return;
         }
 
@@ -1591,9 +1591,9 @@ export function DineInOrderModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={() => {}}>
-        <DialogContent 
-          className="!w-[94vw] !h-[92dvh] !max-w-[94vw] !max-h-[92dvh] border-0 flex flex-col p-[18px] rounded-[20px] [&>button]:hidden"
+      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleModalClose(); }}>
+        <DialogContent
+          className="w-[94vw] h-[92dvh] max-w-[94vw] max-h-[92dvh] border-0 flex flex-col p-[18px] rounded-[20px] overflow-hidden [&>button]:hidden"
           style={{
             backgroundColor: QSAITheme.background.primary,
             border: `1px solid ${QSAITheme.border.medium}`,
@@ -1913,26 +1913,37 @@ export function DineInOrderModal({
                 </div>
                 
                 {/* Primary CTA */}
-                <div className="mb-2">
-                  <POSButton
-                    variant="primary"
-                    onClick={handleSave}
-                    disabled={stagingItems.length === 0}
-                    icon={<Send className="w-5 h-5 text-white" />}
-                    showChevron={false}
-                  >
-                    Review & Send
-                  </POSButton>
-                </div>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={stagingItems.length === 0}
+                  className="w-full text-sm h-11 font-medium mb-2"
+                  style={{
+                    backgroundColor: stagingItems.length === 0 ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
+                    borderColor: QSAITheme.purple.primary,
+                    color: 'white',
+                    boxShadow: stagingItems.length === 0 ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
+                    opacity: stagingItems.length === 0 ? 0.5 : 1,
+                    cursor: stagingItems.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Review & Send
+                </Button>
 
                 {/* Clear Order */}
-                <POSButton
-                  variant="tertiary"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleCancelOrder}
-                  destructive
+                  className="w-full text-xs h-8"
+                  style={{
+                    borderColor: QSAITheme.border.medium,
+                    color: QSAITheme.text.muted
+                  }}
                 >
                   Clear Order
-                </POSButton>
+                </Button>
               </div>
             </div>
           </div>

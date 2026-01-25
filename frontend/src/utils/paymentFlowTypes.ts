@@ -12,11 +12,10 @@ export type PaymentFlowMode = 'payment' | 'pay-later';
 
 /**
  * Payment flow steps - internal state machine for the orchestrator
+ * Simplified flow: ORDER_CONFIRMATION → PAYMENT_PROCESSING → SUCCESS/FAILURE
  */
 export enum PaymentFlowStep {
   ORDER_CONFIRMATION = 'order-confirmation',
-  TIP_SELECTION = 'tip-selection',
-  PAYMENT_METHOD = 'payment-method',
   PAYMENT_PROCESSING = 'payment-processing',
   SUCCESS = 'success',
   FAILURE = 'failure'
@@ -62,6 +61,8 @@ export interface PaymentFlowResult {
   error?: string;
   errorMessage?: string;
   orderNumber?: string;
+  // Payment status for PAID badge on receipts
+  paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
   // WYSIWYG Captured Receipt Images for raster printing
   capturedReceiptImages?: {
     kitchen?: string;
@@ -94,7 +95,7 @@ export interface ReceiptData {
 export interface PaymentFlowOrchestratorProps {
   isOpen: boolean;
   onClose: () => void;
-  mode: PaymentFlowMode; // NEW: determines if payment flow or pay-later flow
+  // Mode is now determined internally based on user action in OrderConfirmationView
   orderItems: OrderItem[];
   orderTotal: number;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
@@ -111,8 +112,7 @@ export interface PaymentFlowOrchestratorProps {
 export interface PaymentFlowState {
   currentStep: PaymentFlowStep;
   selectedPaymentMethod?: PaymentMethod;
-  tipAmount: number;
-  totalWithTip: number;
+  totalAmount: number;
   processingPayment: boolean;
   error?: string;
   transactionId?: string;
@@ -127,7 +127,6 @@ export interface PaymentFlowState {
  * Props for OrderConfirmationView
  */
 export interface OrderConfirmationViewProps {
-  mode: PaymentFlowMode; // NEW: determines CTA text and behavior
   orderItems: OrderItem[];
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   orderTotal: number;
@@ -135,33 +134,10 @@ export interface OrderConfirmationViewProps {
   guestCount?: number;
   customerData?: CustomerData;
   deliveryFee?: number;
-  onContinueToPayment: () => void;
-  onAddToOrder: () => void;
-  onMakeChanges: () => void;
-  onBack?: () => void;
-}
-
-/**
- * Props for TipSelectionView
- */
-export interface TipSelectionViewProps {
-  orderTotal: number;
-  currentTipAmount: number;
-  onTipSelected: (tipAmount: number) => void;
-  onContinue: () => void;
-  onBack: () => void;
-}
-
-/**
- * Props for PaymentMethodView
- */
-export interface PaymentMethodViewProps {
-  orderTotal: number;
-  tipAmount: number;
-  totalWithTip: number;
-  onSelectPaymentMethod: (method: PaymentMethod) => void;
-  onBack: () => void;
-  availableMethods?: PaymentMethod[]; // Optional: restrict available methods
+  // NEW: Separate handlers for each action
+  onTakePaymentNow: () => void;   // Proceed to Stripe payment flow
+  onPayOnCollection: () => void;  // Print receipt and complete (no payment)
+  onBack: () => void;             // Close modal, return to cart
 }
 
 /**

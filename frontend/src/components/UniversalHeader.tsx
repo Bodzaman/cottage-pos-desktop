@@ -9,12 +9,13 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { PremiumTheme } from "../utils/premiumTheme";
 import { useCartStore } from "../utils/cartStore";
 import { useChatIsOpen } from "../utils/chat-store";
-import { 
-  getNavigationConfig, 
-  getFilteredNavigationItems, 
+import {
+  getNavigationConfig,
+  getFilteredNavigationItems,
   shouldShowCtaButton,
-  NavigationContext 
+  NavigationContext
 } from "../utils/navigationConfig";
+import { useBrandFont } from "../utils/useBrandFont";
 
 interface UniversalHeaderProps {
   context?: NavigationContext;
@@ -39,8 +40,9 @@ export function UniversalHeader({
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = React.useState(false);
-  
-  // ✅ NEW: Get chat open state to hide cart when chat is active
+  const { titleFontFamily } = useBrandFont();
+
+  // Get chat open state to hide cart when chat is active
   const isChatOpen = useChatIsOpen();
   
   // Get global cart action as default
@@ -116,16 +118,17 @@ export function UniversalHeader({
         <div className="flex items-center justify-between h-20">
           {/* Logo with glassmorphism enhancement */}
           {finalConfig.showLogo && (
-            <Link 
-              to="/" 
-              className="text-2xl font-oldenglish font-bold tracking-wider py-1 transition-all duration-300 hover:scale-105"
+            <Link
+              to="/"
+              className="text-2xl font-bold tracking-wider py-1 transition-all duration-300 hover:scale-105"
               style={{
+                fontFamily: titleFontFamily,
                 fontSize: '2.4rem',
                 fontWeight: '800',
                 lineHeight: '1.1',
                 letterSpacing: '0.02em',
-                color: '#8B1538', // Updated to match Start Ordering button color
-                textShadow: '0 3px 6px rgba(0, 0, 0, 0.4), 0 0 15px rgba(139, 21, 56, 0.3)', // Drop shadow + burgundy glow
+                color: '#8B1538',
+                textShadow: '0 3px 6px rgba(0, 0, 0, 0.4), 0 0 15px rgba(139, 21, 56, 0.3)',
                 marginBottom: '0.25rem'
               }}
             >

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Search, X } from 'lucide-react';
 import { usePOSCustomerIntelligence, SearchQuery } from 'utils/usePOSCustomerIntelligence';
 
@@ -181,77 +180,64 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
   };
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      {/* Single Intelligent Search Bar */}
-      <div className="space-y-1">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white z-10" />
-          <Input
-            type="text"
-            placeholder={getPlaceholder()}
-            value={searchValue}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={handleKeyDown}
+    <div className={`space-y-1 ${className}`}>
+      {/* Compact Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 z-10" style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
+        <Input
+          type="text"
+          placeholder={getPlaceholder()}
+          value={searchValue}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isSearching}
+          className="pl-8 pr-8 h-9 rounded-md text-sm text-white placeholder:text-gray-500"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'border-color 0.2s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+        />
+
+        {/* Clear button (appears when input has value) */}
+        {searchValue && (
+          <button
+            onClick={handleClear}
             disabled={isSearching}
-            className="pl-10 pr-10 h-11 rounded-lg text-white placeholder:text-gray-400"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-              border: '2px solid',
-              boxShadow: '0 4px 20px rgba(124, 93, 250, 0.1)',
-              transition: 'all 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-              e.target.style.boxShadow = '0 6px 25px rgba(124, 93, 250, 0.2)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-              e.target.style.boxShadow = '0 4px 20px rgba(124, 93, 250, 0.1)';
-            }}
-          />
-          
-          {/* Clear button (appears when input has value) */}
-          {searchValue && (
-            <button
-              onClick={handleClear}
-              disabled={isSearching}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        
-        {/* Validation error */}
-        {validationError && (
-          <p className="text-xs text-red-400 px-2 flex items-center gap-1">
-            <span className="font-bold">!</span>
-            {validationError}
-          </p>
-        )}
-        
-        {/* Type indicator (shows detected type) */}
-        {detectedType && searchValue && (
-          <p className="text-xs text-purple-300 px-2">
-            Detected: {detectedType === 'email' ? 'Email' : detectedType === 'phone' ? 'Phone' : 'Customer Reference'}
-          </p>
-        )}
-        
-        {/* Helper text */}
-        {!searchValue && (
-          <div className="text-xs text-gray-400 text-center px-2">
-            <p>Search by email, phone, or customer reference  e.g. (CT001)</p>
-          </div>
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors z-10"
+            aria-label="Clear search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
 
+      {/* Validation error */}
+      {validationError && (
+        <p className="text-[11px] text-red-400 px-1 flex items-center gap-1">
+          <span className="font-bold">!</span>
+          {validationError}
+        </p>
+      )}
+
+      {/* Type indicator (shows detected type) */}
+      {detectedType && searchValue && (
+        <p className="text-[11px] text-purple-300 px-1">
+          Detected: {detectedType === 'email' ? 'Email' : detectedType === 'phone' ? 'Phone' : 'Customer Reference'}
+        </p>
+      )}
+
       {/* Loading indicator */}
       {isSearching && (
-        <div className="flex items-center justify-center py-2">
-          <div className="flex items-center gap-2 text-sm text-purple-400">
-            <div className="h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-1">
+          <div className="flex items-center gap-1.5 text-xs text-purple-400">
+            <div className="h-3 w-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
             Searching...
           </div>
         </div>
