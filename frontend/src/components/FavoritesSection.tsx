@@ -1,25 +1,22 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, 
-  Heart, 
-  FolderPlus, 
-  FolderEdit, 
-  Trash2, 
-  Check, 
+import {
+  Plus,
+  Heart,
+  FolderPlus,
+  Trash2,
+  Check,
   ShoppingCart,
-  List,
-  MoreVertical,
-  Flame
+  Flame,
+  UtensilsCrossed
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { PremiumCard } from 'components/PremiumCard';
+import { PortalButton } from 'components/PortalButton';
+import { FavoriteListRail } from 'components/favorites';
+import { PremiumTheme } from 'utils/CustomerDesignSystem';
+import { cn } from 'utils/cn';
 import type { EnrichedFavoriteItem, FavoriteList } from 'types';
 
 // Simple spice level indicator component
@@ -64,236 +61,235 @@ export default function FavoritesSection({
 }: Props) {
   const navigate = useNavigate();
 
+  // Category quick links for empty state discovery
+  const categoryLinks = [
+    { name: 'Starters', slug: 'starters' },
+    { name: 'Curries', slug: 'curries' },
+    { name: 'Biryanis', slug: 'biryanis' },
+    { name: 'Tandoori', slug: 'tandoori' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-[#EAECEF]">My Favorites</h2>
-        <div className="flex gap-3">
-          <Button
+    <div className="space-y-4">
+      {/* Action Bar + List Rail */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* List Rail */}
+        <div className="flex-1 min-w-0 -mx-4 sm:mx-0">
+          <FavoriteListRail
+            lists={favoriteLists}
+            selectedListId={selectedListId}
+            onSelectList={setSelectedListId}
+            totalFavorites={enrichedFavorites?.length || 0}
+            onRenameList={(list) => {
+              setListToRename(list);
+              setRenameListModalOpen(true);
+            }}
+            onDeleteList={(list) => {
+              setListToDelete(list);
+              setDeleteListModalOpen(true);
+            }}
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <PortalButton
+            variant="secondary"
+            size="sm"
             onClick={() => setCreateListModalOpen(true)}
-            variant="outline"
-            className="border-[#8B1538]/30 text-[#EAECEF] hover:bg-[#8B1538]/20 hover:border-[#8B1538]"
-            aria-label="Create new list"
           >
-            <FolderPlus className="h-4 w-4 mr-2" aria-hidden="true" />
-            Create List
-          </Button>
-          <Button
-            onClick={() => navigate('/online-orders')}
-            className="bg-[#8B1538] hover:bg-[#7A1530] text-white shadow-[0_0_24px_#8B153855] border-0"
-            aria-label="Browse menu"
-          >
-            <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-            Browse Menu
-          </Button>
+            <FolderPlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Create List</span>
+          </PortalButton>
         </div>
       </div>
 
-      {/* List Tabs/Pills */}
-      <div className="flex items-center gap-3 flex-wrap mb-6">
-        <button
-          onClick={() => setSelectedListId('all')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-            selectedListId === 'all'
-              ? 'bg-[#8B1538] text-white shadow-[0_0_16px_#8B153833]'
-              : 'bg-black/20 text-white hover:bg-white/10 hover:text-[#EAECEF] border border-white/10'
-          }`}
-          aria-label="View all favorites"
-        >
-          <List className="h-4 w-4 inline mr-2" aria-hidden="true" />
-          All Favorites ({enrichedFavorites?.length || 0})
-        </button>
-        
-        {favoriteLists && favoriteLists.map((list) => (
-          <div key={list.id} className="relative group">
-            <button
-              onClick={() => setSelectedListId(list.id)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 pr-10 ${
-                selectedListId === list.id
-                  ? 'bg-[#8B1538] text-white shadow-[0_0_16px_#8B153833]'
-                  : 'bg-black/20 text-white hover:bg-white/10 hover:text-[#EAECEF] border border-white/10'
-              }`}
-              aria-label={`View ${list.list_name} list`}
-            >
-              {list.list_name} ({list.item_count || 0})
-            </button>
-            
-            {/* List Actions Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-white/10"
-                  aria-label="List options"
-                >
-                  <MoreVertical className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-[#17191D] border-white/10">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setListToRename(list);
-                    setRenameListModalOpen(true);
-                  }}
-                  className="text-[#EAECEF] hover:bg-white/10 cursor-pointer"
-                  aria-label="Rename list"
-                >
-                  <FolderEdit className="h-4 w-4 mr-2" aria-hidden="true" />
-                  Rename List
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setListToDelete(list);
-                    setDeleteListModalOpen(true);
-                  }}
-                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
-                  aria-label="Delete list"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" aria-hidden="true" />
-                  Delete List
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ))}
-      </div>
-
-      {/* Favorites List */}
+      {/* Favorites Grid */}
       {enrichedFavorites && enrichedFavorites.length > 0 ? (
-        <div className="grid gap-4">
-          {enrichedFavorites.map((favorite) => {
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+          {enrichedFavorites.map((favorite, index) => {
             // Show ALL favorites when 'all' is selected
             // Only filter by list when a specific list is selected
             if (selectedListId !== 'all') {
               const isInSelectedList = favoriteLists?.find(l => l.id === selectedListId)?.items?.some(item => item.favorite_id === favorite.favorite_id);
               if (!isInSelectedList) return null;
             }
-            
+
             return (
               <motion.div
                 key={favorite.favorite_id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`bg-black/20 backdrop-blur-sm border rounded-xl p-6 hover:border-[#8B1538]/30 transition-all duration-200 ${
-                  !favorite.display_is_available ? 'border-red-500/30 opacity-75' : 'border-white/10'
-                }`}
+                transition={{ delay: index * 0.03 }}
+                className={cn(!favorite.display_is_available && 'opacity-75')}
               >
-                <div className="flex gap-4">
-                  {favorite.display_image_url && (
-                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                <PremiumCard
+                  subsurface
+                  hover
+                  padding="none"
+                  className={cn(
+                    'group overflow-hidden h-full',
+                    !favorite.display_is_available && 'border-red-500/30'
+                  )}
+                >
+                  {/* Image Container - Square */}
+                  <div className="aspect-square relative overflow-hidden">
+                    {favorite.display_image_url ? (
                       <img
                         src={favorite.display_image_url}
                         alt={favorite.display_name}
-                        className={`w-full h-full object-cover ${
-                          !favorite.display_is_available ? 'grayscale opacity-50' : ''
-                        }`}
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-[#EAECEF]">
-                            {favorite.display_name}
-                            {favorite.variant_name && ` (${favorite.variant_name})`}
-                          </h3>
-                          {!favorite.display_is_available && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-                              No longer available
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-[#B7BDC6] mb-3 line-clamp-2">
-                          {favorite.display_description}
-                        </p>
-                        <div className="flex items-center justify-between mb-3">
-                          {favorite.display_price ? (
-                            <p className="text-lg font-bold text-[#EAECEF]">
-                              £{favorite.display_price?.toFixed(2)}
-                            </p>
-                          ) : (
-                            <p className="text-sm text-[#8B92A0] italic">Price unavailable</p>
-                          )}
-                          {favorite.display_spice_level && favorite.display_spice_level > 0 && (
-                            <div className="flex items-center gap-1">
-                              <SpiceLevelIndicator level={favorite.display_spice_level} />
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* List Assignment Pills */}
-                        {favoriteLists && favoriteLists.length > 0 && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-[#B7BDC6]">Lists:</span>
-                            {favoriteLists.map((list) => {
-                              const isInThisList = list.items?.some(item => item.favorite_id === favorite.favorite_id);
-                              return (
-                                <button
-                                  key={list.id}
-                                  onClick={() => handleToggleItemInList(list.id, favorite.favorite_id, isInThisList)}
-                                  className={`text-xs px-2 py-1 rounded-full transition-all ${
-                                    isInThisList
-                                      ? 'bg-[#8B1538]/30 text-white hover:bg-[#8B1538]/40'
-                                      : 'bg-white/5 text-[#8B92A0] hover:bg-white/10 hover:text-white'
-                                  }`}
-                                  aria-label={isInThisList ? 'Remove from list' : 'Add to list'}
-                                >
-                                  {isInThisList && <Check className="h-3 w-3 inline mr-1" aria-hidden="true" />}
-                                  {list.list_name}
-                                </button>
-                              );
-                            })}
-                          </div>
+                        className={cn(
+                          'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105',
+                          !favorite.display_is_available && 'grayscale opacity-50'
                         )}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-[#8B1538]/15 flex items-center justify-center">
+                        <UtensilsCrossed className="h-10 w-10 text-[#8B1538]/50" />
                       </div>
-                      
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 ml-4">
-                        <Button
-                          variant="ghost"
+                    )}
+
+                    {/* Quick Add Overlay */}
+                    {favorite.display_is_available && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end p-3">
+                        <PortalButton
+                          variant="primary"
                           size="sm"
                           onClick={() => handleAddToCart(favorite)}
-                          disabled={!favorite.display_is_available}
-                          className="bg-[#8B1538]/20 text-[#8B1538] hover:bg-[#8B1538] hover:text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#8B1538]/20 disabled:hover:text-[#8B1538]"
-                          aria-label="Add to cart"
+                          className="w-full"
                         >
-                          <ShoppingCart className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveFavorite(favorite.favorite_id, favorite.display_name)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                          aria-label="Remove from favorites"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </Button>
+                          <ShoppingCart className="h-4 w-4" />
+                          Quick Add
+                        </PortalButton>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Unavailable Badge */}
+                    {!favorite.display_is_available && (
+                      <div className="absolute top-2 right-2 px-2 py-1 rounded-lg text-[10px] font-medium bg-red-500/80 text-white backdrop-blur-sm">
+                        Unavailable
+                      </div>
+                    )}
+
+                    {/* Spice Level Badge */}
+                    {favorite.display_spice_level && favorite.display_spice_level > 0 && favorite.display_is_available && (
+                      <div className="absolute top-2 left-2">
+                        <div className="px-1.5 py-1 rounded-lg text-xs backdrop-blur-sm bg-black/60 flex items-center gap-0.5">
+                          <SpiceLevelIndicator level={favorite.display_spice_level} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Remove Button */}
+                    {favorite.display_is_available && (
+                      <button
+                        onClick={() => handleRemoveFavorite(favorite.favorite_id, favorite.display_name)}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white/70 hover:bg-red-500/80 hover:text-white opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        aria-label="Remove from favorites"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
-                </div>
+
+                  {/* Card Content */}
+                  <div className="p-3">
+                    <h3 className="font-medium text-white text-sm truncate">
+                      {favorite.display_name}
+                    </h3>
+                    {favorite.variant_name && (
+                      <p className="text-xs text-gray-500 truncate">{favorite.variant_name}</p>
+                    )}
+
+                    <div className="flex items-center justify-between mt-2">
+                      {favorite.display_price ? (
+                        <p className="text-base font-bold text-[#8B1538]">
+                          £{favorite.display_price?.toFixed(2)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">Price N/A</p>
+                      )}
+
+                      {/* List Pills (compact) */}
+                      {favoriteLists && favoriteLists.length > 0 && (
+                        <div className="flex gap-1">
+                          {favoriteLists.slice(0, 3).map((list) => {
+                            const isInThisList = list.items?.some(item => item.favorite_id === favorite.favorite_id);
+                            if (!isInThisList) return null;
+                            return (
+                              <div
+                                key={list.id}
+                                className="w-1.5 h-1.5 rounded-full bg-[#8B1538]"
+                                title={list.list_name}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* List Assignment (hidden on mobile) */}
+                    {favoriteLists && favoriteLists.length > 0 && (
+                      <div className="hidden md:flex items-center gap-1 flex-wrap mt-2 pt-2 border-t border-white/5">
+                        {favoriteLists.map((list) => {
+                          const isInThisList = list.items?.some(item => item.favorite_id === favorite.favorite_id);
+                          return (
+                            <button
+                              key={list.id}
+                              onClick={() => handleToggleItemInList(list.id, favorite.favorite_id, isInThisList)}
+                              className={cn(
+                                'text-[10px] px-2 py-0.5 rounded-full transition-all',
+                                isInThisList
+                                  ? 'bg-[#8B1538]/30 text-white hover:bg-[#8B1538]/40'
+                                  : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'
+                              )}
+                            >
+                              {isInThisList && <Check className="h-2 w-2 inline mr-0.5" />}
+                              {list.list_name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </PremiumCard>
               </motion.div>
             );
           })}
         </div>
       ) : (
-        <div className="text-center py-12">
-          <div className="p-4 rounded-full bg-[#8B1538]/20 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <Heart className="h-8 w-8 text-[#8B1538]" />
+        <PremiumCard subsurface className="py-12 px-6">
+          <div className="text-center max-w-sm mx-auto">
+            <div className="p-4 rounded-xl bg-[#8B1538]/15 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Heart className="h-7 w-7 text-[#8B1538]" />
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">No favorites yet</h3>
+            <p className="text-sm text-gray-400 mb-5">
+              Heart dishes you love to save them here for easy reordering.
+            </p>
+
+            {/* Category Quick Links */}
+            <div className="flex flex-wrap justify-center gap-2 mb-5">
+              {categoryLinks.map((cat) => (
+                <button
+                  key={cat.slug}
+                  onClick={() => navigate(`/online-orders#${cat.slug}`)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+
+            <PortalButton
+              variant="primary"
+              onClick={() => navigate('/online-orders')}
+            >
+              <Heart className="h-4 w-4" />
+              Discover Favorites
+            </PortalButton>
           </div>
-          <h3 className="text-lg font-semibold text-[#EAECEF] mb-2">No favorites yet</h3>
-          <p className="text-[#B7BDC6] mb-6">Heart dishes you love to save them here for easy reordering.</p>
-          <Button
-            onClick={() => navigate('/online-orders')}
-            className="bg-[#8B1538] hover:bg-[#7A1230] text-white shadow-[0_0_24px_#8B153855] border-0"
-            aria-label="Discover favorites"
-          >
-            <Heart className="h-4 w-4 mr-2" aria-hidden="true" />
-            Discover Favorites
-          </Button>
-        </div>
+        </PremiumCard>
       )}
     </div>
   );

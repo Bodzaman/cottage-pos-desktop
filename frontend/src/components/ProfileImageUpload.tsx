@@ -1,10 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, X, User, Loader2, Move, RotateCcw, Trash2 } from 'lucide-react';
+import { Camera, Upload, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import brain from 'brain';
-import type { BodyUploadProfileImage } from '../brain/data-contracts';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 
@@ -16,14 +15,6 @@ interface Props {
   userId: string;
   className?: string;
   showOptimizationFeedback?: boolean; // Optional: show WebP optimization details (default: false for customer privacy)
-}
-
-interface CropPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  unit: string;
 }
 
 // Crop state for react-easy-crop
@@ -96,21 +87,10 @@ export const ProfileImageUpload: React.FC<Props> = ({
   className = '',
   showOptimizationFeedback = false
 }) => {
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [crop, setCrop] = useState<CropPosition>({
-    x: 0,
-    y: 0,
-    width: 200,
-    height: 200,
-    unit: 'px'
-  });
-  const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Cropping state
   const [showCropModal, setShowCropModal] = useState(false);
@@ -152,128 +132,6 @@ export const ProfileImageUpload: React.FC<Props> = ({
     reader.readAsDataURL(file);
   };
 
-  // Handle drag events
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  }, [handleFileSelect]);
-
-  // Handle upload with simple positioning and image optimization
-  const handleUpload = async () => {
-    if (!selectedFile || !previewImage) return;
-    
-    setIsUploading(true);
-    
-    try {
-      // Show optimization toast
-      if (showOptimizationFeedback) {
-        toast.info(`🎨 Optimizing ${selectedFile.name}...`, { duration: 2000 });
-      }
-      
-      // Create a canvas to crop and optimize the image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Could not get canvas context');
-      
-      // Set canvas size for profile image (max 800x800 for better quality, smaller than original 400x400)
-      const maxSize = 800;
-      canvas.width = maxSize;
-      canvas.height = maxSize;
-      
-      // Create image element
-      const img = new Image();
-      
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          // Calculate the crop area (center crop with drag offset)
-          const scale = Math.max(maxSize / img.width, maxSize / img.height);
-          const scaledWidth = img.width * scale;
-          const scaledHeight = img.height * scale;
-          
-          // Apply user's drag positioning
-          const offsetX = crop.x || 0;
-          const offsetY = crop.y || 0;
-          
-          // Center the image and apply offset
-          const drawX = (maxSize - scaledWidth) / 2 + offsetX;
-          const drawY = (maxSize - scaledHeight) / 2 + offsetY;
-          
-          // Draw the cropped image
-          ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
-          resolve(null);
-        };
-        img.onerror = reject;
-        img.src = previewImage;
-      });
-      
-      // Try WebP first (better compression), fallback to JPEG
-      const supportsWebP = canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
-      const mimeType = supportsWebP ? 'image/webp' : 'image/jpeg';
-      const fileExtension = supportsWebP ? 'webp' : 'jpg';
-      const quality = 0.85; // 85% quality for good balance
-      
-      // Convert canvas to blob with compression
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => resolve(blob!), mimeType, quality);
-      });
-      
-      // Calculate compression ratio
-      const originalSize = selectedFile.size;
-      const compressedSize = blob.size;
-      const compressionRatio = ((1 - compressedSize / originalSize) * 100).toFixed(0);
-      
-      if (showOptimizationFeedback) {
-        toast.info(`✨ ${compressionRatio}% smaller - uploading...`, { duration: 1500 });
-      }
-      
-      // Convert blob to File for proper upload
-      const file = new File([blob], `profile-image.${fileExtension}`, { type: mimeType });
-      
-      // Upload the optimized image using brain client
-      const uploadData: BodyUploadProfileImage = {
-        user_id: userId,
-        file: file
-      };
-      
-      const response = await brain.upload_profile_image(uploadData);
-      
-      if (response.ok) {
-        const result = await response.json();
-        onImageUpdate(result.image_url);
-        if (showOptimizationFeedback) {
-          toast.success(`✅ Profile image updated! (${compressionRatio}% smaller)`);
-        }
-        setShowUploadModal(false);
-        setShowCropModal(false);
-        setPreviewImage(null);
-        setSelectedFile(null);
-        setCrop({ x: 0, y: 0, width: 100, height: 100, unit: 'px' });
-      } else {
-        throw new Error('Upload failed');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload image. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   // Use Google profile image
   const useGoogleImage = async () => {
     if (!googleProfileImage) return;
@@ -289,7 +147,6 @@ export const ProfileImageUpload: React.FC<Props> = ({
       if (result.success) {
         onImageUpdate(result.image_url);
         toast.success('Google profile image set successfully!');
-        setShowUploadModal(false);
       } else {
         toast.error(result.error || 'Failed to sync Google image');
       }
@@ -415,71 +272,52 @@ export const ProfileImageUpload: React.FC<Props> = ({
   };
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Profile Image Display */}
-      <div className="flex items-center gap-6">
-        <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#2A2E36] bg-[#121316]">
-            {renderProfileImage()}
-          </div>
-          
-          {/* Camera overlay for upload */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute bottom-0 right-0 w-8 h-8 bg-[#8B1538] hover:bg-[#7A1230] rounded-full flex items-center justify-center text-white transition-colors"
-            disabled={isUploading}
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-          </button>
+    <div className={className}>
+      {/* Compact Avatar with Edit Overlay */}
+      <div className="relative inline-block group">
+        <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#2A2E36] bg-[#121316] shadow-lg">
+          {renderProfileImage()}
         </div>
 
-        <div className="flex-1 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="outline"
-              size="sm"
-              className="bg-[#121316] border-[#2A2E36] text-[#EAECEF] hover:bg-[#8B1538] hover:border-[#8B1538] hover:text-white"
-              disabled={isUploading}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Photo
-            </Button>
-            
-            {googleProfileImage && authProvider === 'google' && (
-              <Button
-                onClick={useGoogleImage}
-                variant="outline"
-                size="sm"
-                className="bg-[#121316] border-[#2A2E36] text-[#EAECEF] hover:bg-[#4285F4] hover:border-[#4285F4] hover:text-white"
-                disabled={isUploading}
-              >
-                Use Google Photo
-              </Button>
-            )}
-            
-            {currentImageUrl && (
-              <Button
-                onClick={removeImage}
-                variant="outline"
-                size="sm"
-                className="bg-[#121316] border-[#2A2E36] text-[#EAECEF] hover:bg-red-500 hover:border-red-500 hover:text-white"
-                disabled={isUploading}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Remove
-              </Button>
-            )}
+        {/* Hover Overlay with Actions */}
+        <div
+          className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className="text-center">
+            <Camera className="h-5 w-5 text-white mx-auto mb-1" />
+            <span className="text-[10px] text-white/90 font-medium">Change</span>
           </div>
-          
-          <p className="text-sm text-[#8B92A0]">
-            Upload a square image. Max 5MB. JPG, PNG, or GIF.
-          </p>
         </div>
+
+        {/* Edit Badge (always visible) */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="absolute bottom-0 right-0 w-7 h-7 bg-[#8B1538] hover:bg-[#7A1230] rounded-full flex items-center justify-center text-white transition-colors shadow-lg border-2 border-[#121316]"
+          disabled={isUploading}
+          aria-label="Change profile photo"
+        >
+          {isUploading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Camera className="h-3.5 w-3.5" />
+          )}
+        </button>
+
+        {/* Remove Button (only when image exists) */}
+        {currentImageUrl && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              removeImage();
+            }}
+            className="absolute top-0 right-0 w-6 h-6 bg-red-500/90 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors opacity-0 group-hover:opacity-100 shadow-lg border-2 border-[#121316]"
+            disabled={isUploading}
+            aria-label="Remove photo"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {/* Hidden file input */}
@@ -495,159 +333,28 @@ export const ProfileImageUpload: React.FC<Props> = ({
         }}
       />
 
-      {/* Drag & Drop Zone */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          dragActive
-            ? 'border-[#8B1538] bg-[#8B153810]'
-            : 'border-[#2A2E36] hover:border-[#8B1538] hover:bg-[#8B153805]'
-        }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <div className="space-y-2">
-          <Upload className="h-8 w-8 text-[#8B92A0] mx-auto" />
-          <p className="text-[#B7BDC6] font-medium">Click to upload or drag and drop</p>
-          <p className="text-sm text-[#8B92A0]">JPG, PNG or GIF (max 5MB)</p>
-        </div>
+      {/* Subtle Text Actions */}
+      <div className="mt-2 flex items-center justify-center gap-2 text-xs">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="text-gray-500 hover:text-[#8B1538] transition-colors"
+          disabled={isUploading}
+        >
+          Change photo
+        </button>
+        {googleProfileImage && authProvider === 'google' && (
+          <>
+            <span className="text-gray-600">•</span>
+            <button
+              onClick={useGoogleImage}
+              className="text-gray-500 hover:text-[#4285F4] transition-colors"
+              disabled={isUploading}
+            >
+              Use Google
+            </button>
+          </>
+        )}
       </div>
-
-      {/* Upload Modal */}
-      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-        <DialogContent className="bg-[#17191D] border-[#2A2E36] text-[#EAECEF] max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-[#EAECEF] flex items-center gap-2">
-              <Upload className="h-5 w-5 text-[#8B1538]" />
-              Upload Profile Image
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {previewImage ? (
-              <div className="space-y-4">
-                {/* Simple Image Preview with Drag to Reposition */}
-                <div className="relative">
-                  <div className="w-64 h-64 mx-auto relative overflow-hidden rounded-full border-4 border-[#2A2E36]">
-                    <img
-                      ref={setImageRef}
-                      src={previewImage}
-                      alt="Profile preview"
-                      className="w-full h-full object-cover cursor-move transition-transform"
-                      style={{
-                        transform: `translate(${crop.x}px, ${crop.y}px) scale(1.2)`
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        
-                        const startX = e.clientX - crop.x;
-                        const startY = e.clientY - crop.y;
-                        
-                        const handleMouseMove = (moveEvent: MouseEvent) => {
-                          // Allow much more movement - up to 120px in each direction
-                          const newX = Math.max(-120, Math.min(120, moveEvent.clientX - startX));
-                          const newY = Math.max(-120, Math.min(120, moveEvent.clientY - startY));
-                          setCrop(prev => ({ ...prev, x: newX, y: newY }));
-                        };
-                        
-                        const handleMouseUp = () => {
-                          document.removeEventListener('mousemove', handleMouseMove);
-                          document.removeEventListener('mouseup', handleMouseUp);
-                        };
-                        
-                        document.addEventListener('mousemove', handleMouseMove);
-                        document.addEventListener('mouseup', handleMouseUp);
-                      }}
-                    />
-                  </div>
-                </div>
-                
-                {/* Simple Instructions */}
-                <div className="text-center space-y-2">
-                  <div className="flex items-center justify-center gap-2 text-sm text-[#8B92A0]">
-                    <Move className="h-4 w-4" />
-                    <span>Drag image to reposition</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      // Reset to center
-                      setCrop({ x: 0, y: 0, width: 100, height: 100, unit: 'px' });
-                    }}
-                    className="text-[#8B92A0] hover:text-[#EAECEF] text-xs hover:bg-[#2A2E36]"
-                  >
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    Reset to center
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  dragActive 
-                    ? 'border-[#8B1538] bg-[#8B1538]/10' 
-                    : 'border-[#2A2E36] hover:border-[#8B1538]/50'
-                }`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              >
-                <Upload className="h-12 w-12 text-[#8B92A0] mx-auto mb-4" />
-                <p className="text-[#EAECEF] mb-2">Drop your image here</p>
-                <p className="text-[#8B92A0] text-sm mb-4">or</p>
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-[#2A2E36] text-[#B7BDC6] hover:bg-[#2A2E36] hover:text-[#EAECEF]"
-                >
-                  Choose File
-                </Button>
-                <p className="text-xs text-[#8B92A0] mt-4">
-                  PNG, JPG up to 5MB • Auto-cropped to center
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              className="flex-1 border-[#2A2E36] text-[#B7BDC6] hover:bg-[#2A2E36] hover:text-[#EAECEF]"
-              onClick={() => {
-                setShowUploadModal(false);
-                setPreviewImage(null);
-                setSelectedFile(null);
-                setCrop({ x: 0, y: 0, width: 100, height: 100, unit: 'px' });
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="flex-1 bg-[#8B1538] hover:bg-[#8B1538]/80 text-white transition-all duration-200"
-              onClick={handleUpload}
-              disabled={isUploading || !previewImage}
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span>Optimizing...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  <span>Upload Photo</span>
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Crop Modal */}
       <Dialog open={showCropModal} onOpenChange={setShowCropModal}>

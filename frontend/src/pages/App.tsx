@@ -551,7 +551,7 @@ export default function App() {
               style={{ color: PremiumTheme.colors.text.muted }}
             >Read what our valued guests have to say about their dining experience at Cottage Tandoori.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
               {activeTestimonials.map((testimonial, index) => (
                 <div 
                   key={testimonial.id} 
@@ -762,7 +762,7 @@ export default function App() {
               style={{ color: PremiumTheme.colors.text.muted }}
             >Come experience the finest Indian cuisine in West Sussex.</p>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-16">
               {/* Location */}
               <div 
                 className="rounded-lg p-8 border transition-all duration-300"

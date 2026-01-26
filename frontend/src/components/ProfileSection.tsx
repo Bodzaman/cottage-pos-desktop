@@ -1,17 +1,25 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { User, Mail, Phone, CheckCircle2, AlertCircle, Send, Loader2, Bot } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Mail, Phone, CheckCircle2, AlertCircle, Send, Loader2, Bot, Leaf, Bell, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
-import { ProfileImageUpload } from 'components/ProfileImageUpload';
 import { InlineEditField } from 'components/InlineEditField';
+import { DietaryPreferencesSelector } from 'components/DietaryPreferencesSelector';
+import { NotificationPreferences } from 'components/NotificationPreferences';
+import { AccountSecuritySection } from 'components/AccountSecuritySection';
+import { ProfileIdentityCard } from 'components/profile/ProfileIdentityCard';
+import { SettingsModule } from 'components/profile/SettingsModule';
 import { calculateProfileCompletion, getCompletionColor, getCompletionMessage } from 'utils/profileCompletion';
 import type { CustomerProfile, CustomerAddress } from 'types';
+
+interface NotificationSettings {
+  email_order_updates: boolean;
+  sms_order_updates: boolean;
+  marketing_emails: boolean;
+  special_offers: boolean;
+}
 
 interface Props {
   user: any;
@@ -26,6 +34,13 @@ interface Props {
   setPersonalizationEnabled: (value: boolean) => void;
   personalizationLoading: boolean;
   setPersonalizationLoading: (value: boolean) => void;
+  // New props for Phase 5
+  dietaryPreferences?: string[];
+  notificationPreferences?: NotificationSettings;
+  onDietaryPreferencesChange?: (preferences: string[]) => void;
+  onNotificationPreferencesChange?: (key: keyof NotificationSettings, value: boolean) => void;
+  onPasswordChange?: (currentPassword: string, newPassword: string) => Promise<{ error: any }>;
+  onAccountDeletion?: () => Promise<void>;
 }
 
 export default function ProfileSection({
@@ -41,7 +56,78 @@ export default function ProfileSection({
   setPersonalizationEnabled,
   personalizationLoading,
   setPersonalizationLoading,
+  dietaryPreferences = [],
+  notificationPreferences = {
+    email_order_updates: true,
+    sms_order_updates: false,
+    marketing_emails: false,
+    special_offers: false
+  },
+  onDietaryPreferencesChange,
+  onNotificationPreferencesChange,
+  onPasswordChange,
+  onAccountDeletion,
 }: Props) {
+  // Local state for preferences (used when no callbacks provided)
+  const [localDietaryPrefs, setLocalDietaryPrefs] = useState<string[]>(dietaryPreferences);
+  const [localNotificationPrefs, setLocalNotificationPrefs] = useState<NotificationSettings>(notificationPreferences);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+
+  // Handle dietary preferences change
+  const handleDietaryChange = async (prefs: string[]) => {
+    if (onDietaryPreferencesChange) {
+      onDietaryPreferencesChange(prefs);
+    } else {
+      setLocalDietaryPrefs(prefs);
+      // Auto-save to profile
+      setSavingPreferences(true);
+      try {
+        await updateProfile({ dietary_preferences: prefs } as any);
+        toast.success('Dietary preferences saved');
+      } catch (error) {
+        toast.error('Failed to save preferences');
+      } finally {
+        setSavingPreferences(false);
+      }
+    }
+  };
+
+  // Handle notification preferences change
+  const handleNotificationChange = async (key: keyof NotificationSettings, value: boolean) => {
+    if (onNotificationPreferencesChange) {
+      onNotificationPreferencesChange(key, value);
+    } else {
+      const newPrefs = { ...localNotificationPrefs, [key]: value };
+      setLocalNotificationPrefs(newPrefs);
+      // Auto-save to profile
+      setSavingPreferences(true);
+      try {
+        await updateProfile({ notification_preferences: newPrefs } as any);
+        toast.success('Notification preferences saved');
+      } catch (error) {
+        toast.error('Failed to save preferences');
+      } finally {
+        setSavingPreferences(false);
+      }
+    }
+  };
+
+  // Default password change handler
+  const handlePasswordChange = async (currentPassword: string, newPassword: string): Promise<{ error: any }> => {
+    if (onPasswordChange) {
+      return onPasswordChange(currentPassword, newPassword);
+    }
+    // Default implementation would call Supabase auth
+    return { error: { message: 'Password change not configured' } };
+  };
+
+  // Default account deletion handler
+  const handleAccountDeletion = async () => {
+    if (onAccountDeletion) {
+      return onAccountDeletion();
+    }
+    toast.error('Account deletion not configured');
+  };
   const profileCompletion = calculateProfileCompletion(profile, addresses);
   const completionColor = getCompletionColor(profileCompletion.percentage);
   const completionMessage = getCompletionMessage(profileCompletion);
@@ -95,53 +181,29 @@ export default function ProfileSection({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Card className="bg-black/20 backdrop-blur-sm border-white/10">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <CardTitle className="text-[#EAECEF] text-2xl flex items-center gap-2">
-              <User className="h-6 w-6 text-[#8B1538]" />
-              Profile Information
-            </CardTitle>
-          </div>
-          
-          {/* Profile Completion Progress */}
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-[#B7BDC6]">{completionMessage}</span>
-              <span className="text-sm font-medium" style={{ color: completionColor }}>
-                {profileCompletion.percentage}%
-              </span>
-            </div>
-            <Progress 
-              value={profileCompletion.percentage} 
-              className="h-2 bg-black/40"
-              style={{
-                ['--progress-background' as any]: completionColor
-              }}
-            />
-          </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* Profile Image Upload */}
-          <div className="flex justify-center">
-            <ProfileImageUpload
-              userId={user?.id || ''}
-              currentImageUrl={profile?.image_url}
-              googleProfileImage={profile?.google_profile_image}
-              authProvider={profile?.auth_provider}
-              onImageUpdate={async (imageUrl) => {
-                await updateProfile({ image_url: imageUrl });
-              }}
-            />
-          </div>
+    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 lg:gap-6">
+      {/* Left Column - Identity Card (sticky on desktop) */}
+      <div className="lg:sticky lg:top-28 lg:self-start">
+        <ProfileIdentityCard
+          user={user}
+          profile={profile}
+          completionPercentage={profileCompletion.percentage}
+          completionColor={completionColor}
+          completionMessage={completionMessage}
+          onImageUpdate={async (imageUrl) => {
+            await updateProfile({ image_url: imageUrl });
+          }}
+        />
+      </div>
 
-          {/* Inline Editable Fields */}
+      {/* Right Column - Settings Modules */}
+      <div className="space-y-4">
+        {/* Profile Info Module */}
+        <SettingsModule
+          title="Personal Information"
+          icon={User}
+          description="Your basic account details"
+        >
           <div className="space-y-4">
             <InlineEditField
               label="First Name"
@@ -188,10 +250,10 @@ export default function ProfileSection({
                 )
               }
             />
-            
+
             {/* Email Verification Action */}
             {!emailVerified && !checkingEmailVerification && (
-              <div className="pl-10">
+              <div className="pl-0 md:pl-8">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -225,32 +287,65 @@ export default function ProfileSection({
               type="tel"
               icon={<Phone className="h-4 w-4" />}
             />
-          </div>
 
-          {/* AI Personalization Settings */}
-          <div className="border-t border-white/10 pt-6">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <Bot className="h-5 w-5 text-[#8B1538] mt-1" />
-                  <div>
-                    <h3 className="text-[#EAECEF] font-medium">AI Personalization</h3>
-                    <p className="text-sm text-[#8B92A0] mt-1">
-                      Allow our AI chatbot to greet you by name and suggest your favorite dishes
-                    </p>
-                  </div>
+            {/* AI Personalization Toggle */}
+            <div className="flex items-center justify-between py-2 px-0 md:px-8">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-[#8B1538]" />
+                <div>
+                  <p className="text-sm text-white">AI Personalization</p>
+                  <p className="text-xs text-gray-500">Personalized greetings & suggestions</p>
                 </div>
-                <Switch
-                  checked={personalizationEnabled}
-                  onCheckedChange={handlePersonalizationToggle}
-                  disabled={personalizationLoading}
-                  className="data-[state=checked]:bg-[#8B1538]"
-                />
               </div>
+              <Switch
+                checked={personalizationEnabled}
+                onCheckedChange={handlePersonalizationToggle}
+                disabled={personalizationLoading}
+                className="data-[state=checked]:bg-[#8B1538]"
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+        </SettingsModule>
+
+        {/* Dietary Preferences Module */}
+        <SettingsModule
+          title="Dietary Preferences"
+          icon={Leaf}
+          description="Help us recommend suitable dishes"
+        >
+          <DietaryPreferencesSelector
+            selectedPreferences={onDietaryPreferencesChange ? dietaryPreferences : localDietaryPrefs}
+            onChange={handleDietaryChange}
+            disabled={savingPreferences}
+          />
+        </SettingsModule>
+
+        {/* Notification Preferences Module */}
+        <SettingsModule
+          title="Notifications"
+          icon={Bell}
+          description="Choose how you'd like to hear from us"
+        >
+          <NotificationPreferences
+            preferences={onNotificationPreferencesChange ? notificationPreferences : localNotificationPrefs}
+            onChange={handleNotificationChange}
+            disabled={savingPreferences}
+          />
+        </SettingsModule>
+
+        {/* Security Module */}
+        <SettingsModule
+          title="Security"
+          icon={Shield}
+          description="Manage your password and account"
+        >
+          <AccountSecuritySection
+            user={user}
+            onPasswordChange={handlePasswordChange}
+            onAccountDeletion={handleAccountDeletion}
+          />
+        </SettingsModule>
+      </div>
+    </div>
   );
 }

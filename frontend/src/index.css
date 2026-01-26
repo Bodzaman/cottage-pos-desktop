@@ -181,13 +181,51 @@ select:focus-visible,
   }
 }
 
+/* ============================================
+   URGENCY PULSE ANIMATIONS
+   Used by Table Dashboard for urgency indicators
+   ============================================ */
+
+/* Fast pulse - Critical urgency (stale orders) */
+@keyframes pulse-fast {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+/* Slow pulse - Medium urgency (needs attention) */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Urgency animation classes */
+.animate-pulse-fast {
+  animation: pulse-fast 0.5s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
-  .animate-breathe {
+  .animate-breathe,
+  .animate-pulse-fast,
+  .animate-pulse-slow {
     animation: none !important;
   }
-  
+
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -731,6 +769,28 @@ select:focus-visible,
   .touch-simplified {
     animation: breathe 6s ease-in-out infinite !important;
   }
+}
+
+/* Hover-only interactions - only apply on devices that support hover */
+@media (hover: hover) {
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+  }
+}
+
+/* Global touch improvements */
+button, a, [role="button"], [role="tab"], .touch-manipulation {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Prevent text selection on interactive elements (but allow on form inputs) */
+button, [role="button"], [role="tab"] {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Mobile responsive adjustments */

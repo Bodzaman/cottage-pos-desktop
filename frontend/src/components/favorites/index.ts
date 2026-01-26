@@ -1,0 +1,1 @@
+export { FavoriteListRail } from './FavoriteListRail';

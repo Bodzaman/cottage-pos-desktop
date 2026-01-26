@@ -112,7 +112,10 @@ export function UniversalHeader({
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${className}`}
-      style={headerStyles}
+      style={{
+        ...headerStyles,
+        paddingTop: 'env(safe-area-inset-top, 0px)'
+      }}
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
@@ -136,8 +139,8 @@ export function UniversalHeader({
             </Link>
           )}
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* Desktop Navigation - Shows on tablet landscape (lg:1024px+) */}
+          <nav className="hidden lg:flex items-center space-x-8">
             {filteredNavItems.map((item) => (
               <Link
                 key={item.path}
@@ -173,8 +176,8 @@ export function UniversalHeader({
             ))}
           </nav>
 
-          {/* Action Buttons with glassmorphism */}
-          <div className="hidden md:flex items-center space-x-3">
+          {/* Action Buttons with glassmorphism - Shows on tablet landscape (lg:1024px+) */}
+          <div className="hidden lg:flex items-center space-x-3">
             {user && <NotificationIndicator />}
             
             {finalConfig.showCart && !isChatOpen && (
@@ -255,8 +258,8 @@ export function UniversalHeader({
             )}
           </div>
 
-          {/* Enhanced Mobile Menu */}
-          <div className="md:hidden flex items-center">
+          {/* Enhanced Mobile Menu - Shows on mobile and tablet portrait (until lg:1024px) */}
+          <div className="lg:hidden flex items-center">
             <Sheet>
               <SheetTrigger asChild>
                 <Button

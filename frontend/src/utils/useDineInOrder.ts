@@ -198,6 +198,8 @@ export const useDineInOrder = (tableId: string | null) => {
       .subscribe();
 
     // Subscribe to real-time dine_in_order_items updates
+    // Note: dine_in_order_items has order_id and table_number, not table_id
+    // We remove the filter and rely on the handler's order.id check
     const itemsSubscription = supabase
       .channel(`table-order-items-${tableId}`)
       .on(
@@ -206,13 +208,17 @@ export const useDineInOrder = (tableId: string | null) => {
           event: '*',
           schema: 'public',
           table: 'dine_in_order_items',
-          filter: `table_id=eq.${tableId}`,
+          // No filter - handler checks order.id to avoid processing unrelated changes
         },
         (payload) => {
           console.log('[useDineInOrder] Real-time items update:', payload);
-          // Re-fetch all enriched items on any change
+          // Re-fetch all enriched items on any change for this order
           if (order?.id) {
-            fetchEnrichedItems(order.id);
+            // Only refetch if the change is for our order
+            const changedOrderId = (payload.new as any)?.order_id || (payload.old as any)?.order_id;
+            if (changedOrderId === order.id) {
+              fetchEnrichedItems(order.id);
+            }
           }
         }
       )
@@ -339,7 +345,10 @@ export const useDineInOrder = (tableId: string | null) => {
       await response.json();
       console.log('[useDineInOrder] Item removed:', itemId);
       toast.success('Item removed');
-      // State updates via subscription
+      // Explicitly refresh items list (real-time subscription is unreliable)
+      if (order?.id) {
+        await fetchEnrichedItems(order.id);
+      }
     } catch (err: any) {
       console.error('[useDineInOrder] Remove item error:', err);
       toast.error('Failed to remove item');

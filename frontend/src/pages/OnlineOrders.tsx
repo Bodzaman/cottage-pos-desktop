@@ -1154,9 +1154,9 @@ export default function OnlineOrders() {
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between py-3">
               {/* Category Tabs */}
-              <div className="flex-1 overflow-x-auto">
-                <div 
-                  className="flex items-center space-x-2 min-w-max"
+              <div className="flex-1 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div
+                  className="flex items-center space-x-2 pb-1"
                   role="tablist"
                   aria-label="Menu categories"
                   onKeyDown={(e) => {

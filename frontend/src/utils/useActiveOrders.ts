@@ -108,7 +108,7 @@ export function useActiveOrders(): UseActiveOrdersReturn {
       const { data, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('order_type', 'DINE_IN')
+        .in('order_type', ['DINE_IN', 'DINE-IN']) // Handle both formats
         .not('table_id', 'is', null) // Must have a table
         .in('status', ['pending', 'PENDING', 'created', 'CREATED', 'sent_to_kitchen', 'SENT_TO_KITCHEN',
                        'in_prep', 'IN_PREP', 'preparing', 'PREPARING', 'ready', 'READY',
@@ -138,6 +138,8 @@ export function useActiveOrders(): UseActiveOrdersReturn {
   }, [fetchOrders]);
 
   // Real-time subscription
+  // Note: We subscribe to ALL orders and filter client-side because Supabase
+  // real-time filters don't support 'in' operator for order_type
   useEffect(() => {
     const subscription = supabase
       .channel('active-orders-updates')
@@ -146,10 +148,17 @@ export function useActiveOrders(): UseActiveOrdersReturn {
         {
           event: '*',
           schema: 'public',
-          table: 'orders',
-          filter: 'order_type=eq.DINE_IN'
+          table: 'orders'
         },
         (payload) => {
+          const orderData = (payload.new || payload.old) as any;
+
+          // Filter for dine-in orders only (handle both formats)
+          const orderType = orderData?.order_type;
+          if (orderType !== 'DINE_IN' && orderType !== 'DINE-IN') {
+            return; // Not a dine-in order, ignore
+          }
+
           console.log('[useActiveOrders] Real-time update:', payload.eventType);
 
           setOrders((current) => {
@@ -309,4 +318,53 @@ export function useOrder(orderId: string | null) {
   }, [orderId]);
 
   return { order, loading, error, refetch: fetchOrder };
+}
+
+// ================================
+// STALE ORDER DETECTION HELPERS
+// ================================
+
+/**
+ * Default stale order threshold in hours
+ */
+export const DEFAULT_STALE_HOURS = 8;
+
+/**
+ * Check if an order is stale (likely abandoned)
+ *
+ * @param order - The dine-in order to check
+ * @param staleHours - Hours after which an order is considered stale (default: 8)
+ * @returns True if the order is older than the threshold
+ */
+export function isStaleOrder(order: DineInOrder, staleHours: number = DEFAULT_STALE_HOURS): boolean {
+  if (!order.createdAt) return false;
+
+  const createdAt = new Date(order.createdAt);
+  const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+
+  return hoursOld > staleHours;
+}
+
+/**
+ * Filter orders to get only stale/zombie orders
+ *
+ * @param orders - Array of dine-in orders
+ * @param staleHours - Hours after which an order is considered stale (default: 8)
+ * @returns Array of stale orders
+ */
+export function getStaleOrders(orders: DineInOrder[], staleHours: number = DEFAULT_STALE_HOURS): DineInOrder[] {
+  return orders.filter(order => isStaleOrder(order, staleHours));
+}
+
+/**
+ * Get the age of an order in hours
+ *
+ * @param order - The dine-in order
+ * @returns Age in hours (decimal), or 0 if no createdAt
+ */
+export function getOrderAgeHours(order: DineInOrder): number {
+  if (!order.createdAt) return 0;
+
+  const createdAt = new Date(order.createdAt);
+  return (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
 }

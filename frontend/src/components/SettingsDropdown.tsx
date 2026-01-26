@@ -20,6 +20,7 @@ import { RefundManagementPanel } from './RefundManagementPanel';
 import { VoiceOrderNotificationPanel } from './VoiceOrderNotificationPanel';
 import { VoiceOrderTestPanel } from './VoiceOrderTestPanel';
 import RestaurantSettingsManager from './RestaurantSettingsManager';
+import { POSUrgencySettings } from './POSUrgencySettings';
 import { isManagementAuthenticated } from '../utils/management-auth';
 
 interface SettingsSection {
@@ -486,8 +487,10 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
               <TabsContent value="pos-settings" className="space-y-4">
                 <div className="grid gap-4">
                   <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>POS Configuration</h3>
-                  {/* POS settings would go here */}
                   <p style={{ color: globalColors.text.secondary }}>Configure point of sale settings, table management, and receipt templates.</p>
+
+                  {/* Urgency Alert Settings */}
+                  <POSUrgencySettings />
                 </div>
               </TabsContent>
               

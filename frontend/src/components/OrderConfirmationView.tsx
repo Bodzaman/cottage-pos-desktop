@@ -256,7 +256,7 @@ export function OrderConfirmationView({
         <Button
           onClick={onBack}
           variant="ghost"
-          className="w-full h-10 text-white/60 hover:text-white hover:bg-white/5"
+          className="w-full h-11 min-h-[44px] text-white/60 hover:text-white hover:bg-white/5 touch-manipulation"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Cart

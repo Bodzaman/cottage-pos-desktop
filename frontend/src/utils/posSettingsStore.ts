@@ -19,11 +19,35 @@ interface POSDeliverySettings {
   allowed_postcodes: string[];
 }
 
-interface POSSettings {
+/**
+ * Urgency settings for table dashboard indicators
+ * Controls when pulsing urgency indicators appear on table cards
+ */
+export interface UrgencySettings {
+  enabled: boolean;
+  stale_order_hours: number;
+  in_kitchen_high_minutes: number;
+  seated_medium_minutes: number;
+  ordering_medium_minutes: number;
+}
+
+/**
+ * Default urgency settings matching backend defaults
+ */
+export const DEFAULT_URGENCY_SETTINGS: UrgencySettings = {
+  enabled: true,
+  stale_order_hours: 8,
+  in_kitchen_high_minutes: 45,
+  seated_medium_minutes: 10,
+  ordering_medium_minutes: 15,
+};
+
+export interface POSSettings {
   service_charge: POSServiceChargeSettings;
   delivery_charge: POSDeliveryChargeSettings;
   delivery: POSDeliverySettings;
   variant_carousel_enabled?: boolean;
+  urgency_settings?: UrgencySettings;
 }
 
 interface POSSettingsStore {
@@ -53,7 +77,8 @@ const defaultPOSSettings: POSSettings = {
     minimum_order_value: 15.0,
     allowed_postcodes: ["RH20", "BN5", "RH13", "BN6", "RH14"]
   },
-  variant_carousel_enabled: true
+  variant_carousel_enabled: true,
+  urgency_settings: DEFAULT_URGENCY_SETTINGS
 };
 
 export const usePOSSettings = create<POSSettingsStore>((set, get) => ({

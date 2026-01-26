@@ -148,7 +148,7 @@ export function CartSidebar({
       data-testid="cart-sidebar-instance"
     >
       <SheetContent 
-        className="w-[400px] sm:w-[500px] border-0 flex flex-col h-full p-0"
+        className="w-[90vw] sm:w-[400px] md:w-[500px] border-0 flex flex-col h-full p-0"
         style={{
           zIndex: 60,
           background: `linear-gradient(135deg, ${PremiumTheme.colors.dark[900]} 0%, ${PremiumTheme.colors.dark[850]} 100%)`,

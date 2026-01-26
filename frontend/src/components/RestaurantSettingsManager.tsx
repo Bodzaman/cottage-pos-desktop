@@ -36,6 +36,7 @@ import {
 import { useRestaurantSettings, BusinessProfile } from "../utils/useRestaurantSettings";
 import MediaSelector from "./MediaSelector";
 import DeliverySettings from "./DeliverySettings";
+import { POSUrgencySettings } from "./POSUrgencySettings";
 import { MediaItem, uploadMedia } from "../utils/mediaLibraryUtils";
 import brain from "brain";
 import type { POSSettings as BrainPOSSettings, PosTableResponse, CreateTableRequest, UpdateTableRequest } from "../brain/data-contracts";
@@ -558,7 +559,8 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
     setTableFormData({
       table_number: table.table_number,
       capacity: table.capacity,
-      status: table.status as 'available' | 'occupied' | 'reserved' | 'unavailable'
+      // Convert to lowercase - database stores UPPERCASE but form/API expects lowercase
+      status: (table.status?.toLowerCase() || 'available') as 'available' | 'occupied' | 'reserved' | 'unavailable'
     });
     setShowAddForm(true);
   };
@@ -642,7 +644,8 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    // Normalize to lowercase - database may return UPPERCASE
+    switch (status?.toLowerCase()) {
       case 'available':
         return { bg: 'bg-green-900', text: 'text-green-300' };
       case 'occupied':
@@ -657,7 +660,8 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    // Normalize to lowercase - database may return UPPERCASE
+    switch (status?.toLowerCase()) {
       case 'available':
         return <Check className="h-4 w-4 mr-2" />;
       case 'occupied':
@@ -1135,7 +1139,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                   
                   <Tabs value={posActiveTab} onValueChange={setPosActiveTab}>
                     <TabsList
-                      className="grid w-full grid-cols-3"
+                      className="grid w-full grid-cols-4"
                       style={{
                         backgroundColor: 'rgba(26, 26, 26, 0.6)',
                         backdropFilter: 'blur(12px)',
@@ -1147,7 +1151,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                         className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
                         style={{ color: colors.text.secondary }}
                       >
-                        Delivery Management
+                        Delivery
                       </TabsTrigger>
                       <TabsTrigger
                         value="service-charge"
@@ -1161,7 +1165,14 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                         className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
                         style={{ color: colors.text.secondary }}
                       >
-                        Table Management
+                        Tables
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="urgency-alerts"
+                        className="data-[state=active]:bg-[#7C3AED] data-[state=active]:text-white data-[state=active]:shadow-[0_0_16px_rgba(124,58,237,0.4)] transition-all duration-200 hover:bg-[rgba(124,58,237,0.15)]"
+                        style={{ color: colors.text.secondary }}
+                      >
+                        Urgency Alerts
                       </TabsTrigger>
                     </TabsList>
                     
@@ -1375,7 +1386,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                                   </h4>
                                   <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${statusColor.bg} ${statusColor.text}`}>
                                     {getStatusIcon(table.status)}
-                                    {table.status}
+                                    {table.status?.charAt(0).toUpperCase() + table.status?.slice(1).toLowerCase()}
                                   </span>
                                 </div>
                                 
@@ -1424,8 +1435,13 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                         </div>
                       )}
                     </TabsContent>
+
+                    {/* Urgency Alerts Tab */}
+                    <TabsContent value="urgency-alerts" className="space-y-4 mt-6">
+                      <POSUrgencySettings />
+                    </TabsContent>
                   </Tabs>
-                  
+
                   <div className="flex justify-end mt-6">
                     <Button
                       onClick={savePOSSettings}
@@ -1443,7 +1459,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                 </div>
               </div>
             )}
-            
+
             {activeSection === "admin" && (
               <div className="space-y-6">
                 {/* Password Management */}

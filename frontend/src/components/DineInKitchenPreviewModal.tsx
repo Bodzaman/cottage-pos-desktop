@@ -53,6 +53,7 @@ export function DineInKitchenPreviewModal({
   onSaveAndPrint
 }: DineInKitchenPreviewModalProps) {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   // ✅ NO FILTER NEEDED: orderItems now receives staging items directly (inherently pending)
@@ -135,8 +136,14 @@ export function DineInKitchenPreviewModal({
   };
 
   const handleSaveOnly = async () => {
-    await onSaveOnly();
-    onClose();
+    if (isSaving) return; // Guard against double-click race condition
+    setIsSaving(true);
+    try {
+      await onSaveOnly();
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrint = async () => {
@@ -293,10 +300,10 @@ export function DineInKitchenPreviewModal({
           <POSButton
             variant="secondary"
             onClick={handleSaveOnly}
-            disabled={pendingItems.length === 0}
-            icon={<Save className="w-4 h-4" />}
+            disabled={pendingItems.length === 0 || isSaving}
+            icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           >
-            Save Order
+            {isSaving ? 'Saving...' : 'Save Order'}
           </POSButton>
 
           <POSButton

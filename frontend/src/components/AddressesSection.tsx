@@ -1,11 +1,34 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Plus, MapPin, Edit, Trash2, Check, ShoppingBag } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Edit, Trash2, Check, ShoppingBag, Navigation, X, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import MiniMapPreview from 'components/MiniMapPreview';
+import { PremiumCard } from 'components/PremiumCard';
+import { PortalButton } from 'components/PortalButton';
+import { PremiumTheme } from 'utils/CustomerDesignSystem';
+import { cn } from 'utils/cn';
 import type { CustomerAddress } from 'types';
+
+// Restaurant location for distance calculation
+const RESTAURANT_COORDS = {
+  lat: 51.5074, // Example - London
+  lng: -0.1278
+};
+
+// Calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 interface Props {
   addresses: CustomerAddress[] | null;
@@ -24,125 +47,144 @@ export default function AddressesSection({
 }: Props) {
   const navigate = useNavigate();
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-[#EAECEF]">My Addresses</h2>
-        <Button
-          onClick={() => {
-            setEditingAddress(null);
-            setAddressModalOpen(true);
-          }}
-          className="bg-[#8B1538] hover:bg-[#7A1230] text-white shadow-[0_0_24px_#8B153855] border-0"
-          aria-label="Add a new delivery address"
-        >
-          <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-          Add Address
-        </Button>
-      </div>
+  // State for enlarged map modal
+  const [enlargedMapAddress, setEnlargedMapAddress] = useState<any>(null);
 
-      {addresses && addresses.length > 0 ? (
-        <div className="grid gap-4">
-          {addresses.map((address) => {
-            // Type assertion to include lat/lng that we know are saved
+  // Sort addresses with default first
+  const sortedAddresses = useMemo(() => {
+    if (!addresses) return [];
+    return [...addresses].sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return 0;
+    });
+  }, [addresses]);
+
+  return (
+    <div>
+      {sortedAddresses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sortedAddresses.map((address, index) => {
             const addressWithCoords = address as any;
             const hasCoords = addressWithCoords.latitude && addressWithCoords.longitude;
-            
+            const distance = hasCoords
+              ? calculateDistance(
+                  RESTAURANT_COORDS.lat,
+                  RESTAURANT_COORDS.lng,
+                  addressWithCoords.latitude,
+                  addressWithCoords.longitude
+                )
+              : null;
+
             return (
               <motion.div
                 key={address.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden hover:border-[#8B1538]/30 transition-all duration-200"
+                transition={{ delay: index * 0.05 }}
               >
-                <div className="flex flex-col md:flex-row">
-                  {/* Left: Map Preview */}
-                  <div className="md:w-48 h-48 md:h-auto relative flex-shrink-0">
-                    <MiniMapPreview
-                      latitude={addressWithCoords.latitude}
-                      longitude={addressWithCoords.longitude}
-                      address_line1={address.addressLine1}
-                      city={address.city ?? ''}
-                      postal_code={address.postcode}
-                      width={192}
-                      height={192}
-                      zoom={15}
-                      className="w-full h-full"
-                    />
-                    
-                    {/* Delivery Zone Status Badge */}
-                    {hasCoords && (
-                      <div className="absolute bottom-2 left-2 right-2">
-                        <div className="bg-green-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 shadow-lg justify-center">
-                          <Check className="h-3 w-3" />
-                          <span>Within Delivery Zone</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <PremiumCard
+                  subsurface
+                  hover
+                  className={cn(
+                    'overflow-hidden h-full',
+                    address.isDefault && 'border-l-4 border-l-[#8B1538] shadow-[0_0_20px_rgba(139,21,56,0.15)]'
+                  )}
+                >
+                  <div className="flex gap-4 p-4">
+                    {/* Compact Map Preview */}
+                    <div
+                      className="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden flex-shrink-0 relative cursor-pointer group"
+                      onClick={() => hasCoords && setEnlargedMapAddress(addressWithCoords)}
+                    >
+                      <MiniMapPreview
+                        latitude={addressWithCoords.latitude}
+                        longitude={addressWithCoords.longitude}
+                        address_line1={address.addressLine1}
+                        city={address.city ?? ''}
+                        postal_code={address.postcode}
+                        width={96}
+                        height={96}
+                        zoom={15}
+                        className="w-full h-full"
+                      />
 
-                  {/* Right: Address Details & Actions */}
-                  <div className="flex-1 p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-[#8B1538]/20">
-                          <MapPin className="h-5 w-5 text-[#8B1538]" />
+                      {/* Distance Badge */}
+                      {distance !== null && (
+                        <div className="absolute bottom-1 left-1 right-1">
+                          <div className="px-1.5 py-0.5 rounded text-[10px] backdrop-blur-sm bg-black/60 text-white font-medium flex items-center justify-center gap-1">
+                            <Navigation className="h-2.5 w-2.5" />
+                            {distance.toFixed(1)} mi
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-[#EAECEF] capitalize">
-                            {address.label ?? 'Saved'} Address
-                          </h3>
-                          {address.isDefault && (
-                            <span className="inline-block px-2 py-1 text-xs bg-[#8B1538]/20 text-[#8B1538] rounded-full mt-1">
-                              Default
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Edit & Delete Buttons */}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingAddress(address);
-                            setAddressModalOpen(true);
-                          }}
-                          className="text-[#B7BDC6] hover:text-[#EAECEF] hover:bg-white/10"
-                          aria-label="Edit address"
-                        >
-                          <Edit className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAddress(address.id!)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                          aria-label="Delete address"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Address Text */}
-                    <div className="text-[#B7BDC6] space-y-1 mb-4">
-                      <p>{address.addressLine1}</p>
-                      {address.addressLine2 && <p>{address.addressLine2}</p>}
-                      <p>{address.city}, {address.postcode}</p>
-                      {address.deliveryNotes && (
-                        <p className="text-sm italic text-[#8B92A0] mt-2">
-                          {address.deliveryNotes}
-                        </p>
+                      )}
+
+                      {/* Hover overlay */}
+                      {hasCoords && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
                       )}
                     </div>
 
-                    {/* Quick Action Buttons */}
-                    <div className="flex gap-3 mt-4">
+                    {/* Address Details */}
+                    <div className="flex-1 min-w-0">
+                      {/* Header: Label + Default Badge */}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <h3 className="font-semibold text-white capitalize text-sm truncate">
+                          {address.label || 'Saved'}
+                        </h3>
+                        {address.isDefault && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[#8B1538]/20 text-[#8B1538] rounded-full shrink-0">
+                            <Star className="h-2.5 w-2.5 fill-current" />
+                            Default
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Address Text */}
+                      <p className="text-sm text-gray-400 line-clamp-2 mb-2">
+                        {address.addressLine1}
+                        {address.addressLine2 && `, ${address.addressLine2}`}
+                        {`, ${address.city}, ${address.postcode}`}
+                      </p>
+
+                      {/* Delivery Zone Badge */}
+                      {hasCoords && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                          <Check className="h-2.5 w-2.5" />
+                          Delivery available
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.02]">
+                    {/* Icon Actions */}
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingAddress(address);
+                          setAddressModalOpen(true);
+                        }}
+                        className="text-gray-400 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                        aria-label="Edit address"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteAddress(address.id!)}
+                        className="text-gray-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
+                        aria-label="Delete address"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                       {!address.isDefault && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={async () => {
                             const { error } = await setDefaultAddress(address.id!);
@@ -152,56 +194,147 @@ export default function AddressesSection({
                               toast.success('Default address updated!');
                             }
                           }}
-                          className="border-white/20 text-[#B7BDC6] hover:bg-white/10 hover:text-[#EAECEF]"
+                          className="text-gray-400 hover:text-[#8B1538] hover:bg-[#8B1538]/10 h-8 px-2 text-xs"
                           aria-label="Set as default address"
                         >
-                          <Check className="h-4 w-4 mr-1" aria-hidden="true" />
-                          Set as Default
+                          <Star className="h-3.5 w-3.5 mr-1" />
+                          Set Default
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        onClick={async () => {
-                          // Set as default and navigate to order
-                          if (!address.isDefault) {
-                            await setDefaultAddress(address.id!);
-                          }
-                          navigate('/online-orders');
-                          toast.success('Ready to order! Address selected.');
-                        }}
-                        className="bg-[#8B1538] hover:bg-[#7A1530] text-white border-0"
-                        aria-label="Order to this address"
-                      >
-                        <ShoppingBag className="h-4 w-4 mr-1" aria-hidden="true" />
-                        Order to This Address
-                      </Button>
                     </div>
+
+                    {/* Primary CTA */}
+                    <PortalButton
+                      variant="primary"
+                      size="sm"
+                      onClick={async () => {
+                        if (!address.isDefault) {
+                          await setDefaultAddress(address.id!);
+                        }
+                        navigate('/online-orders');
+                        toast.success('Ready to order!');
+                      }}
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      Deliver Here
+                    </PortalButton>
                   </div>
-                </div>
+                </PremiumCard>
               </motion.div>
             );
           })}
         </div>
       ) : (
-        <div className="text-center py-12">
-          <div className="p-4 rounded-full bg-[#8B1538]/20 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <MapPin className="h-8 w-8 text-[#8B1538]" />
+        <PremiumCard subsurface className="py-12 px-6">
+          <div className="text-center max-w-sm mx-auto">
+            <div className="p-4 rounded-xl bg-[#8B1538]/15 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <MapPin className="h-7 w-7 text-[#8B1538]" />
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">No addresses saved</h3>
+            <p className="text-sm text-gray-400 mb-5">
+              Add your delivery addresses for faster checkout next time.
+            </p>
+            <PortalButton
+              variant="primary"
+              onClick={() => {
+                setEditingAddress(null);
+                setAddressModalOpen(true);
+              }}
+            >
+              <MapPin className="h-4 w-4" />
+              Add Your First Address
+            </PortalButton>
           </div>
-          <h3 className="text-lg font-semibold text-[#EAECEF] mb-2">No addresses saved</h3>
-          <p className="text-[#B7BDC6] mb-6">Add your delivery addresses for faster checkout.</p>
-          <Button
-            onClick={() => {
-              setEditingAddress(null);
-              setAddressModalOpen(true);
-            }}
-            className="bg-[#8B1538] hover:bg-[#7A1530] text-white shadow-[0_0_24px_#8B153855] border-0"
-            aria-label="Add your first address"
-          >
-            <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-            Add Your First Address
-          </Button>
-        </div>
+        </PremiumCard>
       )}
+
+      {/* Enlarged Map Modal */}
+      <AnimatePresence>
+        {enlargedMapAddress && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+              onClick={() => setEnlargedMapAddress(null)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-4 md:inset-8 lg:inset-16 rounded-2xl overflow-hidden z-50"
+              style={{
+                background: 'rgba(26, 26, 26, 0.95)',
+                border: `1px solid ${PremiumTheme.colors.border.light}`
+              }}
+            >
+              {/* Header */}
+              <div
+                className="flex items-center justify-between p-4 border-b"
+                style={{ borderColor: PremiumTheme.colors.border.light }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: `${PremiumTheme.colors.burgundy[500]}20` }}
+                  >
+                    <MapPin className="h-5 w-5 text-[#8B1538]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#EAECEF]">
+                      {enlargedMapAddress.addressLine1}
+                    </h3>
+                    <p className="text-sm text-[#8B92A0]">
+                      {enlargedMapAddress.city}, {enlargedMapAddress.postcode}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {/* Distance Info */}
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-[#8B1538]">
+                      {calculateDistance(
+                        RESTAURANT_COORDS.lat,
+                        RESTAURANT_COORDS.lng,
+                        enlargedMapAddress.latitude,
+                        enlargedMapAddress.longitude
+                      ).toFixed(1)} miles
+                    </p>
+                    <p className="text-xs text-[#8B92A0]">from restaurant</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEnlargedMapAddress(null)}
+                    className="text-[#8B92A0] hover:text-[#EAECEF] hover:bg-white/10"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Map Container */}
+              <div className="w-full h-[calc(100%-80px)]">
+                <MiniMapPreview
+                  latitude={enlargedMapAddress.latitude}
+                  longitude={enlargedMapAddress.longitude}
+                  address_line1={enlargedMapAddress.addressLine1}
+                  city={enlargedMapAddress.city ?? ''}
+                  postal_code={enlargedMapAddress.postcode}
+                  width={800}
+                  height={600}
+                  zoom={16}
+                  className="w-full h-full"
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

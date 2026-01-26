@@ -253,7 +253,7 @@ export const ManagementHeader: React.FC<Props> = ({
 
         {/* Center: Enhanced Search Bar - Prominent & Centered */}
         {showSearch ? (
-          <div className="flex-1 max-w-2xl mx-8">
+          <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
             <div className="relative search-container">
               <Search 
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5" 

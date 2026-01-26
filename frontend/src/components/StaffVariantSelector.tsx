@@ -6,6 +6,7 @@ import { Minus, Plus, Sliders } from 'lucide-react';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { cn } from '../utils/cn';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { StaffCustomizationModal } from './StaffCustomizationModal';
 
 // POS Purple Theme Colors
@@ -132,7 +133,15 @@ export function StaffVariantSelector({
     
     const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price, 0) || 0;
     const totalPrice = (price + customizationsTotal) * quantity;
-    
+
+    // ✅ FIX: Guard against £0.00 price
+    if (price <= 0) {
+      toast.warning('Unable to add item', {
+        description: 'Price not available. Please select a variant with valid pricing.',
+      });
+      return;
+    }
+
     // Field names must match what BuildSampleTakeawayModal.handleCustomizedItem() expects
     const orderItem: OrderItem = {
       menu_item_id: item.id,

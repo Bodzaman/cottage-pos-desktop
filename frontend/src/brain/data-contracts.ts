@@ -6159,15 +6159,19 @@ export interface OrderDetails {
 
 /**
  * OrderHistoryListResponse
- * Response wrapper for order history list
+ * Response wrapper for order history list with pagination
  */
 export interface OrderHistoryListResponse {
   /** Success */
   success: boolean;
   /** Orders */
   orders: OrderHistoryResponse[];
-  /** Total Count */
+  /** Total Count - total orders in database */
   total_count: number;
+  /** Returned Count - orders returned in this response */
+  returned_count?: number;
+  /** Has More - true if more pages exist */
+  has_more?: boolean;
   /** Message */
   message?: string | null;
 }
@@ -14173,9 +14177,14 @@ export type SendVerificationEmailError = HTTPValidationError;
 export interface GetOrderHistoryParams {
   /**
    * Limit
-   * @default 100
+   * @default 25
    */
   limit?: number;
+  /**
+   * Offset
+   * @default 0
+   */
+  offset?: number;
   /** Customer Id */
   customerId: string;
 }

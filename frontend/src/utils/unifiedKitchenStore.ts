@@ -17,6 +17,11 @@ interface UnifiedKitchenState {
   // Actions
   loadOrders: () => Promise<void>;
   refreshOrders: () => Promise<void>;
+
+  /**
+   * @deprecated KDS is now read-only. Status updates should be made from POS.
+   * This function is kept for backward compatibility but should not be used.
+   */
   updateOrderStatus: (orderId: string, status: KitchenOrderStatus) => Promise<void>;
 
   // Realtime
@@ -56,7 +61,11 @@ export const useUnifiedKitchenStore = create<UnifiedKitchenState>((set, get) => 
     await get().loadOrders();
   },
 
+  /**
+   * @deprecated KDS is now read-only. Status updates should be made from POS.
+   */
   updateOrderStatus: async (orderId, status) => {
+    console.warn('[UnifiedKitchen] updateOrderStatus is deprecated. KDS is now read-only.');
     const current = get().orders.find((o) => o.id === orderId);
     if (!current) return;
 

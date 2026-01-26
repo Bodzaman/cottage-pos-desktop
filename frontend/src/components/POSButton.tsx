@@ -86,35 +86,41 @@ export function POSButton(props: POSButtonProps) {
   const { variant, children, onClick, disabled, className, icon, type = 'button' } = props;
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Extract primary variant props (with defaults for when not primary)
+  const primaryProps = variant === 'primary' ? props as POSButtonPrimaryProps : null;
+  const colorScheme = primaryProps?.colorScheme ?? 'purple';
+  const scheme = colorSchemes[colorScheme];
+
+  // IMPORTANT: All hooks must be called unconditionally at the top level
+  // These are used by the primary variant but must always be called
+  const handlePrimaryMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    e.currentTarget.style.transform = 'translateY(-2px)';
+    e.currentTarget.style.boxShadow = `0 8px 32px ${scheme.hoverGlow}, 0 4px 8px rgba(0,0,0,0.2)`;
+  }, [disabled, scheme.hoverGlow]);
+
+  const handlePrimaryMouseLeave = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+    e.currentTarget.style.opacity = '1';
+    e.currentTarget.style.boxShadow = `0 6px 20px ${scheme.glowColor}, 0 2px 4px rgba(0,0,0,0.1)`;
+  }, [disabled, scheme.glowColor]);
+
+  const handlePrimaryMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    e.currentTarget.style.transform = 'scale(0.97)';
+    e.currentTarget.style.opacity = '0.9';
+  }, [disabled]);
+
+  const handlePrimaryMouseUp = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    e.currentTarget.style.transform = 'translateY(-2px)';
+    e.currentTarget.style.opacity = '1';
+  }, [disabled]);
+
   // ── Primary Variant ──
   if (variant === 'primary') {
-    const { colorScheme = 'purple', subtitle, hint, showChevron = true, fullWidth = false } = props as POSButtonPrimaryProps;
-    const scheme = colorSchemes[colorScheme];
-
-    const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.boxShadow = `0 8px 32px ${scheme.hoverGlow}, 0 4px 8px rgba(0,0,0,0.2)`;
-    }, [disabled, scheme.hoverGlow]);
-
-    const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-      e.currentTarget.style.opacity = '1';
-      e.currentTarget.style.boxShadow = `0 6px 20px ${scheme.glowColor}, 0 2px 4px rgba(0,0,0,0.1)`;
-    }, [disabled, scheme.glowColor]);
-
-    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      e.currentTarget.style.transform = 'scale(0.97)';
-      e.currentTarget.style.opacity = '0.9';
-    }, [disabled]);
-
-    const handleMouseUp = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.opacity = '1';
-    }, [disabled]);
+    const { subtitle, hint, showChevron = true, fullWidth = false } = props as POSButtonPrimaryProps;
 
     return (
       <button
@@ -138,10 +144,10 @@ export function POSButton(props: POSButtonProps) {
           opacity: disabled ? 0.5 : 1,
           cursor: disabled ? 'not-allowed' : 'pointer',
         }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
+        onMouseEnter={handlePrimaryMouseEnter}
+        onMouseLeave={handlePrimaryMouseLeave}
+        onMouseDown={handlePrimaryMouseDown}
+        onMouseUp={handlePrimaryMouseUp}
       >
         {/* Shimmer overlay */}
         {!disabled && (

@@ -26,6 +26,7 @@ import { usePOSCustomerIntelligence } from 'utils/usePOSCustomerIntelligence';
 import { useDineInOrder } from 'utils/useDineInOrder';
 import { useRestaurantTables } from 'utils/useRestaurantTables';
 import { useCustomerTabs } from 'utils/useCustomerTabs';
+import { useActiveOrders } from 'utils/useActiveOrders';
 
 // Enhanced image preloading imports
 import { OrderSummarySkeleton } from 'components/OrderSummarySkeleton';
@@ -53,7 +54,7 @@ import { POSButton } from '../components/POSButton';
 import { CustomerDetailsModal } from 'components/CustomerDetailsModal';
 import { CustomerOrderHistoryModal } from 'components/CustomerOrderHistoryModal';
 import { POSGuestCountModal } from 'components/POSGuestCountModal';
-import { DineInOrderModal } from 'components/DineInOrderModal';
+import { DineInOrderWorkspace } from 'components/DineInOrderWorkspace';
 import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal';
 import { DineInBillPreviewModal } from 'components/DineInBillPreviewModal';
 import { CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrator';
@@ -227,6 +228,9 @@ export default function POSDesktop() {
 
   const { tables: restaurantTables, loading: tablesLoading, refetch: refetchTables } = useRestaurantTables();
 
+  // Active orders - source of truth for linked tables data
+  const { orders: activeOrders } = useActiveOrders();
+
   // Customer intelligence for order history
   const { customerProfile, clearCustomer: clearIntelligenceCustomer } = usePOSCustomerIntelligence();
   
@@ -244,7 +248,26 @@ export default function POSDesktop() {
   }, [selectedTableNumber, restaurantTables]);
 
   const linkedTableContext = useMemo(() => {
-    if (orderType !== 'DINE-IN' || !selectedTableNumber) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    if (orderType !== 'DINE-IN' || !selectedTableNumber) {
+      return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
+    }
+
+    // PRIMARY SOURCE: Check active orders (source of truth for linked tables)
+    const activeOrder = activeOrders.find(o =>
+      o.tableNumber === selectedTableNumber ||
+      (o.linkedTables && o.linkedTables.includes(selectedTableNumber))
+    );
+
+    if (activeOrder && activeOrder.linkedTables && activeOrder.linkedTables.length > 1) {
+      const linkedTableNumbers = activeOrder.linkedTables.filter(t => t !== selectedTableNumber);
+      const isPrimaryTable = activeOrder.tableNumber === selectedTableNumber;
+      const selectedTable = restaurantTables.find((t: any) => parseInt(t.table_number) === selectedTableNumber);
+      const linkedTableObjects = restaurantTables.filter((t: any) => linkedTableNumbers.includes(parseInt(t.table_number)));
+      const totalLinkedCapacity = (selectedTable?.capacity || 0) + linkedTableObjects.reduce((sum: number, t: any) => sum + (t.capacity || 0), 0);
+      return { linkedTableNumbers, isPrimaryTable, totalLinkedCapacity };
+    }
+
+    // FALLBACK: Check restaurantTables for legacy data
     const selectedTable = restaurantTables.find((t: any) => parseInt(t.table_number) === selectedTableNumber);
     if (!selectedTable) return { linkedTableNumbers: [], isPrimaryTable: false, totalLinkedCapacity: 0 };
     const isLinked = selectedTable.is_linked_table || selectedTable.is_linked_primary;
@@ -254,7 +277,7 @@ export default function POSDesktop() {
     const linkedTableObjects = restaurantTables.filter((t: any) => linkedTableNumbers.includes(parseInt(t.table_number)));
     const totalLinkedCapacity = selectedTable.capacity + linkedTableObjects.reduce((sum: number, t: any) => sum + (t.capacity || 0), 0);
     return { linkedTableNumbers, isPrimaryTable, totalLinkedCapacity };
-  }, [orderType, selectedTableNumber, restaurantTables]);
+  }, [orderType, selectedTableNumber, restaurantTables, activeOrders]);
 
   const { order: dineInOrder, enrichedItems: dineInEnrichedItems, enrichedLoading: dineInEnrichedLoading, enrichedError: dineInEnrichedError, createOrder, addItem: addItemToDineIn, removeItem: removeItemFromDineIn, updateItemQuantity, sendToKitchen: sendDineInToKitchen, updateGuestCount } = useDineInOrder(selectedTableUuid || '');
 
@@ -269,18 +292,31 @@ export default function POSDesktop() {
   const removeFromStagingCart = useCallback((itemId: string) => setDineInStagingItems(prev => prev.filter(item => item.id !== itemId)), []);
   const clearStagingCart = useCallback(() => setDineInStagingItems([]), []);
 
+  // Guard ref to prevent concurrent execution of persistStagingCart (defense in depth)
+  const isPersistingRef = useRef(false);
+
   const persistStagingCart = useCallback(async () => {
+    // Guard against concurrent execution (race condition from double-clicks)
+    if (isPersistingRef.current) {
+      console.log('[POSDesktop] persistStagingCart already in progress, skipping');
+      return false;
+    }
     if (dineInStagingItems.length === 0) return false;
     if (!dineInOrderRef.current) {
       const startTime = Date.now();
       while (!dineInOrderRef.current && (Date.now() - startTime < 3000)) await new Promise(r => setTimeout(r, 100));
       if (!dineInOrderRef.current) return false;
     }
+
+    isPersistingRef.current = true;
     try {
       for (const item of dineInStagingItems) await addItemToDineIn(item);
       setDineInStagingItems([]);
       return true;
     } catch { return false; }
+    finally {
+      isPersistingRef.current = false;
+    }
   }, [dineInStagingItems, addItemToDineIn]);
 
   const clearCustomerData = useCustomerDataStore(state => state.clearCustomerData);
@@ -790,10 +826,44 @@ export default function POSDesktop() {
         <div className="flex-1 overflow-hidden">{renderMainPOSView()}</div>
         <POSFooter currentOrderType={orderType} />
         
-        <DineInOrderModal isOpen={showDineInModal} onClose={() => setModal('showDineInModal', false)} tableId={selectedTableUuid} tableNumber={selectedTableNumber as any} tableCapacity={selectedTableCapacity} linkedTables={linkedTableContext.linkedTableNumbers} isPrimaryTable={linkedTableContext.isPrimaryTable} totalLinkedCapacity={linkedTableContext.totalLinkedCapacity} restaurantTables={restaurantTables} eventDrivenOrder={orderType === 'DINE-IN' ? (dineInOrder as any) : null} eventDrivenCustomerTabs={customerTabsData} eventDrivenActiveTabId={activeTabId} onEventDrivenSetActiveTabId={setActiveTabId} onEventDrivenAddItem={addItemToDineIn} onEventDrivenRemoveItem={removeItemFromDineIn} onEventDrivenUpdateItemQuantity={updateItemQuantity} onEventDrivenUpdateGuestCount={updateGuestCount} onEventDrivenSendToKitchen={sendDineInToKitchen} onEventDrivenCreateTab={createTab} onEventDrivenAddItemsToTab={addItemsToTab} onEventDrivenRenameTab={renameTab} onEventDrivenCloseTab={closeTab} onEventDrivenSplitTab={splitTab} onEventDrivenMergeTabs={mergeTabs} onEventDrivenMoveItemsBetweenTabs={moveItemsBetweenTabs} stagingItems={dineInStagingItems} onAddToStaging={addToStagingCart} onRemoveFromStaging={removeFromStagingCart} onClearStaging={clearStagingCart} onPersistStaging={persistStagingCart as any} enrichedItems={dineInEnrichedItems} enrichedLoading={dineInEnrichedLoading} enrichedError={dineInEnrichedError} />
-        {showGuestCountModal && <POSGuestCountModal isOpen={true} onClose={() => setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={selectedTableNumber || 0} tableCapacity={selectedTableCapacity} initialGuestCount={1} />}
-        {showCustomerModal && <CustomerDetailsModal isOpen={true} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={(newMode) => setOrderType(newMode)} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />}
-        {showAdminPanel && <AdminSidePanel isOpen={true} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />}
+        <DineInOrderWorkspace
+          isOpen={showDineInModal}
+          onClose={() => setModal('showDineInModal', false)}
+          tableId={selectedTableUuid}
+          tableNumber={selectedTableNumber}
+          linkedTables={linkedTableContext.linkedTableNumbers}
+          isPrimaryTable={linkedTableContext.isPrimaryTable}
+          restaurantTables={restaurantTables as any}
+          order={orderType === 'DINE-IN' ? (dineInOrder as any) : null}
+          enrichedItems={dineInEnrichedItems || []}
+          enrichedLoading={dineInEnrichedLoading}
+          enrichedError={dineInEnrichedError}
+          onAddItem={addItemToDineIn}
+          onRemoveItem={removeItemFromDineIn}
+          onUpdateItemQuantity={updateItemQuantity}
+          onSendToKitchen={sendDineInToKitchen}
+          onUpdateGuestCount={updateGuestCount}
+          customerTabs={customerTabsData as any}
+          activeTabId={activeTabId}
+          onSetActiveTabId={setActiveTabId}
+          onCreateTab={createTab}
+          onRenameTab={renameTab}
+          onCloseTab={closeTab}
+          stagingItems={dineInStagingItems}
+          onAddToStaging={addToStagingCart}
+          onRemoveFromStaging={removeFromStagingCart}
+          onClearStaging={clearStagingCart}
+          onPersistStaging={persistStagingCart}
+          onPrintBill={printing.handlePrintBill}
+          onCompleteOrder={async () => {
+            // Mark order as paid and close workspace
+            setModal('showDineInModal', false);
+            clearStagingCart();
+          }}
+        />
+        <POSGuestCountModal isOpen={showGuestCountModal} onClose={() => setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={selectedTableNumber || 0} tableCapacity={selectedTableCapacity} initialGuestCount={1} />
+        <CustomerDetailsModal isOpen={showCustomerModal} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={(newMode) => setOrderType(newMode)} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />
+        <AdminSidePanel isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={customerProfile} orders={customerProfile?.recent_orders || []} onReorder={handleLoadPastOrder} />
         <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
 

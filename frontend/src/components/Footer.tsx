@@ -108,15 +108,16 @@ export function Footer({ variant = 'full' }: FooterProps) {
   ];
   
   return (
-    <footer 
+    <footer
       className="border-t"
       style={{
         background: PremiumTheme.colors.background.primary,
-        borderColor: PremiumTheme.colors.border.medium
+        borderColor: PremiumTheme.colors.border.medium,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)'
       }}
     >
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+      <div className="container mx-auto px-4 py-12 lg:py-16 max-w-7xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-12">
           <div>
             <h3
               className="mb-6"
@@ -130,10 +131,10 @@ export function Footer({ variant = 'full' }: FooterProps) {
               className="mb-6"
               style={{ color: PremiumTheme.colors.text.muted }}
             >Authentic Indian cuisine in the heart of Storrington since 1982.</p>
-            <div className="flex space-x-4">
+            <div className="flex space-x-1">
               <a
                 href="#"
-                className="transition-colors"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors touch-manipulation"
                 style={{
                   color: PremiumTheme.colors.text.muted
                 }}
@@ -144,7 +145,7 @@ export function Footer({ variant = 'full' }: FooterProps) {
               </a>
               <a
                 href="#"
-                className="transition-colors"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors touch-manipulation"
                 style={{
                   color: PremiumTheme.colors.text.muted
                 }}
@@ -155,7 +156,7 @@ export function Footer({ variant = 'full' }: FooterProps) {
               </a>
               <a
                 href="#"
-                className="transition-colors"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors touch-manipulation"
                 style={{
                   color: PremiumTheme.colors.text.muted
                 }}

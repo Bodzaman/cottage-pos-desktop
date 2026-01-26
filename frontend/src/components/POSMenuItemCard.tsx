@@ -245,6 +245,16 @@ export function POSMenuItemCard({
     // priceDisplay already computed using getItemDisplayPrice() which handles all cases
     const price = priceDisplay.displayPrice;
 
+    // ✅ FIX: Guard against £0.00 price (variant-based items before variants load)
+    if (price <= 0) {
+      toast.warning('Unable to add item', {
+        description: 'Price not available. Please try again or select a variant.',
+        duration: 3000,
+        position: 'top-center'
+      });
+      return;
+    }
+
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       menuItemId: item.id,

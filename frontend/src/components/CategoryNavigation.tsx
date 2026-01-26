@@ -157,7 +157,7 @@ export function CategoryNavigation({
           {/* All Dishes */}
           <motion.button
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200",
+              "w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg text-left transition-all duration-200 touch-manipulation",
               !selectedParentCategory ? "font-medium" : ""
             )}
             style={{
@@ -199,7 +199,7 @@ export function CategoryNavigation({
                 {/* Parent Category */}
                 <motion.button
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200",
+                    "w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg text-left transition-all duration-200 touch-manipulation",
                     isSelected ? "font-medium" : ""
                   )}
                   style={{
@@ -323,7 +323,7 @@ export function CategoryNavigation({
                 <motion.button
                   key={category.id}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200",
+                    "w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg text-left transition-all duration-200 touch-manipulation",
                     isSelected ? "font-medium" : ""
                   )}
                   style={{

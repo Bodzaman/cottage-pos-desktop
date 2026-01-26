@@ -140,7 +140,7 @@ export default function InlineTermsScreen({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 50 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="relative rounded-3xl overflow-hidden max-w-2xl mx-auto my-4"
+        className="relative rounded-3xl overflow-hidden max-w-2xl mx-auto my-4 max-h-[85vh]"
         style={{
           background: `linear-gradient(135deg, 
             ${PremiumTheme.colors.dark[900]}95 0%, 
@@ -170,7 +170,10 @@ export default function InlineTermsScreen({
         </button>
         
         {/* Main content */}
-        <div className="p-8 space-y-8">
+        <div
+          className="p-5 sm:p-8 space-y-5 sm:space-y-8 overflow-y-auto max-h-[calc(85vh-2rem)]"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {/* Header with Agent Image */}
           <div className="text-center space-y-6">
             {/* Agent Image with Enhanced Animation */}

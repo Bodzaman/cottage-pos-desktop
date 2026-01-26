@@ -346,6 +346,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
       const checkoutData = {
         items: items.map(item => ({
           id: item.id,
+          menu_item_id: item.menuItemId,
           name: item.name,
           price: item.price,
           quantity: item.quantity,

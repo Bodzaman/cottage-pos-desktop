@@ -21,12 +21,20 @@ import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { useActiveOrders } from '../utils/useActiveOrders';
 import {
   deriveTableCardData,
+  deriveTableCardStatus,
+  calculateTableUrgency,
   DashboardCustomerTab,
   DashboardPersistedOrder,
-  TableCardData
+  TableCardData,
+  TableCardStatus,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  DEFAULT_URGENCY_SETTINGS
 } from '../utils/tableDashboardHelpers';
 import type { RestaurantTable } from '../utils/useRestaurantTables';
+import { getTimeOccupied } from '../utils/tableTypes';
 import { buildLinkedGroupColorMap, getLinkedTableColorFromMap, type LinkedTableColor } from '../utils/linkedTableColors';
+import { usePOSSettingsWithAutoFetch, DEFAULT_URGENCY_SETTINGS as POS_DEFAULT_URGENCY_SETTINGS } from '../utils/posSettingsStore';
 
 interface DineInTableDashboardProps {
   tables: RestaurantTable[];
@@ -189,8 +197,12 @@ export function DineInTableDashboard({
   // NEW: Get active orders for linking data (orders are source of truth)
   const { orders: activeOrders } = useActiveOrders();
 
+  // Get POS settings for urgency thresholds
+  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
+  const urgencySettings = posSettings?.urgency_settings || DEFAULT_URGENCY_SETTINGS;
+
   // Derive enriched table data for all tables
-  // Now merges order-based linking with other data sources
+  // Now uses activeOrders as source of truth for runtime data (guest count, duration, status)
   const enrichedTables = useMemo(() => {
     return tables
       .map(table => {
@@ -203,23 +215,59 @@ export function DineInTableDashboard({
           (o.linkedTables && o.linkedTables.includes(tableNumber))
         );
 
-        // Override linking data from orders (source of truth)
-        if (order && order.linkedTables && order.linkedTables.length > 1) {
+        // If there's an active order, use it as the source of truth for runtime data
+        if (order) {
+          // Calculate duration from the order's createdAt timestamp
+          const seatedAt = order.createdAt ? new Date(order.createdAt) : null;
+          const durationText = seatedAt ? getTimeOccupied(seatedAt) : '';
+
+          // Check if order has unsent items
+          const hasUnsentItems = order.items?.some(item => !item.sentToKitchenAt) ?? false;
+
+          // Derive status using unified function (SINGLE SOURCE OF TRUTH)
+          const derivedStatus = deriveTableCardStatus(order.status, hasUnsentItems);
+
+          // Calculate urgency for the table (using POS settings thresholds)
+          const urgency = calculateTableUrgency(derivedStatus, seatedAt, urgencySettings);
+
+          // Check if this is a linked table group
+          const isLinkedGroup = order.linkedTables && order.linkedTables.length > 1;
+
+          // Derive linkedDisplay for linked table groups
+          const linkedTableNums = isLinkedGroup
+            ? order.linkedTables.filter(t => t !== tableNumber)
+            : baseData.linkedTableNumbers;
+          const linkedDisplay = linkedTableNums.length > 0
+            ? `Linked: T${linkedTableNums.join(' + T')}`
+            : baseData.linkedDisplay;
+
           return {
             ...baseData,
-            isLinked: true,
-            isPrimary: order.tableNumber === tableNumber,
-            linkedTableNumbers: order.linkedTables.filter(t => t !== tableNumber),
-            linkedTableGroupId: order.tableGroupId || `order-${order.id}`,
-            // Also ensure guest count comes from order
+            // ALWAYS override these from the active order (source of truth)
             guestCount: order.guestCount || baseData.guestCount,
+            seatedAt,
+            durationText,
+            status: derivedStatus,
+            statusLabel: STATUS_LABELS[derivedStatus],
+            statusColor: STATUS_COLORS[derivedStatus],
+            urgency, // ADD urgency data
+            // Financial data from order
+            billTotal: order.total || order.totalAmount || null,
+            // Linked table overrides (conditional on linked status)
+            isLinked: isLinkedGroup || baseData.isLinked,
+            isPrimary: isLinkedGroup ? order.tableNumber === tableNumber : baseData.isPrimary,
+            linkedTableNumbers: linkedTableNums,
+            linkedDisplay,
+            linkedTableGroupId: isLinkedGroup
+              ? (order.tableGroupId || `order-${order.id}`)
+              : baseData.linkedTableGroupId,
           };
         }
 
         return baseData;
       })
       .sort((a, b) => a.tableNumber - b.tableNumber);
-  }, [tables, persistedTableOrders, customerTabs, activeOrders]);
+  }, [tables, persistedTableOrders, customerTabs, activeOrders, urgencySettings]);
 
   // Build color map for linked table groups from orders (source of truth)
   const linkedGroupColorMap = useMemo(() => {

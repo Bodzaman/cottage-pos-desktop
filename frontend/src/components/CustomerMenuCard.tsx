@@ -225,7 +225,7 @@ export function CustomerMenuCard({
   // Loading State
   if (isLoading) {
     return (
-      <Card className="h-96 animate-pulse bg-gray-800 border-gray-700">
+      <Card className="h-auto min-h-[280px] sm:h-96 animate-pulse bg-gray-800 border-gray-700">
         <div className="h-48 bg-gray-700 rounded-t-lg"></div>
         <CardContent className="p-4 space-y-3">
           <div className="h-4 bg-gray-700 rounded w-3/4"></div>
@@ -247,8 +247,8 @@ export function CustomerMenuCard({
         className={cn("group cursor-pointer", className)}
         onClick={handleItemClick}
       >
-        <Card 
-          className="h-96 overflow-hidden transition-all duration-300 bg-gray-900 border-gray-700 hover:border-silver-500 hover:shadow-xl"
+        <Card
+          className="h-auto min-h-[280px] sm:h-96 overflow-hidden transition-all duration-300 bg-gray-900 border-gray-700 hover:border-silver-500 hover:shadow-xl"
           style={{
             background: `linear-gradient(145deg, ${PremiumTheme.colors.background.card} 0%, ${PremiumTheme.colors.background.secondary} 100%)`,
             backdropFilter: 'blur(12px)'

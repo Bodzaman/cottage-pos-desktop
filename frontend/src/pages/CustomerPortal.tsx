@@ -3,8 +3,13 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaClock, FaHeart, FaShoppingBag, FaEdit, FaSignOutAlt, FaUtensils } from "react-icons/fa";
-import { AuthLayout } from "components/AuthLayout";
 import { AuthTheme } from "utils/authTheme";
+import { UniversalHeader } from "components/UniversalHeader";
+import { Footer } from "components/Footer";
+import { PremiumBackground } from "components/PremiumBackground";
+import { PortalSection } from "components/PortalSection";
+import { PortalNavigation } from "components/PortalNavigation";
+import { PortalBottomNav } from "components/PortalBottomNav";
 import { AuthButton } from "components/AuthButton";
 import { useSimpleAuth } from "utils/simple-auth-context";
 import { useCartStore } from "utils/cartStore";
@@ -18,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import brain from "brain";
-import { ArrowLeft, LogOut, User, MapPin, History, Heart, Edit, Plus, Trash2, Mail, Phone, Flame, ShoppingBag, Clock, ShoppingCart, Bot, CheckCircle2, AlertCircle, Send, Loader2, Check, Navigation, Settings as SettingsIcon, Edit2, Save, X, XCircle, Calendar, Search, Filter, Package, RotateCcw, Upload, UtensilsCrossed, FolderPlus, FolderEdit, Share2, List, MoreVertical } from "lucide-react";
+import { ArrowLeft, LogOut, User, MapPin, History, Heart, Edit, Plus, Trash2, Mail, Phone, Flame, ShoppingBag, Clock, ShoppingCart, Bot, CheckCircle2, AlertCircle, Send, Loader2, Check, Navigation, Settings as SettingsIcon, Edit2, Save, X, XCircle, Calendar, Search, Filter, Package, RotateCcw, Upload, UtensilsCrossed, FolderPlus, FolderEdit, Share2, List, MoreVertical, LayoutDashboard } from "lucide-react";
 import { ProfileImageUpload } from "components/ProfileImageUpload";
 import { AddressModal } from "components/AddressModal";
 import MiniMapPreview from "components/MiniMapPreview";
@@ -58,9 +63,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 // Types for customer portal
-type CustomerSection = 'profile' | 'addresses' | 'orders' | 'favorites';
+type CustomerSection = 'dashboard' | 'profile' | 'addresses' | 'orders' | 'favorites';
 
 // Lazy load section components for better performance
+const CustomerDashboard = lazy(() => import('components/CustomerDashboard'));
 const ProfileSection = lazy(() => import('components/ProfileSection'));
 const AddressesSection = lazy(() => import('components/AddressesSection'));
 const OrdersSection = lazy(() => import('components/OrdersSection'));
@@ -134,19 +140,30 @@ export default function CustomerPortal() {
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   
   // Additional state for CustomerPortal
-  const [activeSection, setActiveSection] = useState<CustomerSection>('profile');
+  const [activeSection, setActiveSection] = useState<CustomerSection>('dashboard');
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
   const [orderHistory, setOrderHistory] = useState<any[]>([]);
-  
+
+  // Pagination state for order history
+  const [ordersTotalCount, setOrdersTotalCount] = useState(0);
+  const [ordersHasMore, setOrdersHasMore] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersOffset, setOrdersOffset] = useState(0);
+  const ORDERS_PAGE_SIZE = 25;
+
   // NEW: Track if data is from cache
   const [isViewingCachedData, setIsViewingCachedData] = useState(false);
   
   // NEW: Filter and search state for order history
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');  
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isReordering, setIsReordering] = useState<string | null>(null);
+
+  // NEW: Deterministic recommendations state
+  const [recommendations, setRecommendations] = useState<any[] | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   
   // NEW: Email verification state
   const [emailVerified, setEmailVerified] = useState(false);
@@ -395,18 +412,41 @@ export default function CustomerPortal() {
         // ONLINE: Fetch fresh data and cache it
         try {
           setIsViewingCachedData(false);
-          
-          // Load order history
-          const ordersResponse = await brain.get_order_history({ customerId: user.id });
+
+          // Load order history with pagination
+          const ordersResponse = await brain.get_order_history({
+            customerId: user.id,
+            limit: ORDERS_PAGE_SIZE,
+            offset: 0
+          });
           const ordersData = await ordersResponse.json();
           const orders = ordersData?.orders || [];
           setOrderHistory(orders);
-          
+          setOrdersTotalCount(ordersData?.total_count || 0);
+          setOrdersHasMore(ordersData?.has_more || false);
+          setOrdersOffset(ORDERS_PAGE_SIZE);
+
           // Cache for offline use
           cacheOrders(orders);
+
+          // Load deterministic recommendations
+          setRecommendationsLoading(true);
+          try {
+            const recsResponse = await fetch(`/routes/customer-recommendations/customer/${user.id}`);
+            if (recsResponse.ok) {
+              const recsData = await recsResponse.json();
+              if (recsData.success) {
+                setRecommendations(recsData.recommended_for_you || []);
+              }
+            }
+          } catch (recsError) {
+            console.error('Error loading recommendations:', recsError);
+          } finally {
+            setRecommendationsLoading(false);
+          }
         } catch (error) {
           console.error('Error loading user data:', error);
-          
+
           // Fallback to cached data on error
           const cachedOrders = getCachedOrders();
           if (cachedOrders) {
@@ -511,6 +551,34 @@ export default function CustomerPortal() {
     setSearchQuery('');
   };
   
+  // Load more orders (pagination)
+  const handleLoadMoreOrders = async () => {
+    if (!profile?.id || ordersLoading || !ordersHasMore) return;
+
+    setOrdersLoading(true);
+    try {
+      const response = await brain.get_order_history({
+        customerId: profile.id,
+        limit: ORDERS_PAGE_SIZE,
+        offset: ordersOffset
+      });
+      const data = await response.json();
+
+      const newOrders = data?.orders || [];
+      setOrderHistory(prev => [...prev, ...newOrders]);
+      setOrdersHasMore(data?.has_more || false);
+      setOrdersOffset(prev => prev + ORDERS_PAGE_SIZE);
+
+      // Update cache with all loaded orders
+      cacheOrders([...orderHistory, ...newOrders]);
+    } catch (error) {
+      console.error('Failed to load more orders:', error);
+      toast.error('Failed to load more orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   // NEW: Reorder handler
   const handleReorder = async (order: any) => {
     if (!order.order_items || order.order_items.length === 0) {
@@ -973,29 +1041,48 @@ export default function CustomerPortal() {
     );
   };
 
+  // Scroll to section handler
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setActiveSection(sectionId as CustomerSection);
+  };
+
   if (isLoading) {
     return (
-      <AuthLayout>
+      <div className="min-h-screen relative">
+        <PremiumBackground />
+        <UniversalHeader context="AUTH_NAV" />
         <div className="min-h-[60dvh] flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: AuthTheme.colors.primary }}></div>
-            <p style={{ color: AuthTheme.colors.textSecondary }}>Loading your account...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#8B1538' }}></div>
+            <p className="text-gray-400">Loading your account...</p>
           </div>
         </div>
-      </AuthLayout>
+      </div>
     );
   }
 
   return (
-    <AuthLayout>
+    <div className="min-h-screen relative pb-32 md:pb-0 pt-20">
+      {/* Premium Burgundy Background */}
+      <PremiumBackground />
+
+      {/* Universal Header */}
+      <UniversalHeader context="AUTH_NAV" />
+
+      {/* Desktop Tab Navigation */}
+      <PortalNavigation
+        activeSection={activeSection}
+        onSectionChange={scrollToSection}
+      />
+
       {/* Skip Link for Keyboard Navigation */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:ring-2 focus:ring-offset-2"
-        style={{
-          backgroundColor: AuthTheme.colors.primary,
-          color: '#FFFFFF'
-        }}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:ring-2 focus:ring-offset-2 bg-[#8B1538] text-white"
       >
         Skip to main content
       </a>
@@ -1004,222 +1091,174 @@ export default function CustomerPortal() {
       {shouldShowWizard() && !wizardDismissed && (
         <OnboardingWizard
           onNavigateToSection={(section) => {
-            setActiveSection(section as CustomerSection);
-            setJustSignedUp(false); // Clear flag after wizard interaction
+            scrollToSection(section);
+            setJustSignedUp(false);
           }}
         />
       )}
 
-      {/* Page Header */}
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8">
-        <motion.div 
-          className="text-center mb-8"
-          initial="hidden"
-          animate="visible"
-          variants={AuthTheme.animations.containerFade}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex-1"></div>
-            <h1 className="flex-1 text-3xl font-semibold tracking-tight" style={{ color: AuthTheme.colors.textPrimary }}>
-              My Account
-            </h1>
-            <div className="flex-1 flex justify-end">
-              <Button
-                onClick={handleSignOut}
-                variant="ghost"
-                className="text-[#B7BDC6] hover:text-[#EAECEF] hover:bg-white/5 transition-colors"
-                aria-label="Sign out of your account"
-              >
-                <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-          <p style={{ color: AuthTheme.colors.textSecondary }}>
-            Welcome back, {profile?.first_name || 'Guest'}! Manage your profile, addresses, and order history.
-          </p>
-        </motion.div>
-
-        {/* Navigation Tabs - Responsive */}
-        <nav 
-          className="flex justify-center mb-8"
-          aria-label="Account sections"
-          role="navigation"
-        >
-          {isMobile ? (
-            /* Mobile: Dropdown Selector */
-            <div className="w-full max-w-md px-4">
-              <label htmlFor="section-select" className="sr-only">
-                Choose account section
-              </label>
-              <select
-                id="section-select"
-                value={activeSection}
-                onChange={(e) => setActiveSection(e.target.value as CustomerSection)}
-                className="w-full px-4 py-3 rounded-xl font-medium transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-offset-2 appearance-none bg-no-repeat bg-right pr-10"
-                style={{
-                  background: `${AuthTheme.colors.cardBg} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23B7BDC6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 0.75rem center/1.5em 1.5em`,
-                  borderColor: AuthTheme.colors.border,
-                  color: AuthTheme.colors.textPrimary,
-                  minHeight: '44px' // Accessibility: touch target
-                }}
-                aria-label="Select account section to view"
-              >
-                <option value="profile">👤 Profile</option>
-                <option value="addresses">📍 Addresses</option>
-                <option value="orders">📜 Order History</option>
-                <option value="favorites">❤️ Favorites</option>
-              </select>
-            </div>
-          ) : (
-            /* Desktop: Horizontal Tabs */
-            <div 
-              className="rounded-2xl border backdrop-blur-xl p-2 shadow-2xl relative overflow-hidden"
-              style={{ 
-                background: AuthTheme.colors.cardBg,
-                borderColor: AuthTheme.colors.border
-              }}
-              role="tablist"
-              aria-label="Account navigation"
-            >
-              <div 
-                className="absolute inset-0 rounded-2xl pointer-events-none"
-                style={{ background: AuthTheme.gradients.border }}
-                aria-hidden="true"
+      {/* Full-page Sections */}
+      <main id="main-content" role="main">
+        {/* Dashboard Section */}
+        {activeSection === 'dashboard' && (
+          <PortalSection
+            id="dashboard"
+            title="Dashboard"
+            subtitle="Your personalized overview"
+            icon={<LayoutDashboard className="h-6 w-6 text-[#8B1538]" />}
+            action={{
+              label: 'Browse Menu',
+              icon: <UtensilsCrossed className="h-4 w-4" />,
+              onClick: () => navigate('/online-orders'),
+            }}
+          >
+            <Suspense fallback={<ProfileSkeleton />}>
+              <CustomerDashboard
+                profile={profile}
+                addresses={addresses}
+                orderHistory={orderHistory}
+                enrichedFavorites={enrichedFavorites}
+                recommendations={recommendations}
+                recommendationsLoading={recommendationsLoading}
+                onReorder={handleReorder}
+                onAddToCart={handleAddToCart}
+                isReordering={isReordering}
+                onNavigateToAddresses={() => scrollToSection('addresses')}
               />
-              <div className="relative z-10 flex gap-2">
-                {[
-                  { id: 'profile', label: 'Profile', icon: User, tourAttr: 'tour-profile', ariaLabel: 'View and edit your profile information' },
-                  { id: 'addresses', label: 'Addresses', icon: MapPin, tourAttr: 'tour-addresses', ariaLabel: 'Manage your delivery addresses' },
-                  { id: 'orders', label: 'Order History', icon: History, tourAttr: 'tour-orders', ariaLabel: 'View your past orders' },
-                  { id: 'favorites', label: 'Favorites', icon: Heart, tourAttr: 'tour-favorites', ariaLabel: 'Browse your favorite menu items' },
-                ].map(({ id, label, icon: Icon, tourAttr, ariaLabel }) => (
-                  <button
-                    key={id}
-                    data-tour={tourAttr}
-                    onClick={() => setActiveSection(id as CustomerSection)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{
-                      background: activeSection === id ? AuthTheme.colors.primary : 'transparent',
-                      color: activeSection === id ? '#FFFFFF' : AuthTheme.colors.textSecondary,
-                      boxShadow: activeSection === id ? AuthTheme.shadows.glow : 'none'
-                    }}
-                    role="tab"
-                    aria-selected={activeSection === id}
-                    aria-controls={`${id}-section`}
-                    aria-label={ariaLabel}
-                    tabIndex={activeSection === id ? 0 : -1}
-                  >
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                    {label}
-                    <VisuallyHidden>
-                      {activeSection === id ? '(Current section)' : ''}
-                    </VisuallyHidden>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </nav>
+            </Suspense>
+          </PortalSection>
+        )}
 
-        {/* Active Section Content with Glassmorphism */}
-        <main
-          id="main-content"
-          className="rounded-2xl border backdrop-blur-xl p-8 shadow-2xl relative overflow-hidden max-w-4xl mx-auto"
-          style={{
-            background: AuthTheme.colors.cardBg,
-            borderColor: AuthTheme.colors.border
-          }}
-          role="main"
-          aria-label="Account content"
-        >
-          {/* Border glow effect */}
-          <div 
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{ background: AuthTheme.gradients.border }}
-            aria-hidden="true"
-          />
-          
-          {/* Section Content */}
-          <div className="relative z-10">
-            {/* Profile Section */}
-            {activeSection === 'profile' && (
-              <section id="profile-section" role="tabpanel" aria-labelledby="profile-tab">
-                <Suspense fallback={<ProfileSkeleton />}>
-                  <ProfileSection
-                    user={user}
-                    profile={profile}
-                    addresses={addresses}
-                    updateProfile={updateProfile}
-                    emailVerified={emailVerified}
-                    checkingEmailVerification={checkingEmailVerification}
-                    sendingVerificationEmail={sendingVerificationEmail}
-                    setSendingVerificationEmail={setSendingVerificationEmail}
-                    personalizationEnabled={personalizationEnabled}
-                    setPersonalizationEnabled={setPersonalizationEnabled}
-                    personalizationLoading={personalizationLoading}
-                    setPersonalizationLoading={setPersonalizationLoading}
-                  />
-                </Suspense>
-              </section>
-            )}
+        {/* Profile Section */}
+        {activeSection === 'profile' && (
+          <PortalSection
+            id="profile"
+            title="Profile"
+            subtitle="Manage your account settings"
+            icon={<User className="h-6 w-6 text-[#8B1538]" />}
+          >
+            <Suspense fallback={<ProfileSkeleton />}>
+              <ProfileSection
+                user={user}
+                profile={profile}
+                addresses={addresses}
+                updateProfile={updateProfile}
+                emailVerified={emailVerified}
+                checkingEmailVerification={checkingEmailVerification}
+                sendingVerificationEmail={sendingVerificationEmail}
+                setSendingVerificationEmail={setSendingVerificationEmail}
+                personalizationEnabled={personalizationEnabled}
+                setPersonalizationEnabled={setPersonalizationEnabled}
+                personalizationLoading={personalizationLoading}
+                setPersonalizationLoading={setPersonalizationLoading}
+              />
+            </Suspense>
+          </PortalSection>
+        )}
 
-            {/* Addresses Section */}
-            {activeSection === 'addresses' && (
-              <section id="addresses-section" role="tabpanel" aria-labelledby="addresses-tab">
-                <Suspense fallback={<AddressSkeleton count={2} />}>
-                  <AddressesSection
-                    addresses={addresses}
-                    setEditingAddress={setEditingAddress}
-                    setAddressModalOpen={setAddressModalOpen}
-                  />
-                </Suspense>
-              </section>
-            )}
+        {/* Addresses Section */}
+        {activeSection === 'addresses' && (
+          <PortalSection
+            id="addresses"
+            title="My Addresses"
+            subtitle="Manage your delivery locations"
+            icon={<MapPin className="h-6 w-6 text-[#8B1538]" />}
+            action={{
+              label: 'Add Address',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => {
+                setEditingAddress(null);
+                setAddressModalOpen(true);
+              },
+            }}
+          >
+            <Suspense fallback={<AddressSkeleton count={2} />}>
+              <AddressesSection
+                addresses={addresses}
+                setDefaultAddress={setDefaultAddress}
+                setEditingAddress={setEditingAddress}
+                setAddressModalOpen={setAddressModalOpen}
+                handleDeleteAddress={handleDeleteAddress}
+              />
+            </Suspense>
+          </PortalSection>
+        )}
 
-            {/* Order History Section */}
-            {activeSection === 'orders' && (
-              <section id="orders-section" role="tabpanel" aria-labelledby="orders-tab">
-                <Suspense fallback={<OrderSkeleton count={3} />}>
-                  <OrdersSection
-                    orderHistory={orderHistory}
-                    isViewingCachedData={isViewingCachedData}
-                    statusFilter={statusFilter}
-                    setStatusFilter={setStatusFilter}
-                    dateFilter={dateFilter}
-                    setDateFilter={setDateFilter}
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                    isReordering={isReordering}
-                    handleReorder={handleReorder}
-                  />
-                </Suspense>
-              </section>
-            )}
+        {/* Order History Section */}
+        {activeSection === 'orders' && (
+          <PortalSection
+            id="orders"
+            title="Order History"
+            subtitle="View your past orders and details"
+            icon={<History className="h-6 w-6 text-[#8B1538]" />}
+            action={{
+              label: 'Place Order',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => navigate('/online-orders'),
+            }}
+          >
+            <Suspense fallback={<OrderSkeleton count={3} />}>
+              <OrdersSection
+                orderHistory={orderHistory}
+                isViewingCachedData={isViewingCachedData}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                dateFilter={dateFilter}
+                setDateFilter={setDateFilter}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                isReordering={isReordering}
+                handleReorder={handleReorder}
+                totalCount={ordersTotalCount}
+                hasMore={ordersHasMore}
+                isLoadingMore={ordersLoading}
+                onLoadMore={handleLoadMoreOrders}
+              />
+            </Suspense>
+          </PortalSection>
+        )}
 
-            {/* Favorites Section */}
-            {activeSection === 'favorites' && (
-              <section id="favorites-section" role="tabpanel" aria-labelledby="favorites-tab">
-                <Suspense fallback={<FavoriteSkeleton count={4} />}>
-                  <FavoritesSection
-                    enrichedFavorites={enrichedFavorites}
-                    favoriteLists={favoriteLists}
-                    selectedListId={selectedListId}
-                    setSelectedListId={setSelectedListId}
-                    setCreateListModalOpen={setCreateListModalOpen}
-                    setListToRename={setListToRename}
-                    setRenameListModalOpen={setRenameListModalOpen}
-                    setListToDelete={setListToDelete}
-                    setDeleteListModalOpen={setDeleteListModalOpen}
-                    handleToggleItemInList={handleToggleItemInList}
-                    handleAddToCart={handleAddToCart}
-                    handleRemoveFavorite={handleRemoveFavorite}
-                  />
-                </Suspense>
-              </section>
-            )}
-          </div>
-        </main>
+        {/* Favorites Section */}
+        {activeSection === 'favorites' && (
+          <PortalSection
+            id="favorites"
+            title="My Favorites"
+            subtitle="Quick access to your loved items"
+            icon={<Heart className="h-6 w-6 text-[#8B1538]" />}
+            action={{
+              label: 'Browse Menu',
+              icon: <UtensilsCrossed className="h-4 w-4" />,
+              onClick: () => navigate('/online-orders'),
+            }}
+          >
+            <Suspense fallback={<FavoriteSkeleton count={4} />}>
+              <FavoritesSection
+                enrichedFavorites={enrichedFavorites}
+                favoriteLists={favoriteLists}
+                selectedListId={selectedListId}
+                setSelectedListId={setSelectedListId}
+                setCreateListModalOpen={setCreateListModalOpen}
+                setListToRename={setListToRename}
+                setRenameListModalOpen={setRenameListModalOpen}
+                setListToDelete={setListToDelete}
+                setDeleteListModalOpen={setDeleteListModalOpen}
+                handleToggleItemInList={handleToggleItemInList}
+                handleAddToCart={handleAddToCart}
+                handleRemoveFavorite={handleRemoveFavorite}
+              />
+            </Suspense>
+          </PortalSection>
+        )}
+      </main>
+
+      {/* Footer */}
+      <Footer variant="minimal" />
+
+      {/* Mobile Bottom Navigation */}
+      <PortalBottomNav
+        activeSection={activeSection}
+        onSectionChange={scrollToSection}
+      />
         
         {/* Create List Modal */}
         <Dialog open={createListModalOpen} onOpenChange={setCreateListModalOpen}>
@@ -1369,13 +1408,12 @@ export default function CustomerPortal() {
           address={editingAddress}
         />
         
-        {/* Keyboard Shortcuts Help Modal */}
-        <KeyboardShortcutsHelp
-          isOpen={showKeyboardHelp}
-          onClose={() => setShowKeyboardHelp(false)}
-          isAuthenticated={!!user}
-        />
-      </div>
-    </AuthLayout>
+      {/* Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcutsHelp
+        isOpen={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
+        isAuthenticated={!!user}
+      />
+    </div>
   );
 }

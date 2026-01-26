@@ -697,11 +697,12 @@ export default function CheckoutPayment() {
                     </div>
                     
                     {/* Scrollable Items Container */}
-                    <div 
-                      className="space-y-3 max-h-80 overflow-y-auto pr-2 scrollable-items"
+                    <div
+                      className="space-y-3 max-h-[40vh] sm:max-h-80 overflow-y-auto pr-2 scrollable-items"
                       style={{
                         scrollbarWidth: 'thin',
-                        scrollbarColor: '#8B1538 rgba(255, 255, 255, 0.1)'
+                        scrollbarColor: '#8B1538 rgba(255, 255, 255, 0.1)',
+                        WebkitOverflowScrolling: 'touch'
                       }}
                     >
                       {/* Custom Scrollbar Styles */}

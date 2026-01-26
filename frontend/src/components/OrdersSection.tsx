@@ -1,17 +1,22 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Plus, 
-  History, 
-  Search, 
-  Filter, 
-  Calendar, 
-  X, 
+import React, { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  History,
+  Search,
+  Filter,
+  Calendar,
+  X,
   Package,
   UtensilsCrossed,
   RotateCcw,
   Loader2,
-  XCircle
+  XCircle,
+  Check,
+  Clock,
+  ChefHat,
+  Truck,
+  ShoppingBag,
+  Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -24,6 +29,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PremiumCard } from './PremiumCard';
+import { PortalButton } from './PortalButton';
+import { cn } from 'utils/cn';
+
+// Status Badge Component - matches mock design
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+    completed: { label: 'Delivered', color: 'bg-green-500/20 text-green-400', icon: Check },
+    delivered: { label: 'Delivered', color: 'bg-green-500/20 text-green-400', icon: Check },
+    picked_up: { label: 'Picked Up', color: 'bg-green-500/20 text-green-400', icon: Check },
+    pending: { label: 'Pending', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
+    preparing: { label: 'Preparing', color: 'bg-orange-500/20 text-orange-400', icon: ChefHat },
+    ready: { label: 'Ready', color: 'bg-blue-500/20 text-blue-400', icon: Package },
+    out_for_delivery: { label: 'Out for Delivery', color: 'bg-purple-500/20 text-purple-400', icon: Truck },
+    cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400', icon: X },
+    refunded: { label: 'Refunded', color: 'bg-gray-500/20 text-gray-400', icon: RotateCcw },
+  };
+
+  const { label, color, icon: Icon } = config[status] || config.pending;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${color}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
 
 interface Props {
   orderHistory: any[] | null;
@@ -36,6 +68,11 @@ interface Props {
   setSearchQuery: (value: string) => void;
   isReordering: string | null;
   handleReorder: (order: any) => Promise<void>;
+  // Pagination props
+  totalCount?: number;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export default function OrdersSection({
@@ -49,8 +86,36 @@ export default function OrdersSection({
   setSearchQuery,
   isReordering,
   handleReorder,
+  totalCount,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: Props) {
   const navigate = useNavigate();
+
+  // State for expanded order details (view full order)
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  // Format date helper
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('en-GB', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
 
   // Filter logic
   const filteredOrders = useMemo(() => {
@@ -99,292 +164,393 @@ export default function OrdersSection({
     setSearchQuery('');
   };
 
+  // Active order statuses for visual treatment
+  const ACTIVE_STATUSES = ['pending', 'preparing', 'ready', 'out_for_delivery'];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold text-[#EAECEF]">Order History</h2>
-          {/* Show offline indicator when viewing cached data */}
-          {isViewingCachedData && (
-            <Badge 
-              variant="secondary" 
-              className="bg-blue-500/20 text-blue-400 border border-blue-500/30"
-            >
-              <Package className="h-3 w-3 mr-1" />
-              Viewing Offline Data
-            </Badge>
-          )}
-        </div>
-        <Button
-          onClick={() => navigate('/online-orders')}
-          className="bg-[#8B1538] hover:bg-[#7A1230] text-white shadow-[0_0_24px_#8B153855] border-0"
-          aria-label="Place new order"
+    <div className="space-y-4">
+      {/* Offline Indicator */}
+      {isViewingCachedData && (
+        <Badge
+          variant="secondary"
+          className="bg-blue-500/20 text-blue-400 border border-blue-500/30"
         >
-          <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-          Place New Order
-        </Button>
-      </div>
-      
-      {/* Filters and Search Bar */}
-      <div className="space-y-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B7BDC6]" />
-            <Input
-              placeholder="Search by order #, items, or address..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-black/20 border-white/10 text-[#EAECEF] placeholder:text-[#8B92A0]"
-              aria-label="Search order history"
-            />
+          <Package className="h-3 w-3 mr-1" />
+          Viewing Offline Data
+        </Badge>
+      )}
+
+      {/* Compact Filter Toolbar */}
+      <PremiumCard subsurface padding="sm">
+        <div className="space-y-3">
+          {/* Filter Row */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search orders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm rounded-lg bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-36 h-9 text-sm rounded-lg bg-white/5 border-white/10 text-white">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="backdrop-blur-xl rounded-lg border border-white/10 bg-gray-900/95">
+                <SelectItem value="all" className="text-white text-sm">All Status</SelectItem>
+                <SelectItem value="completed" className="text-white text-sm">Completed</SelectItem>
+                <SelectItem value="pending" className="text-white text-sm">Pending</SelectItem>
+                <SelectItem value="cancelled" className="text-white text-sm">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Date Filter */}
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-full sm:w-36 h-9 text-sm rounded-lg bg-white/5 border-white/10 text-white">
+                <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent className="backdrop-blur-xl rounded-lg border border-white/10 bg-gray-900/95">
+                <SelectItem value="all" className="text-white text-sm">All Time</SelectItem>
+                <SelectItem value="last7" className="text-white text-sm">Last 7 Days</SelectItem>
+                <SelectItem value="last30" className="text-white text-sm">Last 30 Days</SelectItem>
+                <SelectItem value="last180" className="text-white text-sm">Last 6 Months</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="bg-black/20 border-white/10 text-[#EAECEF]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#17191D] border-white/10">
-              <SelectItem value="all" className="text-[#EAECEF]">All Status</SelectItem>
-              <SelectItem value="completed" className="text-[#EAECEF]">Completed</SelectItem>
-              <SelectItem value="pending" className="text-[#EAECEF]">Pending</SelectItem>
-              <SelectItem value="cancelled" className="text-[#EAECEF]">Cancelled</SelectItem>
-              <SelectItem value="refunded" className="text-[#EAECEF]">Refunded</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Date Range Filter */}
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="bg-black/20 border-white/10 text-[#EAECEF]">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by date" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#17191D] border-white/10">
-              <SelectItem value="all" className="text-[#EAECEF]">All Time</SelectItem>
-              <SelectItem value="last7" className="text-[#EAECEF]">Last 7 Days</SelectItem>
-              <SelectItem value="last30" className="text-[#EAECEF]">Last 30 Days</SelectItem>
-              <SelectItem value="last180" className="text-[#EAECEF]">Last 6 Months</SelectItem>
-            </SelectContent>
-          </Select>
+
+          {/* Active Filter Pills + Results Count */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {hasActiveFilters && (
+                <>
+                  {statusFilter !== 'all' && (
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#8B1538]/15 text-[#8B1538] hover:bg-[#8B1538]/25 transition-colors"
+                    >
+                      {statusFilter}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  {dateFilter !== 'all' && (
+                    <button
+                      onClick={() => setDateFilter('all')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#8B1538]/15 text-[#8B1538] hover:bg-[#8B1538]/25 transition-colors"
+                    >
+                      {dateFilter === 'last7' ? '7 days' : dateFilter === 'last30' ? '30 days' : '6 months'}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  {searchQuery.trim() && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#8B1538]/15 text-[#8B1538] hover:bg-[#8B1538]/25 transition-colors"
+                    >
+                      "{searchQuery.slice(0, 10)}{searchQuery.length > 10 ? '...' : ''}"
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs text-gray-500 hover:text-white ml-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {filteredOrders.length} of {orderHistory?.length || 0} orders
+            </p>
+          </div>
         </div>
-        
-        {/* Active Filters Pills */}
-        {hasActiveFilters && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-[#B7BDC6]">Active filters:</span>
-            {statusFilter !== 'all' && (
-              <Badge 
-                variant="secondary" 
-                className="bg-[#8B1538]/20 text-[#8B1538] hover:bg-[#8B1538]/30 cursor-pointer"
-                onClick={() => setStatusFilter('all')}
-                aria-label="Remove status filter"
-              >
-                Status: {statusFilter}
-                <X className="h-3 w-3 ml-1" aria-hidden="true" />
-              </Badge>
-            )}
-            {dateFilter !== 'all' && (
-              <Badge 
-                variant="secondary" 
-                className="bg-[#8B1538]/20 text-[#8B1538] hover:bg-[#8B1538]/30 cursor-pointer"
-                onClick={() => setDateFilter('all')}
-                aria-label="Remove date filter"
-              >
-                Date: {dateFilter === 'last7' ? 'Last 7 Days' : dateFilter === 'last30' ? 'Last 30 Days' : 'Last 6 Months'}
-                <X className="h-3 w-3 ml-1" aria-hidden="true" />
-              </Badge>
-            )}
-            {searchQuery.trim() && (
-              <Badge 
-                variant="secondary" 
-                className="bg-[#8B1538]/20 text-[#8B1538] hover:bg-[#8B1538]/30 cursor-pointer"
-                onClick={() => setSearchQuery('')}
-                aria-label="Remove search filter"
-              >
-                Search: {searchQuery}
-                <X className="h-3 w-3 ml-1" aria-hidden="true" />
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="text-[#B7BDC6] hover:text-[#EAECEF] hover:bg-white/10 h-7"
-              aria-label="Clear all filters"
-            >
-              Clear All
-            </Button>
-          </div>
-        )}
-        
-        {/* Results count */}
-        <p className="text-sm text-[#B7BDC6]">
-          Showing {filteredOrders.length} of {orderHistory?.length || 0} orders
-        </p>
-      </div>
+      </PremiumCard>
 
       {orderHistory && orderHistory.length > 0 ? (
-        <div className="space-y-4">
-          {filteredOrders.map((order) => (
-            <motion.div
-              key={order.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:border-[#8B1538]/30 transition-all duration-200"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 rounded-lg bg-[#8B1538]/20">
-                      <History className="h-5 w-5 text-[#8B1538]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-[#EAECEF]">
-                        Order #{order.order_number}
-                      </h3>
-                      <p className="text-sm text-[#B7BDC6]">
-                        {new Date(order.created_at!).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
+        <div className="space-y-3">
+          {filteredOrders.map((order, index) => {
+            const isActive = ACTIVE_STATUSES.includes(order.status);
+            return (
+              <motion.div
+                key={order.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
+              >
+                <PremiumCard
+                  subsurface
+                  hover
+                  className={cn(
+                    'overflow-hidden',
+                    isActive && 'border-l-4 border-l-[#8B1538] bg-[rgba(139,21,56,0.03)]'
+                  )}
+                >
+                  {/* Compact Header: Order # + Date • Time | Status */}
+                  <div className="p-4 pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-white text-sm">
+                          #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
+                        </span>
+                        <span className="text-gray-500 text-xs">•</span>
+                        <span className="text-xs text-gray-400 truncate">
+                          {formatDate(order.created_at)}, {formatTime(order.created_at)}
+                        </span>
+                      </div>
+                      <StatusBadge status={order.status} />
                     </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-[#EAECEF]">£{order.total_amount?.toFixed(2)}</p>
-                  <span className={`inline-block px-3 py-1 text-xs rounded-full capitalize ${
-                    order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                    order.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                    order.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
-                    'bg-blue-500/20 text-blue-400'
-                  }`}>
-                    {order.status}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Order Items List */}
-              {order.order_items && order.order_items.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  <p className="text-sm font-medium text-[#B7BDC6] mb-3">Items Ordered:</p>
-                  {order.order_items.map((item: any, index: number) => (
-                    <div key={index} className="flex gap-3 items-start py-2 border-b border-white/5 last:border-0">
-                      {/* Thumbnail */}
-                      <div className="flex-shrink-0">
-                        {item.image_url ? (
-                          <img 
-                            src={item.image_url} 
-                            alt={item.menu_item_name}
-                            className="w-16 h-16 rounded-lg object-cover border border-white/10 bg-black/40 hover:scale-105 transition-transform"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-lg bg-[#8B1538]/20 border border-white/10 flex items-center justify-center">
-                            <UtensilsCrossed className="h-6 w-6 text-[#8B1538]" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Item details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <span className="text-[#EAECEF] font-medium">
-                              {item.quantity}x {item.menu_item_name}
-                            </span>
-                            {item.variant_name && (
-                              <span className="text-[#8B92A0] ml-2">({item.variant_name})</span>
-                            )}
-                            {item.customizations && item.customizations.length > 0 && (
-                              <div className="text-xs text-[#8B92A0] mt-1">
-                                {item.customizations.join(', ')}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-[#B7BDC6] ml-4 flex-shrink-0">£{item.price.toFixed(2)}</span>
+
+                  {/* Middle Row: Thumbnails | Total + Type */}
+                  <div className="px-4 pb-3 flex items-center justify-between gap-4">
+                    {/* Compact Thumbnails */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {order.order_items?.slice(0, 4).map((item: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-white/10"
+                        >
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.menu_item_name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                              <UtensilsCrossed className="h-4 w-4 text-gray-600" />
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      ))}
+                      {order.order_items?.length > 4 && (
+                        <span className="text-xs text-gray-500 ml-1">
+                          +{order.order_items.length - 4}
+                        </span>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Order Footer with Type, Address, and Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <div className="flex items-center gap-2 text-sm text-[#B7BDC6]">
-                  <UtensilsCrossed className="h-4 w-4" />
-                  <span className="capitalize">{order.order_type}</span>
-                  {order.order_type === 'delivery' && order.delivery_address && (
-                    <span className="text-[#8B92A0]">• {order.delivery_address}</span>
+
+                    {/* Price + Type */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-lg font-bold text-white">
+                        £{order.total_amount?.toFixed(2)}
+                      </span>
+                      <span className={cn(
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium',
+                        order.order_type === 'delivery' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                      )}>
+                        {order.order_type === 'delivery' ? (
+                          <><Truck className="h-3 w-3" /> Delivery</>
+                        ) : (
+                          <><ShoppingBag className="h-3 w-3" /> Pickup</>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Row */}
+                  <div className="px-4 py-3 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
+                    <span className="text-xs text-gray-500">
+                      {order.order_items?.length || 0} items
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleOrderExpand(order.id)}
+                        className="text-gray-400 hover:text-white hover:bg-white/10 h-8 px-3 text-xs"
+                      >
+                        {expandedOrderId === order.id ? 'Hide' : 'View'}
+                      </Button>
+                      <PortalButton
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleReorder(order)}
+                        disabled={isReordering === order.id}
+                      >
+                        {isReordering === order.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+                        Reorder
+                      </PortalButton>
+                    </div>
+                  </div>
+
+                {/* Expandable Details */}
+                <AnimatePresence>
+                  {expandedOrderId === order.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div
+                        className="px-5 py-4 border-t"
+                        style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                      >
+                        {/* Full Order Items List */}
+                        <p className="text-sm font-medium text-gray-400 mb-3">Order Details:</p>
+                        <div className="space-y-3">
+                          {order.order_items?.map((item: any, index: number) => (
+                            <div key={index} className="flex gap-3 items-start py-2 border-b border-white/5 last:border-0">
+                              <div className="flex-shrink-0">
+                                {item.image_url ? (
+                                  <img
+                                    src={item.image_url}
+                                    alt={item.menu_item_name}
+                                    className="w-14 h-14 rounded-lg object-cover border border-white/10 bg-black/40"
+                                  />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-lg bg-[#8B1538]/20 border border-white/10 flex items-center justify-center">
+                                    <UtensilsCrossed className="h-5 w-5 text-[#8B1538]" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-white font-medium">
+                                      {item.quantity}x {item.menu_item_name}
+                                    </span>
+                                    {item.variant_name && (
+                                      <span className="text-gray-500 ml-2">({item.variant_name})</span>
+                                    )}
+                                    {/* Item Description */}
+                                    {item.menu_item_description && (
+                                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                        {item.menu_item_description}
+                                      </p>
+                                    )}
+                                    {item.customizations && item.customizations.length > 0 && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {Array.isArray(item.customizations)
+                                          ? item.customizations.map((c: any) => typeof c === 'string' ? c : c.name).join(', ')
+                                          : ''}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-gray-400 ml-4 flex-shrink-0">
+                                    £{((item.unit_price || item.price) * item.quantity).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Order Totals */}
+                        <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+                          {order.subtotal && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Subtotal</span>
+                              <span className="text-white">£{order.subtotal.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {order.delivery_fee && order.delivery_fee > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Delivery Fee</span>
+                              <span className="text-white">£{order.delivery_fee.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {order.tip_amount && order.tip_amount > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Tip</span>
+                              <span className="text-white">£{order.tip_amount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between pt-2 border-t border-white/10">
+                            <span className="font-semibold text-white">Total</span>
+                            <span className="font-bold text-lg text-[#8B1538]">
+                              £{order.total_amount?.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                      </div>
+                    </motion.div>
                   )}
-                </div>
-                
-                {/* Reorder Button */}
-                <Button
-                  size="sm"
-                  onClick={() => handleReorder(order)}
-                  disabled={isReordering === order.id}
-                  className="bg-[#8B1538] hover:bg-[#7A1230] text-white border-0"
-                >
-                  {isReordering === order.id ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reorder
-                    </>
-                  )}
-                </Button>
-              </div>
+                </AnimatePresence>
+              </PremiumCard>
             </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="p-4 rounded-full bg-[#8B1538]/20 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            {hasActiveFilters ? (
-              <Search className="h-8 w-8 text-[#8B1538]" />
-            ) : (
-              <History className="h-8 w-8 text-[#8B1538]" />
-            )}
-          </div>
-          <h3 className="text-lg font-semibold text-[#EAECEF] mb-2">
-            {hasActiveFilters ? 'No orders match your filters' : 'No orders yet'}
-          </h3>
-          <p className="text-[#B7BDC6] mb-6">
-            {hasActiveFilters 
-              ? 'Try adjusting your filters or search criteria to find what you\'re looking for.' 
-              : 'Your order history will appear here once you place your first order.'}
-          </p>
-          {hasActiveFilters ? (
-            <Button
-              onClick={clearFilters}
-              variant="outline"
-              className="border-[#8B1538] text-[#8B1538] hover:bg-[#8B1538] hover:text-white"
-              aria-label="Clear filters"
-            >
-              <XCircle className="h-4 w-4 mr-2" aria-hidden="true" />
-              Clear Filters
-            </Button>
-          ) : (
-            <Button
-              onClick={() => navigate('/online-orders')}
-              className="bg-[#8B1538] hover:bg-[#7A1530] text-white shadow-[0_0_24px_#8B153855] border-0"
-              aria-label="Place new order"
-            >
-              <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-              Place Your First Order
-            </Button>
+            );
+          })}
+
+          {/* Load More Button */}
+          {hasMore && onLoadMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={onLoadMore}
+                disabled={isLoadingMore}
+                className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Load More Orders
+                    {totalCount && (
+                      <span className="ml-2 text-gray-500">
+                        ({orderHistory?.length || 0} of {totalCount})
+                      </span>
+                    )}
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
+      ) : (
+        <PremiumCard subsurface className="py-12 px-6">
+          <div className="text-center max-w-sm mx-auto">
+            <div className="p-4 rounded-xl bg-[#8B1538]/15 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              {hasActiveFilters ? (
+                <Search className="h-7 w-7 text-[#8B1538]" />
+              ) : (
+                <History className="h-7 w-7 text-[#8B1538]" />
+              )}
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {hasActiveFilters ? 'No orders match your filters' : 'No orders yet'}
+            </h3>
+            <p className="text-sm text-gray-400 mb-5">
+              {hasActiveFilters
+                ? 'Try adjusting your filters or search criteria.'
+                : 'Your order history will appear here once you place your first order.'}
+            </p>
+            {hasActiveFilters ? (
+              <PortalButton
+                variant="secondary"
+                onClick={clearFilters}
+              >
+                <XCircle className="h-4 w-4" />
+                Clear Filters
+              </PortalButton>
+            ) : (
+              <PortalButton
+                variant="primary"
+                onClick={() => navigate('/online-orders')}
+              >
+                <Plus className="h-4 w-4" />
+                Place Your First Order
+              </PortalButton>
+            )}
+          </div>
+        </PremiumCard>
       )}
     </div>
   );

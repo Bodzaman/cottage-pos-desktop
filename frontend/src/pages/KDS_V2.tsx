@@ -33,14 +33,15 @@ export default function KDS_V2() {
 function KDS_V2_Content() {
   const { user } = useSimpleAuth();
   const { isLocked, lock, unlock, updateActivity, checkAutoLock } = useKDSAuth();
-  const { 
-    orders, 
-    isLoading, 
-    error, 
-    loadOrders, 
-    updateOrderStatus, 
-    initializeRealtimeSubscription, 
-    cleanupSubscription 
+  // Note: Status updates are no longer driven from KDS. Kitchen is read-only.
+  // All status changes are controlled from the POS.
+  const {
+    orders,
+    isLoading,
+    error,
+    loadOrders,
+    initializeRealtimeSubscription,
+    cleanupSubscription
   } = useUnifiedKitchenStore();
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [time, setTime] = useState(new Date());
@@ -356,7 +357,7 @@ function KDS_V2_Content() {
 
       {/* Main container */}
       <div className="relative z-10 p-6 space-y-6">
-        {/* Status Lanes */}
+        {/* Status Lanes - Read-only display (no status updates from KDS) */}
         <div className="grid grid-cols-4 gap-6">
           {/* PENDING Lane */}
           <StatusLane
@@ -364,7 +365,6 @@ function KDS_V2_Content() {
             count={pendingOrders.length}
             orders={pendingOrders}
             color={QSAITheme.status.warning}
-            onStatusUpdate={updateOrderStatus}
           />
 
           {/* PREPARING Lane */}
@@ -373,7 +373,6 @@ function KDS_V2_Content() {
             count={preparingOrders.length}
             orders={preparingOrders}
             color={QSAITheme.purple.primary}
-            onStatusUpdate={updateOrderStatus}
           />
 
           {/* READY Lane */}
@@ -382,7 +381,6 @@ function KDS_V2_Content() {
             count={readyOrders.length}
             orders={readyOrders}
             color={QSAITheme.status.success}
-            onStatusUpdate={updateOrderStatus}
           />
 
           {/* DELAYED Lane */}
@@ -391,7 +389,6 @@ function KDS_V2_Content() {
             count={delayedOrders.length}
             orders={delayedOrders}
             color={QSAITheme.status.error}
-            onStatusUpdate={updateOrderStatus}
           />
         </div>
       </div>
@@ -399,16 +396,15 @@ function KDS_V2_Content() {
   );
 }
 
-// Status Lane Component
+// Status Lane Component - Read-only display
 interface StatusLaneProps {
   title: string;
   count: number;
   orders: any[];
   color: string;
-  onStatusUpdate: (orderId: string, status: any) => void;
 }
 
-function StatusLane({ title, count, orders, color, onStatusUpdate }: StatusLaneProps) {
+function StatusLane({ title, count, orders, color }: StatusLaneProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -473,7 +469,7 @@ function StatusLane({ title, count, orders, color, onStatusUpdate }: StatusLaneP
               transition={{ duration: 0.3, delay: idx * 0.05 }}
               layout
             >
-              <KitchenOrderCard order={order} onStatusUpdate={onStatusUpdate} />
+              <KitchenOrderCard order={order} />
             </motion.div>
           ))}
         </AnimatePresence>

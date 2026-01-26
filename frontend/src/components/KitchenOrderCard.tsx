@@ -1,19 +1,23 @@
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UnifiedKitchenOrder } from "utils/kitchenTypes";
 import { OrderSourceBadge } from "components/OrderSourceBadge";
 import { OrderTypeBadge } from "components/OrderTypeBadge";
 import { OrderItemRow } from "components/OrderItemRow";
-import { StatusButtons } from "components/StatusButtons";
 import { QSAITheme, effects } from "utils/QSAIDesign";
 import { motion } from "framer-motion";
 
+/**
+ * KitchenOrderCard - Read-only display card for kitchen orders
+ *
+ * Note: Status update buttons have been removed. Kitchen staff can view
+ * orders but all status updates are driven from the POS.
+ */
 interface Props {
   order: UnifiedKitchenOrder;
-  onStatusUpdate: (orderId: string, status: UnifiedKitchenOrder["status"]) => void;
 }
 
-export function KitchenOrderCard({ order, onStatusUpdate }: Props) {
+export function KitchenOrderCard({ order }: Props) {
   const isPriority = order.isPriority;
   
   return (
@@ -146,10 +150,6 @@ export function KitchenOrderCard({ order, onStatusUpdate }: Props) {
             </motion.div>
           )}
         </CardContent>
-
-        <CardFooter style={{ paddingTop: '0.75rem' }}>
-          <StatusButtons orderId={order.id} currentStatus={order.status} onStatusUpdate={onStatusUpdate} />
-        </CardFooter>
       </Card>
     </motion.div>
   );

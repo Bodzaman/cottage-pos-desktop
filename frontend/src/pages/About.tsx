@@ -83,7 +83,7 @@ export default function About() {
               ))}
             </div>
             {/* TODO: Heritage images to be migrated to Supabase storage via Website CMS */}
-            <div className="order-1 md:order-2 grid grid-cols-2 gap-4">
+            <div className="order-1 md:order-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <img
                 src="https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/INSIDE RESTAURANT IMAGE 1.png" 
                 alt="Cottage Tandoori in the 1980s" 

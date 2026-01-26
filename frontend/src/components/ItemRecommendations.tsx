@@ -1,13 +1,11 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Sparkles, TrendingUp, Loader2, Wand2 } from 'lucide-react';
+import { Plus, Sparkles, TrendingUp, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { MenuItem, CartItem } from 'types';
 import { trackItemAdded } from '../utils/cartAnalytics';
-import brain from 'brain';
-import { useSimpleAuth } from 'utils/simple-auth-context';
 
 interface ItemRecommendationsProps {
   cartItems: CartItem[];
@@ -15,17 +13,6 @@ interface ItemRecommendationsProps {
   onAddItem: (item: MenuItem) => void;
   orderMode: 'delivery' | 'collection';
   className?: string;
-}
-
-// AI-powered recommendation item with reasoning
-interface AIRecommendation {
-  item_id: string;
-  item_name: string;
-  price: number;
-  category?: string | null;
-  reason: string;  // AI-generated explanation
-  confidence: number;
-  pairing_type: string;
 }
 
 // Helper function to format currency
@@ -36,6 +23,72 @@ const formatPrice = (price: number): string => {
   }).format(price);
 };
 
+// Deterministic pairing rules for Indian cuisine
+const CATEGORY_PAIRINGS: Record<string, string[]> = {
+  // Main dishes pair with rice, naan, sides
+  'curry': ['rice', 'naan', 'side', 'accompaniment'],
+  'biryani': ['raita', 'side', 'starter'],
+  'tandoori': ['naan', 'rice', 'salad'],
+  // Starters pair with mains
+  'starter': ['curry', 'main', 'biryani'],
+  'appetizer': ['curry', 'main', 'biryani'],
+  // Rice pairs with curry
+  'rice': ['curry', 'main'],
+  // Bread pairs with curry
+  'naan': ['curry', 'main'],
+  'bread': ['curry', 'main'],
+};
+
+// Category keywords for matching
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'curry': ['curry', 'masala', 'korma', 'madras', 'vindaloo', 'balti', 'jalfrezi', 'dhansak', 'pathia', 'rogan', 'dopiaza'],
+  'rice': ['rice', 'pilau', 'biryani', 'pulao'],
+  'naan': ['naan', 'roti', 'chapati', 'paratha', 'puri', 'bread'],
+  'starter': ['starter', 'samosa', 'pakora', 'bhaji', 'tikka', 'kebab', 'appetizer'],
+  'side': ['side', 'raita', 'chutney', 'pickle', 'salad', 'accompaniment'],
+  'tandoori': ['tandoori', 'tikka', 'kebab'],
+  'biryani': ['biryani'],
+};
+
+function categorizeItem(item: MenuItem): string {
+  const nameLower = (item.name || '').toLowerCase();
+  const categoryLower = (item.category || '').toLowerCase();
+  const combined = `${nameLower} ${categoryLower}`;
+
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(keyword => combined.includes(keyword))) {
+      return category;
+    }
+  }
+  return 'other';
+}
+
+function getRecommendationReason(cartCategory: string, recCategory: string): string {
+  const reasons: Record<string, Record<string, string>> = {
+    'curry': {
+      'rice': 'Perfect with your curry',
+      'naan': 'Great for scooping',
+      'side': 'Complements your meal',
+    },
+    'biryani': {
+      'raita': 'Cool & refreshing pairing',
+      'starter': 'Start your feast right',
+    },
+    'starter': {
+      'curry': 'Complete your meal',
+      'biryani': 'A hearty main course',
+    },
+    'rice': {
+      'curry': 'Add a flavorful curry',
+    },
+    'naan': {
+      'curry': 'Add a delicious curry',
+    },
+  };
+
+  return reasons[cartCategory]?.[recCategory] || 'Recommended for you';
+}
+
 export function ItemRecommendations({
   cartItems,
   menuItems,
@@ -43,209 +96,107 @@ export function ItemRecommendations({
   orderMode,
   className = ''
 }: ItemRecommendationsProps) {
-  // Get current user for personalization
-  const { user } = useSimpleAuth();
-  
-  // State for AI recommendations
-  const [aiRecommendations, setAiRecommendations] = React.useState<AIRecommendation[]>([]);
-  const [isLoadingAI, setIsLoadingAI] = React.useState(false);
-  const [aiError, setAiError] = React.useState(false);
-  const [isPersonalized, setIsPersonalized] = React.useState(false);
-  
-  // State for delivery config from database
-  const [deliveryConfig, setDeliveryConfig] = React.useState<{
-    fee: number;
-    min_order: number;
-    free_over: number;
-  } | null>(null);
-  
-  // Fetch delivery config on mount
-  React.useEffect(() => {
-    const fetchDeliveryConfig = async () => {
-      try {
-        const response = await brain.get_delivery_config();
-        const data = await response.json();
-        setDeliveryConfig({
-          fee: data.fee || 3.0,
-          min_order: data.min_order || 25.0,
-          free_over: data.free_over || 30.0
-        });
-      } catch (error) {
-        console.error('Failed to fetch delivery config:', error);
-        // Fallback to defaults
-        setDeliveryConfig({
-          fee: 3.0,
-          min_order: 25.0,
-          free_over: 30.0
-        });
-      }
-    };
-    
-    fetchDeliveryConfig();
-  }, []);
-  
-  const cartTotal = useMemo(() => {
-    // 🔍 OBSERVATION: Log first item's customizations to identify data type issue
-    if (cartItems.length > 0) {
-      const firstItem = cartItems[0];
-      console.log('🔍 [OBSERVE - ItemRecommendations] First cart item raw data:', {
-        itemName: firstItem.name || 'unknown',
-        customizationsType: typeof firstItem.customizations,
-        customizationsValue: firstItem.customizations,
-        isArray: Array.isArray(firstItem.customizations),
-        rawJSON: JSON.stringify(firstItem.customizations)
-      });
+  // Deterministic recommendations based on cart contents
+  const recommendations = useMemo(() => {
+    if (cartItems.length === 0 || !menuItems || menuItems.length === 0) {
+      return [];
     }
-    
-    return cartItems.reduce((total, item) => {
-      // Defensive: Ensure customizations is always an array (handle object/array mismatch)
-      const customizationsArray = Array.isArray(item.customizations) ? item.customizations : [];
-      const customizationsTotal = customizationsArray.reduce((sum, c) => sum + c.price, 0);
-      return total + (item.price + customizationsTotal) * item.quantity;
-    }, 0);
-  }, [cartItems]);
-  
-  // NEW: Fetch AI recommendations when cart changes
-  React.useEffect(() => {
-    const fetchAIRecommendations = async () => {
-      // Only fetch if we have cart items
-      if (cartItems.length === 0) {
-        setAiRecommendations([]);
-        return;
-      }
-      
-      setIsLoadingAI(true);
-      setAiError(false);
-      
-      try {
-        // Build request payload
-        const requestPayload = {
-          cart_items: cartItems.map(item => ({
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            category: item.categoryId || null
-          })),
-          customer_id: user?.id || null,
-          order_mode: orderMode,
-          limit: 3
-        };
-        
-        // Call AI recommendations endpoint
-        const response = await brain.get_cart_suggestions(requestPayload);
-        const data = await response.json();
-        
-        if (data.success && data.recommendations) {
-          setAiRecommendations(data.recommendations);
-          setIsPersonalized(data.personalized || false);
-          
-          // Log cache performance
-          if (data.cached) {
-            console.log('✅ [AI Recommendations] Served from cache');
-          } else {
-            console.log(`🧠 [AI Recommendations] Generated ${data.recommendations.length} suggestions in ${data.processing_time_ms.toFixed(0)}ms`);
-          }
-        } else {
-          console.warn('⚠️ [AI Recommendations] No recommendations returned');
-          setAiRecommendations([]);
-        }
-      } catch (error) {
-        console.error('❌ [AI Recommendations] Failed to fetch:', error);
-        setAiError(true);
-        setAiRecommendations([]);
-      } finally {
-        setIsLoadingAI(false);
-      }
-    };
-    
-    // Debounce to avoid too many API calls
-    const timeoutId = setTimeout(fetchAIRecommendations, 500);
-    
-    return () => clearTimeout(timeoutId);
-  }, [cartItems, orderMode, user?.id]);
-  
-  // Convert AI recommendations to MenuItem format for display
-  const recommendedMenuItems = useMemo(() => {
-    return aiRecommendations.map(aiRec => {
-      // Find full menu item by ID
-      const menuItem = menuItems.find(m => m.id === aiRec.item_id);
-      
-      if (menuItem) {
-        return {
-          ...menuItem,
-          aiReason: aiRec.reason,  // Attach AI reasoning
-          aiConfidence: aiRec.confidence,
-          aiPairingType: aiRec.pairing_type
-        };
-      }
-      
-      // Fallback if menu item not found
-      return {
-        id: aiRec.item_id,
-        name: aiRec.item_name,
-        price: aiRec.price,
-        category: aiRec.category || '',
-        description: aiRec.reason,
-        is_available: true,
-        aiReason: aiRec.reason,
-        aiConfidence: aiRec.confidence,
-        aiPairingType: aiRec.pairing_type
-      } as MenuItem & { aiReason?: string; aiConfidence?: number; aiPairingType?: string };
+
+    // Categorize cart items
+    const cartCategories = new Set<string>();
+    const cartItemIds = new Set(cartItems.map(item => item.id));
+
+    cartItems.forEach(item => {
+      const category = categorizeItem(item as unknown as MenuItem);
+      cartCategories.add(category);
     });
-  }, [aiRecommendations, menuItems]);
-  
-  // Don't show if loading, error, or no recommendations
-  if (isLoadingAI) {
-    return (
-      <div className={`${className} flex items-center justify-center py-4`}>
-        <Loader2 className="h-5 w-5 animate-spin" style={{ color: PremiumTheme.colors.silver[400] }} />
-        <span className="ml-2 text-sm" style={{ color: PremiumTheme.colors.text.muted }}>
-          Finding perfect pairings...
-        </span>
-      </div>
-    );
-  }
-  
-  // Show friendly fallback when AI is unavailable or returns no recommendations
-  if (aiError) {
-    return (
-      <div className={`${className}`}>
-        <div 
-          className="flex items-center gap-2 p-3 rounded-lg border"
-          style={{
-            backgroundColor: PremiumTheme.colors.dark[800] + '80',
-            borderColor: PremiumTheme.colors.border.light
-          }}
-        >
-          <Sparkles className="h-4 w-4" style={{ color: PremiumTheme.colors.text.muted }} />
-          <p 
-            className="text-xs"
-            style={{ color: PremiumTheme.colors.text.muted }}
-          >
-            AI recommendations temporarily unavailable. Browse our menu to discover more dishes!
-          </p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Don't show anything if no recommendations (but no error)
-  if (recommendedMenuItems.length === 0) return null;
-  
+
+    // Find recommended categories based on what's in cart
+    const recommendedCategories = new Set<string>();
+    cartCategories.forEach(cartCat => {
+      const pairings = CATEGORY_PAIRINGS[cartCat] || [];
+      pairings.forEach(p => recommendedCategories.add(p));
+    });
+
+    // Don't recommend categories already in cart
+    cartCategories.forEach(c => recommendedCategories.delete(c));
+
+    // Score and filter menu items
+    const scoredItems: Array<{
+      item: MenuItem;
+      score: number;
+      reason: string;
+      recCategory: string;
+    }> = [];
+
+    menuItems.forEach(menuItem => {
+      // Skip items already in cart
+      if (cartItemIds.has(menuItem.id)) return;
+      // Skip unavailable items
+      if (!menuItem.is_available) return;
+
+      const itemCategory = categorizeItem(menuItem);
+
+      // Check if this category is recommended
+      let isRecommended = false;
+      let matchedCartCategory = '';
+
+      for (const cartCat of Array.from(cartCategories)) {
+        const pairings = CATEGORY_PAIRINGS[cartCat] || [];
+        if (pairings.some(p => itemCategory.includes(p) || p.includes(itemCategory))) {
+          isRecommended = true;
+          matchedCartCategory = cartCat;
+          break;
+        }
+      }
+
+      if (isRecommended) {
+        // Score based on various factors
+        let score = 50; // Base score for being a pairing match
+
+        // Boost popular items (if we had data, we'd use it)
+        // For now, boost items with images (usually featured items)
+        if (menuItem.image_url) score += 10;
+
+        // Boost items in similar price range
+        const avgCartPrice = cartItems.reduce((sum, i) => sum + i.price, 0) / cartItems.length;
+        if (Math.abs((menuItem.price || 0) - avgCartPrice) < 5) {
+          score += 5;
+        }
+
+        const reason = getRecommendationReason(matchedCartCategory, itemCategory);
+
+        scoredItems.push({
+          item: menuItem,
+          score,
+          reason,
+          recCategory: itemCategory
+        });
+      }
+    });
+
+    // Sort by score and return top 3
+    scoredItems.sort((a, b) => b.score - a.score);
+    return scoredItems.slice(0, 3);
+  }, [cartItems, menuItems]);
+
+  // Don't show if no recommendations
+  if (recommendations.length === 0) return null;
+
   return (
     <div className={`${className}`}>
-      <div 
+      <div
         className="flex items-center gap-2 mb-3 pb-2 border-b"
         style={{ borderColor: PremiumTheme.colors.border.medium }}
       >
-        <Wand2 className="h-4 w-4" style={{ color: PremiumTheme.colors.gold[500] }} />
-        <h3 
+        <TrendingUp className="h-4 w-4" style={{ color: PremiumTheme.colors.gold[500] }} />
+        <h3
           className="text-sm font-semibold"
           style={{ color: PremiumTheme.colors.text.primary }}
         >
-          {isPersonalized ? 'Recommended for you' : 'You might also like'}
+          Complete your order
         </h3>
-        <Badge 
+        <Badge
           variant="secondary"
           className="ml-auto text-xs"
           style={{
@@ -255,18 +206,16 @@ export function ItemRecommendations({
           }}
         >
           <Sparkles className="h-3 w-3 mr-1" />
-          AI powered
+          Smart pairing
         </Badge>
       </div>
-      
+
       <AnimatePresence mode="popLayout">
         <div className="space-y-2">
-          {recommendedMenuItems.map((item, index) => {
-            const extendedItem = item as MenuItem & { aiReason?: string };
-            
+          {recommendations.map((rec, index) => {
             return (
               <motion.div
-                key={item.id}
+                key={rec.item.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
@@ -278,40 +227,37 @@ export function ItemRecommendations({
                 }}
               >
                 <div className="flex-1 min-w-0 mr-3">
-                  <p 
+                  <p
                     className="text-sm font-medium"
                     style={{ color: PremiumTheme.colors.text.primary }}
                   >
-                    {item.name}
+                    {rec.item.name}
                   </p>
-                  
-                  {/* AI-generated reasoning */}
-                  {extendedItem.aiReason && (
-                    <p 
-                      className="text-xs mt-1 leading-relaxed"
-                      style={{ color: PremiumTheme.colors.silver[400] }}
-                    >
-                      💡 {extendedItem.aiReason}
-                    </p>
-                  )}
-                  
-                  <p 
+
+                  {/* Deterministic reasoning */}
+                  <p
+                    className="text-xs mt-1 leading-relaxed"
+                    style={{ color: PremiumTheme.colors.silver[400] }}
+                  >
+                    {rec.reason}
+                  </p>
+
+                  <p
                     className="text-xs font-semibold mt-1.5"
                     style={{ color: PremiumTheme.colors.text.muted }}
                   >
-                    {formatPrice(item.price || 0)}
+                    {formatPrice(rec.item.price || 0)}
                   </p>
                 </div>
-                
+
                 <Button
                   size="sm"
                   onClick={() => {
-                    onAddItem(item);
-                    // Track as recommendation source
+                    onAddItem(rec.item);
                     trackItemAdded(
-                      item.id,
-                      item.name,
-                      item.price || 0,
+                      rec.item.id,
+                      rec.item.name,
+                      rec.item.price || 0,
                       orderMode,
                       'recommendation'
                     );
