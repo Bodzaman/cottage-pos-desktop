@@ -12,7 +12,7 @@ interface PortalBottomNavProps {
 const sections = [
   { id: 'dashboard' as const, label: 'Home', icon: LayoutDashboard },
   { id: 'profile' as const, label: 'Profile', icon: User },
-  { id: 'addresses' as const, label: 'Address', icon: MapPin },
+  { id: 'addresses' as const, label: 'Addresses', icon: MapPin },
   { id: 'orders' as const, label: 'Orders', icon: ClipboardList },
   { id: 'favorites' as const, label: 'Favorites', icon: Heart },
 ];

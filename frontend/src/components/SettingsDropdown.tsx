@@ -9,18 +9,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
 import { useRestaurantSettings } from '../utils/useRestaurantSettings';
 import { usePOSSettings } from '../utils/posSettingsStore';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
-import { RefundManagementPanel } from './RefundManagementPanel';
-import { VoiceOrderNotificationPanel } from './VoiceOrderNotificationPanel';
-import { VoiceOrderTestPanel } from './VoiceOrderTestPanel';
-import RestaurantSettingsManager from './RestaurantSettingsManager';
-import { POSUrgencySettings } from './POSUrgencySettings';
+import { RestaurantManagementModal } from './RestaurantManagementModal';
 import { isManagementAuthenticated } from '../utils/management-auth';
 
 interface SettingsSection {
@@ -440,71 +434,13 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
         onAuthenticated={handlePasswordAuthenticated}
       />
 
-      {/* Management Modal with Tabs */}
-      <Dialog open={showManagementModal} onOpenChange={setShowManagementModal}>
-        <DialogContent 
-          className="max-w-4xl max-h-[90dvh] overflow-hidden"
-          style={{
-            backgroundColor: globalColors.background.secondary,
-            borderColor: globalColors.border.light
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle style={{ color: globalColors.text.primary }}>
-              Restaurant Management
-            </DialogTitle>
-          </DialogHeader>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="business-profile">Business</TabsTrigger>
-              <TabsTrigger value="online-orders">Online Orders</TabsTrigger>
-              <TabsTrigger value="payments-delivery">Payments</TabsTrigger>
-              <TabsTrigger value="pos-settings">POS</TabsTrigger>
-              <TabsTrigger value="ai-staff">AI Staff</TabsTrigger>
-            </TabsList>
-            
-            <div className="mt-4 max-h-[60dvh] overflow-y-auto">
-              <TabsContent value="business-profile" className="space-y-4">
-                <RestaurantSettingsManager />
-              </TabsContent>
-              
-              <TabsContent value="online-orders" className="space-y-4">
-                <div className="grid gap-4">
-                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>Online Orders Configuration</h3>
-                  {/* Online orders settings would go here */}
-                  <p style={{ color: globalColors.text.secondary }}>Configure website ordering, delivery zones, and payment options.</p>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="payments-delivery" className="space-y-4">
-                <div className="grid gap-6">
-                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>Payment & Delivery Management</h3>
-                  <RefundManagementPanel />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="pos-settings" className="space-y-4">
-                <div className="grid gap-4">
-                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>POS Configuration</h3>
-                  <p style={{ color: globalColors.text.secondary }}>Configure point of sale settings, table management, and receipt templates.</p>
-
-                  {/* Urgency Alert Settings */}
-                  <POSUrgencySettings />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="ai-staff" className="space-y-4">
-                <div className="grid gap-6">
-                  <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>AI Staff Management</h3>
-                  <VoiceOrderNotificationPanel compact={true} />
-                  <VoiceOrderTestPanel />
-                </div>
-              </TabsContent>
-            </div>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
+      {/* Restaurant Management Modal */}
+      <RestaurantManagementModal
+        isOpen={showManagementModal}
+        onClose={() => setShowManagementModal(false)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Heart,
@@ -6,7 +6,9 @@ import {
   Sparkles,
   ArrowRight,
   UtensilsCrossed,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,6 +54,131 @@ const reasonTagLabels: Record<string, string> = {
 
 // Active order statuses
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'];
+
+// Favorites strip with scroll affordance
+function FavoritesStrip({
+  favorites,
+  totalCount,
+  onAddToCart,
+  onViewAll
+}: {
+  favorites: EnrichedFavoriteItem[];
+  totalCount: number;
+  onAddToCart: (favorite: EnrichedFavoriteItem) => void;
+  onViewAll: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Check scroll position and update states
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll);
+      // Also check on resize
+      window.addEventListener('resize', checkScroll);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [favorites]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollAmount = direction === 'left' ? -120 : 120;
+    el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative group/strip">
+      {/* Left scroll button */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-[#17191D]/90 border border-white/20 flex items-center justify-center text-white hover:bg-[#8B1538] hover:border-[#8B1538] transition-all shadow-lg -ml-2"
+          aria-label="Scroll left"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* Right scroll button */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-[#17191D]/90 border border-white/20 flex items-center justify-center text-white hover:bg-[#8B1538] hover:border-[#8B1538] transition-all shadow-lg -mr-2"
+          aria-label="Scroll right"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* Gradient fade left */}
+      {canScrollLeft && (
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#1A1C20] to-transparent pointer-events-none z-[5]" />
+      )}
+
+      {/* Gradient fade right */}
+      {canScrollRight && (
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#1A1C20] to-transparent pointer-events-none z-[5]" />
+      )}
+
+      {/* Scrollable container */}
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide scroll-smooth"
+      >
+        {favorites.map((favorite) => (
+          <button
+            key={favorite.favorite_id}
+            onClick={() => favorite.display_is_available && onAddToCart(favorite)}
+            disabled={!favorite.display_is_available}
+            className="flex-shrink-0 group relative w-14 h-14 rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-[#8B1538]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            title={favorite.display_name}
+          >
+            {favorite.display_image_url ? (
+              <img
+                src={favorite.display_image_url}
+                alt={favorite.display_name}
+                className={`w-full h-full object-cover ${!favorite.display_is_available ? 'grayscale' : ''}`}
+              />
+            ) : (
+              <div className="w-full h-full bg-[#8B1538]/20 flex items-center justify-center">
+                <UtensilsCrossed className="h-5 w-5 text-[#8B1538]" />
+              </div>
+            )}
+            {/* Add overlay on hover/touch */}
+            {favorite.display_is_available && (
+              <div className="absolute inset-0 bg-[#8B1538]/80 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex items-center justify-center">
+                <ShoppingCart className="h-4 w-4 text-white" />
+              </div>
+            )}
+          </button>
+        ))}
+        {totalCount > 6 && (
+          <button
+            onClick={onViewAll}
+            className="flex-shrink-0 w-14 h-14 rounded-xl bg-white/5 border border-white/10 hover:border-[#8B1538]/30 transition-all flex items-center justify-center"
+          >
+            <span className="text-xs text-gray-400">+{totalCount - 6}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerDashboard({
   profile,
@@ -178,43 +305,12 @@ export default function CustomerDashboard({
             </div>
 
             {topFavorites.length > 0 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {topFavorites.map((favorite) => (
-                  <button
-                    key={favorite.favorite_id}
-                    onClick={() => favorite.display_is_available && onAddToCart(favorite)}
-                    disabled={!favorite.display_is_available}
-                    className="flex-shrink-0 group relative w-14 h-14 rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-[#8B1538]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={favorite.display_name}
-                  >
-                    {favorite.display_image_url ? (
-                      <img
-                        src={favorite.display_image_url}
-                        alt={favorite.display_name}
-                        className={`w-full h-full object-cover ${!favorite.display_is_available ? 'grayscale' : ''}`}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-[#8B1538]/20 flex items-center justify-center">
-                        <UtensilsCrossed className="h-5 w-5 text-[#8B1538]" />
-                      </div>
-                    )}
-                    {/* Add overlay on hover */}
-                    {favorite.display_is_available && (
-                      <div className="absolute inset-0 bg-[#8B1538]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <ShoppingCart className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-                {enrichedFavorites?.length > 6 && (
-                  <button
-                    onClick={() => navigate('/customer-portal#favorites')}
-                    className="flex-shrink-0 w-14 h-14 rounded-xl bg-white/5 border border-white/10 hover:border-[#8B1538]/30 transition-all flex items-center justify-center"
-                  >
-                    <span className="text-xs text-gray-400">+{enrichedFavorites.length - 6}</span>
-                  </button>
-                )}
-              </div>
+              <FavoritesStrip
+                favorites={topFavorites}
+                totalCount={enrichedFavorites?.length || 0}
+                onAddToCart={onAddToCart}
+                onViewAll={() => navigate('/customer-portal#favorites')}
+              />
             ) : (
               <div className="flex items-center gap-3 py-2">
                 <div className="p-2.5 rounded-xl bg-white/5 border border-dashed border-white/20">

@@ -368,7 +368,14 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
         subtotal: subtotal,
         delivery_fee: deliveryFee,
         tip_amount: 0,
-        order_notes: undefined
+        order_notes: undefined,
+        // Include customer data for guest checkout support
+        customer: {
+          firstName: customerData.firstName,
+          lastName: customerData.lastName,
+          email: customerData.email,
+          phone: customerData.phone,
+        }
       };
       
       console.log('🛒 CheckoutView: Storing checkout data and navigating to styled payment page');

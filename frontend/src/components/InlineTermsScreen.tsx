@@ -172,7 +172,11 @@ export default function InlineTermsScreen({
         {/* Main content */}
         <div
           className="p-5 sm:p-8 space-y-5 sm:space-y-8 overflow-y-auto max-h-[calc(85vh-2rem)]"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y'
+          }}
         >
           {/* Header with Agent Image */}
           <div className="text-center space-y-6">

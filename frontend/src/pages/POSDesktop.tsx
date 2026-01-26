@@ -70,6 +70,13 @@ import { Loader2 } from 'lucide-react';
 
 // View Components - Import from POSDesktop for parity
 import { OnlineOrderManagement } from 'components/OnlineOrderManagement';
+import {
+  OnlineOrderKanban,
+  OnlineOrderFilters,
+  OnlineOrderSummaryPanel,
+  RejectOrderModal,
+} from 'components/online-orders';
+import { useOnlineOrdersRealtimeStore } from 'utils/stores/onlineOrdersRealtimeStore';
 import { ReservationsPlaceholder } from 'components/ReservationsPlaceholder';
 
 // Utility imports
@@ -230,6 +237,10 @@ export default function POSDesktop() {
 
   // Active orders - source of truth for linked tables data
   const { orders: activeOrders } = useActiveOrders();
+
+  // Online orders badge tracking (early extraction for handleViewModeChange)
+  const unseenCount = useOnlineOrdersRealtimeStore(state => state.unseenCount);
+  const markAllSeen = useOnlineOrdersRealtimeStore(state => state.markAllSeen);
 
   // Customer intelligence for order history
   const { customerProfile, clearCustomer: clearIntelligenceCustomer } = usePOSCustomerIntelligence();
@@ -498,12 +509,14 @@ export default function POSDesktop() {
         break;
       case 'ONLINE':
         setActiveView('pos');
+        // Mark all online orders as seen when viewing the tab
+        markAllSeen();
         break;
       case 'RESERVATIONS':
         setActiveView('pos');
         break;
     }
-  }, [orderType]);
+  }, [orderType, markAllSeen]);
   
   const handleTableSelect = useCallback((tableNumber: number, tableStatus?: string) => {
     const table = restaurantTables.find((t: any) => parseInt(t.table_number) === tableNumber);
@@ -711,6 +724,157 @@ export default function POSDesktop() {
   const handleCategorySelect = useCallback((id: string | null) => { setSelectedCategoryId(id); useRealtimeMenuStore.getState().setSelectedMenuCategory(id); }, []);
   const childCats = useMemo(() => selectedSectionId ? categories.filter(c => c.parent_category_id === selectedSectionId) : [], [categories, selectedSectionId]);
 
+  // ============================================================================
+  // ONLINE ORDERS STATE & HANDLERS
+  // ============================================================================
+  const {
+    orders: onlineOrders,
+    isLoading: onlineOrdersLoading,
+    acceptOrder,
+    rejectOrder,
+    markReady,
+    markComplete,
+    initializeRealtime: initOnlineRealtime,
+    cleanup: cleanupOnlineRealtime,
+    newOrders,
+    preparingOrders,
+    readyOrders,
+  } = useOnlineOrdersRealtimeStore();
+
+  const [selectedOnlineOrderId, setSelectedOnlineOrderId] = useState<string | null>(null);
+  const [isOnlineRejectModalOpen, setIsOnlineRejectModalOpen] = useState(false);
+  const [orderToReject, setOrderToReject] = useState<string | null>(null);
+  const [isOnlineActionLoading, setIsOnlineActionLoading] = useState(false);
+
+  // Initialize online orders realtime when ONLINE mode is active
+  useEffect(() => {
+    if (posViewMode === 'ONLINE') {
+      initOnlineRealtime();
+    }
+    return () => {
+      if (posViewMode === 'ONLINE') {
+        cleanupOnlineRealtime();
+      }
+    };
+  }, [posViewMode, initOnlineRealtime, cleanupOnlineRealtime]);
+
+  const selectedOnlineOrder = selectedOnlineOrderId ? onlineOrders[selectedOnlineOrderId] : null;
+  const rejectingOnlineOrder = orderToReject ? onlineOrders[orderToReject] : null;
+
+  const handleOnlineAccept = useCallback(async (orderId: string) => {
+    setIsOnlineActionLoading(true);
+    try {
+      const success = await acceptOrder(orderId);
+      if (success) {
+        toast.success('Order accepted and sent to kitchen');
+        // Create print job for kitchen ticket
+        const order = onlineOrders[orderId];
+        if (order) {
+          await supabase.rpc('create_print_job', {
+            p_job_type: 'KITCHEN_TICKET',
+            p_order_data: {
+              orderNumber: order.orderNumber,
+              orderType: order.orderType,
+              items: order.items,
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              deliveryAddress: order.deliveryAddress,
+              specialInstructions: order.specialInstructions,
+              allergenNotes: order.allergenNotes,
+            },
+            p_printer_id: null,
+            p_priority: 3,
+          });
+        }
+      } else {
+        toast.error('Failed to accept order');
+      }
+    } finally {
+      setIsOnlineActionLoading(false);
+    }
+  }, [acceptOrder, onlineOrders]);
+
+  const handleOnlineRejectClick = useCallback((orderId: string) => {
+    setOrderToReject(orderId);
+    setIsOnlineRejectModalOpen(true);
+  }, []);
+
+  const handleOnlineRejectConfirm = useCallback(async (reason: string) => {
+    if (!orderToReject) return;
+    setIsOnlineActionLoading(true);
+    try {
+      const success = await rejectOrder(orderToReject, reason);
+      if (success) {
+        toast.success('Order rejected and customer notified');
+      } else {
+        toast.error('Failed to reject order');
+      }
+    } finally {
+      setIsOnlineActionLoading(false);
+      setIsOnlineRejectModalOpen(false);
+      setOrderToReject(null);
+    }
+  }, [orderToReject, rejectOrder]);
+
+  const handleOnlineMarkReady = useCallback(async (orderId: string) => {
+    setIsOnlineActionLoading(true);
+    try {
+      const success = await markReady(orderId);
+      if (success) {
+        toast.success('Order marked as ready');
+      } else {
+        toast.error('Failed to update order');
+      }
+    } finally {
+      setIsOnlineActionLoading(false);
+    }
+  }, [markReady]);
+
+  const handleOnlineComplete = useCallback(async (orderId: string) => {
+    setIsOnlineActionLoading(true);
+    try {
+      const success = await markComplete(orderId);
+      if (success) {
+        const order = onlineOrders[orderId];
+        toast.success(
+          order?.orderType === 'DELIVERY' ? 'Order dispatched' : 'Order collected'
+        );
+      } else {
+        toast.error('Failed to complete order');
+      }
+    } finally {
+      setIsOnlineActionLoading(false);
+      setSelectedOnlineOrderId(null);
+    }
+  }, [markComplete, onlineOrders]);
+
+  const handleOnlinePrint = useCallback(async (orderId: string) => {
+    const order = onlineOrders[orderId];
+    if (!order) return;
+    try {
+      await supabase.rpc('create_print_job', {
+        p_job_type: 'CUSTOMER_RECEIPT',
+        p_order_data: {
+          orderNumber: order.orderNumber,
+          orderType: order.orderType,
+          items: order.items,
+          subtotal: order.subtotal,
+          deliveryFee: order.deliveryFee,
+          total: order.total,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          deliveryAddress: order.deliveryAddress,
+        },
+        p_printer_id: null,
+        p_priority: 5,
+      });
+      toast.success('Print job created');
+    } catch (error) {
+      console.error('Failed to print:', error);
+      toast.error('Failed to print receipt');
+    }
+  }, [onlineOrders]);
+
   const renderMainPOSView = () => {
     // Full-width table dashboard for DINE-IN mode
     if (posViewMode === 'DINE_IN') {
@@ -726,9 +890,50 @@ export default function POSDesktop() {
       );
     }
 
-    // Online Orders mode - render inline
+    // Online Orders mode - render within ResponsivePOSShell for visual consistency
     if (posViewMode === 'ONLINE') {
-      return <OnlineOrderManagement />;
+      return (
+        <ResponsivePOSShell zones={{
+          customer: (
+            <POSZoneErrorBoundary zoneName="Filters" onReset={() => {}} showHomeButton>
+              <OnlineOrderFilters />
+            </POSZoneErrorBoundary>
+          ),
+          categories: null,
+          menu: (
+            <POSZoneErrorBoundary zoneName="Kanban" onReset={() => {}} showHomeButton>
+              <div className="h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5">
+                <OnlineOrderKanban
+                  newOrders={newOrders()}
+                  preparingOrders={preparingOrders()}
+                  readyOrders={readyOrders()}
+                  selectedOrderId={selectedOnlineOrderId}
+                  onAccept={handleOnlineAccept}
+                  onReject={handleOnlineRejectClick}
+                  onMarkReady={handleOnlineMarkReady}
+                  onComplete={handleOnlineComplete}
+                  onViewDetails={setSelectedOnlineOrderId}
+                  onSelectOrder={setSelectedOnlineOrderId}
+                  isActionLoading={isOnlineActionLoading}
+                />
+              </div>
+            </POSZoneErrorBoundary>
+          ),
+          summary: (
+            <POSZoneErrorBoundary zoneName="Details" onReset={() => setSelectedOnlineOrderId(null)} showHomeButton>
+              <OnlineOrderSummaryPanel
+                order={selectedOnlineOrder}
+                onAccept={handleOnlineAccept}
+                onReject={handleOnlineRejectClick}
+                onMarkReady={handleOnlineMarkReady}
+                onComplete={handleOnlineComplete}
+                onPrint={handleOnlinePrint}
+                isActionLoading={isOnlineActionLoading}
+              />
+            </POSZoneErrorBoundary>
+          )
+        }} />
+      );
     }
 
     // Reservations mode - render inline
@@ -818,15 +1023,17 @@ export default function POSDesktop() {
 
   return (
     <CustomizeOrchestratorProvider>
-      <div className="grid grid-rows-[auto_1fr_auto] h-dvh bg-black overflow-hidden">
-        {/* Offline/Online Status Banner */}
-        <POSOfflineBanner />
+      {/* Offline/Online Status Banner - Fixed overlay, outside grid to prevent row mismatch */}
+      <POSOfflineBanner />
+      <div className="fixed inset-0 grid grid-rows-[auto_auto_1fr_auto] bg-black overflow-hidden">
         <ManagementHeader title="POS" onAdminSuccess={handleManagementAuthSuccess} onLogout={handleLogout} />
-        <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} />
-        <div className="flex-1 overflow-hidden">{renderMainPOSView()}</div>
+        <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} onlineOrdersCount={unseenCount()} />
+        <div className="h-full overflow-hidden">{renderMainPOSView()}</div>
         <POSFooter currentOrderType={orderType} />
-        
-        <DineInOrderWorkspace
+      </div>
+
+      {/* Modals - Outside grid to prevent implicit row creation */}
+      <DineInOrderWorkspace
           isOpen={showDineInModal}
           onClose={() => setModal('showDineInModal', false)}
           tableId={selectedTableUuid}
@@ -897,6 +1104,18 @@ export default function POSDesktop() {
           onPrintBill={printing.handlePrintBill}
         />
 
+        {/* Online Orders Reject Modal */}
+        <RejectOrderModal
+          isOpen={isOnlineRejectModalOpen}
+          onClose={() => {
+            setIsOnlineRejectModalOpen(false);
+            setOrderToReject(null);
+          }}
+          onConfirm={handleOnlineRejectConfirm}
+          orderNumber={rejectingOnlineOrder?.orderNumber}
+          isLoading={isOnlineActionLoading}
+        />
+
         {/* Session Restore Dialog - Prompt user to restore saved session on app restart */}
         <Dialog open={showSessionRestoreDialog} onOpenChange={(open) => !open && handleSessionDiscard()}>
           <DialogContent className="sm:max-w-md">
@@ -933,11 +1152,10 @@ export default function POSDesktop() {
             </div>
           </DialogContent>
         </Dialog>
-        {/* Lock Screen Overlay */}
-        <AnimatePresence>
-          {isLocked && <POSLockScreen onUnlock={handleUnlock} />}
-        </AnimatePresence>
-      </div>
+      {/* Lock Screen Overlay */}
+      <AnimatePresence>
+        {isLocked && <POSLockScreen onUnlock={handleUnlock} />}
+      </AnimatePresence>
     </CustomizeOrchestratorProvider>
   );
 }

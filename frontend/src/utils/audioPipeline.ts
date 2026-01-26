@@ -31,6 +31,8 @@ export interface MicPipelineController {
   onSpeechEvent: (cb: (ev: SpeechEvent) => void) => void;
   // Stop and cleanup
   stop: () => void;
+  // Promise that resolves when pipeline is ready (AudioContext running, mic connected)
+  ready: Promise<void>;
 }
 
 export function createMicPipeline(options: MicOptions = {}): MicPipelineController {
@@ -59,11 +61,28 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
   let msAbove = 0;
   let msBelow = 0;
 
+  // Visibility change handler for iOS background/lock screen recovery
+  let visibilityHandler: (() => void) | null = null;
+
   const init = async () => {
     // Create AudioContext at requested sample rate
     audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
       sampleRate,
     });
+
+    // iOS Safari requires explicit resume in user gesture context
+    if (audioContext.state === 'suspended') {
+      console.log('[audioPipeline] AudioContext suspended, resuming...');
+      await audioContext.resume();
+    }
+
+    // Verify AudioContext is running
+    if (audioContext.state !== 'running') {
+      console.warn(`[audioPipeline] AudioContext state: ${audioContext.state}, attempting resume...`);
+      await audioContext.resume();
+    }
+
+    console.log(`[audioPipeline] AudioContext state after resume: ${audioContext.state}`);
 
     // Get mic
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -80,6 +99,19 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
     // Source and processor
     sourceNode = audioContext.createMediaStreamSource(mediaStream);
     scriptNode = audioContext.createScriptProcessor(bufferSize, channelCount, channelCount);
+
+    // Setup visibility change handler for iOS background/lock screen
+    visibilityHandler = async () => {
+      if (document.visibilityState === 'visible' && audioContext?.state === 'suspended') {
+        try {
+          await audioContext.resume();
+          console.log('[audioPipeline] AudioContext resumed after visibility change');
+        } catch (e) {
+          console.error('[audioPipeline] Failed to resume AudioContext:', e);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
 
     scriptNode.onaudioprocess = (e: AudioProcessingEvent) => {
       const input = e.inputBuffer.getChannelData(0);
@@ -126,13 +158,19 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
     scriptNode.connect(audioContext.destination);
   };
 
-  // Kick off init immediately for convenience
-  // Note: callers should await first onAudioFrame callback or check audioContext state if needed
-  init().catch((e) => {
+  // Create ready promise that resolves when init completes
+  // Callers should await this before expecting audio frames
+  const readyPromise = init().catch((e) => {
     console.error("MicPipeline init failed:", e);
+    throw e; // Re-throw so callers can handle
   });
 
   const stop = () => {
+    // Remove visibility change handler
+    if (visibilityHandler) {
+      document.removeEventListener('visibilitychange', visibilityHandler);
+      visibilityHandler = null;
+    }
     try { scriptNode?.disconnect(); } catch {}
     try { sourceNode?.disconnect(); } catch {}
     try { mediaStream?.getTracks().forEach(t => t.stop()); } catch {}
@@ -153,6 +191,7 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
     onAudioFrame: (cb) => { frameCallbacks.push(cb); },
     onSpeechEvent: (cb) => { speechCallbacks.push(cb); },
     stop,
+    ready: readyPromise,
   } as MicPipelineController;
 }
 

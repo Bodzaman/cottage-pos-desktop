@@ -5,6 +5,7 @@ import type { OrderItem } from './menuTypes';
 import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
 import { useCustomerDataStore } from './customerDataStore';
+import { usePOSCustomerStore } from './posCustomerStore';
 
 /**
  * Hook: useOrderProcessing
@@ -144,6 +145,8 @@ export function useOrderProcessing(
         order_type: orderType,
         items: orderItems.map(item => ({
           item_id: item.menu_item_id,
+          menu_item_id: item.menu_item_id, // For ThermalPreview section divider resolution
+          category_id: item.category_id,   // For ThermalPreview section divider grouping
           name: item.name,
           quantity: item.quantity,
           price: item.price,
@@ -167,6 +170,12 @@ export function useOrderProcessing(
         orderPayload.customer_phone = customerData.phone;
         orderPayload.customer_email = customerData.email || null;
         orderPayload.notes = customerData.notes || null;
+      }
+
+      // CRM: Include customer_id for linking to customer records
+      const posCustomerData = usePOSCustomerStore.getState().customerData;
+      if (posCustomerData.customerId) {
+        orderPayload.customer_id = posCustomerData.customerId;
       }
 
       console.log('📤 Submitting POS order:', orderPayload);

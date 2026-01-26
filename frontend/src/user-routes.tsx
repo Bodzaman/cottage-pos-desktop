@@ -14,6 +14,7 @@ const AllOrders = lazy(() => import("./pages/AllOrders.tsx"));
 const App = lazy(() => import("./pages/App.tsx"));
 const CheckoutPayment = lazy(() => import("./pages/CheckoutPayment.tsx"));
 const Contact = lazy(() => import("./pages/Contact.tsx"));
+const CRM = lazy(() => import("./pages/CRM.tsx"));
 const CustomerPortal = lazy(() => import("./pages/CustomerPortal.tsx"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
 const Gallery = lazy(() => import("./pages/Gallery.tsx"));
@@ -52,6 +53,7 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/checkout-payment", element: <CheckoutPayment />},
 	{ path: "/checkoutpayment", element: <CheckoutPayment />},
 	{ path: "/contact", element: <Contact />},
+	{ path: "/crm", element: <CRM />},
 	{ path: "/customer-portal", element: <CustomerPortal />},
 	{ path: "/customerportal", element: <CustomerPortal />},
 	{ path: "/forgot-password", element: <ForgotPassword />},

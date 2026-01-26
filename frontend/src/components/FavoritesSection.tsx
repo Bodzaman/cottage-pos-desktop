@@ -8,7 +8,10 @@ import {
   Check,
   ShoppingCart,
   Flame,
-  UtensilsCrossed
+  UtensilsCrossed,
+  RefreshCw,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -43,6 +46,10 @@ interface Props {
   handleToggleItemInList: (listId: string, favoriteId: string, isInList: boolean) => Promise<void>;
   handleAddToCart: (favorite: EnrichedFavoriteItem) => void;
   handleRemoveFavorite: (favoriteId: string, itemName: string) => Promise<void>;
+  // Error handling props
+  loadError?: string | null;
+  onRetry?: () => void;
+  isLoading?: boolean;
 }
 
 export default function FavoritesSection({
@@ -58,6 +65,9 @@ export default function FavoritesSection({
   handleToggleItemInList,
   handleAddToCart,
   handleRemoveFavorite,
+  loadError,
+  onRetry,
+  isLoading,
 }: Props) {
   const navigate = useNavigate();
 
@@ -104,8 +114,42 @@ export default function FavoritesSection({
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && !enrichedFavorites?.length && (
+        <PremiumCard subsurface className="py-12 px-6">
+          <div className="flex flex-col items-center justify-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-[#8B1538]" />
+            <p className="text-sm text-gray-400">Loading your favorites...</p>
+          </div>
+        </PremiumCard>
+      )}
+
+      {/* Error State with Retry */}
+      {loadError && !isLoading && (
+        <PremiumCard subsurface className="py-12 px-6">
+          <div className="text-center max-w-sm mx-auto">
+            <div className="p-4 rounded-xl bg-red-500/10 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <AlertCircle className="h-7 w-7 text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">Unable to Load Favorites</h3>
+            <p className="text-sm text-gray-400 mb-5">
+              {loadError}
+            </p>
+            {onRetry && (
+              <PortalButton
+                variant="secondary"
+                onClick={onRetry}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </PortalButton>
+            )}
+          </div>
+        </PremiumCard>
+      )}
+
       {/* Favorites Grid */}
-      {enrichedFavorites && enrichedFavorites.length > 0 ? (
+      {!loadError && !isLoading && enrichedFavorites && enrichedFavorites.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {enrichedFavorites.map((favorite, index) => {
             // Show ALL favorites when 'all' is selected
@@ -144,14 +188,18 @@ export default function FavoritesSection({
                         )}
                       />
                     ) : (
-                      <div className="w-full h-full bg-[#8B1538]/15 flex items-center justify-center">
-                        <UtensilsCrossed className="h-10 w-10 text-[#8B1538]/50" />
+                      <div
+                        className="w-full h-full bg-[#8B1538]/15 flex items-center justify-center"
+                        aria-label={`${favorite.display_name} - no image available`}
+                        role="img"
+                      >
+                        <UtensilsCrossed className="h-10 w-10 text-[#8B1538]/50" aria-hidden="true" />
                       </div>
                     )}
 
-                    {/* Quick Add Overlay */}
+                    {/* Quick Add Overlay - visible on mobile, hover on desktop */}
                     {favorite.display_is_available && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end p-3">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 flex items-end p-3">
                         <PortalButton
                           variant="primary"
                           size="sm"
@@ -180,11 +228,11 @@ export default function FavoritesSection({
                       </div>
                     )}
 
-                    {/* Remove Button */}
+                    {/* Remove Button - visible on mobile, hover on desktop */}
                     {favorite.display_is_available && (
                       <button
                         onClick={() => handleRemoveFavorite(favorite.favorite_id, favorite.display_name)}
-                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white/70 hover:bg-red-500/80 hover:text-white opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white/70 hover:bg-red-500/80 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200"
                         aria-label="Remove from favorites"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -243,8 +291,10 @@ export default function FavoritesSection({
                                   ? 'bg-[#8B1538]/30 text-white hover:bg-[#8B1538]/40'
                                   : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'
                               )}
+                              aria-label={isInThisList ? `Remove ${favorite.display_name} from ${list.list_name}` : `Add ${favorite.display_name} to ${list.list_name}`}
+                              aria-pressed={isInThisList}
                             >
-                              {isInThisList && <Check className="h-2 w-2 inline mr-0.5" />}
+                              {isInThisList && <Check className="h-2 w-2 inline mr-0.5" aria-hidden="true" />}
                               {list.list_name}
                             </button>
                           );
@@ -257,7 +307,7 @@ export default function FavoritesSection({
             );
           })}
         </div>
-      ) : (
+      ) : !loadError && !isLoading ? (
         <PremiumCard subsurface className="py-12 px-6">
           <div className="text-center max-w-sm mx-auto">
             <div className="p-4 rounded-xl bg-[#8B1538]/15 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
@@ -290,7 +340,7 @@ export default function FavoritesSection({
             </PortalButton>
           </div>
         </PremiumCard>
-      )}
+      ) : null}
     </div>
   );
 }

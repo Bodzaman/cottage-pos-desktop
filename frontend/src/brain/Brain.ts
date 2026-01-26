@@ -9761,6 +9761,116 @@ export class Brain<SecurityDataType = unknown> extends HttpClient<SecurityDataTy
     });
 
   /**
+   * @description Export all customer data as JSON for GDPR compliance (Article 15 - Right of Access)
+   *
+   * @tags customer-profile, dbtn/module:customer_profile_api
+   * @name gdpr_export
+   * @summary GDPR Data Export
+   * @request POST:/routes/customer-profile/gdpr-export
+   */
+  gdpr_export = (data: CustomerLookupRequest, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-profile/gdpr-export`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description Check if a customer can cancel their order
+   *
+   * @tags customer-order-cancellation
+   * @name check_can_cancel_order
+   * @summary Check Order Cancellation Eligibility
+   * @request GET:/routes/customer-order-cancellation/can-cancel/{order_id}
+   */
+  check_can_cancel_order = (orderId: string, customerId: string, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-order-cancellation/can-cancel/${orderId}`,
+      method: "GET",
+      query: { customer_id: customerId },
+      ...params,
+    });
+
+  /**
+   * @description Cancel a customer's order and process refund
+   *
+   * @tags customer-order-cancellation
+   * @name cancel_customer_order
+   * @summary Cancel Order
+   * @request POST:/routes/customer-order-cancellation/cancel
+   */
+  cancel_customer_order = (data: { order_id: string; customer_id: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-order-cancellation/cancel`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description List saved payment methods for a customer
+   *
+   * @tags customer-payment-methods
+   * @name list_payment_methods
+   * @summary List Payment Methods
+   * @request GET:/routes/customer-payment-methods/list/{customer_id}
+   */
+  list_payment_methods = (customerId: string, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-payment-methods/list/${customerId}`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * @description Create a SetupIntent for adding a new payment method
+   *
+   * @tags customer-payment-methods
+   * @name create_setup_intent
+   * @summary Create Setup Intent
+   * @request POST:/routes/customer-payment-methods/setup-intent/{customer_id}
+   */
+  create_setup_intent = (customerId: string, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-payment-methods/setup-intent/${customerId}`,
+      method: "POST",
+      ...params,
+    });
+
+  /**
+   * @description Delete a saved payment method
+   *
+   * @tags customer-payment-methods
+   * @name delete_payment_method
+   * @summary Delete Payment Method
+   * @request DELETE:/routes/customer-payment-methods/delete/{customer_id}/{payment_method_id}
+   */
+  delete_payment_method = (customerId: string, paymentMethodId: string, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-payment-methods/delete/${customerId}/${paymentMethodId}`,
+      method: "DELETE",
+      ...params,
+    });
+
+  /**
+   * @description Set a payment method as default
+   *
+   * @tags customer-payment-methods
+   * @name set_default_payment_method
+   * @summary Set Default Payment Method
+   * @request POST:/routes/customer-payment-methods/set-default/{customer_id}/{payment_method_id}
+   */
+  set_default_payment_method = (customerId: string, paymentMethodId: string, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-payment-methods/set-default/${customerId}/${paymentMethodId}`,
+      method: "POST",
+      ...params,
+    });
+
+  /**
    * @description Get all template assignments for order modes
    *
    * @tags dbtn/module:template_assignments
@@ -13431,6 +13541,176 @@ export class Brain<SecurityDataType = unknown> extends HttpClient<SecurityDataTy
       method: "POST",
       body: data,
       type: ContentType.Json,
+      ...params,
+    });
+
+  // ============================================================================
+  // CRM API - Customer Relationship Management
+  // ============================================================================
+
+  /**
+   * @description Search customers by various criteria
+   * @tags dbtn/module:customer_crm
+   * @name crm_search_customers
+   * @summary CRM Search Customers
+   * @request GET:/routes/crm/search
+   */
+  crm_search_customers = (data: { query: string; search_type?: string; limit?: number }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/search`,
+      method: "GET",
+      query: { q: data.query, limit: data.limit },
+      ...params,
+    });
+
+  /**
+   * @description Get customer profile with comprehensive data
+   * @tags dbtn/module:customer_crm
+   * @name crm_get_customer_profile
+   * @summary CRM Get Customer Profile
+   * @request GET:/routes/crm/customers/{customer_id}
+   */
+  crm_get_customer_profile = (query: { customer_id: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/customers/${query.customer_id}`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * @description Get customer timeline/touchpoints
+   * @tags dbtn/module:customer_crm
+   * @name crm_get_customer_timeline
+   * @summary CRM Get Customer Timeline
+   * @request GET:/routes/crm/customers/{customer_id}/timeline
+   */
+  crm_get_customer_timeline = (query: { customer_id: string; limit?: number }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/customers/${query.customer_id}/timeline`,
+      method: "GET",
+      query: { limit: query.limit },
+      ...params,
+    });
+
+  /**
+   * @description Get customer notes
+   * @tags dbtn/module:customer_crm
+   * @name crm_get_customer_notes
+   * @summary CRM Get Customer Notes
+   * @request GET:/routes/crm/customers/{customer_id}/notes
+   */
+  crm_get_customer_notes = (query: { customer_id: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/customers/${query.customer_id}/notes`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * @description Add note to customer
+   * @tags dbtn/module:customer_crm
+   * @name crm_add_customer_note
+   * @summary CRM Add Customer Note
+   * @request POST:/routes/crm/customers/{customer_id}/notes
+   */
+  crm_add_customer_note = (data: { customer_id: string; note_type: string; content: string; is_pinned?: boolean }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/customers/${data.customer_id}/notes`,
+      method: "POST",
+      body: { note_type: data.note_type, content: data.content, is_pinned: data.is_pinned },
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description Get customer orders
+   * @tags dbtn/module:customer_crm
+   * @name crm_get_customer_orders
+   * @summary CRM Get Customer Orders
+   * @request GET:/routes/crm/customers/{customer_id}/orders
+   */
+  crm_get_customer_orders = (query: { customer_id: string; limit?: number; include_staff_only?: boolean }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/customers/${query.customer_id}/orders`,
+      method: "GET",
+      query: { limit: query.limit, include_staff_only: query.include_staff_only },
+      ...params,
+    });
+
+  /**
+   * @description Get full order with items for receipt preview and re-order
+   * @tags dbtn/module:customer_crm
+   * @name crm_get_full_order
+   * @summary CRM Get Full Order
+   * @request GET:/routes/crm/orders/{order_id}/full
+   */
+  crm_get_full_order = (query: { order_id: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/crm/orders/${query.order_id}/full`,
+      method: "GET",
+      ...params,
+    });
+
+  // ============================================================================
+  // Identity Linking API
+  // ============================================================================
+
+  /**
+   * @description Get identity link queue
+   * @tags dbtn/module:customer_identity
+   * @name identity_get_link_queue
+   * @summary Get Identity Link Queue
+   * @request GET:/routes/customer-identity/link-queue
+   */
+  identity_get_link_queue = (query?: { status?: string; tier?: string; limit?: number; offset?: number }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-identity/link-queue`,
+      method: "GET",
+      query: query,
+      ...params,
+    });
+
+  /**
+   * @description Approve identity link
+   * @tags dbtn/module:customer_identity
+   * @name identity_approve_link
+   * @summary Approve Identity Link
+   * @request POST:/routes/customer-identity/link-queue/{link_id}/approve
+   */
+  identity_approve_link = (data: { link_id: string; reviewer_id?: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-identity/link-queue/${data.link_id}/approve`,
+      method: "POST",
+      query: { reviewer_id: data.reviewer_id },
+      ...params,
+    });
+
+  /**
+   * @description Reject identity link
+   * @tags dbtn/module:customer_identity
+   * @name identity_reject_link
+   * @summary Reject Identity Link
+   * @request POST:/routes/customer-identity/link-queue/{link_id}/reject
+   */
+  identity_reject_link = (data: { link_id: string; reviewer_id?: string }, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-identity/link-queue/${data.link_id}/reject`,
+      method: "POST",
+      query: { reviewer_id: data.reviewer_id },
+      ...params,
+    });
+
+  /**
+   * @description Get identity stats
+   * @tags dbtn/module:customer_identity
+   * @name identity_get_stats
+   * @summary Get Identity Stats
+   * @request GET:/routes/customer-identity/stats
+   */
+  identity_get_stats = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/routes/customer-identity/stats`,
+      method: "GET",
       ...params,
     });
 }

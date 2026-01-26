@@ -223,6 +223,14 @@ export default function CheckoutPayment() {
 
       try {
         
+        // Build customer info - prefer form data for guests, fallback to auth user data
+        const guestCustomer = checkoutData.customer;
+        const customerName = guestCustomer?.firstName && guestCustomer?.lastName
+          ? `${guestCustomer.firstName} ${guestCustomer.lastName}`
+          : user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest';
+        const customerEmail = guestCustomer?.email || user?.email;
+        const customerPhone = guestCustomer?.phone || user?.phone || undefined;
+
         // Log the exact payload being sent
         const orderPayload = {
           items: checkoutData.items.map(item => ({
@@ -235,10 +243,10 @@ export default function CheckoutPayment() {
           delivery_fee: checkoutData.delivery_fee,
           tip_amount: checkoutData.tip_amount,
           order_notes: checkoutData.order_notes,
-          customer_id: user?.id, // Link order to authenticated user
-          customer_email: user?.email,
-          customer_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest',
-          customer_phone: user?.phone || undefined
+          customer_id: user?.id || undefined, // Link order to authenticated user (undefined for guests)
+          customer_email: customerEmail,
+          customer_name: customerName,
+          customer_phone: customerPhone
         };
         
 

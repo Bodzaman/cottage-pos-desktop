@@ -307,15 +307,12 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
           throw new Error(`No template assignment found for ${storageKey}`);
         }
 
-        // Determine which template ID to use based on receiptFormat
-        // Kitchen receipts use kitchen_template_id, customer receipts use customer_template_id
-        const isKitchenReceipt = receiptFormat === 'kitchen' || receiptFormat === 'kitchen_customer';
-        const templateIdToUse = isKitchenReceipt
-          ? assignmentData.kitchen_template_id
-          : assignmentData.customer_template_id;
+        // NEW FLOW: Always use customer_template_id for the template
+        // The receiptFormat prop controls whether to render as FOH or kitchen style
+        // (Kitchen copy is a view/format of the same template, not a separate template)
+        const templateIdToUse = assignmentData.customer_template_id;
 
         if (templateIdToUse) {
-
           // Load the assigned template (no userId needed)
           const templateResponse = await ReceiptDesignerService.fetchTemplate(templateIdToUse);
 
@@ -325,7 +322,7 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
             throw new Error('Assigned template not found');
           }
         } else {
-          throw new Error(`No ${isKitchenReceipt ? 'kitchen' : 'customer'} template assigned for this order mode`);
+          throw new Error(`No template assigned for this order mode`);
         }
       } else {
         throw new Error('Either templateId or orderMode must be provided');

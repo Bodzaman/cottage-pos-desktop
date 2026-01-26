@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, X } from 'lucide-react';
-import { usePOSCustomerIntelligence, SearchQuery } from 'utils/usePOSCustomerIntelligence';
+import { Search, X, User } from 'lucide-react';
+import { usePOSCustomerIntelligence, SearchQuery, CustomerSearchResult } from 'utils/usePOSCustomerIntelligence';
+import { usePOSCustomerStore } from 'utils/posCustomerStore';
+import { colors } from '../utils/InternalDesignSystem';
 
 interface POSCustomerSearchFormProps {
   className?: string;
+  orderType?: 'COLLECTION' | 'DELIVERY' | 'WAITING' | 'DINE-IN';
+  onCustomerNeedsAddress?: () => void;  // Callback when delivery mode but customer has no address
 }
 
 /**
@@ -19,29 +23,38 @@ interface POSCustomerSearchFormProps {
  * - Clear button when input has value
  * - QSAI purple theme
  */
-export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ className = '' }) => {
-  const { searchCustomer, clearSearch, isSearching } = usePOSCustomerIntelligence();
-  
+export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({
+  className = '',
+  orderType,
+  onCustomerNeedsAddress,
+}) => {
+  const { searchCustomer, clearSearch, isSearching, searchResults, selectCustomer, clearSearchResults } = usePOSCustomerIntelligence();
+
   const [searchValue, setSearchValue] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [detectedType, setDetectedType] = useState<'email' | 'phone' | 'ref' | null>(null);
+  const [detectedType, setDetectedType] = useState<'email' | 'phone' | 'ref' | 'name' | null>(null);
 
   // Auto-detect input type
-  const detectInputType = (value: string): 'email' | 'phone' | 'ref' | null => {
-    if (!value.trim()) return null;
-    
+  const detectInputType = (value: string): 'email' | 'phone' | 'ref' | 'name' | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
     // Email detection: contains @
-    if (value.includes('@')) return 'email';
-    
-    // Phone detection: starts with 07 or all digits (10-11 chars)
-    const digitsOnly = value.replace(/\s/g, '');
+    if (trimmed.includes('@')) return 'email';
+
+    // Phone detection: starts with 07, +44, or all digits (10-11 chars)
+    const digitsOnly = trimmed.replace(/\s/g, '');
     if (/^\d+$/.test(digitsOnly) && digitsOnly.length >= 10) return 'phone';
-    if (/^07/.test(value)) return 'phone';
-    
+    if (/^07/.test(trimmed)) return 'phone';
+    if (/^\+44/.test(trimmed)) return 'phone';
+
     // Customer reference: alphanumeric (CTR12345 or CT001)
-    if (/^[A-Z]{2,3}\d+$/i.test(value)) return 'ref';
-    
+    if (/^CT[R]?\d+$/i.test(trimmed)) return 'ref';
+
+    // Fallback: treat any other text (2+ chars) as name search
+    if (trimmed.length >= 2) return 'name';
+
     return null;
   };
 
@@ -67,26 +80,32 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
   };
 
   // Validate based on detected type
-  const validateInput = (value: string, type: 'email' | 'phone' | 'ref' | null): { isValid: boolean; error: string } => {
+  const validateInput = (value: string, type: 'email' | 'phone' | 'ref' | 'name' | null): { isValid: boolean; error: string } => {
     if (!value.trim()) return { isValid: true, error: '' };
-    if (!type) return { isValid: false, error: 'Unable to detect search type' };
+    if (!type) return { isValid: false, error: 'Enter at least 2 characters' };
 
     switch (type) {
       case 'email':
-        return validateEmail(value) 
+        return validateEmail(value)
           ? { isValid: true, error: '' }
           : { isValid: false, error: 'Invalid email format' };
-      
+
       case 'phone':
         return validatePhone(value)
           ? { isValid: true, error: '' }
           : { isValid: false, error: 'Invalid phone format (use 07xxx xxxxxx)' };
-      
+
       case 'ref':
         return validateCustomerRef(value)
           ? { isValid: true, error: '' }
           : { isValid: false, error: 'Invalid reference format (e.g., CT001)' };
-      
+
+      case 'name':
+        // Name search is always valid if 2+ characters
+        return value.trim().length >= 2
+          ? { isValid: true, error: '' }
+          : { isValid: false, error: 'Enter at least 2 characters' };
+
       default:
         return { isValid: false, error: '' };
     }
@@ -119,10 +138,10 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
   };
 
   // Handle search action
-  const handleSearch = useCallback((value?: string, type?: 'email' | 'phone' | 'ref' | null) => {
+  const handleSearch = useCallback((value?: string, type?: 'email' | 'phone' | 'ref' | 'name' | null) => {
     const searchVal = value || searchValue;
     const searchType = type !== undefined ? type : detectedType;
-    
+
     if (!searchVal.trim() || !searchType) return;
 
     // Validate before search
@@ -130,10 +149,11 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
     if (!validation.isValid) return;
 
     // Map detected type to SearchQuery field
-    const fieldMap: Record<'email' | 'phone' | 'ref', keyof SearchQuery> = {
+    const fieldMap: Record<'email' | 'phone' | 'ref' | 'name', keyof SearchQuery> = {
       email: 'email',
       phone: 'phone',
-      ref: 'customerRef'
+      ref: 'customerRef',
+      name: 'name'
     };
 
     const field = fieldMap[searchType];
@@ -146,6 +166,7 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
     setValidationError('');
     setDetectedType(null);
     clearSearch();
+    clearSearchResults();
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
@@ -176,11 +197,41 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
     if (detectedType === 'email') return 'Searching by email...';
     if (detectedType === 'phone') return 'Searching by phone...';
     if (detectedType === 'ref') return 'Searching by reference...';
-    return 'Email • Phone • Ref';
+    if (detectedType === 'name') return 'Searching by name...';
+    return 'Name • Email • Phone • Ref';
+  };
+
+  // Get display label for detected type
+  const getTypeLabel = () => {
+    switch (detectedType) {
+      case 'email': return 'Email';
+      case 'phone': return 'Phone';
+      case 'ref': return 'Customer Reference';
+      case 'name': return 'Name';
+      default: return '';
+    }
+  };
+
+  // Handle customer selection from dropdown
+  const handleSelectCustomer = async (customer: CustomerSearchResult) => {
+    setSearchValue('');
+    clearSearchResults();
+    await selectCustomer(customer);
+
+    // If delivery mode and customer has no address, trigger form to open
+    if (orderType === 'DELIVERY' && onCustomerNeedsAddress) {
+      // Small delay to allow store to update
+      setTimeout(() => {
+        const customerData = usePOSCustomerStore.getState().customerData;
+        if (!customerData.postcode) {
+          onCustomerNeedsAddress();
+        }
+      }, 100);
+    }
   };
 
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-1 relative ${className}`}>
       {/* Compact Search Bar */}
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 z-10" style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
@@ -227,9 +278,9 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
       )}
 
       {/* Type indicator (shows detected type) */}
-      {detectedType && searchValue && (
+      {detectedType && searchValue && searchResults.length === 0 && (
         <p className="text-[11px] text-purple-300 px-1">
-          Detected: {detectedType === 'email' ? 'Email' : detectedType === 'phone' ? 'Phone' : 'Customer Reference'}
+          Detected: {getTypeLabel()}
         </p>
       )}
 
@@ -239,6 +290,84 @@ export const POSCustomerSearchForm: React.FC<POSCustomerSearchFormProps> = ({ cl
           <div className="flex items-center gap-1.5 text-xs text-purple-400">
             <div className="h-3 w-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
             Searching...
+          </div>
+        </div>
+      )}
+
+      {/* Search Results Dropdown (for name searches with multiple results) */}
+      {searchResults.length > 0 && !isSearching && (
+        <div
+          className="absolute z-50 w-full mt-1 rounded-lg border overflow-hidden shadow-lg"
+          style={{
+            backgroundColor: colors.background.secondary,
+            borderColor: colors.border.light,
+            maxHeight: '280px',
+            top: '100%',
+            left: 0,
+          }}
+        >
+          {/* Results header */}
+          <div
+            className="px-3 py-2 text-xs border-b"
+            style={{
+              color: colors.text.muted,
+              backgroundColor: colors.background.tertiary,
+              borderColor: colors.border.light,
+            }}
+          >
+            {searchResults.length} customer{searchResults.length > 1 ? 's' : ''} found
+          </div>
+
+          {/* Scrollable results list */}
+          <div className="overflow-y-auto" style={{ maxHeight: '220px' }}>
+            {searchResults.map((customer) => {
+              // Generate initials for avatar
+              const initials = [
+                customer.first_name?.[0] || '',
+                customer.last_name?.[0] || ''
+              ].join('').toUpperCase() || '?';
+
+              return (
+                <button
+                  key={customer.id}
+                  onClick={() => handleSelectCustomer(customer)}
+                  className="w-full px-3 py-2.5 text-left transition-colors border-b last:border-b-0 flex items-center gap-3"
+                  style={{
+                    borderColor: colors.border.light,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(147, 51, 234, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {/* Avatar with initials */}
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${colors.purple.primary}33 0%, ${colors.purple.primary}66 100%)`,
+                    }}
+                  >
+                    <span className="text-xs font-semibold" style={{ color: colors.purple.primary }}>
+                      {initials}
+                    </span>
+                  </div>
+
+                  {/* Customer info */}
+                  <div className="flex-1 min-w-0">
+                    {/* Line 1: Name */}
+                    <p className="font-medium text-sm truncate" style={{ color: colors.text.primary }}>
+                      {customer.first_name} {customer.last_name}
+                    </p>
+                    {/* Line 2: Phone • Ref */}
+                    <p className="text-xs truncate" style={{ color: colors.text.muted }}>
+                      {[customer.phone, customer.customer_reference_number].filter(Boolean).join(' • ')}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

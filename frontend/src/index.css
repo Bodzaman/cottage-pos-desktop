@@ -384,6 +384,9 @@ select:focus-visible,
 
 
 @layer base {
+  html, body, #root {
+    height: 100dvh;
+  }
   * {
     @apply border-border;
   }

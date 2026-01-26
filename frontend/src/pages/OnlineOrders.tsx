@@ -379,9 +379,9 @@ export default function OnlineOrders() {
       
       // Don't process navigation shortcuts when typing
       if (isTyping) return;
-      
-      // Section navigation shortcuts: 1-6 keys
-      if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+
+      // Section navigation shortcuts: 1-7 keys (for 7 sections)
+      if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
         e.preventDefault();
         const sectionIndex = parseInt(e.key, 10) - 1;
         if (sectionIndex < FIXED_SECTIONS.length) {
@@ -988,13 +988,9 @@ export default function OnlineOrders() {
     setIsVariantSelectorOpen(false);
   }, []);
   
-  // **NEW: Get parent categories for tabs (6 sections, exclude DESSERTS & COFFEE, NO COUNTS)**
+  // Get all sections for tabs (sorted by order for consistent display)
   const parentCategoriesForTabs = useMemo(() => {
-    // Use only 6 sections for OnlineOrders (exclude DESSERTS & COFFEE, no counts)
-    // ✅ FIX: Explicitly sort by order property to ensure consistent display sequence
-    return FIXED_SECTIONS
-      .filter(s => s.id !== 'desserts-coffee')
-      .sort((a, b) => a.order - b.order);
+    return FIXED_SECTIONS.sort((a, b) => a.order - b.order);
   }, []);
 
   // Filter items based on selected category using proper section mapping
@@ -1111,8 +1107,8 @@ export default function OnlineOrders() {
         );
       }}
     >
-      <div 
-        className="min-h-screen"
+      <div
+        className="min-h-screen flex flex-col"
         style={{
           background: `linear-gradient(135deg, ${PremiumTheme.colors.dark[950]} 0%, ${PremiumTheme.colors.charcoal[900]} 50%, ${PremiumTheme.colors.dark[900]} 100%)`,
           color: PremiumTheme.colors.text.primary
@@ -1387,8 +1383,8 @@ export default function OnlineOrders() {
         </div>
 
         {/* **FIXED: Main Content with Proper Top Margin - NO Z-INDEX CONFLICTS */}
-        <div 
-          className="container mx-auto px-4 pb-20"
+        <div
+          className="container mx-auto px-4 pb-20 flex-1"
           style={{
             marginTop: `${tabsHeight + 24}px` // Simplified - no AI panel offset needed
           }}

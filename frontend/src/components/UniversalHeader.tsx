@@ -3,12 +3,19 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { HiOutlineMenu, HiOutlineX } from "react-icons/hi";
+import { User, LogOut, ChevronDown } from "lucide-react";
 import { Cart } from "./Cart";
 import { NotificationIndicator } from "./NotificationIndicator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PremiumTheme } from "../utils/premiumTheme";
 import { useCartStore } from "../utils/cartStore";
-import { useChatIsOpen } from "../utils/chat-store";
 import {
   getNavigationConfig,
   getFilteredNavigationItems,
@@ -42,9 +49,6 @@ export function UniversalHeader({
   const [isScrolled, setIsScrolled] = React.useState(false);
   const { titleFontFamily } = useBrandFont();
 
-  // Get chat open state to hide cart when chat is active
-  const isChatOpen = useChatIsOpen();
-  
   // Get global cart action as default
   const openCart = useCartStore((state) => state.openCart);
   const cartClickHandler = onCartClick || openCart;
@@ -180,9 +184,9 @@ export function UniversalHeader({
           <div className="hidden lg:flex items-center space-x-3">
             {user && <NotificationIndicator />}
             
-            {finalConfig.showCart && !isChatOpen && (
-              <Cart 
-                className="text-white hover:text-white/80" 
+            {finalConfig.showCart && (
+              <Cart
+                className="text-white hover:text-white/80"
                 onCartClick={cartClickHandler}
               />
             )}
@@ -213,19 +217,48 @@ export function UniversalHeader({
 
             {finalConfig.showAuthButtons && (
               user ? (
-                <Button
-                  onClick={() => navigate("/customer-portal")}
-                  className="font-light tracking-wide transition-all duration-300 backdrop-blur-sm border hover:scale-105"
-                  variant="outline"
-                  style={{
-                    color: PremiumTheme.colors.text.primary,
-                    borderColor: PremiumTheme.colors.border.medium,
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  My Account
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="font-light tracking-wide transition-all duration-300 backdrop-blur-sm border hover:scale-105"
+                      variant="outline"
+                      style={{
+                        color: PremiumTheme.colors.text.primary,
+                        borderColor: PremiumTheme.colors.border.medium,
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      My Account
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-48 backdrop-blur-xl border"
+                    style={{
+                      background: 'rgba(15, 15, 15, 0.95)',
+                      borderColor: PremiumTheme.colors.border.light,
+                    }}
+                  >
+                    <DropdownMenuItem
+                      onClick={() => navigate("/customer-portal")}
+                      className="cursor-pointer text-white hover:bg-white/10 focus:bg-white/10"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      My Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem
+                      onClick={() => signOut()}
+                      className="cursor-pointer text-white hover:bg-white/10 focus:bg-white/10"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <>
                   <Button
@@ -298,7 +331,7 @@ export function UniversalHeader({
                     </span>
                     <div className="flex items-center gap-2">
                       {user && <NotificationIndicator className="mr-1" />}
-                      {finalConfig.showCart && !isChatOpen && <Cart insideMobileMenu={true} onCartClick={onCartClick} />}
+                      {finalConfig.showCart && <Cart insideMobileMenu={true} onCartClick={onCartClick} />}
                     </div>
                   </div>
 

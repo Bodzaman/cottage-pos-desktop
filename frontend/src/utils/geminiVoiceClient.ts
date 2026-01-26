@@ -774,6 +774,8 @@ Always use functions to perform cart operations.`;
     try {
       // Use unified mic pipeline at 16kHz (Gemini-native)
       const useVAD = isFlagEnabled('voice_pipeline_v1');
+      console.log(`[GeminiVoice] Starting mic pipeline, VAD enabled: ${useVAD}`);
+
       this.mic = createMicPipeline({
         sampleRate: 16000,
         bufferSize: 4096,
@@ -786,21 +788,19 @@ Always use functions to perform cart operations.`;
         },
       });
 
+      // Wait for pipeline to be fully initialized (AudioContext running, mic connected)
+      // This is critical for iOS Safari which requires AudioContext.resume() in user gesture
+      await this.mic.ready;
+
+      // Diagnostic logging for iOS debugging
+      console.log(`[GeminiVoice] Mic pipeline ready, AudioContext state: ${this.mic.audioContext?.state}`);
+      console.log(`[GeminiVoice] MediaStream active: ${this.mic.mediaStream?.active}, tracks: ${this.mic.mediaStream?.getAudioTracks().length}`);
+
       // Keep legacy fields populated for internal teardown compatibility
-      // Note: mic init is async; wait until context is ready by polling
-      const waitForContext = async () => {
-        let tries = 0;
-        while (tries < 50) { // ~5s max
-          if (this.mic?.audioContext && this.mic?.mediaStream && this.mic?.scriptNode && this.mic?.sourceNode) break;
-          await new Promise(r => setTimeout(r, 100));
-          tries++;
-        }
-        this.audioContext = this.mic?.audioContext || null;
-        this.mediaStream = this.mic?.mediaStream || null;
-        this.scriptNode = this.mic?.scriptNode || null;
-        this.sourceNode = this.mic?.sourceNode || null;
-      };
-      await waitForContext();
+      this.audioContext = this.mic?.audioContext || null;
+      this.mediaStream = this.mic?.mediaStream || null;
+      this.scriptNode = this.mic?.scriptNode || null;
+      this.sourceNode = this.mic?.sourceNode || null;
 
       let audioChunkCount = 0;
       let sendSuccessCount = 0;
@@ -828,13 +828,20 @@ Always use functions to perform cart operations.`;
 
       if (useVAD) {
         this.vadSpeaking = false; // VAD active: start gated until speech detected
+        console.log(`[GeminiVoice] VAD active, starting with vadSpeaking=false`);
         this.mic.onSpeechEvent((ev) => {
           if (ev === 'speechStart') {
+            console.log('[GeminiVoice] VAD: Speech detected');
             this.vadSpeaking = true;
           } else if (ev === 'speechEnd') {
+            console.log('[GeminiVoice] VAD: Speech ended');
             this.vadSpeaking = false;
           }
         });
+      } else {
+        // When VAD is disabled, always allow sending audio
+        this.vadSpeaking = true;
+        console.log(`[GeminiVoice] VAD disabled, vadSpeaking=true (always sending)`);
       }
 
     } catch (error: any) {

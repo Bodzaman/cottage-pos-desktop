@@ -64,6 +64,7 @@ export function ResponsivePOSShell({ zones }: Props) {
             gap: "var(--pos-gap, 1rem)",
             gridTemplateColumns:
               "var(--pos-col-customer, 300px) 1fr var(--pos-col-summary, 300px)",
+            gridTemplateRows: "1fr",
           }}
         >
           {/* Customer | Menu | Summary */}
@@ -83,6 +84,7 @@ export function ResponsivePOSShell({ zones }: Props) {
           gap: "var(--pos-gap, 1rem)",
           gridTemplateColumns:
             "var(--pos-col-customer, 300px) var(--pos-col-categories, 200px) 1fr var(--pos-col-summary, 300px)",
+          gridTemplateRows: "1fr",
         }}
       >
         {/* Customer | Categories | Menu | Summary */}
@@ -105,6 +107,7 @@ export function ResponsivePOSShell({ zones }: Props) {
             gap: "var(--pos-gap, 1rem)",
             gridTemplateColumns:
               "minmax(260px, var(--pos-col-customer, 300px)) 1fr minmax(260px, var(--pos-col-summary, 300px))",
+            gridTemplateRows: "1fr",
           }}
         >
           <ZoneWrap>{zones.customer}</ZoneWrap>
@@ -124,6 +127,7 @@ export function ResponsivePOSShell({ zones }: Props) {
           // Slightly compress fixed columns to avoid horizontal pressure
           gridTemplateColumns:
             "minmax(260px, var(--pos-col-customer, 300px)) minmax(160px, var(--pos-col-categories, 200px)) 1fr minmax(260px, var(--pos-col-summary, 300px))",
+          gridTemplateRows: "1fr",
         }}
       >
         <ZoneWrap>{zones.customer}</ZoneWrap>

@@ -147,9 +147,9 @@ const ManagementPasswordDialog: React.FC<ManagementPasswordDialogProps> = ({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent 
-        className="sm:max-w-md" 
-        style={{ 
+      <DialogContent
+        className="sm:max-w-md z-[10000]"
+        style={{
           backgroundColor: colors.background.tertiary,
           borderColor: colors.border.medium,
           color: colors.text.primary

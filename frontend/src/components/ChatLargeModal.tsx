@@ -681,6 +681,24 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   // NEW (MYA-1581): Voice maintenance modal state
   const [showVoiceMaintenanceModal, setShowVoiceMaintenanceModal] = useState(false);
 
+  // Lock body scroll when voice T&C screen is open (prevents background page scroll on mobile)
+  useEffect(() => {
+    if (showVoiceTCScreen) {
+      const scrollY = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${scrollY}px`;
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.top = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showVoiceTCScreen]);
+
   // iOS keyboard-aware height: track visual viewport shrinking when keyboard opens
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
@@ -1661,13 +1679,16 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       
       {/* Voice ordering T&C screen modal overlay */}
       {showVoiceTCScreen && (
-        <div 
+        <div
           className="fixed inset-0 flex items-center justify-center p-4"
           style={{
             zIndex: 70,
             backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            backdropFilter: 'blur(8px)'
+            backdropFilter: 'blur(8px)',
+            touchAction: 'none',
+            overscrollBehavior: 'contain'
           }}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           <InlineTermsScreen
             onAcceptTerms={handleVoiceTermsAccepted}

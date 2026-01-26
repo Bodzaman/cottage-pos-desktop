@@ -213,15 +213,9 @@ export default function App() {
 
   const [activeSection, setActiveSection] = useState<string | null>("home");
 
-  // Auth-aware navigation function
+  // Navigate to online ordering - auth is handled at checkout, not menu browsing
   const handleOrderNow = () => {
-    if (user) {
-      // User is logged in, go directly to ordering
-      navigate("/order");
-    } else {
-      // User not logged in, show auth prompt or go to login
-      navigate("/login");
-    }
+    navigate("/online-orders");
   };
 
   return (
@@ -323,7 +317,7 @@ export default function App() {
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <Button
-                    onClick={() => navigate("/order")}
+                    onClick={() => navigate("/online-orders")}
                     className="px-8 py-4 text-lg font-medium rounded-full transition-all duration-300 transform hover:scale-105 border backdrop-blur-sm group"
                     style={{
                       background: PremiumTheme.colors.burgundy[500],

@@ -31,6 +31,8 @@ export interface CustomerData {
   deliveryNotes: string;
   customerRef?: string;
   recentOrderCount?: number;
+  // CRM: Customer ID for linking orders to customer records
+  customerId?: string | null;
 }
 
 export interface CustomerStore {
@@ -63,7 +65,8 @@ const initialCustomerData: CustomerData = {
   street: '',
   city: '',
   postcode: '',
-  deliveryNotes: ''
+  deliveryNotes: '',
+  customerId: null
 };
 
 // ============================================================================

@@ -9,6 +9,33 @@ interface NotificationSettings {
   urgentAlerts: boolean;
 }
 
+// MP3 sound file path for online order notifications
+const ONLINE_ORDER_MP3_PATH = '/audio-sounds/online_order_notification_sound_pos.mp3';
+
+// Preloaded MP3 audio element (singleton)
+let preloadedMp3Audio: HTMLAudioElement | null = null;
+
+// Preload the MP3 file on module load
+const preloadOnlineOrderMp3 = () => {
+  if (typeof window === 'undefined') return;
+  if (preloadedMp3Audio) return; // Already preloaded
+
+  try {
+    preloadedMp3Audio = new Audio(ONLINE_ORDER_MP3_PATH);
+    preloadedMp3Audio.preload = 'auto';
+    // Preload by loading metadata
+    preloadedMp3Audio.load();
+  } catch (error) {
+    console.warn('Failed to preload online order MP3:', error);
+  }
+};
+
+// Preload on module initialization
+if (typeof window !== 'undefined') {
+  // Delay preload slightly to not block initial render
+  setTimeout(preloadOnlineOrderMp3, 1000);
+}
+
 // Sound files mapping
 const SOUND_FILES: Record<NotificationType, string> = {
   new_order: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAkUXrTp66hVFApGn+D1u2EdBDaG0fPTgjMLJYHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAkUXrTp66hVFApGn+D1u2EdBDaG0fPTgjMLJYHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAkUXrTp66hVFApGn+D1u2EdBDaG0fPTgj',
@@ -71,13 +98,58 @@ const SOUND_PATTERNS: Record<NotificationType, { frequency: number; duration: nu
 export class SoundNotificationManager {
   private settings: NotificationSettings;
   private isPlaying: boolean = false;
-  
+  private mp3Audio: HTMLAudioElement | null = null;
+
   constructor(settings: NotificationSettings) {
     this.settings = settings;
+    this.initMp3Audio();
   }
-  
+
+  private initMp3Audio() {
+    if (typeof window === 'undefined') return;
+    // Use the preloaded audio if available, otherwise create new
+    if (preloadedMp3Audio) {
+      this.mp3Audio = preloadedMp3Audio;
+    } else {
+      try {
+        this.mp3Audio = new Audio(ONLINE_ORDER_MP3_PATH);
+        this.mp3Audio.preload = 'auto';
+      } catch (error) {
+        console.warn('Failed to initialize MP3 audio:', error);
+      }
+    }
+  }
+
   updateSettings(settings: NotificationSettings) {
     this.settings = settings;
+  }
+
+  /**
+   * Play MP3 sound for new online orders
+   * Falls back to beep sound if MP3 playback fails
+   */
+  async playNewOrderMP3(volume?: number): Promise<void> {
+    if (!this.settings.soundEnabled) {
+      return;
+    }
+
+    const effectiveVolume = volume !== undefined ? volume / 100 : this.settings.volume;
+
+    // Try to play MP3 first
+    if (this.mp3Audio) {
+      try {
+        this.mp3Audio.currentTime = 0;
+        this.mp3Audio.volume = Math.max(0, Math.min(1, effectiveVolume));
+        await this.mp3Audio.play();
+        return; // Success - exit early
+      } catch (error) {
+        console.warn('MP3 playback failed, falling back to beep:', error);
+        // Fall through to beep fallback
+      }
+    }
+
+    // Fallback to programmatic beep
+    await this.playNotification('new_order');
   }
   
   async playNotification(type: NotificationType): Promise<void> {
@@ -230,4 +302,13 @@ export const playOrderReadySound = async (settings?: NotificationSettings) => {
 export const playPaymentSuccessSound = async (settings?: NotificationSettings) => {
   const manager = getDefaultSoundManager(settings);
   await manager.playNotification('payment_success');
+};
+
+/**
+ * Play MP3 sound for new online orders
+ * This uses the custom MP3 file with fallback to beep
+ */
+export const playOnlineOrderMP3 = async (volume?: number, settings?: NotificationSettings) => {
+  const manager = getDefaultSoundManager(settings);
+  await manager.playNewOrderMP3(volume);
 };

@@ -42,18 +42,51 @@ export interface AIMessages {
   busy_message: string;
 }
 
+// Online Orders Settings Types
+export interface PrepTimeSchedule {
+  id: string;
+  day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  orderType: 'COLLECTION' | 'DELIVERY';
+  minMinutes: number;
+  maxMinutes: number;
+  isActive: boolean;
+}
+
+export interface OnlineOrdersSettings {
+  notifications: {
+    playSound: boolean;
+    soundVolume: number;
+    repeatUntilAcknowledged: boolean;
+  };
+  processing: {
+    autoApproveOrders: boolean;
+    autoPrintOnAccept: boolean;
+  };
+  prepTimeSchedule: PrepTimeSchedule[];
+  availability: {
+    acceptOnlineOrders: boolean;
+    acceptDeliveryOrders: boolean;
+    acceptCollectionOrders: boolean;
+    orderCutoffMinutes: number;
+  };
+}
+
 export interface RestaurantSettings {
   business_profile: BusinessProfile;
   opening_hours: OpeningHours[];
   delivery: DeliverySettings;
   kitchen_status: KitchenStatus;
   ai_messages: AIMessages;
+  // Online orders settings
+  onlineOrders?: OnlineOrdersSettings;
   // General settings for backward compatibility
   general?: {
     name?: string;
     currency?: string;
     timezone?: string;
     locale?: string;
+    onlineOrderingEnabled?: boolean;
+    autoApproveOrders?: boolean;
   };
 }
 

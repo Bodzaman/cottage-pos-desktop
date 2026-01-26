@@ -1,5 +1,6 @@
 import React from 'react';
-import { LayoutDashboard, User, MapPin, ClipboardList, Heart } from 'lucide-react';
+import { LayoutDashboard, User, MapPin, ClipboardList, Heart, LogOut } from 'lucide-react';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 import { cn } from 'utils/cn';
 
 type CustomerSection = 'dashboard' | 'profile' | 'addresses' | 'orders' | 'favorites';
@@ -23,6 +24,8 @@ const sections = [
  * Hidden on mobile (< 768px), shows PortalBottomNav instead
  */
 export function PortalNavigation({ activeSection, onSectionChange }: PortalNavigationProps) {
+  const { signOut } = useSimpleAuth();
+
   return (
     <nav
       className="sticky top-20 z-40 backdrop-blur-xl hidden md:block border-b border-white/5"
@@ -54,6 +57,21 @@ export function PortalNavigation({ activeSection, onSectionChange }: PortalNavig
               </button>
             );
           })}
+
+          {/* Sign Out Button */}
+          <button
+            onClick={() => signOut()}
+            className={cn(
+              'relative flex items-center gap-2 px-5 py-2.5 rounded-full',
+              'text-sm font-medium whitespace-nowrap',
+              'transition-all duration-200 ease-out',
+              'border',
+              'bg-white/5 text-gray-400 border-transparent hover:text-white hover:bg-red-500/20 hover:border-red-500/30'
+            )}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
         </div>
       </div>
     </nav>

@@ -97,7 +97,10 @@ export function OrderCustomerCard({
       {/* B. Customer Search (compact, subtle - only in empty state) */}
       {!hasCustomerData && (
         <div className="px-3 pt-3 pb-2 flex-shrink-0">
-          <POSCustomerSearchForm />
+          <POSCustomerSearchForm
+            orderType={orderType}
+            onCustomerNeedsAddress={onTakeOrder}
+          />
         </div>
       )}
 

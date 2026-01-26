@@ -40,6 +40,7 @@ import { KeyboardShortcutsHelp } from "components/KeyboardShortcutsHelp";
 import { VisuallyHidden } from "components/VisuallyHidden";
 import { useIsMobile } from "utils/useMediaQuery";
 import { useOfflineSync } from "utils/useOfflineSync";
+import { useRealtimeMenuStore } from "utils/realtimeMenuStore";
 import {
   Select,
   SelectContent,
@@ -137,6 +138,7 @@ export default function CustomerPortal() {
   // State for enriched favorites
   const [enrichedFavorites, setEnrichedFavorites] = useState<EnrichedFavoriteItem[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesError, setFavoritesError] = useState<string | null>(null);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   
   // Additional state for CustomerPortal
@@ -341,20 +343,27 @@ export default function CustomerPortal() {
   // Load enriched favorites
   const loadEnrichedFavorites = async () => {
     if (!profile?.id) return;
-    
+
     setFavoritesLoading(true);
+    setFavoritesError(null);
     try {
       const response = await brain.get_enriched_favorites({ customer_id: profile.id });
-      
+
       const data: EnrichedFavoritesResponse = await response.json();
-      
+
       if (data.success) {
         setEnrichedFavorites(data.favorites);
+        setFavoritesError(null);
       } else {
-        toast.error('Failed to load favorites');
+        setFavoritesError('Unable to load your favorites. Please try again.');
       }
     } catch (error) {
-      toast.error('Failed to load favorites');
+      const isOffline = !navigator.onLine;
+      setFavoritesError(
+        isOffline
+          ? 'You appear to be offline. Please check your connection.'
+          : 'Something went wrong loading your favorites.'
+      );
     } finally {
       setFavoritesLoading(false);
     }
@@ -579,53 +588,112 @@ export default function CustomerPortal() {
     }
   };
 
-  // NEW: Reorder handler
+  // Refresh orders after cancellation
+  const refreshOrderHistory = async () => {
+    if (!profile?.id) return;
+
+    try {
+      const response = await brain.get_order_history({
+        customerId: profile.id,
+        limit: ORDERS_PAGE_SIZE,
+        offset: 0
+      });
+      const data = await response.json();
+      const orders = data?.orders || [];
+      setOrderHistory(orders);
+      setOrdersTotalCount(data?.total_count || 0);
+      setOrdersHasMore(data?.has_more || false);
+      setOrdersOffset(ORDERS_PAGE_SIZE);
+      cacheOrders(orders);
+    } catch (error) {
+      console.error('Failed to refresh orders:', error);
+    }
+  };
+
+  // Reorder handler - validates items against current menu before adding to cart
   const handleReorder = async (order: any) => {
     if (!order.order_items || order.order_items.length === 0) {
       toast.error('This order has no items to reorder');
       return;
     }
-    
+
     setIsReordering(order.id);
-    
+
     try {
-      let addedCount = 0;
-      const warnings: string[] = [];
-      
-      // Add each item from the order to the cart
-      for (const item of order.order_items) {
-        try {
-          const menuItemInput = {
-            id: item.menu_item_id || `item-${Date.now()}-${addedCount}`,
-            name: item.menu_item_name,
-            price: item.price || 0
-          };
-          const variant = { id: `v-${item.menu_item_id}`, name: 'Standard', price: item.price || 0 };
-          addItem(menuItemInput, variant, item.quantity || 1);
-          addedCount++;
-        } catch (error) {
-          warnings.push(`Could not add ${item.menu_item_name}`);
+      // Get current menu items from store
+      const menuStore = useRealtimeMenuStore.getState();
+      let currentMenuItems = menuStore.menuItems;
+
+      // If menu isn't loaded yet, try to initialize it
+      if (!currentMenuItems || currentMenuItems.length === 0) {
+        await menuStore.initialize();
+        currentMenuItems = useRealtimeMenuStore.getState().menuItems;
+      }
+
+      // Validate each item against the current menu
+      const validItems: Array<{ orderItem: any; menuItem: any }> = [];
+      const unavailableItems: string[] = [];
+
+      for (const orderItem of order.order_items) {
+        // Find the item in the current menu
+        const menuItem = currentMenuItems.find(
+          (m: any) => m.id === orderItem.menu_item_id
+        );
+
+        if (menuItem && menuItem.is_active) {
+          validItems.push({ orderItem, menuItem });
+        } else {
+          unavailableItems.push(orderItem.menu_item_name);
         }
       }
-      
+
+      // Warn about unavailable items
+      if (unavailableItems.length > 0) {
+        toast.warning(
+          `${unavailableItems.length} item${unavailableItems.length > 1 ? 's' : ''} no longer available`,
+          {
+            description: unavailableItems.slice(0, 3).join(', ') +
+              (unavailableItems.length > 3 ? ` and ${unavailableItems.length - 3} more` : ''),
+          }
+        );
+      }
+
+      // Add valid items with current menu prices
+      let addedCount = 0;
+      for (const { orderItem, menuItem } of validItems) {
+        try {
+          const menuItemInput = {
+            id: menuItem.id,
+            name: menuItem.name,
+            price: menuItem.price || orderItem.price || 0,
+            description: menuItem.description || '',
+            imageUrl: menuItem.image_url || '/placeholder-food.jpg',
+          };
+          // Use order variant info or fallback to standard
+          const variant = {
+            id: orderItem.variant_id || `v-${menuItem.id}`,
+            name: orderItem.variant_name || 'Standard',
+            price: menuItem.price || orderItem.price || 0,
+          };
+          addItem(menuItemInput, variant, orderItem.quantity || 1);
+          addedCount++;
+        } catch (error) {
+          console.error(`Error adding ${menuItem.name}:`, error);
+        }
+      }
+
       if (addedCount > 0) {
         toast.success(`Added ${addedCount} item${addedCount > 1 ? 's' : ''} to cart!`, {
           description: 'Navigate to the menu to review and checkout',
         });
-
-        if (warnings.length > 0) {
-          setTimeout(() => {
-            toast.warning(`Some items couldn't be added`, {
-              description: warnings.join(', ')
-            });
-          }, 500);
-        }
+      } else if (unavailableItems.length > 0) {
+        toast.error('All items from this order are no longer available');
       } else {
         toast.error('Failed to add items to cart');
       }
     } catch (error) {
       console.error('Reorder error:', error);
-      toast.error('Failed to reorder');
+      toast.error('Failed to reorder. Please try again.');
     } finally {
       setIsReordering(null);
     }
@@ -1213,6 +1281,8 @@ export default function CustomerPortal() {
                 hasMore={ordersHasMore}
                 isLoadingMore={ordersLoading}
                 onLoadMore={handleLoadMoreOrders}
+                customerId={profile?.id}
+                onOrderCancelled={refreshOrderHistory}
               />
             </Suspense>
           </PortalSection>
@@ -1245,6 +1315,9 @@ export default function CustomerPortal() {
                 handleToggleItemInList={handleToggleItemInList}
                 handleAddToCart={handleAddToCart}
                 handleRemoveFavorite={handleRemoveFavorite}
+                loadError={favoritesError}
+                onRetry={loadEnrichedFavorites}
+                isLoading={favoritesLoading}
               />
             </Suspense>
           </PortalSection>
@@ -1262,7 +1335,7 @@ export default function CustomerPortal() {
         
         {/* Create List Modal */}
         <Dialog open={createListModalOpen} onOpenChange={setCreateListModalOpen}>
-          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF]">
+          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF] max-w-[calc(100vw-2rem)] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Create New List</DialogTitle>
               <DialogDescription className="text-[#B7BDC6]">
@@ -1310,7 +1383,7 @@ export default function CustomerPortal() {
         
         {/* Rename List Modal */}
         <Dialog open={renameListModalOpen} onOpenChange={setRenameListModalOpen}>
-          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF]">
+          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF] max-w-[calc(100vw-2rem)] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Rename List</DialogTitle>
               <DialogDescription className="text-[#B7BDC6]">
@@ -1359,7 +1432,7 @@ export default function CustomerPortal() {
 
         {/* Delete List Modal */}
         <Dialog open={deleteListModalOpen} onOpenChange={setDeleteListModalOpen}>
-          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF]">
+          <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF] max-w-[calc(100vw-2rem)] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Delete List?</DialogTitle>
               <DialogDescription className="text-[#B7BDC6]">

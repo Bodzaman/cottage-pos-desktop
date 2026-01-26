@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChefHat, Printer, Menu, BarChart3, DollarSign, Shield, Zap } from 'lucide-react';
+import { X, ChefHat, BarChart3, DollarSign, Zap, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { globalColors } from '../utils/QSAIDesign';
 import { colors as designColors } from '../utils/designSystem';
 import { useNavigate } from 'react-router-dom';
 import { APP_BASE_PATH } from '../constants';
+import ManagementPasswordDialog from './ManagementPasswordDialog';
+import { CRMModal } from './CRMModal';
 
 interface QuickToolsModalProps {
   isOpen: boolean;
@@ -25,12 +27,31 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
   const navigate = useNavigate();
   const [isClosing, setIsClosing] = useState(false);
 
+  // Password dialog and CRM modal state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showCRMModal, setShowCRMModal] = useState(false);
+
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
       setIsClosing(false);
       onClose();
     }, 200);
+  };
+
+  // Handle CRM card click - show password dialog
+  const handleCRMClick = () => {
+    setShowPasswordDialog(true);
+  };
+
+  // Handle successful password verification
+  const handlePasswordSuccess = () => {
+    setShowPasswordDialog(false);
+    handleClose(); // Close Quick Tools modal
+    // Small delay to allow Quick Tools to close first
+    setTimeout(() => {
+      setShowCRMModal(true);
+    }, 250);
   };
 
   const tools: ToolItem[] = [
@@ -49,14 +70,11 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
       description: 'View and manage kitchen orders in dedicated window'
     },
     {
-      id: 'printer-management',
-      label: '🖨️ Printer Management',
-      icon: <Printer className="h-6 w-6" />,
-      action: () => {
-        navigate('/printer-management');
-        handleClose();
-      },
-      description: 'Configure receipt and kitchen printers'
+      id: 'crm',
+      label: '👥 CRM',
+      icon: <Users className="h-6 w-6" />,
+      action: handleCRMClick,
+      description: 'Customer Relationship Management'
     },
     {
       id: 'view-all-orders',
@@ -81,16 +99,18 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
     }
   ];
 
-  if (!isOpen) return null;
+  if (!isOpen && !showCRMModal && !showPasswordDialog) return null;
 
   return (
+    <>
     <AnimatePresence>
+      {isOpen && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        className="fixed inset-0 z-50 flex items-center justify-center"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           backdropFilter: 'blur(4px)'
@@ -217,7 +237,22 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
           </Card>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
+
+      {/* Management Password Dialog */}
+      <ManagementPasswordDialog
+        isOpen={showPasswordDialog}
+        onClose={() => setShowPasswordDialog(false)}
+        onAuthenticated={handlePasswordSuccess}
+      />
+
+      {/* CRM Modal */}
+      <CRMModal
+        isOpen={showCRMModal}
+        onClose={() => setShowCRMModal(false)}
+      />
+    </>
   );
 };
 

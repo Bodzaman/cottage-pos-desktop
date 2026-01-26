@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History,
@@ -16,7 +16,8 @@ import {
   ChefHat,
   Truck,
   ShoppingBag,
-  Plus
+  Plus,
+  Ban
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -29,9 +30,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PremiumCard } from './PremiumCard';
 import { PortalButton } from './PortalButton';
 import { cn } from 'utils/cn';
+import brain from 'brain';
+import { toast } from 'sonner';
 
 // Status Badge Component - matches mock design
 function StatusBadge({ status }: { status: string }) {
@@ -57,6 +68,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Cancellation eligibility state per order
+interface CancellationState {
+  canCancel: boolean;
+  secondsRemaining: number;
+  refundAmount?: number;
+}
+
 interface Props {
   orderHistory: any[] | null;
   isViewingCachedData: boolean;
@@ -73,6 +91,10 @@ interface Props {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  // Customer ID for cancellation
+  customerId?: string;
+  // Callback to refresh orders after cancellation
+  onOrderCancelled?: () => void;
 }
 
 export default function OrdersSection({
@@ -90,14 +112,167 @@ export default function OrdersSection({
   hasMore,
   isLoadingMore,
   onLoadMore,
+  customerId,
+  onOrderCancelled,
 }: Props) {
   const navigate = useNavigate();
 
   // State for expanded order details (view full order)
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
+  // Cancellation state
+  const [cancellationStates, setCancellationStates] = useState<Record<string, CancellationState>>({});
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<any>(null);
+
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  // Check cancellation eligibility for recent pending/confirmed orders
+  const checkCancellationEligibility = useCallback(async (orderId: string) => {
+    if (!customerId) return;
+
+    try {
+      const response = await brain.check_can_cancel_order(orderId, customerId);
+      const data = await response.json();
+
+      if (data.can_cancel) {
+        setCancellationStates(prev => ({
+          ...prev,
+          [orderId]: {
+            canCancel: true,
+            secondsRemaining: data.seconds_remaining || 0,
+            refundAmount: data.refund_amount
+          }
+        }));
+      } else {
+        setCancellationStates(prev => ({
+          ...prev,
+          [orderId]: {
+            canCancel: false,
+            secondsRemaining: 0
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking cancellation eligibility:', error);
+    }
+  }, [customerId]);
+
+  // Check eligibility for pending/confirmed orders on mount and periodically
+  useEffect(() => {
+    if (!orderHistory || !customerId) return;
+
+    // Get orders that might be cancellable (pending or confirmed, recent)
+    const recentOrders = orderHistory.filter(order => {
+      const status = order.status?.toLowerCase();
+      if (status !== 'pending' && status !== 'confirmed') return false;
+
+      // Only check orders from last 10 minutes (buffer for 5 min window)
+      const createdAt = new Date(order.created_at);
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      return createdAt > tenMinutesAgo;
+    });
+
+    // Check each order's eligibility
+    recentOrders.forEach(order => {
+      checkCancellationEligibility(order.id);
+    });
+
+    // Set up interval to refresh eligibility and countdown
+    const interval = setInterval(() => {
+      // Update countdowns
+      setCancellationStates(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(orderId => {
+          if (updated[orderId].canCancel && updated[orderId].secondsRemaining > 0) {
+            updated[orderId] = {
+              ...updated[orderId],
+              secondsRemaining: Math.max(0, updated[orderId].secondsRemaining - 1)
+            };
+            // If countdown reached 0, mark as not cancellable
+            if (updated[orderId].secondsRemaining <= 0) {
+              updated[orderId].canCancel = false;
+            }
+          }
+        });
+        return updated;
+      });
+
+      // Re-check eligibility every 30 seconds
+    }, 1000);
+
+    // Re-check eligibility every 30 seconds
+    const recheckInterval = setInterval(() => {
+      recentOrders.forEach(order => {
+        checkCancellationEligibility(order.id);
+      });
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(recheckInterval);
+    };
+  }, [orderHistory, customerId, checkCancellationEligibility]);
+
+  // Format countdown timer
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle cancel button click - open confirmation dialog
+  const handleCancelClick = (order: any) => {
+    setOrderToCancel(order);
+    setCancelDialogOpen(true);
+  };
+
+  // Handle confirmed cancellation
+  const handleConfirmCancel = async () => {
+    if (!orderToCancel || !customerId) return;
+
+    setCancellingOrderId(orderToCancel.id);
+    setCancelDialogOpen(false);
+
+    try {
+      const response = await brain.cancel_customer_order({
+        order_id: orderToCancel.id,
+        customer_id: customerId
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Order cancelled successfully', {
+          description: data.refund_amount
+            ? `Refund of £${data.refund_amount.toFixed(2)} initiated`
+            : 'Your order has been cancelled'
+        });
+
+        // Update local state
+        setCancellationStates(prev => ({
+          ...prev,
+          [orderToCancel.id]: { canCancel: false, secondsRemaining: 0 }
+        }));
+
+        // Refresh orders list
+        onOrderCancelled?.();
+      } else {
+        toast.error('Could not cancel order', {
+          description: data.message || 'Please try again or contact support'
+        });
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error('Failed to cancel order', {
+        description: 'Please try again or contact support'
+      });
+    } finally {
+      setCancellingOrderId(null);
+      setOrderToCancel(null);
+    }
   };
 
   // Format date helper
@@ -324,8 +499,8 @@ export default function OrdersSection({
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                              <UtensilsCrossed className="h-4 w-4 text-gray-600" />
+                            <div className="w-full h-full bg-gray-800 flex items-center justify-center" aria-label={`${item.menu_item_name} - no image available`}>
+                              <UtensilsCrossed className="h-4 w-4 text-gray-600" aria-hidden="true" />
                             </div>
                           )}
                         </div>
@@ -361,11 +536,30 @@ export default function OrdersSection({
                       {order.order_items?.length || 0} items
                     </span>
                     <div className="flex gap-2">
+                      {/* Cancel Button - only show if cancellable */}
+                      {cancellationStates[order.id]?.canCancel && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelClick(order)}
+                          disabled={cancellingOrderId === order.id}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 px-3 text-xs"
+                        >
+                          {cancellingOrderId === order.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                          ) : (
+                            <Ban className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          Cancel ({formatCountdown(cancellationStates[order.id].secondsRemaining)})
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleOrderExpand(order.id)}
                         className="text-gray-400 hover:text-white hover:bg-white/10 h-8 px-3 text-xs"
+                        aria-expanded={expandedOrderId === order.id}
+                        aria-label={expandedOrderId === order.id ? 'Hide order details' : 'View order details'}
                       >
                         {expandedOrderId === order.id ? 'Hide' : 'View'}
                       </Button>
@@ -412,8 +606,8 @@ export default function OrdersSection({
                                     className="w-14 h-14 rounded-lg object-cover border border-white/10 bg-black/40"
                                   />
                                 ) : (
-                                  <div className="w-14 h-14 rounded-lg bg-[#8B1538]/20 border border-white/10 flex items-center justify-center">
-                                    <UtensilsCrossed className="h-5 w-5 text-[#8B1538]" />
+                                  <div className="w-14 h-14 rounded-lg bg-[#8B1538]/20 border border-white/10 flex items-center justify-center" aria-label={`${item.menu_item_name} - no image available`}>
+                                    <UtensilsCrossed className="h-5 w-5 text-[#8B1538]" aria-hidden="true" />
                                   </div>
                                 )}
                               </div>
@@ -552,6 +746,57 @@ export default function OrdersSection({
           </div>
         </PremiumCard>
       )}
+
+      {/* Cancel Order Confirmation Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="bg-[#17191D] border-white/10 text-[#EAECEF] max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Cancel Order?</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Are you sure you want to cancel order #{orderToCancel?.order_number || orderToCancel?.id?.slice(0, 8).toUpperCase()}?
+            </DialogDescription>
+          </DialogHeader>
+
+          {orderToCancel && cancellationStates[orderToCancel.id] && (
+            <div className="py-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Order Total</span>
+                <span className="text-white font-medium">
+                  £{orderToCancel.total_amount?.toFixed(2)}
+                </span>
+              </div>
+              {cancellationStates[orderToCancel.id]?.refundAmount && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Refund Amount</span>
+                  <span className="text-green-400 font-medium">
+                    £{cancellationStates[orderToCancel.id].refundAmount?.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 pt-2">
+                Your refund will be processed to your original payment method within 3-5 business days.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              className="border-white/20 text-gray-300 hover:bg-white/10"
+            >
+              Keep Order
+            </Button>
+            <Button
+              onClick={handleConfirmCancel}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Ban className="h-4 w-4 mr-2" />
+              Cancel Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, CheckCircle2, AlertCircle, Send, Loader2, Bot, Leaf, Bell, Shield } from 'lucide-react';
+import { User, Mail, Phone, CheckCircle2, AlertCircle, Send, Loader2, Bot, Leaf, Bell, Shield, LogOut, Download, CreditCard } from 'lucide-react';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 import { toast } from 'sonner';
 import brain from 'brain';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { NotificationPreferences } from 'components/NotificationPreferences';
 import { AccountSecuritySection } from 'components/AccountSecuritySection';
 import { ProfileIdentityCard } from 'components/profile/ProfileIdentityCard';
 import { SettingsModule } from 'components/profile/SettingsModule';
+import PaymentMethodsSection from 'components/PaymentMethodsSection';
 import { calculateProfileCompletion, getCompletionColor, getCompletionMessage } from 'utils/profileCompletion';
 import type { CustomerProfile, CustomerAddress } from 'types';
 
@@ -72,6 +74,7 @@ export default function ProfileSection({
   const [localDietaryPrefs, setLocalDietaryPrefs] = useState<string[]>(dietaryPreferences);
   const [localNotificationPrefs, setLocalNotificationPrefs] = useState<NotificationSettings>(notificationPreferences);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
 
   // Handle dietary preferences change
   const handleDietaryChange = async (prefs: string[]) => {
@@ -128,6 +131,7 @@ export default function ProfileSection({
     }
     toast.error('Account deletion not configured');
   };
+  const { signOut } = useSimpleAuth();
   const profileCompletion = calculateProfileCompletion(profile, addresses);
   const completionColor = getCompletionColor(profileCompletion.percentage);
   const completionMessage = getCompletionMessage(profileCompletion);
@@ -155,7 +159,7 @@ export default function ProfileSection({
 
   const handlePersonalizationToggle = async (enabled: boolean) => {
     if (!profile?.id) return;
-    
+
     setPersonalizationLoading(true);
     try {
       const response = await brain.update_personalization_settings({
@@ -166,8 +170,8 @@ export default function ProfileSection({
       if (response.ok) {
         setPersonalizationEnabled(enabled);
         toast.success(
-          enabled 
-            ? 'Personalization enabled - AI chatbot will greet you by name and suggest your favorites' 
+          enabled
+            ? 'Personalization enabled - AI chatbot will greet you by name and suggest your favorites'
             : 'Personalization disabled - AI chatbot will use generic responses'
         );
       } else {
@@ -177,6 +181,41 @@ export default function ProfileSection({
       toast.error('Failed to update personalization settings');
     } finally {
       setPersonalizationLoading(false);
+    }
+  };
+
+  // GDPR Data Export handler
+  const handleGDPRExport = async () => {
+    if (!profile?.id) return;
+
+    setExportingData(true);
+    try {
+      const response = await brain.gdpr_export({ customer_id: profile.id });
+      const data = await response.json();
+
+      if (data.success && data.export_data) {
+        // Create and download JSON file
+        const blob = new Blob([JSON.stringify(data.export_data, null, 2)], {
+          type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `my-data-export-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success('Your data has been exported');
+      } else {
+        throw new Error(data.error || 'Failed to export data');
+      }
+    } catch (error) {
+      console.error('GDPR export error:', error);
+      toast.error('Failed to export your data. Please try again.');
+    } finally {
+      setExportingData(false);
     }
   };
 
@@ -333,6 +372,17 @@ export default function ProfileSection({
           />
         </SettingsModule>
 
+        {/* Payment Methods Module - Customer Portal Only */}
+        {profile?.id && (
+          <SettingsModule
+            title="Payment Methods"
+            icon={CreditCard}
+            description="Manage your saved cards for faster checkout"
+          >
+            <PaymentMethodsSection customerId={profile.id} />
+          </SettingsModule>
+        )}
+
         {/* Security Module */}
         <SettingsModule
           title="Security"
@@ -344,7 +394,48 @@ export default function ProfileSection({
             onPasswordChange={handlePasswordChange}
             onAccountDeletion={handleAccountDeletion}
           />
+
+          {/* GDPR Data Export */}
+          <div className="pt-4 mt-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm text-white">Download Your Data</p>
+                <p className="text-xs text-gray-500">Export all your personal data (GDPR)</p>
+              </div>
+              <Button
+                onClick={handleGDPRExport}
+                disabled={exportingData}
+                variant="outline"
+                size="sm"
+                className="text-white border-white/20 hover:bg-white/10 hover:border-white/30"
+              >
+                {exportingData ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Data
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </SettingsModule>
+
+        {/* Sign Out Button */}
+        <div className="pt-4 border-t border-white/10">
+          <Button
+            onClick={() => signOut()}
+            variant="outline"
+            className="w-full sm:w-auto text-white border-white/20 hover:bg-white/10 hover:border-white/30"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
       </div>
     </div>
   );
