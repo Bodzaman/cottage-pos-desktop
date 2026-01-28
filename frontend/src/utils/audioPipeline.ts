@@ -26,6 +26,9 @@ export interface MicOptions {
   enableVAD?: boolean;      // default false
   vad?: VADConfig;          // optional VAD tuning
   constraints?: MediaTrackConstraints; // extra getUserMedia constraints
+  // Pre-warmed resources (created in user gesture context for iOS compatibility)
+  existingAudioContext?: AudioContext;
+  existingMediaStream?: MediaStream;
 }
 
 export interface MicPipelineController {
@@ -104,7 +107,9 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
     channelCount = 1,
     enableVAD = false,
     vad = {},
-    constraints = {}
+    constraints = {},
+    existingAudioContext,
+    existingMediaStream,
   } = options;
 
   // Internal state
@@ -146,15 +151,22 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
     const isMobile = isMobileDevice();
     const isIOS = isIOSSafari();
 
-    // On iOS/mobile: don't specify sample rate, let browser use native (typically 48000)
-    // On desktop: can request specific sample rate (browsers handle resampling)
-    const contextOptions: AudioContextOptions = isMobile ? {} : { sampleRate: targetSampleRate };
+    // Reuse pre-warmed AudioContext if provided (created in user gesture context for iOS)
+    if (existingAudioContext) {
+      audioContext = existingAudioContext;
+      console.log(`[audioPipeline] Reusing pre-warmed AudioContext (state: ${audioContext.state}, rate: ${audioContext.sampleRate}Hz)`);
+    } else {
+      // On iOS/mobile: don't specify sample rate, let browser use native (typically 48000)
+      // On desktop: can request specific sample rate (browsers handle resampling)
+      const contextOptions: AudioContextOptions = isMobile ? {} : { sampleRate: targetSampleRate };
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)(contextOptions);
+      console.log(`[audioPipeline] Created new AudioContext`);
+    }
 
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)(contextOptions);
     actualSampleRate = audioContext.sampleRate;
 
     console.log(`[audioPipeline] Platform: ${isIOS ? 'iOS' : isMobile ? 'Mobile' : 'Desktop'}`);
-    console.log(`[audioPipeline] AudioContext created at ${actualSampleRate}Hz (target: ${targetSampleRate}Hz)`);
+    console.log(`[audioPipeline] AudioContext at ${actualSampleRate}Hz (target: ${targetSampleRate}Hz)`);
 
     if (actualSampleRate !== targetSampleRate) {
       console.log(`[audioPipeline] Will resample from ${actualSampleRate}Hz to ${targetSampleRate}Hz`);
@@ -174,18 +186,24 @@ export function createMicPipeline(options: MicOptions = {}): MicPipelineControll
 
     console.log(`[audioPipeline] AudioContext state after resume: ${audioContext.state}`);
 
-    // Get mic - don't specify sampleRate constraint as iOS ignores it
-    // The browser will capture at its native rate
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        ...constraints,
-      },
-      video: false,
-    });
+    // Reuse pre-warmed MediaStream if provided, otherwise acquire mic
+    if (existingMediaStream) {
+      mediaStream = existingMediaStream;
+      console.log(`[audioPipeline] Reusing pre-warmed MediaStream (active: ${mediaStream.active}, tracks: ${mediaStream.getAudioTracks().length})`);
+    } else {
+      // Get mic - don't specify sampleRate constraint as iOS ignores it
+      // The browser will capture at its native rate
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          ...constraints,
+        },
+        video: false,
+      });
+    }
 
     // Log actual track settings for debugging
     const audioTrack = mediaStream.getAudioTracks()[0];

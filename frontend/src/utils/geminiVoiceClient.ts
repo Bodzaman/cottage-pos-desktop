@@ -122,6 +122,10 @@ export class GeminiVoiceClient {
   // Network change detection for mobile WiFi/cellular transitions
   private networkChangeHandler: (() => void) | null = null;
 
+  // Safety timeout to reset shouldSendAudio if turnComplete is never received
+  private turnCompleteTimeout: number | null = null;
+  private readonly TURN_COMPLETE_TIMEOUT_MS = 15000; // 15 seconds
+
   // Streaming audio playback state (ring buffer pattern)
   private outputSampleRate = 24000; // Gemini native audio output rate
   private outputAudioContext: AudioContext | null = null;
@@ -139,6 +143,53 @@ export class GeminiVoiceClient {
 
   get currentState() {
     return this.state;
+  }
+
+  // Pre-warmed resources (created in user gesture context for iOS)
+  private prewarmedAudioContext: AudioContext | null = null;
+  private prewarmedMediaStream: MediaStream | null = null;
+  private prewarmedOutputContext: AudioContext | null = null;
+
+  /**
+   * Pre-warm AudioContext and mic in user gesture context.
+   * MUST be called synchronously from a tap/click handler BEFORE any async work.
+   * This ensures iOS Safari allows AudioContext.resume() and getUserMedia().
+   */
+  async prewarmMic(): Promise<void> {
+    const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+    console.log(`[GeminiVoice] Pre-warming mic, mobile: ${isMobile}`);
+
+    try {
+      // Create input AudioContext at native rate on mobile, target rate on desktop
+      const contextOptions: AudioContextOptions = isMobile ? {} : { sampleRate: 16000 };
+      this.prewarmedAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)(contextOptions);
+      await this.prewarmedAudioContext.resume(); // Guaranteed to work in user gesture
+      console.log(`[GeminiVoice] Input AudioContext pre-warmed (state: ${this.prewarmedAudioContext.state}, rate: ${this.prewarmedAudioContext.sampleRate}Hz)`);
+
+      // Acquire mic in user gesture context
+      this.prewarmedMediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      console.log(`[GeminiVoice] MediaStream pre-warmed (active: ${this.prewarmedMediaStream.active})`);
+
+      // Pre-warm output AudioContext for AI voice playback
+      this.prewarmedOutputContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: this.outputSampleRate,
+      });
+      await this.prewarmedOutputContext.resume();
+      console.log(`[GeminiVoice] Output AudioContext pre-warmed (state: ${this.prewarmedOutputContext.state})`);
+    } catch (e: any) {
+      console.error('[GeminiVoice] prewarmMic failed:', e);
+      // Clean up partial state
+      this.prewarmedMediaStream?.getTracks().forEach(t => t.stop());
+      this.prewarmedMediaStream = null;
+      try { this.prewarmedAudioContext?.close(); } catch {}
+      this.prewarmedAudioContext = null;
+      try { this.prewarmedOutputContext?.close(); } catch {}
+      this.prewarmedOutputContext = null;
+      throw e;
+    }
   }
 
   async start(): Promise<void> {
@@ -481,6 +532,17 @@ export class GeminiVoiceClient {
             // ✅ FIX: Pause mic when Gemini starts responding
             if (message.serverContent?.modelTurn) {
               this.shouldSendAudio = false; // Stop sending audio while Gemini speaks
+
+              // Safety timeout: reset shouldSendAudio if turnComplete/generationComplete
+              // is never received (e.g. stream error mid-response). Prevents permanent deadlock.
+              if (this.turnCompleteTimeout) clearTimeout(this.turnCompleteTimeout);
+              this.turnCompleteTimeout = window.setTimeout(() => {
+                if (!this.shouldSendAudio) {
+                  console.warn('[GeminiVoice] turnComplete timeout — forcing shouldSendAudio=true');
+                  this.shouldSendAudio = true;
+                  this.isPlayingAudio = false;
+                }
+              }, this.TURN_COMPLETE_TIMEOUT_MS);
             }
 
             // Handle function calls
@@ -542,21 +604,26 @@ export class GeminiVoiceClient {
                 }
               }
 
-              // ✅ Turn complete signals end of turn - resume mic only
-              if (message.serverContent.turnComplete) {
-                // Resume mic after Gemini finishes speaking
-                this.shouldSendAudio = true;
-                // Reset playback state for next turn
-                this.isPlayingAudio = false;
-              }
-            } else {
-              // Message without modelTurn - this is normal for many Gemini message types
             }
 
-            // ✅ Also handle generationComplete (Gemini sends this instead of turnComplete)
+            // Handle turnComplete at top level — Gemini may send it with or without modelTurn
+            if (message.serverContent?.turnComplete) {
+              this.shouldSendAudio = true;
+              this.isPlayingAudio = false;
+              if (this.turnCompleteTimeout) {
+                clearTimeout(this.turnCompleteTimeout);
+                this.turnCompleteTimeout = null;
+              }
+            }
+
+            // Also handle generationComplete (Gemini sends this instead of turnComplete)
             if (message.serverContent?.generationComplete) {
               this.shouldSendAudio = true;
               this.isPlayingAudio = false;
+              if (this.turnCompleteTimeout) {
+                clearTimeout(this.turnCompleteTimeout);
+                this.turnCompleteTimeout = null;
+              }
             }
           },
           onerror: (error: any) => {
@@ -616,6 +683,12 @@ export class GeminiVoiceClient {
       if (this.reconnectTimeout) {
         clearTimeout(this.reconnectTimeout);
         this.reconnectTimeout = null;
+      }
+
+      // Clear turn complete safety timeout
+      if (this.turnCompleteTimeout) {
+        clearTimeout(this.turnCompleteTimeout);
+        this.turnCompleteTimeout = null;
       }
 
       // Remove network change listeners
@@ -773,8 +846,12 @@ Always use functions to perform cart operations.`;
   private async startMic() {
     try {
       // Use unified mic pipeline at 16kHz (Gemini-native)
-      const useVAD = isFlagEnabled('voice_pipeline_v1');
-      console.log(`[GeminiVoice] Starting mic pipeline, VAD enabled: ${useVAD}`);
+      // Disable client-side VAD on mobile — ScriptProcessorNode often produces zero frames on iOS,
+      // preventing VAD from ever detecting speech. Gemini's server-side automaticActivityDetection
+      // (configured in realtimeInputConfig) handles voice detection reliably on all platforms.
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+      const useVAD = !isMobile && isFlagEnabled('voice_pipeline_v1');
+      console.log(`[GeminiVoice] Starting mic pipeline, VAD enabled: ${useVAD}, mobile: ${isMobile}`);
 
       this.mic = createMicPipeline({
         sampleRate: 16000,
@@ -786,7 +863,20 @@ Always use functions to perform cart operations.`;
           minSpeechMs: 120,
           minSilenceMs: 200,
         },
+        // Pass pre-warmed resources if available (created in user gesture context for iOS)
+        existingAudioContext: this.prewarmedAudioContext || undefined,
+        existingMediaStream: this.prewarmedMediaStream || undefined,
       });
+
+      // Use pre-warmed output context if available
+      if (this.prewarmedOutputContext && !this.outputAudioContext) {
+        this.outputAudioContext = this.prewarmedOutputContext;
+        this.nextPlaybackTime = this.outputAudioContext.currentTime;
+        this.prewarmedOutputContext = null;
+      }
+      // Clear pre-warmed refs (now owned by pipeline / this instance)
+      this.prewarmedAudioContext = null;
+      this.prewarmedMediaStream = null;
 
       // Wait for pipeline to be fully initialized (AudioContext running, mic connected)
       // This is critical for iOS Safari which requires AudioContext.resume() in user gesture
@@ -806,8 +896,29 @@ Always use functions to perform cart operations.`;
       let audioChunkCount = 0;
       let sendSuccessCount = 0;
       let sendErrorCount = 0;
+      let totalFrameCount = 0;
+      let zeroFrameCount = 0;
+      let blockedByFlags = 0;
 
       this.mic.onAudioFrame((input: Float32Array) => {
+        totalFrameCount++;
+
+        // Check for zero/silent frames (diagnostic for mobile)
+        let maxAmplitude = 0;
+        for (let i = 0; i < Math.min(input.length, 100); i++) {
+          maxAmplitude = Math.max(maxAmplitude, Math.abs(input[i]));
+        }
+        if (maxAmplitude < 0.0001) zeroFrameCount++;
+
+        // Log diagnostics every ~5 seconds (approx 20 frames at 4096/16000)
+        if (totalFrameCount % 20 === 0) {
+          const zeroPct = ((zeroFrameCount / totalFrameCount) * 100).toFixed(1);
+          console.log(`[GeminiVoice] Audio: ${totalFrameCount} frames, ${zeroPct}% silent, sent=${sendSuccessCount}, blocked=${blockedByFlags}, errors=${sendErrorCount}, shouldSend=${this.shouldSendAudio}, vadSpeaking=${this.vadSpeaking}`);
+          if (totalFrameCount > 10 && zeroFrameCount === totalFrameCount) {
+            console.error('[GeminiVoice] WARNING: All audio frames are silent — mic may not be working on this device');
+          }
+        }
+
         const pcm16 = this.floatTo16BitPCM(input);
         if (pcm16.length > 0 && this.session && this.shouldSendAudio && this.vadSpeaking) {
           const b64 = this.pcm16ToBase64(pcm16);
@@ -824,6 +935,8 @@ Always use functions to perform cart operations.`;
             sendErrorCount++;
             console.error('❌ Failed to send audio chunk:', e);
           }
+        } else if (pcm16.length > 0 && this.session) {
+          blockedByFlags++;
         }
       });
 
@@ -860,6 +973,16 @@ Always use functions to perform cart operations.`;
     this.sourceNode = null;
     this.mediaStream = null;
     this.audioContext = null;
+
+    // Clean up any unused pre-warmed resources
+    if (this.prewarmedMediaStream) {
+      this.prewarmedMediaStream.getTracks().forEach(t => t.stop());
+      this.prewarmedMediaStream = null;
+    }
+    try { this.prewarmedAudioContext?.close(); } catch {}
+    this.prewarmedAudioContext = null;
+    try { this.prewarmedOutputContext?.close(); } catch {}
+    this.prewarmedOutputContext = null;
   }
 
   /**
@@ -872,6 +995,13 @@ Always use functions to perform cart operations.`;
       this.outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: this.outputSampleRate
       });
+      // iOS requires resume — AudioContext may start suspended outside user gesture context.
+      // If prewarmMic() was used, this context is already pre-warmed and running.
+      if (this.outputAudioContext.state === 'suspended') {
+        this.outputAudioContext.resume().catch(e => {
+          console.warn('[GeminiVoice] Output AudioContext resume failed:', e);
+        });
+      }
       this.nextPlaybackTime = this.outputAudioContext.currentTime;
     }
 

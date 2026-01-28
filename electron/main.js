@@ -721,10 +721,25 @@ class CottageTandooriPOS {
             this.mainWindow.webContents.openDevTools();
         } else {
             // Production: Load local bundled frontend
-            const indexPath = path.join(__dirname, 'dist', 'renderer', 'index.html');
+            // Use loadFile() instead of loadURL() for cross-platform compatibility
+            // Windows requires proper file:// URL formatting that loadFile() handles automatically
+            const indexPath = path.join(__dirname, 'dist', 'index.html');
             log.info(`Loading POS from: ${indexPath} (production mode)`);
-            this.mainWindow.loadURL(`file://${indexPath}`);
+            this.mainWindow.loadFile(indexPath);
         }
+
+        // Add error handlers for debugging page load issues
+        this.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+            log.error(`Page load failed: ${errorDescription} (code: ${errorCode}) - URL: ${validatedURL}`);
+        });
+
+        this.mainWindow.webContents.on('crashed', (event, killed) => {
+            log.error(`Renderer process crashed (killed: ${killed})`);
+        });
+
+        this.mainWindow.webContents.on('render-process-gone', (event, details) => {
+            log.error(`Renderer process gone: ${details.reason}`);
+        });
 
         this.mainWindow.once('ready-to-show', () => {
             // Ensure splash shows for at least 2.5s so the animation is visible

@@ -509,7 +509,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     
     try {
       // Initialize Gemini voice client with event handlers
-      geminiClientRef.current = new GeminiVoiceClient({
+      const client = new GeminiVoiceClient({
         voiceName: 'Puck',
         
         // State change handler - update voice status in chat-store
@@ -550,9 +550,16 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
           // Function calls logged in geminiVoiceClient
         }
       });
+      geminiClientRef.current = client;
 
-      // Start the session
-      await geminiClientRef.current.start();
+      // CRITICAL: Pre-warm AudioContext and mic in user gesture context BEFORE any async work.
+      // On iOS Safari, AudioContext.resume() and getUserMedia() must be called within the
+      // synchronous call stack of a user gesture. The async start() flow (fetch token, SDK connect)
+      // would break this chain, causing mic access to fail silently on mobile.
+      await client.prewarmMic();
+
+      // Start the session (async network calls — mic already pre-warmed above)
+      await client.start();
       
       // Get real call ID (session ID from Gemini)
       const callId = geminiClientRef.current.currentState;
