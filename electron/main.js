@@ -2629,7 +2629,8 @@ Powered by QuickServe AI`
      * @returns {Promise<void>}
      */
     async sendRawToPrinter(printerName, filePath) {
-        const printScript = `
+        // Write PowerShell script to temp file (avoids here-string escaping issues)
+        const scriptContent = `
 $code = @'
 using System;
 using System.Runtime.InteropServices;
@@ -2673,7 +2674,16 @@ if ([RawPrinter]::OpenPrinter($printer, [ref]$hPrinter, [IntPtr]::Zero)) {
 }
 if (-not $success) { exit 1 }
 `;
-        await execAsync(`powershell -Command "${printScript.replace(/\r?\n/g, ' ')}"`);
+        // Write script to temp file to preserve here-string formatting
+        const scriptFile = path.join(os.tmpdir(), `print-${Date.now()}.ps1`);
+        await fs.writeFile(scriptFile, scriptContent, 'utf8');
+
+        try {
+            await execAsync(`powershell -ExecutionPolicy Bypass -File "${scriptFile}"`);
+        } finally {
+            // Cleanup script file
+            await fs.unlink(scriptFile).catch(() => {});
+        }
     }
 
     /**
