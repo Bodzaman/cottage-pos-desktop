@@ -2163,11 +2163,12 @@ export const apiClient = {
     try {
       const { order_id } = params;
 
+      // Use 'orders' table (matches backend dine_in_commands)
       const { error } = await supabase
-        .from('dine_in_orders')
+        .from('orders')
         .update({
           status: 'SENT_TO_KITCHEN',
-          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq('id', order_id);
 
@@ -2189,11 +2190,12 @@ export const apiClient = {
     try {
       const { order_id } = params;
 
+      // Use 'orders' table (matches backend dine_in_commands)
       const { error } = await supabase
-        .from('dine_in_orders')
+        .from('orders')
         .update({
-          status: 'CHECK_REQUESTED',
-          check_requested_at: new Date().toISOString(),
+          status: 'PENDING_PAYMENT',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', order_id);
 

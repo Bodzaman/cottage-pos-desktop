@@ -1129,14 +1129,43 @@ Powered by QuickServe AI`
     async initializePrinter() {
         try {
             const printers = await this.discoverPrinters();
-            
-            const epsonPrinter = printers.find(p => 
-                p.name.toLowerCase().includes('epson') && 
+
+            // Virtual printer patterns to exclude from fallback selection
+            const virtualPrinterPatterns = [
+                'microsoft print to pdf',
+                'microsoft xps',
+                'onenote',
+                'fax',
+                'send to onenote',
+                'snagit',
+                'adobe pdf',
+                'foxit',
+                'nitro pdf',
+                'primopdf',
+                'cutepdf'
+            ];
+
+            // Find Epson thermal printer (preferred)
+            const epsonPrinter = printers.find(p =>
+                p.name.toLowerCase().includes('epson') &&
                 (p.name.toLowerCase().includes('tm-t20') || p.name.toLowerCase().includes('tm-t88'))
             );
-            
-            this.defaultPrinter = epsonPrinter ? epsonPrinter.name : printers[0]?.name;
+
+            // Fallback to first non-virtual printer
+            const firstRealPrinter = printers.find(p =>
+                !virtualPrinterPatterns.some(pattern => p.name.toLowerCase().includes(pattern))
+            );
+
+            this.defaultPrinter = epsonPrinter?.name || firstRealPrinter?.name || printers[0]?.name;
             log.info('Default printer set to:', this.defaultPrinter);
+
+            if (epsonPrinter) {
+                log.info('✅ Found Epson thermal printer');
+            } else if (firstRealPrinter) {
+                log.info('⚠️ Using non-Epson printer as fallback:', firstRealPrinter.name);
+            } else if (printers.length > 0) {
+                log.warn('⚠️ Only virtual printers found, using:', printers[0]?.name);
+            }
         } catch (error) {
             log.error('Printer initialization error:', error);
         }
@@ -2591,6 +2620,63 @@ Powered by QuickServe AI`
     }
 
     /**
+     * Send raw data to printer using Win32 Spooler API
+     * Works reliably on all Windows versions without WPF dependencies
+     * Uses P/Invoke to call winspool.drv directly
+     *
+     * @param {string} printerName - The Windows printer name
+     * @param {string} filePath - Path to the file containing raw ESC/POS data
+     * @returns {Promise<void>}
+     */
+    async sendRawToPrinter(printerName, filePath) {
+        const printScript = `
+$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class RawPrinter {
+    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]
+    public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]
+    public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFO pDocInfo);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, byte[] pBytes, int dwCount, out int dwWritten);
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
+    public struct DOCINFO { public string pDocName; public string pOutputFile; public string pDatatype; }
+}
+'@
+Add-Type -TypeDefinition $code -PassThru | Out-Null
+$printer = '${printerName.replace(/'/g, "''")}'
+$file = '${filePath.replace(/\\/g, '\\\\').replace(/'/g, "''")}'
+$hPrinter = [IntPtr]::Zero
+$success = $false
+if ([RawPrinter]::OpenPrinter($printer, [ref]$hPrinter, [IntPtr]::Zero)) {
+    $di = New-Object RawPrinter+DOCINFO
+    $di.pDocName = 'ESC/POS Print Job'
+    $di.pDatatype = 'RAW'
+    if ([RawPrinter]::StartDocPrinter($hPrinter, 1, [ref]$di)) {
+        [RawPrinter]::StartPagePrinter($hPrinter) | Out-Null
+        $bytes = [IO.File]::ReadAllBytes($file)
+        $written = 0
+        $success = [RawPrinter]::WritePrinter($hPrinter, $bytes, $bytes.Length, [ref]$written)
+        [RawPrinter]::EndPagePrinter($hPrinter) | Out-Null
+        [RawPrinter]::EndDocPrinter($hPrinter) | Out-Null
+    }
+    [RawPrinter]::ClosePrinter($hPrinter) | Out-Null
+}
+if (-not $success) { exit 1 }
+`;
+        await execAsync(`powershell -Command "${printScript.replace(/\r?\n/g, ' ')}"`);
+    }
+
+    /**
      * Print receipt using ESC/POS commands (raw thermal printing)
      * This is the hybrid approach - ESC/POS for text, reliable and fast
      *
@@ -2634,21 +2720,8 @@ Powered by QuickServe AI`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Use .NET System.Printing to send raw data via print spooler
-                // This is more reliable than WMI port detection which fails for modern USB printers
-                const printScript = `
-                    Add-Type -AssemblyName System.Printing
-                    $queue = New-Object System.Printing.PrintQueue(
-                        (New-Object System.Printing.LocalPrintServer),
-                        '${printer.replace(/'/g, "''")}'
-                    )
-                    $job = $queue.AddJob()
-                    $stream = $job.JobStream
-                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
-                    $stream.Write($bytes, 0, $bytes.Length)
-                    $stream.Close()
-                `;
-                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
+                // Windows: Use Win32 Spooler API to send raw ESC/POS data
+                await this.sendRawToPrinter(printer, tempFile);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
@@ -2697,20 +2770,9 @@ Powered by QuickServe AI`
                 log.info(`Sending cut command to printer: ${printerName}`);
                 await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Use .NET System.Printing to send raw data via print spooler
-                const printScript = `
-                    Add-Type -AssemblyName System.Printing
-                    $queue = New-Object System.Printing.PrintQueue(
-                        (New-Object System.Printing.LocalPrintServer),
-                        '${printerName.replace(/'/g, "''")}'
-                    )
-                    $job = $queue.AddJob()
-                    $stream = $job.JobStream
-                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
-                    $stream.Write($bytes, 0, $bytes.Length)
-                    $stream.Close()
-                `;
-                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
+                // Windows: Use Win32 Spooler API to send raw ESC/POS data
+                log.info(`Sending cut command to printer: ${printerName}`);
+                await this.sendRawToPrinter(printerName, tempFile);
             }
 
             log.info('Paper cut command sent successfully');
@@ -2772,21 +2834,8 @@ Powered by QuickServe AI`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Use .NET System.Printing to send raw data via print spooler
-                // This is more reliable than WMI port detection which fails for modern USB printers
-                const printScript = `
-                    Add-Type -AssemblyName System.Printing
-                    $queue = New-Object System.Printing.PrintQueue(
-                        (New-Object System.Printing.LocalPrintServer),
-                        '${printer.replace(/'/g, "''")}'
-                    )
-                    $job = $queue.AddJob()
-                    $stream = $job.JobStream
-                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
-                    $stream.Write($bytes, 0, $bytes.Length)
-                    $stream.Close()
-                `;
-                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
+                // Windows: Use Win32 Spooler API to send raw ESC/POS data
+                await this.sendRawToPrinter(printer, tempFile);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
