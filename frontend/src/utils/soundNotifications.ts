@@ -10,8 +10,7 @@ interface NotificationSettings {
 }
 
 // MP3 sound file path for online order notifications
-// Use relative path for Electron compatibility (file:// protocol)
-const ONLINE_ORDER_MP3_PATH = './audio-sounds/online_order_notification_sound_pos.mp3';
+const ONLINE_ORDER_MP3_PATH = '/audio-sounds/online_order_notification_sound_pos.mp3';
 
 // Preloaded MP3 audio element (singleton)
 let preloadedMp3Audio: HTMLAudioElement | null = null;

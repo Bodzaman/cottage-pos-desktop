@@ -1036,6 +1036,17 @@ Powered by QuickServe AI`
                 return { success: false, error: error.message };
             }
         });
+
+        // Z-Report / End of Day thermal printing
+        ipcMain.handle('print-z-report', async (event, data) => {
+            try {
+                log.info('Received Z-Report print request');
+                return await this.printZReport(data);
+            } catch (error) {
+                log.error('Z-Report print error:', error);
+                return { success: false, error: error.message };
+            }
+        });
     }
 
     setupStripePayments() {
@@ -2866,6 +2877,183 @@ if (-not $success) { exit 1 }
             log.error('[Raster] Print error:', error);
             throw error;
         }
+    }
+
+    /**
+     * Print Z-Report / End of Day report on thermal printer
+     * Generates ESC/POS formatted Z-Report with sales summary
+     *
+     * @param {Object} data - Z-Report data
+     * @param {string} data.business_date - Report date
+     * @param {number} data.total_orders - Total number of orders
+     * @param {number} data.gross_sales - Gross sales amount
+     * @param {number} data.net_sales - Net sales amount
+     * @param {number} data.total_cash - Cash payments
+     * @param {number} data.total_card - Card payments
+     * @param {number} data.total_refunds - Refund amount
+     * @param {number} data.total_discounts - Discount amount
+     * @param {Object} data.breakdown_by_type - Sales by order type
+     * @param {string} [data.printerName] - Optional specific printer name
+     * @returns {Promise<Object>} - Print result
+     */
+    async printZReport(data) {
+        const { printerName } = data;
+
+        // Use customer printer for Z-Report (it's a management report)
+        const printer = printerName || this.getPrinterForRole('customer') || this.defaultPrinter;
+        if (!printer) {
+            throw new Error('No printer available. Please check printer connection.');
+        }
+
+        log.info(`[Z-Report] Starting Z-Report print to ${printer}`);
+
+        try {
+            // Generate ESC/POS buffer for Z-Report
+            const buffer = this.formatZReport(data);
+
+            log.info(`[Z-Report] ESC/POS buffer generated: ${buffer.length} bytes`);
+
+            // Write buffer to temp file
+            const tempFile = path.join(os.tmpdir(), `zreport-${Date.now()}.bin`);
+            await fs.writeFile(tempFile, buffer);
+
+            // Send raw data to printer
+            if (process.platform === 'darwin') {
+                // macOS: Use lp with raw option
+                await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
+            } else if (process.platform === 'win32') {
+                // Windows: Use Win32 Spooler API to send raw ESC/POS data
+                await this.sendRawToPrinter(printer, tempFile);
+            } else {
+                throw new Error(`Unsupported platform: ${process.platform}`);
+            }
+
+            // Cleanup temp file
+            await fs.unlink(tempFile).catch(() => {});
+
+            log.info('[Z-Report] Z-Report printed successfully');
+
+            return {
+                success: true,
+                printer: printer,
+                timestamp: new Date().toISOString(),
+                bytesWritten: buffer.length,
+                type: 'z-report'
+            };
+        } catch (error) {
+            log.error('[Z-Report] Print error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Format Z-Report for ESC/POS thermal printing
+     * Creates a formatted end-of-day report with sales summary
+     * Uses ESCPOSBuilder for consistent formatting with other print methods
+     *
+     * @param {Object} data - Z-Report data
+     * @returns {Buffer} - ESC/POS command buffer
+     */
+    formatZReport(data) {
+        const builder = new ESCPOSBuilder(80);
+
+        // Helper function to format currency
+        const formatCurrency = (amount) => `£${(amount || 0).toFixed(2)}`;
+
+        builder
+            .init()
+            .align('center')
+            .textSize('double')
+            .bold(true)
+            .text('Z-REPORT')
+            .textSize('normal')
+            .bold(false)
+            .text('END OF DAY REPORT')
+            .text(`Date: ${data.business_date || new Date().toLocaleDateString()}`)
+            .text(`Time: ${new Date().toLocaleTimeString()}`)
+            .feed(1);
+
+        builder
+            .align('left')
+            .separator('=')
+            .feed(1)
+            .bold(true)
+            .text('ORDER SUMMARY')
+            .bold(false)
+            .separator()
+            .twoColumn('Total Orders:', String(data.total_orders || 0));
+
+        // Breakdown by type
+        if (data.breakdown_by_type) {
+            const breakdown = data.breakdown_by_type;
+            if (breakdown.dine_in !== undefined) {
+                builder.twoColumn('  Dine-In:', String(breakdown.dine_in || 0));
+            }
+            if (breakdown.takeaway !== undefined) {
+                builder.twoColumn('  Takeaway:', String(breakdown.takeaway || 0));
+            }
+            if (breakdown.collection !== undefined) {
+                builder.twoColumn('  Collection:', String(breakdown.collection || 0));
+            }
+            if (breakdown.delivery !== undefined) {
+                builder.twoColumn('  Delivery:', String(breakdown.delivery || 0));
+            }
+        }
+
+        // Sales Summary
+        builder
+            .feed(1)
+            .bold(true)
+            .text('SALES SUMMARY')
+            .bold(false)
+            .separator()
+            .twoColumn('Gross Sales:', formatCurrency(data.gross_sales))
+            .twoColumn('Discounts:', `-${formatCurrency(data.total_discounts)}`)
+            .twoColumn('Refunds:', `-${formatCurrency(data.total_refunds)}`)
+            .separator()
+            .textSize('double-height')
+            .bold(true)
+            .twoColumn('NET SALES:', formatCurrency(data.net_sales))
+            .textSize('normal')
+            .bold(false);
+
+        // Payment Breakdown
+        builder
+            .feed(1)
+            .bold(true)
+            .text('PAYMENT BREAKDOWN')
+            .bold(false)
+            .separator()
+            .twoColumn('Cash:', formatCurrency(data.total_cash))
+            .twoColumn('Card:', formatCurrency(data.total_card));
+
+        if (data.total_online) {
+            builder.twoColumn('Online:', formatCurrency(data.total_online));
+        }
+
+        // Tax Summary (if available)
+        if (data.total_tax !== undefined) {
+            builder
+                .feed(1)
+                .bold(true)
+                .text('TAX SUMMARY')
+                .bold(false)
+                .separator()
+                .twoColumn('VAT Collected:', formatCurrency(data.total_tax));
+        }
+
+        // Footer
+        builder
+            .feed(1)
+            .separator('=')
+            .align('center')
+            .text('Cottage Tandoori')
+            .bold(true)
+            .text('*** END OF Z-REPORT ***')
+            .bold(false)
+            .feedAndCut();
+
+        return builder.getBuffer();
     }
 }
 

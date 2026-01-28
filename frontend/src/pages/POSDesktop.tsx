@@ -7,6 +7,7 @@ import { shallow } from 'zustand/shallow';
 
 // Databutton imports
 import { supabase } from 'utils/supabaseClient';
+import brain from 'brain';
 
 // Store imports
 import { useSimpleAuth } from '../utils/simple-auth-context';
@@ -566,7 +567,6 @@ export default function POSDesktop() {
       localStorage.setItem('pos_clean_exit', 'true');
       setPendingSession(null);
       setModal('showSessionRestoreDialog', false);
-      toast.success('Starting fresh order');
     } catch (error) {
       console.error('[POSDesktop] Failed to discard session:', error);
       toast.error('Failed to clear saved session');
@@ -787,7 +787,6 @@ export default function POSDesktop() {
     if (orderItems.length === 0) return;
     const subtotal = calculateOrderTotal();
     await supabase.from('orders').insert({ order_type: orderType, table_number: selectedTableNumber, guest_count: guestCount || 1, items: orderItems as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
-    toast.success('🍽️ Sent to kitchen!');
   }, [calculateOrderTotal]);
 
   const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
@@ -838,7 +837,6 @@ export default function POSDesktop() {
           });
           if (customerResult.success) {
             console.log('✅ Customer receipt printed via WYSIWYG on', customerResult.printer);
-            toast.success('Order placed & receipts printed');
           } else {
             console.warn('⚠️ Customer receipt print failed:', customerResult.error);
             toast.warning('Order placed but receipt print failed');
@@ -854,8 +852,6 @@ export default function POSDesktop() {
       const paymentStatus = result.paymentStatus;
       await printing.handlePrintKitchen(paymentStatus);
       await printing.handlePrintReceipt(result.orderTotal ?? 0, paymentStatus);
-      const successMsg = paymentStatus === 'PAID' ? 'Payment complete - receipts printed' : 'Order placed - receipts printed';
-      toast.success(successMsg);
     }
 
     clearOrder();
@@ -922,7 +918,6 @@ export default function POSDesktop() {
     try {
       const success = await acceptOrder(orderId);
       if (success) {
-        toast.success('Order accepted and sent to kitchen');
         // Create print job for kitchen ticket
         const order = onlineOrders[orderId];
         if (order) {
@@ -960,9 +955,7 @@ export default function POSDesktop() {
     setIsOnlineActionLoading(true);
     try {
       const success = await rejectOrder(orderToReject, reason);
-      if (success) {
-        toast.success('Order rejected and customer notified');
-      } else {
+      if (!success) {
         toast.error('Failed to reject order');
       }
     } finally {
@@ -976,9 +969,7 @@ export default function POSDesktop() {
     setIsOnlineActionLoading(true);
     try {
       const success = await markReady(orderId);
-      if (success) {
-        toast.success('Order marked as ready');
-      } else {
+      if (!success) {
         toast.error('Failed to update order');
       }
     } finally {
@@ -990,12 +981,7 @@ export default function POSDesktop() {
     setIsOnlineActionLoading(true);
     try {
       const success = await markComplete(orderId);
-      if (success) {
-        const order = onlineOrders[orderId];
-        toast.success(
-          order?.orderType === 'DELIVERY' ? 'Order dispatched' : 'Order collected'
-        );
-      } else {
+      if (!success) {
         toast.error('Failed to complete order');
       }
     } finally {
@@ -1024,7 +1010,6 @@ export default function POSDesktop() {
         p_printer_id: null,
         p_priority: 5,
       });
-      toast.success('Print job created');
     } catch (error) {
       console.error('Failed to print:', error);
       toast.error('Failed to print receipt');
@@ -1159,9 +1144,7 @@ export default function POSDesktop() {
             e.preventDefault();
             // Undo: remove last item from cart
             if (orderItems.length > 0) {
-              const lastItem = orderItems[orderItems.length - 1];
               setOrderItems(orderItems.slice(0, -1));
-              toast.info(`Removed ${lastItem.name || 'last item'}`);
             }
             return;
         }
@@ -1171,7 +1154,6 @@ export default function POSDesktop() {
         case 'F1':
           e.preventDefault();
           handleClearOrder();
-          toast.info('New order started');
           break;
         case 'F2':
           e.preventDefault();
@@ -1194,7 +1176,6 @@ export default function POSDesktop() {
         case 'F5':
           e.preventDefault();
           loadPOSBundle();
-          toast.info('Menu refreshed');
           break;
 
         // F6-F12: Section quick-select (Starters, Main, Sides, Accompaniments, Desserts, Drinks, Set Meals)
@@ -1207,7 +1188,6 @@ export default function POSDesktop() {
             setSelectedSectionId(section.uuid);
             setSelectedCategoryId(null);
             useRealtimeMenuStore.getState().setSelectedMenuCategory(section.uuid);
-            toast.info(`${section.icon} ${section.displayName}`);
           }
           break;
         }
@@ -1272,10 +1252,8 @@ export default function POSDesktop() {
               const status = await api.isCustomerDisplayOpen?.();
               if (status?.isOpen) {
                 await api.closeCustomerDisplay?.();
-                toast.info('Customer display closed');
               } else {
                 await api.openCustomerDisplay?.();
-                toast.success('Customer display opened');
                 setTimeout(() => {
                   api.sendToCustomerDisplay?.({
                     items: orderItems.map(item => ({
@@ -1329,7 +1307,16 @@ export default function POSDesktop() {
           onPersistStaging={persistStagingCart}
           onPrintBill={printing.handlePrintBill}
           onCompleteOrder={async () => {
-            // Mark order as paid and close workspace
+            // Mark order as COMPLETED and reset table to AVAILABLE
+            if (dineInOrder?.id) {
+              try {
+                await brain.apiClient.complete_order({ order_id: dineInOrder.id });
+                toast.success('Table session completed');
+              } catch (error) {
+                console.error('Failed to complete order:', error);
+                toast.error('Failed to complete table session');
+              }
+            }
             setModal('showDineInModal', false);
             clearStagingCart();
           }}
@@ -1345,11 +1332,11 @@ export default function POSDesktop() {
           isOpen={showCommandPalette}
           onClose={() => setModal('showCommandPalette', false)}
           actions={{
-            onNewOrder: () => { handleClearOrder(); toast.info('New order started'); },
+            onNewOrder: () => { handleClearOrder(); },
             onCheckout: () => { if (orderItems.length > 0) setModal('showPaymentFlow', true); else toast.warning('Add items before checkout'); },
             onPrintReceipt: () => { if (orderItems.length > 0) printing.handlePrintReceipt(orderTotal); },
             onLockScreen: handleLockScreen,
-            onRefreshMenu: () => { loadPOSBundle(); toast.info('Menu refreshed'); },
+            onRefreshMenu: () => { loadPOSBundle(); },
             onOpenReprint: () => setModal('showReprintDialog', true),
             onOpenKDS: () => { window.open(`${window.location.origin}/kds-v2?fullscreen=true`, 'kitchen-display', 'width=1920,height=1080'); },
             onOpenAllOrders: () => { document.dispatchEvent(new CustomEvent('open-all-orders')); },
@@ -1360,8 +1347,8 @@ export default function POSDesktop() {
               if (!api) return;
               try {
                 const status = await api.isCustomerDisplayOpen?.();
-                if (status?.isOpen) { await api.closeCustomerDisplay?.(); toast.info('Customer display closed'); }
-                else { await api.openCustomerDisplay?.(); toast.success('Customer display opened'); }
+                if (status?.isOpen) { await api.closeCustomerDisplay?.(); }
+                else { await api.openCustomerDisplay?.(); }
               } catch { toast.error('Customer display error'); }
             },
             onOpenEndOfDay: () => { document.dispatchEvent(new CustomEvent('open-end-of-day')); },

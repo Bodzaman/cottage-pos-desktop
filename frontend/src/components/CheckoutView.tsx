@@ -478,7 +478,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
         <div 
           className="absolute inset-0 opacity-[0.02] bg-center bg-no-repeat pointer-events-none"
           style={{
-            backgroundImage: `url('./static/cottage-logo-watermark.png')`,
+            backgroundImage: `url('/static/cottage-logo-watermark.png')`,
             backgroundSize: '400px 400px'
           }}
         />
@@ -520,7 +520,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
       <div 
         className="absolute inset-0 opacity-[0.02] bg-center bg-no-repeat pointer-events-none"
         style={{
-          backgroundImage: `url('./static/cottage-logo-watermark.png')`,
+          backgroundImage: `url('/static/cottage-logo-watermark.png')`,
           backgroundSize: '400px 400px'
         }}
       />

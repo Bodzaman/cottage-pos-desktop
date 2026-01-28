@@ -70,8 +70,12 @@ export interface GeminiVoiceClientOptions {
   onError?: (err: string) => void;
   onCartUpdate?: (action: 'add' | 'remove', item: any) => void;
   onFunctionCall?: (name: string, args: any) => void;
-  onSessionWarning?: (message: string) => void;
-  
+  onSessionWarning?: (message: string, timeRemainingMs: number, canExtend: boolean) => void;
+  onMicIssue?: (message: string) => void;
+  onQualityChange?: (quality: 'excellent' | 'good' | 'fair' | 'poor') => void;
+  /** Issue 13: Real-time audio level (0-1) for waveform visualization */
+  onAudioLevel?: (level: number) => void;
+
   // Cart operation callbacks (user-aware)
   cartOperations?: {
     addItem?: (itemName: string, quantity: number, notes?: string) => Promise<{success: boolean; message: string}>;
@@ -115,16 +119,39 @@ export class GeminiVoiceClient {
   // Session timeout to prevent runaway costs
   private sessionTimer: number | null = null;
   private sessionWarningTimer: number | null = null;
+  private sessionWarning5minTimer: number | null = null;
   private sessionTimedOut: boolean = false;
   private readonly SESSION_MAX_MS = 10 * 60 * 1000; // 10 minutes
-  private readonly SESSION_WARNING_MS = 8 * 60 * 1000; // 8 minutes
+  private readonly SESSION_WARNING_5MIN_MS = 5 * 60 * 1000; // 5-minute mark
+  private readonly SESSION_WARNING_MS = 8 * 60 * 1000; // 8 minutes (2 min remaining)
 
   // Network change detection for mobile WiFi/cellular transitions
   private networkChangeHandler: (() => void) | null = null;
 
   // Safety timeout to reset shouldSendAudio if turnComplete is never received
   private turnCompleteTimeout: number | null = null;
-  private readonly TURN_COMPLETE_TIMEOUT_MS = 15000; // 15 seconds
+  private readonly TURN_COMPLETE_TIMEOUT_MS = 5000; // 5 seconds (reduced from 15s for better UX)
+
+  // Greeting-specific timeout (shorter than general turn timeout)
+  private greetingTimeout: number | null = null;
+  private readonly GREETING_TIMEOUT_MS = 4000; // 4 seconds for greeting to complete
+  private isGreetingPhase: boolean = false;
+
+  // Audio playback completion fallback
+  private lastChunkEndTime: number = 0;
+  private playbackMonitorInterval: number | null = null;
+
+  // WebSocket connection ready promise (ensures onopen fires before proceeding)
+  private connectionReadyResolve: (() => void) | null = null;
+  private connectionReadyPromise: Promise<void> | null = null;
+
+  // Mic issue detection: surface to UI when all frames are silent
+  private hasSurfacedMicIssue: boolean = false;
+
+  // Quality tracking: measure response latency
+  private lastAudioSendTime: number = 0;
+  private responseLatencies: number[] = [];
+  private lastReportedQuality: string = '';
 
   // Streaming audio playback state (ring buffer pattern)
   private outputSampleRate = 24000; // Gemini native audio output rate
@@ -139,6 +166,17 @@ export class GeminiVoiceClient {
   private setState(newState: GeminiVoiceState): void {
     this.state = newState;
     this.options.onStateChange?.(newState);
+  }
+
+  private reportQuality(): void {
+    if (this.responseLatencies.length < 2) return;
+    const recent = this.responseLatencies.slice(-5);
+    const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const quality = avg < 500 ? 'excellent' : avg < 1000 ? 'good' : avg < 2000 ? 'fair' : 'poor';
+    if (quality !== this.lastReportedQuality) {
+      this.lastReportedQuality = quality;
+      this.options.onQualityChange?.(quality as any);
+    }
   }
 
   get currentState() {
@@ -225,6 +263,15 @@ export class GeminiVoiceClient {
       
       // Optional: Store expiry for future token refresh logic
       const expiresAt = new Date(data.expires_at);
+
+      // 2.5) Assign pre-warmed output context early to prevent streamAudioChunk from creating new one
+      // This ensures iOS devices use the context created in user gesture context
+      if (this.prewarmedOutputContext && !this.outputAudioContext) {
+        this.outputAudioContext = this.prewarmedOutputContext;
+        this.nextPlaybackTime = this.outputAudioContext.currentTime;
+        this.prewarmedOutputContext = null;
+        console.log('[GeminiVoice] Pre-warmed output context assigned early for iOS');
+      }
 
       // 3) Initialize Google GenAI SDK with v1alpha for proactive audio support
       const ai = new GoogleGenAI({ 
@@ -480,41 +527,74 @@ export class GeminiVoiceClient {
       // 5) Connect to Live API with CORRECT config structure (official SDK pattern)
       this.setState("connecting");
       const model = "models/gemini-2.5-flash-native-audio-preview-09-2025";
-      
+
+      // Create promise to wait for WebSocket onopen callback
+      // This fixes the race condition where we send data before connection is ready
+      this.connectionReadyPromise = new Promise<void>((resolve, reject) => {
+        this.connectionReadyResolve = resolve;
+        // Timeout if connection never opens (10 seconds)
+        setTimeout(() => {
+          if (this.state === 'connecting') {
+            console.error('[GeminiVoice] WebSocket connection timeout (10s)');
+            reject(new Error('WebSocket connection timeout (10s)'));
+          }
+        }, 10000);
+      });
+
+      // Log connection details for diagnosis
+      console.log('[GeminiVoice] Connecting to Gemini Live API...');
+      console.log('[GeminiVoice] Model:', model);
+      console.log('[GeminiVoice] API Key (first 10 chars):', this.apiKey?.substring(0, 10) + '...');
+
+      // Build config object for logging and use
+      const systemPromptText = this.options.systemPrompt || this.assembledSystemPrompt || this.buildFallbackPrompt();
+      const voiceName = this.options.voiceName || "Puck";
+
+      const config = {
+        responseModalities: ["AUDIO"] as any,
+        contextWindowCompression: {
+          slidingWindow: {}
+        },
+        proactivity: {
+          proactiveAudio: false
+        },
+        realtimeInputConfig: {
+          automaticActivityDetection: {
+            disabled: false,
+            prefixPaddingMs: 20,
+            silenceDurationMs: 100,
+          },
+        },
+        systemInstruction: {
+          parts: [{ text: systemPromptText }]
+        },
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName }
+          }
+        },
+        tools: tools as any
+      };
+
+      // Log config for diagnosis (truncate system prompt for readability)
+      console.log('[GeminiVoice] Config:', {
+        ...config,
+        systemInstruction: { parts: [{ text: systemPromptText.substring(0, 100) + '...' }] },
+        tools: `${tools[0].functionDeclarations?.length || 0} functions`
+      });
+
       this.session = await ai.live.connect({
         model: model,
-        config: {
-          responseModalities: ["AUDIO"] as any, // Type assertion for Gemini SDK
-          contextWindowCompression: {
-            slidingWindow: {} // ✅ Enable unlimited session length for continuous conversation
-          },
-          proactivity: {
-            proactiveAudio: false // Greeting sent via sendClientContent; no unprompted speech after
-          },
-          realtimeInputConfig: {
-            automaticActivityDetection: {
-              disabled: false,
-              prefixPaddingMs: 100,
-              silenceDurationMs: 200,
-            },
-          },
-          systemInstruction: {
-            parts: [{
-              text: this.options.systemPrompt || this.assembledSystemPrompt || this.buildFallbackPrompt()
-            }]
-          },
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: this.options.voiceName || "Puck"
-              }
-            }
-          },
-          tools: tools as any // Type assertion for Gemini SDK function declarations
-        },
+        config,
         callbacks: {
           onopen: () => {
+            console.log('[GeminiVoice] WebSocket opened successfully');
             this.setState("connected");
+            // Resolve the connection ready promise so mic can start
+            if (this.connectionReadyResolve) {
+              this.connectionReadyResolve();
+              this.connectionReadyResolve = null;
+            }
           },
           onmessage: (message: any) => {
             // Handle setupComplete
@@ -531,7 +611,18 @@ export class GeminiVoiceClient {
 
             // ✅ FIX: Pause mic when Gemini starts responding
             if (message.serverContent?.modelTurn) {
+              if (this.shouldSendAudio) {
+                console.log('[GeminiVoice] shouldSendAudio: true -> false (modelTurn received)');
+              }
               this.shouldSendAudio = false; // Stop sending audio while Gemini speaks
+
+              // Track response latency for quality indicator
+              if (this.lastAudioSendTime > 0) {
+                const latency = performance.now() - this.lastAudioSendTime;
+                this.responseLatencies.push(latency);
+                if (this.responseLatencies.length > 10) this.responseLatencies.shift();
+                this.reportQuality();
+              }
 
               // Safety timeout: reset shouldSendAudio if turnComplete/generationComplete
               // is never received (e.g. stream error mid-response). Prevents permanent deadlock.
@@ -608,36 +699,91 @@ export class GeminiVoiceClient {
 
             // Handle turnComplete at top level — Gemini may send it with or without modelTurn
             if (message.serverContent?.turnComplete) {
+              if (!this.shouldSendAudio) {
+                console.log('[GeminiVoice] shouldSendAudio: false -> true (turnComplete received)');
+              }
               this.shouldSendAudio = true;
               this.isPlayingAudio = false;
+              this.isGreetingPhase = false;
+              if (this.greetingTimeout) {
+                clearTimeout(this.greetingTimeout);
+                this.greetingTimeout = null;
+              }
               if (this.turnCompleteTimeout) {
                 clearTimeout(this.turnCompleteTimeout);
                 this.turnCompleteTimeout = null;
+              }
+              if (this.playbackMonitorInterval) {
+                clearInterval(this.playbackMonitorInterval);
+                this.playbackMonitorInterval = null;
               }
             }
 
             // Also handle generationComplete (Gemini sends this instead of turnComplete)
             if (message.serverContent?.generationComplete) {
+              if (!this.shouldSendAudio) {
+                console.log('[GeminiVoice] shouldSendAudio: false -> true (generationComplete received)');
+              }
               this.shouldSendAudio = true;
               this.isPlayingAudio = false;
+              this.isGreetingPhase = false;
+              if (this.greetingTimeout) {
+                clearTimeout(this.greetingTimeout);
+                this.greetingTimeout = null;
+              }
               if (this.turnCompleteTimeout) {
                 clearTimeout(this.turnCompleteTimeout);
                 this.turnCompleteTimeout = null;
+              }
+              if (this.playbackMonitorInterval) {
+                clearInterval(this.playbackMonitorInterval);
+                this.playbackMonitorInterval = null;
               }
             }
           },
           onerror: (error: any) => {
             console.error('❌ Gemini session error:', error);
+            // Log full error details for diagnosis
+            try {
+              console.error('❌ Error type:', typeof error);
+              console.error('❌ Error constructor:', error?.constructor?.name);
+              console.error('❌ Error message:', error?.message);
+              console.error('❌ Error code:', error?.code);
+              console.error('❌ Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
+            } catch (e) {
+              console.error('❌ Could not stringify error:', e);
+            }
             this.options.onError?.(String(error?.message || error));
             this.setState("error");
           },
-          onclose: () => {
+          onclose: (event?: any) => {
+            console.log('[GeminiVoice] WebSocket closed');
+            // Log close event details for diagnosis
+            console.log('[GeminiVoice] Close event type:', typeof event);
+            console.log('[GeminiVoice] Close event:', event);
+            if (event) {
+              console.log('[GeminiVoice] Close code:', event.code);
+              console.log('[GeminiVoice] Close reason:', event.reason);
+              console.log('[GeminiVoice] Close wasClean:', event.wasClean);
+            }
+            console.log('[GeminiVoice] Current state when closed:', this.state);
+            // If connection closed during connecting phase, clear the resolve
+            // The timeout will handle the rejection
+            if (this.state === 'connecting' && this.connectionReadyResolve) {
+              this.connectionReadyResolve = null;
+            }
             if (this.state !== "stopping" && this.state !== "closed") {
               this.setState("error");
             }
           }
         }
       });
+
+      // Wait for WebSocket to actually be open before proceeding
+      // This fixes the race condition where greeting/audio is sent before connection is ready
+      console.log('[GeminiVoice] Waiting for WebSocket to open...');
+      await this.connectionReadyPromise;
+      console.log('[GeminiVoice] WebSocket ready, starting mic...');
 
       // 6) Start microphone capture via unified pipeline (preserves previous behavior)
       await this.startMic();
@@ -662,6 +808,19 @@ export class GeminiVoiceClient {
             }],
             turn_complete: true
           });
+          console.log('[GeminiVoice] Greeting trigger sent, starting greeting timeout');
+
+          // Start greeting-specific timeout (shorter than general turn timeout)
+          this.isGreetingPhase = true;
+          if (this.greetingTimeout) clearTimeout(this.greetingTimeout);
+          this.greetingTimeout = window.setTimeout(() => {
+            if (this.isGreetingPhase && !this.shouldSendAudio) {
+              console.warn('[GeminiVoice] Greeting timeout (4s) - forcing shouldSendAudio=true');
+              this.shouldSendAudio = true;
+              this.isGreetingPhase = false;
+              this.isPlayingAudio = false;
+            }
+          }, this.GREETING_TIMEOUT_MS);
         } catch (error) {
           console.error('❌ Failed to send greeting trigger:', error);
         }
@@ -691,11 +850,31 @@ export class GeminiVoiceClient {
         this.turnCompleteTimeout = null;
       }
 
+      // Clear greeting timeout
+      if (this.greetingTimeout) {
+        clearTimeout(this.greetingTimeout);
+        this.greetingTimeout = null;
+      }
+
+      // Clear playback monitor interval
+      if (this.playbackMonitorInterval) {
+        clearInterval(this.playbackMonitorInterval);
+        this.playbackMonitorInterval = null;
+      }
+
+      // Clear connection ready promise (prevents memory leak)
+      this.connectionReadyResolve = null;
+      this.connectionReadyPromise = null;
+
+      // Reset greeting phase flag
+      this.isGreetingPhase = false;
+
       // Remove network change listeners
       this.cleanupNetworkChangeDetection();
 
-      // Reset VAD state for next session
+      // Reset VAD state and mic issue flag for next session
       this.vadSpeaking = true;
+      this.hasSurfacedMicIssue = false;
 
       // Clear session timers
       this.clearSessionTimers();
@@ -724,17 +903,37 @@ export class GeminiVoiceClient {
     this.clearSessionTimers();
     this.sessionTimedOut = false;
 
+    // 5-minute informational warning
+    this.sessionWarning5minTimer = window.setTimeout(() => {
+      this.options.onSessionWarning?.("Session active for 5 minutes", 5 * 60 * 1000, true);
+    }, this.SESSION_WARNING_5MIN_MS);
+
+    // 2-minute urgent warning
     this.sessionWarningTimer = window.setTimeout(() => {
-      this.options.onSessionWarning?.("Session will end in 2 minutes");
+      this.options.onSessionWarning?.("Session ending in 2 minutes", 2 * 60 * 1000, true);
     }, this.SESSION_WARNING_MS);
 
+    // Hard timeout
     this.sessionTimer = window.setTimeout(() => {
       this.sessionTimedOut = true;
+      this.options.onSessionWarning?.("Session ended", 0, false);
       this.stop();
     }, this.SESSION_MAX_MS);
   }
 
+  /** Extend the session by resetting all timers. Returns false if already timed out. */
+  extendSession(): boolean {
+    if (this.sessionTimedOut) return false;
+    this.clearSessionTimers();
+    this.startSessionTimers();
+    return true;
+  }
+
   private clearSessionTimers() {
+    if (this.sessionWarning5minTimer) {
+      clearTimeout(this.sessionWarning5minTimer);
+      this.sessionWarning5minTimer = null;
+    }
     if (this.sessionWarningTimer) {
       clearTimeout(this.sessionWarningTimer);
       this.sessionWarningTimer = null;
@@ -820,12 +1019,17 @@ export class GeminiVoiceClient {
     const basePrompt = `You are the AI voice assistant for Cottage Tandoori restaurant. Be friendly, concise, and help customers order food.
 
 IMPORTANT GUIDELINES:
-- Always confirm items, quantities, and any special requests
-- Check for allergens when requested
-- Use the add_to_cart function when customer orders items
-- Use check_allergens function when asked about allergens
 - Keep responses brief and natural
+- Check for allergens when requested
 - If unsure about an item, check the menu
+
+ORDER CONFIRMATION (Issue 9 - CRITICAL):
+Before adding ANY item to the cart, you MUST:
+1. State the item name and its price clearly
+2. Ask "Would you like me to add that to your order?"
+3. ONLY call add_to_cart AFTER the customer confirms with "yes", "sure", "go ahead", etc.
+4. If the customer says "no" or changes their mind, do NOT add the item
+5. After adding, briefly confirm what was added and the running total
 
 MENU:
 ${this.menuContext}
@@ -846,16 +1050,17 @@ Always use functions to perform cart operations.`;
   private async startMic() {
     try {
       // Use unified mic pipeline at 16kHz (Gemini-native)
-      // Disable client-side VAD on mobile — ScriptProcessorNode often produces zero frames on iOS,
-      // preventing VAD from ever detecting speech. Gemini's server-side automaticActivityDetection
-      // (configured in realtimeInputConfig) handles voice detection reliably on all platforms.
+      // Client-side VAD is DISABLED on all platforms. Reasons:
+      // 1. Mobile: ScriptProcessorNode produces zero frames on iOS, breaking VAD
+      // 2. Desktop: VAD threshold too sensitive (0.005), blocks 87% of audio
+      // 3. Gemini's server-side automaticActivityDetection (in realtimeInputConfig) is more reliable
       const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
-      const useVAD = !isMobile && isFlagEnabled('voice_pipeline_v1');
+      const useVAD = false; // Disabled - Gemini server-side VAD handles this reliably
       console.log(`[GeminiVoice] Starting mic pipeline, VAD enabled: ${useVAD}, mobile: ${isMobile}`);
 
       this.mic = createMicPipeline({
         sampleRate: 16000,
-        bufferSize: 4096,
+        bufferSize: 2048, // Reduced from 4096 for lower latency (128ms vs 256ms per frame)
         channelCount: 1,
         enableVAD: useVAD,
         vad: {
@@ -916,7 +1121,22 @@ Always use functions to perform cart operations.`;
           console.log(`[GeminiVoice] Audio: ${totalFrameCount} frames, ${zeroPct}% silent, sent=${sendSuccessCount}, blocked=${blockedByFlags}, errors=${sendErrorCount}, shouldSend=${this.shouldSendAudio}, vadSpeaking=${this.vadSpeaking}`);
           if (totalFrameCount > 10 && zeroFrameCount === totalFrameCount) {
             console.error('[GeminiVoice] WARNING: All audio frames are silent — mic may not be working on this device');
+            if (!this.hasSurfacedMicIssue) {
+              this.hasSurfacedMicIssue = true;
+              this.options.onMicIssue?.('Having trouble hearing you. Please check your microphone permissions and try speaking again.');
+            }
           }
+        }
+
+        // Issue 13: Compute RMS audio level for waveform visualization
+        if (this.options.onAudioLevel && input.length > 0) {
+          let sum = 0;
+          for (let i = 0; i < input.length; i++) {
+            sum += input[i] * input[i];
+          }
+          const rms = Math.sqrt(sum / input.length);
+          // Clamp to 0-1 range (typical mic RMS is 0-0.3 for speech)
+          this.options.onAudioLevel(Math.min(1, rms * 3.3));
         }
 
         const pcm16 = this.floatTo16BitPCM(input);
@@ -924,6 +1144,7 @@ Always use functions to perform cart operations.`;
           const b64 = this.pcm16ToBase64(pcm16);
           try {
             audioChunkCount++;
+            this.lastAudioSendTime = performance.now();
             this.session.sendRealtimeInput({
               audio: {
                 data: b64,
@@ -937,6 +1158,10 @@ Always use functions to perform cart operations.`;
           }
         } else if (pcm16.length > 0 && this.session) {
           blockedByFlags++;
+          // Log every 20th blocked frame to help diagnose issues without spam
+          if (blockedByFlags % 20 === 1) {
+            console.log(`[GeminiVoice] Audio blocked (frame ${blockedByFlags}): shouldSendAudio=${this.shouldSendAudio}, vadSpeaking=${this.vadSpeaking}, isGreetingPhase=${this.isGreetingPhase}`);
+          }
         }
       });
 
@@ -1027,16 +1252,53 @@ Always use functions to perform cart operations.`;
     // Update next playback time (duration of this chunk)
     const chunkDuration = float32.length / this.outputSampleRate;
     this.nextPlaybackTime = startTime + chunkDuration;
+    this.lastChunkEndTime = this.nextPlaybackTime; // Track when audio should end
 
     if (!this.isPlayingAudio) {
       this.isPlayingAudio = true;
     }
 
-    // Cleanup when done
+    // Start playback monitor if not already running (fallback to enable mic after playback)
+    if (!this.playbackMonitorInterval) {
+      this.playbackMonitorInterval = window.setInterval(() => {
+        if (this.outputAudioContext && !this.shouldSendAudio) {
+          const currentTime = this.outputAudioContext.currentTime;
+          // If playback has completed (current time past last chunk + small buffer)
+          // Reduced buffer from 0.3s to 0.1s for faster mic re-enable
+          if (currentTime > this.lastChunkEndTime + 0.1) {
+            console.log('[GeminiVoice] Audio playback completed - enabling mic (fallback)');
+            this.shouldSendAudio = true;
+            this.isPlayingAudio = false;
+            this.isGreetingPhase = false;
+            if (this.playbackMonitorInterval) {
+              clearInterval(this.playbackMonitorInterval);
+              this.playbackMonitorInterval = null;
+            }
+          }
+        } else if (this.shouldSendAudio && this.playbackMonitorInterval) {
+          // Mic already enabled, stop monitoring
+          clearInterval(this.playbackMonitorInterval);
+          this.playbackMonitorInterval = null;
+        }
+      }, 100); // Reduced from 200ms to 100ms for faster response
+    }
+
+    // Re-enable mic when audio chunk finishes (faster than polling fallback)
     source.onended = () => {
-      // Check if this was the last scheduled chunk
-      if (this.outputAudioContext && this.outputAudioContext.currentTime >= this.nextPlaybackTime - 0.01) {
-        // Audio stream completed
+      // Check if this was the last scheduled chunk (no more audio pending)
+      if (this.outputAudioContext && this.outputAudioContext.currentTime >= this.nextPlaybackTime - 0.05) {
+        // Audio stream completed - re-enable mic immediately
+        if (!this.shouldSendAudio) {
+          console.log('[GeminiVoice] Audio chunk ended - enabling mic (native callback)');
+          this.shouldSendAudio = true;
+          this.isPlayingAudio = false;
+          this.isGreetingPhase = false;
+          // Clear polling fallback since native callback handled it
+          if (this.playbackMonitorInterval) {
+            clearInterval(this.playbackMonitorInterval);
+            this.playbackMonitorInterval = null;
+          }
+        }
       }
     };
   }

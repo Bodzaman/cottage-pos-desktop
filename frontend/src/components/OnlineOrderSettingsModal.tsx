@@ -245,9 +245,8 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
   }, [hasChanges, onClose]);
 
   // Test notification sound
-  // Use relative path for Electron compatibility (file:// protocol)
   const testSound = () => {
-    const audio = new Audio('./audio-sounds/online_order_notification_sound_pos.mp3');
+    const audio = new Audio('/audio-sounds/online_order_notification_sound_pos.mp3');
     audio.volume = localSettings.notifications.soundVolume / 100;
     audio.play().catch((err) => {
       console.warn('Failed to play test sound:', err);

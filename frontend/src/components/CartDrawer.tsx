@@ -1,12 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from 'utils/cartStore';
 import { CartContent } from './CartContent';
 import { PremiumTheme } from 'utils/premiumTheme';
 import { useSimpleAuth } from 'utils/simple-auth-context';
+import { toast } from 'sonner';
+import { t } from '../utils/i18n';
 
 interface CartDrawerProps {
   /** Optional menu items for recommendations */
@@ -19,6 +21,8 @@ export function CartDrawer({ menuItems }: CartDrawerProps) {
   const isChatCartOpen = useCartStore((state) => state.isChatCartOpen);
   const closeChatCart = useCartStore((state) => state.closeChatCart);
   const totalItems = useCartStore((state) => state.totalItems);
+  const items = useCartStore((state) => state.items);
+  const totalAmount = useCartStore((state) => state.totalAmount);
 
   // ✅ FIXED: Provide checkout handler
   const handleCheckout = () => {
@@ -35,6 +39,24 @@ export function CartDrawer({ menuItems }: CartDrawerProps) {
   const handleSignIn = () => {
     closeChatCart();
     navigate('/login');
+  };
+
+  // Issue 16: Copy order summary to clipboard
+  const handleCopyOrder = async () => {
+    if (!items || items.length === 0) {
+      toast.info(t('cart.empty'));
+      return;
+    }
+    const summary = items
+      .map((item: any) => `${item.quantity}x ${item.name} — £${(item.basePrice * item.quantity).toFixed(2)}`)
+      .join('\n');
+    const text = `Order Summary:\n${summary}\n\nTotal: £${totalAmount?.toFixed(2) || '0.00'}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t('cart.copiedSuccess'));
+    } catch {
+      toast.error('Failed to copy');
+    }
   };
 
   return (
@@ -58,17 +80,31 @@ export function CartDrawer({ menuItems }: CartDrawerProps) {
             style={{ borderBottom: `1px solid ${PremiumTheme.colors.border.medium}` }}
           >
             <h2 className="text-2xl font-bold" style={{ color: PremiumTheme.colors.text.primary }}>
-              Your Order
+              {t('cart.title')}
             </h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={closeChatCart}
-              className="h-8 w-8"
-              style={{ color: PremiumTheme.colors.text.secondary }}
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Issue 16: Copy order summary */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCopyOrder}
+                className="h-8 w-8"
+                style={{ color: PremiumTheme.colors.text.secondary }}
+                title={t('cart.copyOrder')}
+                aria-label={t('cart.copyOrder')}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={closeChatCart}
+                className="h-8 w-8"
+                style={{ color: PremiumTheme.colors.text.secondary }}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Cart Content - ✅ FIXED: Pass required props */}

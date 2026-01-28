@@ -93,8 +93,7 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
       if (newOrders.length > 0) {
         setNewOrderNotification(true);
         // Play notification sound for new orders
-        // Use relative path for Electron compatibility (file:// protocol)
-        const audio = new Audio('./assets/notification.mp3');
+        const audio = new Audio('/assets/notification.mp3');
         audio.play().catch(() => {
           // Audio playback failed, possibly due to autoplay restrictions
         });

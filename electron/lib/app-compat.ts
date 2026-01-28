@@ -2259,6 +2259,80 @@ export const apiClient = {
     }
   },
 
+  // Complete order and close table session (for dine-in bill completion)
+  complete_order: async (params: { order_id: string }) => {
+    console.log('✅ [app-compat] complete_order called:', params);
+    try {
+      const { order_id } = params;
+
+      // 1. Get order to find table number and linked table group
+      const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('id, table_number, linked_table_group_id')
+        .eq('id', order_id)
+        .single();
+
+      if (fetchError) {
+        console.error('❌ [app-compat] Failed to fetch order:', fetchError);
+        return mockResponse({ success: false, error: fetchError.message }, false);
+      }
+
+      // 2. Update order status to COMPLETED
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          status: 'COMPLETED',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order_id);
+
+      if (orderError) {
+        console.error('❌ [app-compat] Failed to complete order:', orderError);
+        return mockResponse({ success: false, error: orderError.message }, false);
+      }
+
+      // 3. Mark table as AVAILABLE
+      if (order?.table_number) {
+        const { error: tableError } = await supabase
+          .from('pos_tables')
+          .update({
+            status: 'AVAILABLE',
+            current_order_id: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('table_number', order.table_number);
+
+        if (tableError) {
+          console.warn('⚠️ [app-compat] Failed to reset table status:', tableError);
+        }
+      }
+
+      // 4. Handle linked tables - unlink and reset all tables in the group
+      if (order?.linked_table_group_id) {
+        const { error: linkedError } = await supabase
+          .from('pos_tables')
+          .update({
+            status: 'AVAILABLE',
+            current_order_id: null,
+            linked_table_group_id: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('linked_table_group_id', order.linked_table_group_id);
+
+        if (linkedError) {
+          console.warn('⚠️ [app-compat] Failed to reset linked tables:', linkedError);
+        }
+      }
+
+      console.log('✅ [app-compat] Order completed and table(s) reset:', order_id);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] Exception in complete_order:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
   print_dine_in_bill: async (params: any) => {
     console.log('📄 [app-compat] print_dine_in_bill called:', params);
     const electronAPI = (window as any).electronAPI;
@@ -2267,8 +2341,9 @@ export const apiClient = {
         // If order_id provided, fetch order data from Supabase
         let orderData = params;
         if (params?.order_id && !params?.items) {
+          // Try orders table first (main order table)
           const { data: order } = await supabase
-            .from('table_orders')
+            .from('orders')
             .select('*')
             .eq('id', params.order_id)
             .single();
@@ -6119,7 +6194,68 @@ export const apiClient = {
 
   print_epson: async (params: any) => mockResponse({ success: true }),
 
-  print_kitchen_and_customer: async (params: any) => mockResponse({ success: true }),
+  print_kitchen_and_customer: async (params: any) => {
+    console.log('🖨️ [app-compat] print_kitchen_and_customer called:', params);
+    const electronAPI = (window as any).electronAPI;
+
+    if (!electronAPI?.printReceiptESCPOS) {
+      console.warn('⚠️ [app-compat] Electron print API not available');
+      return mockResponse({ success: false, error: 'Electron print API not available' }, false);
+    }
+
+    try {
+      // 1. Print kitchen ticket
+      const kitchenData = {
+        type: 'kitchen',
+        receiptData: {
+          orderNumber: params.orderNumber || params.order_number,
+          orderType: params.orderType || params.order_type || 'TAKEAWAY',
+          items: params.items || [],
+          tableNumber: params.tableNumber || params.table_number,
+          customerName: params.customerName || params.customer_name,
+          timestamp: new Date().toISOString(),
+          notes: params.specialInstructions || params.notes || params.order_notes
+        }
+      };
+
+      console.log('📋 [app-compat] Printing kitchen ticket:', kitchenData);
+      const kitchenResult = await electronAPI.printReceiptESCPOS(kitchenData);
+      console.log('✅ [app-compat] Kitchen ticket printed:', kitchenResult);
+
+      // Small delay between prints to avoid printer buffer issues
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 2. Print customer receipt
+      const customerData = {
+        type: 'customer',
+        receiptData: {
+          orderNumber: params.orderNumber || params.order_number,
+          orderType: params.orderType || params.order_type || 'TAKEAWAY',
+          items: params.items || [],
+          tableNumber: params.tableNumber || params.table_number,
+          customerName: params.customerName || params.customer_name,
+          customerPhone: params.customerPhone || params.customer_phone,
+          timestamp: new Date().toISOString(),
+          notes: params.specialInstructions || params.notes,
+          subtotal: params.subtotal || params.sub_total,
+          tax: params.tax || params.tax_amount,
+          total: params.total || params.total_amount,
+          paymentMethod: params.paymentMethod || params.payment_method,
+          deliveryAddress: params.deliveryAddress || params.delivery_address,
+          estimatedTime: params.estimatedTime || params.estimated_time
+        }
+      };
+
+      console.log('📋 [app-compat] Printing customer receipt:', customerData);
+      const customerResult = await electronAPI.printReceiptESCPOS(customerData);
+      console.log('✅ [app-compat] Customer receipt printed:', customerResult);
+
+      return mockResponse({ success: true, kitchenResult, customerResult });
+    } catch (error) {
+      console.error('❌ [app-compat] print_kitchen_and_customer failed:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   print_kitchen_thermal: async (params: any) => mockResponse({ success: true }),
 

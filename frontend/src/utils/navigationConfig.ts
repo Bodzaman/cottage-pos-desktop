@@ -42,7 +42,6 @@ export const navigationConfigs: Record<NavigationContext, NavigationConfig> = {
       { name: "Order Online", path: "/online-orders" },
       { name: "About", path: "/about" },
       { name: "Gallery", path: "/gallery" },
-      { name: "Blog", path: "/blog" },
       { name: "Contact", path: "/contact" },
     ],
   },

@@ -105,7 +105,6 @@ export function Footer({ variant = 'full' }: FooterProps) {
     { to: "/online-orders", label: "Menu" },
     { to: "/gallery", label: "Gallery" },
     { to: "/about", label: "About Us" },
-    { to: "/blog", label: "Blog" },
     { to: "/faq", label: "FAQ" },
     { to: "/allergens", label: "Allergen Info" },
   ];

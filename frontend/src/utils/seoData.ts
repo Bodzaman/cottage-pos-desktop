@@ -119,9 +119,4 @@ export const PAGE_SEO = {
     description:
       "View allergen information for all dishes at Cottage Tandoori. 14 major UK allergens listed per item to help you dine safely.",
   },
-  blog: {
-    title: "Blog & News",
-    description:
-      "News, recipes, and stories from Cottage Tandoori — Storrington's favourite Indian restaurant since 1980.",
-  },
 };

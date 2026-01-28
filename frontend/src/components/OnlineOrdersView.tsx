@@ -5,6 +5,8 @@ import { OrderActionPanel } from "./OrderActionPanel";
 import { useNavigate } from "react-router-dom";
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { orderManagementService, CompletedOrder, OrderFilterParams } from "../utils/orderManagementService";
+import brain from 'brain';
+import { supabase } from 'utils/supabaseClient';
 import { DetailedOrderDialog } from "./DetailedOrderDialog";
 import { colors, cardStyle } from "../utils/designSystem";
 import { QSAITheme, styles, effects } from "../utils/QSAIDesign";
@@ -249,12 +251,63 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
   // Handle order approval
   const handleApproveOrder = async (orderId: string) => {
     try {
-      // Here you would integrate with your actual order approval API
-      toast.success(`Order ${orderId} approved and sent to kitchen`);
-      
-      // Trigger printing of FOH and kitchen tickets
-      toast.success(`Printing tickets for order ${orderId}`);
-      
+      // Get full order details from the orders list
+      const order = orders.find(o => o.order_id === orderId);
+      if (!order) {
+        toast.error('Order not found');
+        return;
+      }
+
+      // 1. Update order status to APPROVED in Supabase
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'APPROVED',
+          approved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (updateError) {
+        console.error('Failed to update order status:', updateError);
+        toast.error('Failed to approve order');
+        return;
+      }
+
+      toast.success(`Order ${order.order_number || orderId} approved`);
+
+      // 2. Print kitchen ticket and customer receipt
+      try {
+        // Print kitchen ticket
+        await brain.apiClient.print_kitchen_ticket({
+          orderNumber: order.order_number || orderId,
+          orderType: order.order_type || 'ONLINE',
+          items: order.items || [],
+          customerName: order.customer_name,
+          notes: order.notes || order.special_instructions
+        });
+
+        // Print customer receipt
+        await brain.apiClient.print_receipt({
+          orderNumber: order.order_number || orderId,
+          orderType: order.order_type || 'ONLINE',
+          items: order.items || [],
+          customerName: order.customer_name,
+          customerPhone: order.customer_phone,
+          subtotal: order.subtotal || order.total * 0.8333, // Estimate if not available
+          total: order.total,
+          paymentMethod: order.payment_method || 'ONLINE',
+          deliveryAddress: order.delivery_address,
+          estimatedTime: order.estimated_time
+        });
+
+        toast.success('Tickets printed successfully');
+      } catch (printError) {
+        console.error('Print error:', printError);
+        // Don't fail the approval if printing fails
+        toast.warning('Order approved but printing failed - check printer');
+      }
+
       // Refresh orders list
       fetchOrders();
     } catch (error) {

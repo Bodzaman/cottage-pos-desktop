@@ -12,16 +12,22 @@ import { useSimpleAuth } from '../utils/simple-auth-context';
 import { MessageActions } from './MessageActions';
 import { DynamicUserAvatar } from './DynamicUserAvatar';
 import { QuickReplyChips } from './QuickReplyChips';
+import { ContextualQuickReplyChips } from './ContextualQuickReplyChips';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { ThinkingMessageSkeleton } from './ThinkingMessageSkeleton';
+import { MessageStatusIndicator } from './MessageStatusIndicator';
 import { CartBadge } from './CartBadge';
 import { CartDrawer } from './CartDrawer';
 import { CartHintTooltip } from './CartHintTooltip';
 import { CartContent } from './CartContent';
 import { VoiceCallOverlay } from 'components/VoiceCallOverlay';
+import { SessionTimeoutWarning } from 'components/SessionTimeoutWarning';
 import { CallSummaryMessage } from 'components/CallSummaryMessage';
 import InlineTermsScreen from 'components/InlineTermsScreen';
 import { WelcomeScreen, useWelcomeScreen } from 'components/WelcomeScreen';
 import { VoiceSignupPrompt } from './VoiceSignupPrompt';
+import { VoiceDemoModal } from './VoiceDemoModal';
+import { VoiceCartToast } from './VoiceCartToast';
 import { VoiceMaintenanceModal } from './VoiceMaintenanceModal';
 import { InlineMenuCard } from 'components/InlineMenuCard';
 import { ChatMenuCardScroller } from 'components/ChatMenuCardScroller';
@@ -51,6 +57,7 @@ import type { ChatMessage } from '../utils/chat-store';
 import type { CartItem } from '../utils/cartStore';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useVoiceAgentStore } from '../utils/voiceAgentStore';
+import { useAgentVoiceConfig } from '../utils/agentConfigStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { GeminiVoiceClient, GeminiVoiceState } from 'utils/geminiVoiceClient';
 
@@ -370,12 +377,9 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     }
   }, [location.pathname, openChat]);
   
-  // ✅ FIXED: Show welcome screen on first chat open (based only on sessionStorage check)
-  React.useEffect(() => {
-    if (isOpen && shouldShowWelcome) {
-      setIsWelcomeOpen(true);
-    }
-  }, [isOpen, shouldShowWelcome]);
+  // Issue 10: Welcome screen is now non-blocking (inline in chat area).
+  // The modal WelcomeScreen is no longer auto-triggered.
+  // The inline welcome with quick reply chips and feature pills shows when messages.length === 0.
   
   // Track if we've loaded the prompt for this modal session
   const hasLoadedPromptRef = React.useRef(false);
@@ -481,6 +485,12 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   const isVoiceCallActive = useVoiceCallActive();
   const voiceCallStatus = useVoiceCallStatus();
   const isAISpeaking = useIsAISpeaking(); // NEW: Reactive hook for AI speaking state
+  const [voiceConnectionQuality, setVoiceConnectionQuality] = useState<'excellent' | 'good' | 'fair' | 'poor' | undefined>(undefined);
+  const [sessionWarning, setSessionWarning] = useState<{
+    message: string;
+    timeRemainingMs: number;
+    canExtend: boolean;
+  } | null>(null);
 
   // NEW: Add voice T&C screen selector
   const showVoiceTCScreen = useChatStore((state) => state.showVoiceTCScreen);
@@ -497,6 +507,9 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   // NEW: Get voice agent store
   const voiceAgentStore = useVoiceAgentStore();
 
+  // Get published voice configuration from AIStaffManagementHub
+  const publishedVoiceConfig = useAgentVoiceConfig();
+
   // NEW: Voice terms accepted handler - Initialize Gemini voice client
   const handleVoiceTermsAccepted = async () => {
     // Close T&C modal
@@ -509,8 +522,9 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     
     try {
       // Initialize Gemini voice client with event handlers
+      // Use published voice config from AIStaffManagementHub, fallback to 'Puck'
       const client = new GeminiVoiceClient({
-        voiceName: 'Puck',
+        voiceName: publishedVoiceConfig?.voice_model || 'Puck',
         
         // State change handler - update voice status in chat-store
         onStateChange: (state: GeminiVoiceState) => {
@@ -540,14 +554,47 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
           updateVoiceStatus(VoiceCallStatus.FAILED);
         },
 
+        // Mic issue handler - surface silent mic warning to user (iOS)
+        onMicIssue: (message: string) => {
+          toast.error(message, { duration: 8000 });
+        },
+
         // Cart update handler - triggered by backend validation in geminiVoiceClient
+        // Issue 8: Show visual toast for cart updates during voice call
         onCartUpdate: (action: 'add' | 'remove', item: any) => {
-          // Cart operations are handled via backend validation in geminiVoiceClient
+          setVoiceCartUpdate({
+            action,
+            itemName: item?.name || 'Item',
+            quantity: item?.quantity,
+            price: item?.price ? `£${item.price}` : undefined,
+          });
+          setShowVoiceCartToast(true);
+          setTimeout(() => setShowVoiceCartToast(false), 3000);
         },
 
         // Function call handler - for debugging/monitoring
         onFunctionCall: (name: string, args: any) => {
           // Function calls logged in geminiVoiceClient
+        },
+
+        // Quality change handler - update connection quality display
+        onQualityChange: (quality: 'excellent' | 'good' | 'fair' | 'poor') => {
+          setVoiceConnectionQuality(quality);
+        },
+
+        // Issue 13: Real-time audio level for waveform visualization
+        onAudioLevel: (level: number) => {
+          setVoiceAudioLevel(level);
+        },
+
+        // Session warning handler - show timeout warning overlay
+        onSessionWarning: (message: string, timeRemainingMs: number, canExtend: boolean) => {
+          if (timeRemainingMs === 0) {
+            toast.info('Voice session ended due to time limit');
+            setSessionWarning(null);
+          } else {
+            setSessionWarning({ message, timeRemainingMs, canExtend });
+          }
         }
       });
       geminiClientRef.current = client;
@@ -654,7 +701,7 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
     if (isAuthenticated) {
       setShowVoiceTCScreen(true); // Existing voice T&C modal
     } else {
-      setShowVoiceSignupPrompt(true); // New signup prompt for guests
+      setShowVoiceDemoModal(true); // Show voice demo walkthrough for guests
     }
   };
 
@@ -678,6 +725,16 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   
   // NEW (Phase 4C): Voice signup prompt state for guest users
   const [showVoiceSignupPrompt, setShowVoiceSignupPrompt] = useState(false);
+
+  // Voice demo modal state for guest users (Issue 3)
+  const [showVoiceDemoModal, setShowVoiceDemoModal] = useState(false);
+
+  // Issue 8: Voice cart toast state
+  const [voiceCartUpdate, setVoiceCartUpdate] = useState<import('./VoiceCartToast').VoiceCartUpdate | null>(null);
+  const [showVoiceCartToast, setShowVoiceCartToast] = useState(false);
+
+  // Issue 13: Real-time audio level for waveform
+  const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   
   // NEW (MYA-1581): Voice settings state for maintenance mode control
   const [voiceSettings, setVoiceSettings] = useState<{
@@ -1094,17 +1151,20 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
             {/* Modal Content - Flex container for chat + cart drawer */}
             <div className="flex-1 overflow-hidden flex">
               {/* Chat Area - Takes 65% when drawer open, 100% when closed */}
-              <div 
-                className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
-                style={{ 
-                  width: isChatCartOpen ? '65%' : '100%',
-                  maxWidth: isChatCartOpen ? '65%' : '100%'
-                }}
+              {/* Issue 18: Responsive cart drawer - mobile: full width (cart overlays), tablet: 60%, desktop: 65% */}
+              <div
+                className={cn(
+                  "flex-1 flex flex-col overflow-hidden transition-all duration-300",
+                  isChatCartOpen ? "max-md:w-full md:w-[60%] lg:w-[65%] max-md:max-w-full md:max-w-[60%] lg:max-w-[65%]" : "w-full max-w-full"
+                )}
               >
-                {/* Messages Container */}
+                {/* Messages Container - Issue 15: Added role="log" and aria-live for accessibility */}
                 <div
                   ref={messagesContainerRef}
                   onScroll={handleScroll}
+                  role="log"
+                  aria-live="polite"
+                  aria-label="Chat messages"
                   className="flex-1 overflow-y-auto relative overscroll-contain"
                   style={{
                     backgroundColor: PremiumTheme.colors.background.primary,
@@ -1403,9 +1463,11 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                                       "px-5 py-3 shadow-sm",
                                       "sm:px-4 sm:py-2.5",
                                       "transition-all duration-200 hover:shadow-md",
-                                      isUser 
+                                      isUser
                                         ? "bg-[#2F2F2F] text-white border-l-[3px] border-l-[#8B1538] border border-[rgba(255,255,255,0.1)] rounded-br-md"
-                                        : "bg-[#1A1A1A] text-secondary-foreground border-l-[3px] border-l-[#F97316] border border-[rgba(255,255,255,0.05)] rounded-bl-md"
+                                        : message.metadata?.errorType
+                                          ? "bg-red-950/40 text-red-200 border-l-[3px] border-l-red-500 border border-red-500/20 rounded-bl-md"
+                                          : "bg-[#1A1A1A] text-secondary-foreground border-l-[3px] border-l-[#F97316] border border-[rgba(255,255,255,0.05)] rounded-bl-md"
                                     )}
                                   >
                                     {/* Timestamp - appears on hover */}
@@ -1474,8 +1536,14 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                                       />
                                     </div>
                                   </motion.div>
+                                  {/* Issue 7: Message status indicator for user messages */}
+                                  {isUser && message.status && (
+                                    <div className="flex justify-end mt-0.5 pr-1">
+                                      <MessageStatusIndicator status={message.status} />
+                                    </div>
+                                  )}
                                 </div>
-                                
+
                                 {/* User Avatar - Only show for first message in chain */}
                                 {isUser && showAvatar && (
                                   <div className="flex-shrink-0">
@@ -1516,10 +1584,40 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                       agentName={config.botName || 'Uncle Raj'}
                       agentAvatar={config.botAvatar}
                       isAISpeaking={isAISpeaking}
+                      connectionStatus={
+                        voiceCallStatus === VoiceCallStatus.CONNECTING ? 'connecting' :
+                        voiceCallStatus === VoiceCallStatus.CONNECTED ? 'connected' : 'reconnecting'
+                      }
+                      connectionQuality={voiceConnectionQuality}
+                      audioLevel={voiceAudioLevel}
                       onHangUp={handleEndVoiceCall}
                     />
                   )}
-                  
+
+                  {/* Issue 8: Voice cart update toast */}
+                  {isVoiceCallActive && (
+                    <VoiceCartToast
+                      update={voiceCartUpdate}
+                      isVisible={showVoiceCartToast}
+                    />
+                  )}
+
+                  {/* Session timeout warning - overlays during voice call */}
+                  {isVoiceCallActive && (
+                    <SessionTimeoutWarning
+                      isVisible={!!sessionWarning}
+                      message={sessionWarning?.message || ''}
+                      timeRemainingMs={sessionWarning?.timeRemainingMs || 0}
+                      canExtend={sessionWarning?.canExtend || false}
+                      onExtend={() => {
+                        geminiClientRef.current?.extendSession();
+                        setSessionWarning(null);
+                        toast.success('Session extended');
+                      }}
+                      onDismiss={() => setSessionWarning(null)}
+                    />
+                  )}
+
                   {/* Scroll to Bottom Button - Inside messages container */}
                   <AnimatePresence>
                     {showScrollButton && (
@@ -1570,7 +1668,21 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                 >
                   {/* Constrained container */}
                   <div className="max-w-4xl mx-auto px-4 py-3">
-                    
+
+                    {/* Issue 11: Contextual quick reply chips */}
+                    {messages.length > 0 && !isVoiceCallActive && (
+                      <ContextualQuickReplyChips
+                        messages={messages}
+                        onReplySelect={(message) => {
+                          sendMessage(message).catch(error => {
+                            console.error('Error sending quick reply:', error);
+                            toast.error('Failed to send message');
+                          });
+                        }}
+                        disabled={isLoading}
+                      />
+                    )}
+
                     {/* Single ChatGPT-style pill container */}
                     <div 
                       className={cn(
@@ -1589,9 +1701,10 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        aria-label="Type your message"
                         placeholder={
-                          isVoiceCallActive 
-                            ? "Voice call in progress..." 
+                          isVoiceCallActive
+                            ? "Voice call in progress..."
                             : "Ask about our menu, dietary options, or place an order..."
                         }
                         disabled={isLoading || isVoiceCallActive}
@@ -1608,6 +1721,14 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                         rows={1}
                       />
                       
+                      {/* Issue 20: Emoji picker */}
+                      {!isVoiceCallActive && (
+                        <EmojiPickerPopover
+                          onEmojiSelect={(emoji) => setInputValue(prev => prev + emoji)}
+                          disabled={isLoading || isVoiceCallActive}
+                        />
+                      )}
+
                       {/* Green Call Button - RIGHT (inside pill) - Only show if voice enabled */}
                       {voiceSettings?.enabled && (
                         <button
@@ -1711,11 +1832,21 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       />
       
       {/* Voice Signup Prompt Modal - Guest users clicking phone icon */}
-      <VoiceSignupPrompt 
+      <VoiceSignupPrompt
         isOpen={showVoiceSignupPrompt}
         onClose={() => setShowVoiceSignupPrompt(false)}
       />
-      
+
+      {/* Voice Demo Modal - Animated walkthrough for guest users (Issue 3) */}
+      <VoiceDemoModal
+        isOpen={showVoiceDemoModal}
+        onClose={() => setShowVoiceDemoModal(false)}
+        onSignUp={() => {
+          setShowVoiceDemoModal(false);
+          setShowVoiceSignupPrompt(true);
+        }}
+      />
+
       {/* Voice Maintenance Modal - Shown when maintenance mode is ON */}
       <VoiceMaintenanceModal
         isOpen={showVoiceMaintenanceModal}

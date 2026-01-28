@@ -12,6 +12,7 @@ import { validateChatMessage, cleanupCorruptedMessages } from './messageValidati
 import { supabase } from './supabaseClient';
 import { getOrCreateSessionId } from './session-manager';
 import { useAgentConfigStore } from './agentConfigStore';
+import { classifyChatError, type ChatErrorType } from './chat-error-handler';
 
 // NEW: Import structured streaming components
 import {
@@ -91,6 +92,8 @@ export interface ChatMessage {
   timestamp: Date;
   isTyping?: boolean;
   isStreaming?: boolean;
+  /** Issue 7: Message delivery status for user messages */
+  status?: 'sending' | 'sent' | 'delivered' | 'error';
   // NEW: Support structured content parts
   structuredParts?: MessageContentPart[];
   menuCards?: MenuItem[];
@@ -110,6 +113,8 @@ export interface ChatMessage {
     // NEW: Structured event metadata
     intent?: string;
     toolsUsed?: string[];
+    // Issue 6: Error classification
+    errorType?: ChatErrorType;
   };
 }
 
@@ -355,12 +360,13 @@ export const useChatStore = create<ChatState>()(
       sendMessage: async (message: string) => {
         const { sessionId, userContext } = get();
 
-        // Add user message immediately
+        // Add user message immediately with 'sending' status (Issue 7)
         const userMessage: ChatMessage = {
           id: generateMessageId(),
           content: message,
           sender: 'user',
           timestamp: new Date(),
+          status: 'sending',
           metadata: {
             userId: userContext.userId,
             sessionId,
@@ -566,11 +572,16 @@ export const useChatStore = create<ChatState>()(
                         console.log(`[PERF] Time to first token: ${ttft.toFixed(0)}ms`);
 
                         set((state) => ({
-                          messages: state.messages.map(msg =>
-                            msg.id === typingMessageId
-                              ? { ...msg, isTyping: false, isStreaming: true, content: '' }
-                              : msg
-                          ),
+                          messages: state.messages.map(msg => {
+                            if (msg.id === typingMessageId) {
+                              return { ...msg, isTyping: false, isStreaming: true, content: '' };
+                            }
+                            // Issue 7: Mark user message as 'sent' when AI starts responding
+                            if (msg.id === userMessage.id) {
+                              return { ...msg, status: 'sent' as const };
+                            }
+                            return msg;
+                          }),
                           isLoading: false,
                           isStreaming: true,
                           isTyping: false
@@ -830,13 +841,17 @@ export const useChatStore = create<ChatState>()(
                       // events that update the frontend cart immediately during streaming.
                       // No need to sync again on completion.
                       
-                      // Streaming complete
+                      // Streaming complete - mark user message as delivered (Issue 7)
                       set((state) => ({
-                        messages: state.messages.map((msg) =>
-                          msg.id === botMessageId
-                            ? { ...msg, isStreaming: false }
-                            : msg
-                        ),
+                        messages: state.messages.map((msg) => {
+                          if (msg.id === botMessageId) {
+                            return { ...msg, isStreaming: false };
+                          }
+                          if (msg.id === userMessage.id) {
+                            return { ...msg, status: 'delivered' as const };
+                          }
+                          return msg;
+                        }),
                         isStreaming: false,
                         isLoading: false,
                         isTyping: false,
@@ -871,18 +886,25 @@ export const useChatStore = create<ChatState>()(
 
           console.error('[chat-store] Failed to send message:', error);
 
-          // ✅ OPTIMISTIC UI ERROR HANDLING:
-          // Remove typing indicator and show error message
+          // ✅ OPTIMISTIC UI ERROR HANDLING with contextual messages (Issue 6):
+          // Classify the error and show an appropriate user-friendly message
+          const classified = classifyChatError(error);
           const errorMessageId = generateMessageId();
           const errorMessage: ChatMessage = {
             id: errorMessageId,
-            content: 'Sorry, I encountered an error. Please try again.',
+            content: classified.message,
             sender: 'bot',
-            timestamp: new Date()
+            timestamp: new Date(),
+            metadata: {
+              errorType: classified.type,
+            },
           };
 
           set((state) => ({
-            messages: state.messages.filter(msg => msg.id !== typingMessageId).concat(errorMessage),
+            messages: state.messages
+              .filter(msg => msg.id !== typingMessageId)
+              .map(msg => msg.id === userMessage.id ? { ...msg, status: 'error' as const } : msg)
+              .concat(errorMessage),
             isLoading: false,
             isStreaming: false,
             isTyping: false,
@@ -1155,17 +1177,42 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'cottage-chat-storage',
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         userContext: state.userContext,
-        config: state.config
+        config: state.config,
+        // Issue 12: Persist last 20 messages (sanitized, no streaming state)
+        messages: state.messages
+          .filter(msg => !msg.isTyping && !msg.isStreaming && msg.content)
+          .slice(-20)
+          .map(msg => ({
+            ...msg,
+            isTyping: undefined,
+            isStreaming: undefined,
+            status: msg.status === 'sending' ? 'error' as const : msg.status,
+          })),
+        _persistedAt: Date.now(),
       }),
+      migrate: (persisted: any, version: number) => {
+        if (version < 2) {
+          // Migration from v1: add empty messages array
+          return { ...persisted, messages: [], _persistedAt: Date.now() };
+        }
+        return persisted;
+      },
       onRehydrateStorage: () => (state) => {
         if (state && Array.isArray(state.messages)) {
-          const cleanedMessages = cleanupCorruptedMessages(state.messages);
-          if (cleanedMessages.length !== state.messages.length ||
-              cleanedMessages.some((msg, i) => msg.content !== state.messages[i]?.content)) {
-            state.messages = cleanedMessages;
+          // Issue 12: Check 24-hour TTL
+          const persistedAt = (state as any)._persistedAt || 0;
+          const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+          if (Date.now() - persistedAt > TWENTY_FOUR_HOURS) {
+            state.messages = [];
+          } else {
+            const cleanedMessages = cleanupCorruptedMessages(state.messages);
+            if (cleanedMessages.length !== state.messages.length ||
+                cleanedMessages.some((msg, i) => msg.content !== state.messages[i]?.content)) {
+              state.messages = cleanedMessages;
+            }
           }
         }
 

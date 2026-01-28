@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Use this for kitchen tickets and customer receipts
     printReceiptESCPOS: (data) => ipcRenderer.invoke('print-receipt-escpos', data),
 
+    // Z-Report / End of Day thermal printing
+    printZReport: (data) => ipcRenderer.invoke('print-z-report', data),
+
     // Raster image printing - true WYSIWYG thermal printing
     // Converts HTML screenshot (from html2canvas) to ESC/POS raster bitmap
     // Use this when you need printed output to exactly match the screen preview
