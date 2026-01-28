@@ -14,6 +14,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+// Check if running in Electron (has electronAPI on window)
+const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -82,17 +85,26 @@ export function useRestaurantAvailability(options?: {
   });
 
   /**
-   * Fetch current POS status from backend
+   * Fetch current POS status from backend (web) or Supabase direct (Electron)
    */
   const checkStatus = useCallback(async () => {
     try {
-      const response = await fetch(STATUS_ENDPOINT);
+      let data;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (isElectron) {
+        // Electron: Use brain module for direct Supabase query
+        // This avoids the file:// URL resolution issue
+        const brain = await import('brain');
+        const response = await brain.apiClient.get_pos_status();
+        data = await response.json();
+      } else {
+        // Web: Use backend API endpoint (proxied by Vite dev server)
+        const response = await fetch(STATUS_ENDPOINT);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        data = await response.json();
       }
-
-      const data = await response.json();
 
       setStatus({
         isOnline: data.is_online ?? false,

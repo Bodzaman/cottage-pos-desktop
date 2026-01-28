@@ -6066,6 +6066,70 @@ export const apiClient = {
     }
   },
 
+  // Get POS status for availability checks (used by useRestaurantAvailability hook)
+  get_pos_status: async () => {
+    console.log('📋 [app-compat] get_pos_status - querying Supabase');
+    try {
+      const { data, error } = await supabase
+        .from('pos_status')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // Calculate if online based on heartbeat recency (2 minutes)
+      const lastHeartbeat = data?.last_heartbeat_at ? new Date(data.last_heartbeat_at) : null;
+      const secondsSinceHeartbeat = lastHeartbeat
+        ? Math.floor((Date.now() - lastHeartbeat.getTime()) / 1000)
+        : null;
+      const isOnline = secondsSinceHeartbeat !== null && secondsSinceHeartbeat < 120;
+
+      return mockResponse({
+        is_online: isOnline,
+        is_accepting_orders: isOnline && (data?.is_accepting_orders ?? true),
+        manual_accepting_orders: data?.is_accepting_orders ?? true,
+        custom_message: data?.custom_message || null,
+        seconds_since_heartbeat: secondsSinceHeartbeat,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] get_pos_status error:', error);
+      // Return optimistic defaults on error
+      return mockResponse({ is_online: true, is_accepting_orders: true });
+    }
+  },
+
+  // Update POS status (pause/resume orders) - used by usePOSStatusControl hook
+  set_pos_status: async (params: { is_accepting_orders: boolean; custom_message?: string }) => {
+    console.log('📋 [app-compat] set_pos_status:', params);
+    try {
+      const { data: existing } = await supabase
+        .from('pos_status')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      const updateData = {
+        is_accepting_orders: params.is_accepting_orders,
+        custom_message: params.custom_message || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existing) {
+        await supabase.from('pos_status').update(updateData).eq('id', existing.id);
+      } else {
+        await supabase.from('pos_status').insert({
+          ...updateData,
+          last_heartbeat_at: new Date().toISOString()
+        });
+      }
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] set_pos_status error:', error);
+      return mockResponse({ success: false }, false);
+    }
+  },
+
   pos_settings_diagnostics: async (params: any) => mockResponse({ success: true }),
 
   preflight_check: async (params: any) => mockResponse({ success: true }),

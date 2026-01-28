@@ -10,6 +10,9 @@
 import { useState, useCallback } from 'react';
 import { useRestaurantAvailability, RestaurantAvailability } from './useRestaurantAvailability';
 
+// Check if running in Electron (has electronAPI on window)
+const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -62,20 +65,31 @@ export function usePOSStatusControl(): POSStatusControl {
     setUpdateError(null);
 
     try {
-      const response = await fetch('/routes/pos/status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      if (isElectron) {
+        // Electron: Use brain module for direct Supabase update
+        // This avoids the file:// URL resolution issue
+        const brain = await import('brain');
+        await brain.apiClient.set_pos_status({
           is_accepting_orders: isAccepting,
           custom_message: message || null,
-        }),
-      });
+        });
+      } else {
+        // Web: Use backend API endpoint (proxied by Vite dev server)
+        const response = await fetch('/routes/pos/status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            is_accepting_orders: isAccepting,
+            custom_message: message || null,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP ${response.status}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
       }
 
       // Success - the useRestaurantAvailability hook will pick up the change

@@ -2634,19 +2634,21 @@ Powered by QuickServe AI`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Get printer port and copy raw data
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                // Windows: Use .NET System.Printing to send raw data via print spooler
+                // This is more reliable than WMI port detection which fails for modern USB printers
+                const printScript = `
+                    Add-Type -AssemblyName System.Printing
+                    $queue = New-Object System.Printing.PrintQueue(
+                        (New-Object System.Printing.LocalPrintServer),
+                        '${printer.replace(/'/g, "''")}'
+                    )
+                    $job = $queue.AddJob()
+                    $stream = $job.JobStream
+                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
+                    $stream.Write($bytes, 0, $bytes.Length)
+                    $stream.Close()
                 `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    throw new Error('Could not determine printer port');
-                }
+                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
@@ -2695,22 +2697,20 @@ Powered by QuickServe AI`
                 log.info(`Sending cut command to printer: ${printerName}`);
                 await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Use copy command to send raw data to printer port
-                // First get the printer port
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printerName.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                // Windows: Use .NET System.Printing to send raw data via print spooler
+                const printScript = `
+                    Add-Type -AssemblyName System.Printing
+                    $queue = New-Object System.Printing.PrintQueue(
+                        (New-Object System.Printing.LocalPrintServer),
+                        '${printerName.replace(/'/g, "''")}'
+                    )
+                    $job = $queue.AddJob()
+                    $stream = $job.JobStream
+                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
+                    $stream.Write($bytes, 0, $bytes.Length)
+                    $stream.Close()
                 `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    // Copy raw bytes to printer port
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    log.warn('Could not determine printer port for cut command');
-                    return false;
-                }
+                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
             }
 
             log.info('Paper cut command sent successfully');
@@ -2772,19 +2772,21 @@ Powered by QuickServe AI`
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Get printer port and copy raw data
-                const ps = `
-                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
-                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                // Windows: Use .NET System.Printing to send raw data via print spooler
+                // This is more reliable than WMI port detection which fails for modern USB printers
+                const printScript = `
+                    Add-Type -AssemblyName System.Printing
+                    $queue = New-Object System.Printing.PrintQueue(
+                        (New-Object System.Printing.LocalPrintServer),
+                        '${printer.replace(/'/g, "''")}'
+                    )
+                    $job = $queue.AddJob()
+                    $stream = $job.JobStream
+                    $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\')}')
+                    $stream.Write($bytes, 0, $bytes.Length)
+                    $stream.Close()
                 `;
-                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
-                const port = portName.trim();
-
-                if (port) {
-                    await execAsync(`copy /b "${tempFile}" "${port}"`);
-                } else {
-                    throw new Error('Could not determine printer port');
-                }
+                await execAsync(`powershell -Command "${printScript.replace(/\n/g, ' ')}"`);
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
