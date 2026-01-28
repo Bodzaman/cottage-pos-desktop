@@ -168,7 +168,8 @@ export function OnlineOrdersView({ onBack, initialTab = 'orders', autoApproveEna
         setNewOrderNotification(true);
         
         // Play notification sound for new orders
-        const audio = new Audio('/assets/notification.mp3');
+        // Use relative path for Electron compatibility (file:// protocol)
+        const audio = new Audio('./assets/notification.mp3');
         
         // Show toast notification
         toast.info(`${newOrders.length} new online order${newOrders.length > 1 ? 's' : ''} received`, {

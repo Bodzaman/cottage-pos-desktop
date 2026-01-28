@@ -713,47 +713,19 @@ export const apiClient = {
         return mockResponse({ success: false, error: 'Order ID and status required' }, false);
       }
 
-      // Determine which table to update based on order_type or try both
-      if (order_type === 'DINE-IN' || order_type === 'DINE_IN') {
-        const { error } = await supabase
-          .from('dine_in_orders')
-          .update({
-            status,
-            updated_at: new Date().toISOString(),
-            status_updated_at: new Date().toISOString(),
-          })
-          .eq('id', order_id);
+      // All orders are in the 'orders' table
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+          status_updated_at: new Date().toISOString(),
+        })
+        .eq('id', order_id);
 
-        if (error) {
-          console.error('❌ [app-compat] Failed to update dine-in order status:', error);
-          return mockResponse({ success: false, error: error.message }, false);
-        }
-      } else {
-        // Try orders table first
-        const { error } = await supabase
-          .from('orders')
-          .update({
-            status,
-            updated_at: new Date().toISOString(),
-            status_updated_at: new Date().toISOString(),
-          })
-          .eq('id', order_id);
-
-        if (error) {
-          // Might be a dine-in order, try that table
-          const { error: dineInError } = await supabase
-            .from('dine_in_orders')
-            .update({
-              status,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', order_id);
-
-          if (dineInError) {
-            console.error('❌ [app-compat] Failed to update order status:', dineInError);
-            return mockResponse({ success: false, error: dineInError.message }, false);
-          }
-        }
+      if (error) {
+        console.error('❌ [app-compat] Failed to update order status:', error);
+        return mockResponse({ success: false, error: error.message }, false);
       }
 
       console.log('✅ [app-compat] Order status updated:', order_id, '→', status);
@@ -816,10 +788,11 @@ export const apiClient = {
             payment_amount: amount,
             updated_at: new Date().toISOString(),
           })
-          .eq('order_id', order_id);
+          .eq('id', order_id);
 
         if (error) {
           console.error('❌ [app-compat] process_cash_payment update error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
         }
       }
 
@@ -831,7 +804,7 @@ export const apiClient = {
       });
     } catch (error) {
       console.error('❌ [app-compat] process_cash_payment error:', error);
-      return mockResponse({ success: true, payment_method: 'cash' });
+      return mockResponse({ success: false, error: (error as Error).message }, false);
     }
   },
 
@@ -901,7 +874,7 @@ export const apiClient = {
       // For cash payments, just record the payment status
       if (payment_method === 'cash' || payment_method === 'CASH') {
         if (order_id) {
-          await supabase
+          const { error } = await supabase
             .from('orders')
             .update({
               payment_status: 'PAID',
@@ -909,7 +882,11 @@ export const apiClient = {
               payment_amount: amount,
               updated_at: new Date().toISOString(),
             })
-            .eq('order_id', order_id);
+            .eq('id', order_id);
+
+          if (error) {
+            console.error('❌ [app-compat] create_payment_intent2 cash update error:', error);
+          }
         }
 
         return mockResponse({
