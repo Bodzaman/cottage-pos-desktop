@@ -127,6 +127,11 @@ jobs:
           rm -f package-lock.json
           npm install
 
+      # Rebuild sharp native module against Electron's Node.js ABI
+      - name: Rebuild native modules for Electron
+        working-directory: electron
+        run: npx @electron/rebuild -f -w sharp
+
       # Create production .env file from GitHub secrets
       - name: Create production environment file
         working-directory: electron
