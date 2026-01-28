@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChefHat, BarChart3, DollarSign, Zap, Users } from 'lucide-react';
+import { X, ChefHat, BarChart3, DollarSign, Zap, Users, ClipboardCheck, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { globalColors } from '../utils/QSAIDesign';
@@ -9,6 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import { APP_BASE_PATH } from '../constants';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { CRMModal } from './CRMModal';
+import { EndOfDayModal } from './EndOfDayModal';
+import { OnlineOrderSettingsModal } from './OnlineOrderSettingsModal';
+import { usePOSAuth } from '../utils/usePOSAuth';
 
 interface QuickToolsModalProps {
   isOpen: boolean;
@@ -26,18 +29,44 @@ interface ToolItem {
 const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const [isClosing, setIsClosing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Password dialog and CRM modal state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showCRMModal, setShowCRMModal] = useState(false);
+  const [showEndOfDayModal, setShowEndOfDayModal] = useState(false);
+  const [showOnlineOrderSettings, setShowOnlineOrderSettings] = useState(false);
 
-  const handleClose = () => {
+  // Get staff name from POS auth for End of Day
+  const posUser = usePOSAuth((s) => s.user);
+
+  const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       setIsClosing(false);
       onClose();
     }, 200);
-  };
+  }, [onClose]);
+
+  // ESC key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, handleClose]);
+
+  // Auto-focus container on open for keyboard accessibility
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      containerRef.current.focus();
+    }
+  }, [isOpen]);
 
   // Handle CRM card click - show password dialog
   const handleCRMClick = () => {
@@ -47,14 +76,30 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
   // Handle successful password verification
   const handlePasswordSuccess = () => {
     setShowPasswordDialog(false);
-    handleClose(); // Close Quick Tools modal
-    // Small delay to allow Quick Tools to close first
-    setTimeout(() => {
-      setShowCRMModal(true);
-    }, 250);
+    setShowCRMModal(true);
   };
 
   const tools: ToolItem[] = [
+    {
+      id: 'online-order-settings',
+      label: 'Online Orders',
+      icon: <ShoppingCart className="h-6 w-6" />,
+      action: () => {
+        setShowOnlineOrderSettings(true);
+      },
+      description: 'Manage online ordering hours and settings'
+    },
+    {
+      id: 'view-all-orders',
+      label: '📊 View All Orders',
+      icon: <BarChart3 className="h-6 w-6" />,
+      action: () => {
+        // This will trigger the existing modal from ManagementHeader
+        document.dispatchEvent(new CustomEvent('open-all-orders'));
+        handleClose();
+      },
+      description: 'View comprehensive order history and analytics'
+    },
     {
       id: 'kitchen-display',
       label: '🍳 Kitchen Display',
@@ -77,17 +122,6 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
       description: 'Customer Relationship Management'
     },
     {
-      id: 'view-all-orders',
-      label: '📊 View All Orders',
-      icon: <BarChart3 className="h-6 w-6" />,
-      action: () => {
-        // This will trigger the existing modal from ManagementHeader
-        document.dispatchEvent(new CustomEvent('open-all-orders'));
-        handleClose();
-      },
-      description: 'View comprehensive order history and analytics'
-    },
-    {
       id: 'reconciliation',
       label: '💰 Reconciliation',
       icon: <DollarSign className="h-6 w-6" />,
@@ -96,21 +130,35 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
         handleClose();
       },
       description: 'Daily sales reports and financial reconciliation'
+    },
+    {
+      id: 'end-of-day',
+      label: '🧾 End of Day',
+      icon: <ClipboardCheck className="h-6 w-6" />,
+      action: () => {
+        setShowEndOfDayModal(true);
+      },
+      description: 'Count cash and print end of day report'
     }
   ];
 
-  if (!isOpen && !showCRMModal && !showPasswordDialog) return null;
+  if (!isOpen && !showCRMModal && !showPasswordDialog && !showEndOfDayModal && !showOnlineOrderSettings) return null;
 
   return (
     <>
     <AnimatePresence>
       {isOpen && (
       <motion.div
+        ref={containerRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="fixed inset-0 z-50 flex items-center justify-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-tools-title"
+        tabIndex={-1}
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           backdropFilter: 'blur(4px)'
@@ -145,7 +193,8 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
                     <Zap className="h-6 w-6" style={{ color: '#7C5DFA' }} />
                   </div>
                   <div>
-                    <h2 
+                    <h2
+                      id="quick-tools-title"
                       className="text-2xl font-bold"
                       style={{ color: globalColors.text.primary }}
                     >
@@ -251,6 +300,19 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
       <CRMModal
         isOpen={showCRMModal}
         onClose={() => setShowCRMModal(false)}
+      />
+
+      {/* End of Day Modal */}
+      <EndOfDayModal
+        isOpen={showEndOfDayModal}
+        onClose={() => setShowEndOfDayModal(false)}
+        staffName={posUser?.fullName}
+      />
+
+      {/* Online Order Settings Modal */}
+      <OnlineOrderSettingsModal
+        isOpen={showOnlineOrderSettings}
+        onClose={() => setShowOnlineOrderSettings(false)}
       />
     </>
   );

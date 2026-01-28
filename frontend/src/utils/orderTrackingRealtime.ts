@@ -111,6 +111,58 @@ export function subscribeToAllOrderTracking(
 }
 
 /**
+ * Subscribe to order updates for a specific customer
+ * This enables real-time status updates in the CustomerPortal
+ */
+export function subscribeToCustomerOrders(
+  customerId: string,
+  onOrderUpdate: (order: any) => void,
+  onError?: (error: any) => void
+) {
+  const subscription = supabase
+    .channel(`customer-orders-${customerId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `customer_id=eq.${customerId}`
+      },
+      (payload) => {
+        if (payload.new) {
+          console.log('📦 Real-time order update for customer:', payload.new);
+          onOrderUpdate(payload.new);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'orders',
+        filter: `customer_id=eq.${customerId}`
+      },
+      (payload) => {
+        if (payload.new) {
+          console.log('📦 New order for customer:', payload.new);
+          onOrderUpdate(payload.new);
+        }
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ Subscribed to order updates for customer ${customerId}`);
+      } else if (status === 'CHANNEL_ERROR' && onError) {
+        onError(new Error('Channel error'));
+      }
+    });
+
+  return subscription;
+}
+
+/**
  * Convert status_id to status string for voice orders
  */
 function getStatusFromId(statusId: number): string {

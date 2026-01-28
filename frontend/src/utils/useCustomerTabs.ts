@@ -195,9 +195,14 @@ export function useCustomerTabs(tableNumber: number | null, orderId?: string | n
     guestId?: string
   ): Promise<any> => {
     try {
-      // Split tab functionality - to be implemented in backend
-      console.warn('Split tab functionality not yet available in API');
-      return { success: false, message: 'Not implemented' };
+      const response = await brain.split_customer_tab({
+        source_tab_id: sourceTabId,
+        new_tab_name: newTabName,
+        item_indices: itemIndices,
+        guest_id: guestId || null,
+      });
+      const data = await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to split tab:', err);
       return { success: false };
@@ -207,9 +212,12 @@ export function useCustomerTabs(tableNumber: number | null, orderId?: string | n
   // Command: Merge tabs
   const mergeTabs = async (sourceTabId: string, targetTabId: string): Promise<any> => {
     try {
-      // Merge tabs functionality - to be implemented in backend
-      console.warn('Merge tabs functionality not yet available in API');
-      return { success: false, message: 'Not implemented' };
+      const response = await brain.merge_customer_tabs({
+        source_tab_id: sourceTabId,
+        target_tab_id: targetTabId,
+      });
+      const data = await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to merge tabs:', err);
       return { success: false };

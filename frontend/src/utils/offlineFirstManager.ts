@@ -286,25 +286,37 @@ class OfflineFirstManager {
   }
 
   /**
-   * Execute a queued operation
+   * Execute a queued operation via brain (Supabase in Electron, HTTP in web)
    */
   private async executeOperation(operation: OfflineOperation): Promise<void> {
+    const brain = (await import('brain')).default;
+
     switch (operation.type) {
-      case 'order_create':
-        // Placeholder: Submit order to backend
-        console.log('📦 [OfflineFirst] Creating order:', operation.data);
+      case 'order_create': {
+        console.log('📦 [OfflineFirst] Syncing queued order:', operation.data);
+        const response = await brain.create_pos_order(operation.data);
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Order sync failed');
+        console.log('✅ [OfflineFirst] Order synced:', result.order_number);
         break;
-      
+      }
+
+      case 'order_update': {
+        console.log('📝 [OfflineFirst] Syncing order update:', operation.data);
+        const response = await brain.update_order_status(operation.data);
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Update sync failed');
+        break;
+      }
+
       case 'payment_process':
-        // Placeholder: Process payment
-        console.log('💳 [OfflineFirst] Processing payment:', operation.data);
+        console.log('💳 [OfflineFirst] Payment sync — not yet implemented');
         break;
-      
+
       case 'print_ticket':
-        // Placeholder: Send to printer
-        console.log('🖨️ [OfflineFirst] Printing ticket:', operation.data);
+        console.log('🖨️ [OfflineFirst] Print queue — not yet implemented');
         break;
-      
+
       default:
         console.warn(`⚠️ [OfflineFirst] Unknown operation type: ${operation.type}`);
     }

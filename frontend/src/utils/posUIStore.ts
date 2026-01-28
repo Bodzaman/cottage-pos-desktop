@@ -30,7 +30,11 @@ export interface UIStore {
   showGuestCountModal: boolean;
   showDineInModal: boolean;
   showPaymentFlow: boolean;
+  showReprintDialog: boolean;
   showSessionRestoreDialog: boolean;
+  showCommandPalette: boolean;
+  showWorkspaceWizard: boolean;
+  show86Board: boolean;
   
   // Pending Actions
   pendingOrderConfirmation: boolean;
@@ -76,7 +80,11 @@ export const usePOSUIStore = create<UIStore>((set) => ({
   showGuestCountModal: false,
   showDineInModal: false,
   showPaymentFlow: false,
+  showReprintDialog: false,
   showSessionRestoreDialog: false,
+  showCommandPalette: false,
+  showWorkspaceWizard: false,
+  show86Board: false,
   
   // Pending Actions
   pendingOrderConfirmation: false,
@@ -126,7 +134,11 @@ export const usePOSUIStore = create<UIStore>((set) => ({
       showGuestCountModal: false,
       showDineInModal: false,
       showPaymentFlow: false,
-      showSessionRestoreDialog: false
+      showReprintDialog: false,
+      showSessionRestoreDialog: false,
+      showCommandPalette: false,
+      showWorkspaceWizard: false,
+      show86Board: false
     });
   },
   

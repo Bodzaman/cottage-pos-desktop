@@ -1437,6 +1437,13 @@ export const loadPOSBundle = async () => {
       }));
 
       store.setMenuItems(bundleMenuItems);
+
+      // Set item variants so variantsByMenuItem lookup is populated
+      // This enables variant images, pricing, and variant chips on POS cards
+      if (bundleData.itemVariants && bundleData.itemVariants.length > 0) {
+        store.setItemVariants(bundleData.itemVariants);
+      }
+
       store.setLoading(false);
       store.setError(null);
 

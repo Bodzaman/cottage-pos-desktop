@@ -34,6 +34,7 @@ import { POSZoneErrorBoundary } from 'components/POSZoneErrorBoundary';
 
 // Utility imports
 import { QSAITheme } from '../utils/QSAIDesign';
+import { useRestaurantSettings } from '../utils/useRestaurantSettings';
 import { createLogger } from 'utils/logger';
 import { useOnDemandPrinter } from 'utils/onDemandPrinterService';
 import posPerf, { POSPerfMarks } from 'utils/posPerformance';
@@ -65,6 +66,11 @@ import { AnimatePresence } from 'framer-motion';
 import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
+import { ReprintDialog } from 'components/pos/ReprintDialog';
+import { PrinterSettings } from 'components/pos/PrinterSettings';
+import { CommandPalette } from 'components/pos/CommandPalette';
+import { WorkspaceSetupWizard } from 'components/pos/WorkspaceSetupWizard';
+import { EightySixBoard } from 'components/pos/EightySixBoard';
 import { PaymentFlowResult } from 'utils/paymentFlowTypes';
 import { Loader2 } from 'lucide-react';
 
@@ -92,6 +98,7 @@ import { usePrintingOperations } from 'utils/usePrintingOperations';
 import { usePOSInitialization } from 'utils/usePOSInitialization';
 
 import { OfflineFirst } from '../utils/offlineFirstManager';
+import { useNativeNotifications } from '../utils/useNativeNotifications';
 import { type PersistedSession } from '../utils/sessionPersistence';
 import { startPOSHeartbeat } from '../utils/posHeartbeat';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -175,37 +182,28 @@ export default function POSDesktop() {
     return stopHeartbeat;
   }, []);
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) navigate('/pos-login', { replace: true });
-  }, [authLoading, isAuthenticated, navigate]);
+  // Dynamic window title from restaurant settings
+  const { getBusinessProfile } = useRestaurantSettings();
+  const restaurantName = getBusinessProfile().name;
 
-  // Admin users should not be on POSDesktop - redirect to Admin portal
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.role === 'admin') {
-      navigate('/admin', { replace: true });
+    if (!restaurantName) return;
+    document.title = restaurantName;
+    // Update Electron window title if running in Electron
+    if ((window as any).electronAPI?.setWindowTitle) {
+      (window as any).electronAPI.setWindowTitle(restaurantName);
     }
-  }, [authLoading, isAuthenticated, user?.role, navigate]);
-
-  const [isManagementDialogOpen, setIsManagementDialogOpen] = useState(false);
-  const managerApprovalResolverRef = useRef<((approved: boolean) => void) | null>(null);
-  const [managerOverrideGranted, setManagerOverrideGranted] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  }, [restaurantName]);
 
   // ============================================================================
-  // SESSION PERSISTENCE STATE
+  // STORE SUBSCRIPTIONS — must be declared before any useEffect/useCallback that references them
   // ============================================================================
-  const [pendingSession, setPendingSession] = useState<PersistedSession | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(false);
-  const showSessionRestoreDialog = usePOSUIStore(state => state.showSessionRestoreDialog);
-
   const categories = useRealtimeMenuStore(state => state.categories, shallow);
   const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
   const isLoading = useRealtimeMenuStore(state => state.isLoading);
   const isConnected = useRealtimeMenuStore(state => state.isConnected);
   const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
-  
-  // ✅ FIX: Use reactive selectors for values that should trigger re-renders
-  // Use getState() only for actions (mutations), not for reading values
+
   const orderType = usePOSOrderStore(state => state.orderType);
   const orderItems = usePOSOrderStore(state => state.orderItems, shallow);
   const selectedTableNumber = usePOSOrderStore(state => state.selectedTableNumber);
@@ -215,11 +213,11 @@ export default function POSDesktop() {
   const setSelectedTableNumber = usePOSOrderStore(state => state.setSelectedTableNumber);
   const setGuestCount = usePOSOrderStore(state => state.setGuestCount);
   const clearOrder = usePOSOrderStore(state => state.clearOrder);
-  
+
   const customerData = usePOSCustomerStore(state => state.customerData, shallow);
   const updateCustomer = usePOSCustomerStore(state => state.updateCustomer);
   const clearCustomer = usePOSCustomerStore(state => state.clearCustomer);
-  
+
   const activeView = usePOSUIStore(state => state.activeView);
   const posViewMode = usePOSUIStore(state => state.posViewMode);
   const setPosViewMode = usePOSUIStore(state => state.setPosViewMode);
@@ -227,6 +225,10 @@ export default function POSDesktop() {
   const showGuestCountModal = usePOSUIStore(state => state.showGuestCountModal);
   const showCustomerModal = usePOSUIStore(state => state.showCustomerModal);
   const showPaymentFlow = usePOSUIStore(state => state.showPaymentFlow);
+  const showReprintDialog = usePOSUIStore(state => state.showReprintDialog);
+  const showCommandPalette = usePOSUIStore(state => state.showCommandPalette);
+  const showWorkspaceWizard = usePOSUIStore(state => state.showWorkspaceWizard);
+  const show86Board = usePOSUIStore(state => state.show86Board);
   const setActiveView = usePOSUIStore(state => state.setActiveView);
   const setModal = usePOSUIStore(state => state.setModal);
   const setQueuedJobsCount = usePOSUIStore(state => state.setQueuedJobsCount);
@@ -244,7 +246,126 @@ export default function POSDesktop() {
 
   // Customer intelligence for order history
   const { customerProfile, clearCustomer: clearIntelligenceCustomer } = usePOSCustomerIntelligence();
-  
+
+  // Native Windows notifications for critical events (online orders, printer status)
+  const { notify } = useNativeNotifications({
+    onNotificationClick: (actionId) => {
+      if (actionId.startsWith('online-order-')) {
+        setPosViewMode('ONLINE');
+        markAllSeen();
+      }
+    },
+  });
+
+  // Notify on new online orders via native notification
+  const prevUnseenRef = useRef(0);
+  useEffect(() => {
+    const current = unseenCount();
+    if (current > prevUnseenRef.current && prevUnseenRef.current >= 0) {
+      const newCount = current - prevUnseenRef.current;
+      notify({
+        title: `${newCount} New Online Order${newCount > 1 ? 's' : ''}`,
+        body: 'Tap to view and accept',
+        urgency: 'critical',
+        actionId: 'online-order-new',
+      });
+    }
+    prevUnseenRef.current = current;
+  }, [unseenCount()]);
+
+  // KIOSK MODE state — declared before kiosk useEffect that references it
+  const [kioskMode, setKioskMode] = useState(false);
+
+  // KIOSK MODE: Load initial state + listen for blocked exit attempts
+  useEffect(() => {
+    const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+    if (!electronAPI) return;
+
+    // Load initial kiosk state
+    if (electronAPI.getKioskState) {
+      electronAPI.getKioskState().then((result: any) => {
+        if (result?.success) setKioskMode(!!result.enabled);
+      }).catch(() => {});
+    }
+
+    // Listen for blocked exit attempts — toast the user
+    if (electronAPI.onKioskExitBlocked) {
+      electronAPI.onKioskExitBlocked(() => {
+        toast.warning('Kiosk mode active', {
+          description: 'Disable kiosk mode from Admin panel to exit'
+        });
+      });
+    }
+
+    return () => {
+      if (electronAPI.removeKioskExitBlockedListener) {
+        electronAPI.removeKioskExitBlockedListener();
+      }
+    };
+  }, []);
+
+  const toggleKioskMode = useCallback(async () => {
+    const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+    if (!electronAPI?.setKioskMode) return;
+    const newState = !kioskMode;
+    try {
+      const result = await electronAPI.setKioskMode(newState);
+      if (result?.success) {
+        setKioskMode(newState);
+        toast.success(newState ? 'Kiosk mode enabled' : 'Kiosk mode disabled', {
+          description: newState ? 'App is now locked to fullscreen' : 'Normal window mode restored'
+        });
+      }
+    } catch {
+      toast.error('Failed to toggle kiosk mode');
+    }
+  }, [kioskMode]);
+
+  // CUSTOMER DISPLAY: Push cart state to secondary monitor when items change
+  useEffect(() => {
+    const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+    if (!electronAPI?.sendToCustomerDisplay) return;
+
+    electronAPI.isCustomerDisplayOpen?.().then((result: any) => {
+      if (!result?.isOpen) return;
+      electronAPI.sendToCustomerDisplay({
+        items: orderItems.map(item => ({
+          name: item.name || item.menuItemName || 'Item',
+          quantity: item.quantity,
+          price: item.price,
+          modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
+        })),
+        total: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        orderType: orderType,
+        itemCount: orderItems.length
+      });
+    }).catch(() => {});
+  }, [orderItems, orderType]);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) navigate('/pos-login', { replace: true });
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Admin users should not be on POSDesktop - redirect to Admin portal
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user?.role === 'admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, user?.role, navigate]);
+
+  const [isManagementDialogOpen, setIsManagementDialogOpen] = useState(false);
+  const managerApprovalResolverRef = useRef<((approved: boolean) => void) | null>(null);
+  const [managerOverrideGranted, setManagerOverrideGranted] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+
+  // ============================================================================
+  // SESSION PERSISTENCE STATE
+  // ============================================================================
+  const [pendingSession, setPendingSession] = useState<PersistedSession | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const showSessionRestoreDialog = usePOSUIStore(state => state.showSessionRestoreDialog);
+
   const selectedTableUuid = useMemo(() => {
     if (orderType !== 'DINE-IN' || !selectedTableNumber) return null;
     const table = restaurantTables.find((t: any) => Number(t.table_number) === selectedTableNumber);
@@ -391,7 +512,24 @@ export default function POSDesktop() {
         // Check crash detection flag - only restore after unexpected termination
         const cleanExit = localStorage.getItem('pos_clean_exit');
 
-        if (cleanExit !== 'false') {
+        // Also check Electron main process crash detection (file-based)
+        let electronCrashDetected = false;
+        const electronAPI = (window as any).electronAPI;
+        if (electronAPI?.getCrashState) {
+          try {
+            const crashResult = await electronAPI.getCrashState();
+            electronCrashDetected = crashResult.hasCrashState;
+            if (electronCrashDetected) {
+              if (isDev) console.log('[POSDesktop] Electron main process crash detected');
+              // Clear Electron crash state since we're handling it
+              await electronAPI.clearCrashState();
+            }
+          } catch {
+            // Non-critical — fallback to localStorage detection
+          }
+        }
+
+        if (cleanExit !== 'false' && !electronCrashDetected) {
           // Last exit was clean (or flag never set) - clear any stale IndexedDB data
           if (isDev) console.log('[POSDesktop] Clean exit detected, clearing stale session data');
           await OfflineFirst.clearAllSessions();
@@ -490,6 +628,24 @@ export default function POSDesktop() {
     const timeoutId = setTimeout(saveCurrentSession, 2000);
     return () => clearTimeout(timeoutId);
   }, [orderItems, orderType, customerData, selectedTableNumber, guestCount]);
+
+  // Also save crash state to Electron main process (file-based, survives renderer crashes)
+  useEffect(() => {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI?.saveCrashState) return;
+    if (orderItems.length === 0) return;
+
+    const saveCrashState = () => {
+      electronAPI.saveCrashState({
+        tableNumber: selectedTableNumber,
+        orderType,
+        cartItems: orderItems,
+      }).catch(() => { /* non-critical */ });
+    };
+
+    const timeoutId = setTimeout(saveCrashState, 3000);
+    return () => clearTimeout(timeoutId);
+  }, [orderItems, orderType, selectedTableNumber]);
 
   const handleLogout = useCallback(async () => { await logout(); navigate('/pos-login', { replace: true }); }, [logout, navigate]);
   const handleManagementAuthSuccess = useCallback(() => { setManagerOverrideGranted(true); if (managerApprovalResolverRef.current) managerApprovalResolverRef.current(true); setIsManagementDialogOpen(false); setShowAdminPanel(true); }, []);
@@ -974,13 +1130,42 @@ export default function POSDesktop() {
     );
   };
 
-  // Keyboard shortcuts: F1-F5 for POS actions
+  // Keyboard shortcuts: F1-F12 + Ctrl combos for POS actions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when lock screen is active or in input fields
       if (isLocked) return;
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as any).isContentEditable) return;
+
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      // ---- Ctrl combos ----
+      if (ctrl) {
+        switch (e.key.toLowerCase()) {
+          case 'k':
+            e.preventDefault();
+            setModal('showCommandPalette', true);
+            return;
+          case '8':
+            e.preventDefault();
+            setModal('show86Board', !show86Board);
+            return;
+          case 'p':
+            e.preventDefault();
+            setModal('showReprintDialog', true);
+            return;
+          case 'z':
+            e.preventDefault();
+            // Undo: remove last item from cart
+            if (orderItems.length > 0) {
+              const lastItem = orderItems[orderItems.length - 1];
+              setOrderItems(orderItems.slice(0, -1));
+              toast.info(`Removed ${lastItem.name || 'last item'}`);
+            }
+            return;
+        }
+      }
 
       switch (e.key) {
         case 'F1':
@@ -1011,12 +1196,54 @@ export default function POSDesktop() {
           loadPOSBundle();
           toast.info('Menu refreshed');
           break;
+
+        // F6-F12: Section quick-select (Starters, Main, Sides, Accompaniments, Desserts, Drinks, Set Meals)
+        case 'F6': case 'F7': case 'F8': case 'F9': case 'F10': case 'F11': case 'F12': {
+          e.preventDefault();
+          const sectionIndex = parseInt(e.key.slice(1)) - 6; // F6→0, F7→1, ...F12→6
+          const { FIXED_SECTIONS } = require('../utils/sectionMapping');
+          const section = FIXED_SECTIONS[sectionIndex];
+          if (section) {
+            setSelectedSectionId(section.uuid);
+            setSelectedCategoryId(null);
+            useRealtimeMenuStore.getState().setSelectedMenuCategory(section.uuid);
+            toast.info(`${section.icon} ${section.displayName}`);
+          }
+          break;
+        }
+
+        // Numpad quantity adjustment (operates on last item in cart)
+        case '+':
+        case 'Add': {
+          e.preventDefault();
+          if (orderItems.length > 0) {
+            const updated = [...orderItems];
+            updated[updated.length - 1] = { ...updated[updated.length - 1], quantity: updated[updated.length - 1].quantity + 1 };
+            setOrderItems(updated);
+          }
+          break;
+        }
+        case '-':
+        case 'Subtract': {
+          e.preventDefault();
+          if (orderItems.length > 0) {
+            const updated = [...orderItems];
+            const last = updated[updated.length - 1];
+            if (last.quantity > 1) {
+              updated[updated.length - 1] = { ...last, quantity: last.quantity - 1 };
+              setOrderItems(updated);
+            } else {
+              setOrderItems(updated.slice(0, -1));
+            }
+          }
+          break;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen]);
+  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen, setOrderItems, setSelectedSectionId, setSelectedCategoryId]);
 
   if (authLoading) return <div className="h-dvh w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
   if (!isAuthenticated) return null;
@@ -1026,10 +1253,49 @@ export default function POSDesktop() {
       {/* Offline/Online Status Banner - Fixed overlay, outside grid to prevent row mismatch */}
       <POSOfflineBanner />
       <div className="fixed inset-0 grid grid-rows-[auto_auto_1fr_auto] bg-black overflow-hidden">
-        <ManagementHeader title="POS" onAdminSuccess={handleManagementAuthSuccess} onLogout={handleLogout} />
+        <ManagementHeader
+          title="POS"
+          onAdminSuccess={handleManagementAuthSuccess}
+          onLogout={handleLogout}
+          onCustomerSelect={(customer) => usePOSCustomerIntelligence.getState().selectCustomer(customer)}
+          onSelectOnlineOrder={(id) => setSelectedOnlineOrderId(id)}
+          onReorder={handleLoadPastOrder}
+        />
         <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} onlineOrdersCount={unseenCount()} />
         <div className="h-full overflow-hidden">{renderMainPOSView()}</div>
-        <POSFooter currentOrderType={orderType} />
+        <POSFooter
+          currentOrderType={orderType}
+          onToggleCustomerDisplay={async () => {
+            const api = (window as any).electronAPI;
+            if (!api) return;
+            try {
+              const status = await api.isCustomerDisplayOpen?.();
+              if (status?.isOpen) {
+                await api.closeCustomerDisplay?.();
+                toast.info('Customer display closed');
+              } else {
+                await api.openCustomerDisplay?.();
+                toast.success('Customer display opened');
+                setTimeout(() => {
+                  api.sendToCustomerDisplay?.({
+                    items: orderItems.map(item => ({
+                      name: item.name || item.menuItemName || 'Item',
+                      quantity: item.quantity,
+                      price: item.price,
+                      modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
+                    })),
+                    total: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                    orderType: orderType,
+                    itemCount: orderItems.length
+                  });
+                }, 1000);
+              }
+            } catch { toast.error('Customer display error'); }
+          }}
+          onToggleKioskMode={toggleKioskMode}
+          kioskMode={kioskMode}
+          onPrinterSettingsClick={() => setShowPrinterSettings(true)}
+        />
       </div>
 
       {/* Modals - Outside grid to prevent implicit row creation */}
@@ -1073,6 +1339,45 @@ export default function POSDesktop() {
         <AdminSidePanel isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={customerProfile} orders={customerProfile?.recent_orders || []} onReorder={handleLoadPastOrder} />
         <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
+        <ReprintDialog isOpen={showReprintDialog} onClose={() => setModal('showReprintDialog', false)} />
+        <PrinterSettings isOpen={showPrinterSettings} onClose={() => setShowPrinterSettings(false)} />
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setModal('showCommandPalette', false)}
+          actions={{
+            onNewOrder: () => { handleClearOrder(); toast.info('New order started'); },
+            onCheckout: () => { if (orderItems.length > 0) setModal('showPaymentFlow', true); else toast.warning('Add items before checkout'); },
+            onPrintReceipt: () => { if (orderItems.length > 0) printing.handlePrintReceipt(orderTotal); },
+            onLockScreen: handleLockScreen,
+            onRefreshMenu: () => { loadPOSBundle(); toast.info('Menu refreshed'); },
+            onOpenReprint: () => setModal('showReprintDialog', true),
+            onOpenKDS: () => { window.open(`${window.location.origin}/kds-v2?fullscreen=true`, 'kitchen-display', 'width=1920,height=1080'); },
+            onOpenAllOrders: () => { document.dispatchEvent(new CustomEvent('open-all-orders')); },
+            onOpenQuickTools: () => { document.dispatchEvent(new CustomEvent('open-quick-tools')); },
+            onAddMenuItem: (item: any) => handleAddToOrder(item),
+            onOpenCustomerDisplay: async () => {
+              const api = (window as any).electronAPI;
+              if (!api) return;
+              try {
+                const status = await api.isCustomerDisplayOpen?.();
+                if (status?.isOpen) { await api.closeCustomerDisplay?.(); toast.info('Customer display closed'); }
+                else { await api.openCustomerDisplay?.(); toast.success('Customer display opened'); }
+              } catch { toast.error('Customer display error'); }
+            },
+            onOpenEndOfDay: () => { document.dispatchEvent(new CustomEvent('open-end-of-day')); },
+            onOpenWorkspaceSetup: () => { setModal('showWorkspaceWizard', true); },
+            onOpen86Board: () => { setModal('show86Board', true); },
+          }}
+        />
+
+        <WorkspaceSetupWizard
+          isOpen={showWorkspaceWizard}
+          onClose={() => setModal('showWorkspaceWizard', false)}
+        />
+        <EightySixBoard
+          isOpen={show86Board}
+          onClose={() => setModal('show86Board', false)}
+        />
 
         {/* Kitchen Preview Modal for DINE-IN staging items */}
         <DineInKitchenPreviewModal

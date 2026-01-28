@@ -207,8 +207,32 @@ export function useOrderProcessing(
       return { success: true, order_number: data.order_number, order_id: data.database_order_id };
     } catch (error) {
       console.error('❌ Error submitting order:', error);
-      toast.error('Failed to submit order. Please try again.');
-      return { success: false };
+
+      // OFFLINE FALLBACK: Queue order for later sync if network fails
+      try {
+        const { outboxSyncManager } = await import('./outboxSyncManager');
+        const offlineOrderId = await outboxSyncManager.queueOrderCreation({
+          order_type: orderType,
+          table_number: selectedTableNumber ?? undefined,
+          guest_count: guestCount,
+          items: orderItems,
+          total_amount: calculateTotal(),
+          customer_data: customerData,
+          payment_method: 'cash',
+        });
+
+        console.log('📥 Order queued for offline sync:', offlineOrderId);
+        toast.warning('Network unavailable — order saved locally and will sync when online.', { duration: 6000 });
+
+        // Still clear cart since the order is safely queued
+        if (onOrderComplete) onOrderComplete();
+
+        return { success: true, order_number: offlineOrderId, offline: true };
+      } catch (queueError) {
+        console.error('❌ Failed to queue order offline:', queueError);
+        toast.error('Failed to submit order. Please try again.');
+        return { success: false };
+      }
     }
   }, [orderType, orderItems, customerData, selectedTableNumber, guestCount, calculateTotal, validateOrder, customerDataStore, onOrderComplete]);
 

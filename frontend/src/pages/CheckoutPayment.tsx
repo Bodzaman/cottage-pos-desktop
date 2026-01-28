@@ -13,6 +13,7 @@ import brain from 'brain';
 import { toast } from 'sonner';
 import { supabase } from 'utils/supabaseClient';
 import { FaCreditCard, FaLock, FaMapMarkerAlt, FaClock, FaPhone, FaUser, FaReceipt } from 'react-icons/fa';
+import { useCartStore } from 'utils/cartStore';
 import { AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 
 // Types
@@ -49,8 +50,16 @@ interface CheckoutData {
   total: number;
   subtotal: number;
   delivery_fee: number;
+  discount?: number;
+  promo_code?: string;
   tip_amount: number;
   order_notes?: string;
+  customer?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
 }
 
 // ✅ Data validation utility
@@ -113,8 +122,11 @@ const validateCheckoutData = (data: any): CheckoutData | null => {
       total: data.total,
       subtotal: data.subtotal,
       delivery_fee: data.delivery_fee || 0,
+      discount: data.discount || 0,
+      promo_code: data.promo_code || undefined,
       tip_amount: data.tip_amount || 0,
-      order_notes: data.order_notes || undefined
+      order_notes: data.order_notes || undefined,
+      customer: data.customer || undefined
     };
   } catch (error) {
     console.error(' CheckoutPayment: Error validating checkout data:', error);
@@ -127,7 +139,8 @@ export default function CheckoutPayment() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useSimpleAuth();
-  
+  const clearCart = useCartStore((state) => state.clearCart);
+
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const [restaurantConfig, setRestaurantConfig] = useState<RestaurantConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -223,13 +236,13 @@ export default function CheckoutPayment() {
 
       try {
         
-        // Build customer info - prefer form data for guests, fallback to auth user data
-        const guestCustomer = checkoutData.customer;
-        const customerName = guestCustomer?.firstName && guestCustomer?.lastName
-          ? `${guestCustomer.firstName} ${guestCustomer.lastName}`
+        // Build customer info - prefer checkout form data, fallback to auth user data
+        const formCustomer = checkoutData.customer;
+        const customerName = formCustomer?.firstName && formCustomer?.lastName
+          ? `${formCustomer.firstName} ${formCustomer.lastName}`
           : user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest';
-        const customerEmail = guestCustomer?.email || user?.email;
-        const customerPhone = guestCustomer?.phone || user?.phone || undefined;
+        const customerEmail = formCustomer?.email || user?.email;
+        const customerPhone = formCustomer?.phone || user?.phone || undefined;
 
         // Log the exact payload being sent
         const orderPayload = {
@@ -415,12 +428,15 @@ export default function CheckoutPayment() {
     
     // Payment already confirmed by StripeCheckout component via brain.confirm_payment()
     // Order status updated to CONFIRMED via Stripe webhook
-    // Just redirect to customer portal to view order
-    
+
+    // Clear cart and checkout session data
+    clearCart();
+    sessionStorage.removeItem('checkoutData');
+
     toast.success('Order placed successfully!', {
       description: 'Your payment has been processed',
     });
-    
+
     // Redirect to customer portal
     setTimeout(() => {
       navigate('/customer-portal');
@@ -655,14 +671,16 @@ export default function CheckoutPayment() {
                     <div className="space-y-2">
                       {/* Customer Name */}
                       <div className="text-[#EAECEF] font-medium">
-                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+                        {checkoutData.customer?.firstName && checkoutData.customer?.lastName
+                          ? `${checkoutData.customer.firstName} ${checkoutData.customer.lastName}`
+                          : user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
                       </div>
-                      
+
                       {/* Phone Number */}
-                      {user?.phone && (
+                      {(checkoutData.customer?.phone || user?.phone) && (
                         <div className="flex items-center gap-2 text-sm text-[#B7BDC6]">
                           <FaPhone className="text-[#8B1538] text-xs" />
-                          <span>{user?.phone}</span>
+                          <span>{checkoutData.customer?.phone || user?.phone}</span>
                         </div>
                       )}
                       
@@ -786,6 +804,12 @@ export default function CheckoutPayment() {
                         <span>£{checkoutData.delivery_fee.toFixed(2)}</span>
                       </div>
                     )}
+                    {(checkoutData.discount || 0) > 0 && (
+                      <div className="flex justify-between text-green-400 text-base">
+                        <span>Discount{checkoutData.promo_code ? ` (${checkoutData.promo_code})` : ''}</span>
+                        <span>-£{(checkoutData.discount || 0).toFixed(2)}</span>
+                      </div>
+                    )}
                     {checkoutData.tip_amount > 0 && (
                       <div className="flex justify-between text-[#B7BDC6] text-base">
                         <span>Tip</span>
@@ -816,9 +840,11 @@ export default function CheckoutPayment() {
                     amount={Math.round(checkoutData.total * 100)} // Convert to pence
                     currency="GBP"
                     orderType={checkoutData.delivery.method === 'delivery' ? 'DELIVERY' : 'COLLECTION'}
-                    customerEmail={user?.email || undefined}
+                    customerEmail={checkoutData.customer?.email || user?.email || undefined}
                     customerName={
-                      user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'
+                      checkoutData.customer?.firstName && checkoutData.customer?.lastName
+                        ? `${checkoutData.customer.firstName} ${checkoutData.customer.lastName}`
+                        : user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'
                     }
                     onPaymentSuccess={handlePaymentSuccess}
                     onPaymentError={handlePaymentError}

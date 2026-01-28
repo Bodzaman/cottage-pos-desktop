@@ -53,17 +53,29 @@ const MenuGrid = memo<MenuGridProps>(({
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(menuItems.length / columnCount),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 380, // Estimated height per row (card height ~350px + gap)
+    estimateSize: () => 300, // Estimated height per row (compact card ~280px + gap)
     overscan: 2, // Render 2 extra rows above/below viewport
   });
 
   // If loading, show loading state
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${className}`}>
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading menu items...</p>
+      <div className={`w-full ${className}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="rounded-2xl overflow-hidden border border-white/10 bg-black/30">
+              <Skeleton className="h-[160px] sm:h-[180px] w-full" />
+              <div className="p-4 space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-5 w-3/5" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -93,7 +105,7 @@ const MenuGrid = memo<MenuGridProps>(({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
         >
           {menuItems.map((item) => (
             <OnlineMenuCard

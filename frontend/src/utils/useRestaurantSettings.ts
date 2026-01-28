@@ -52,6 +52,21 @@ export interface PrepTimeSchedule {
   isActive: boolean;
 }
 
+export interface TimeSlot {
+  label: string;     // "Lunch", "Evening", "All Day"
+  openTime: string;  // "12:00"
+  closeTime: string; // "14:30"
+}
+
+export interface OrderingHoursEntry {
+  day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  enabled: boolean;
+  slots: TimeSlot[];
+  // Legacy fields (backward compat — migrated to slots on load)
+  openTime?: string;
+  closeTime?: string;
+}
+
 export interface OnlineOrdersSettings {
   notifications: {
     playSound: boolean;
@@ -69,6 +84,7 @@ export interface OnlineOrdersSettings {
     acceptCollectionOrders: boolean;
     orderCutoffMinutes: number;
   };
+  orderingHours?: OrderingHoursEntry[];
 }
 
 export interface RestaurantSettings {

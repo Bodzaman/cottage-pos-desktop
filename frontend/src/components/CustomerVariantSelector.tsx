@@ -389,15 +389,6 @@ export function CustomerVariantSelector({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 rounded-full h-8 w-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
           {/* Price Range Display - Outside DialogHeader to avoid Radix Slot ref issues */}
           {isMultiVariant && variants.length > 1 && (
             <div className="-mt-2 mb-2">

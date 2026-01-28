@@ -22,6 +22,7 @@
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       -webkit-app-region: drag;
       user-select: none;
+      transition: opacity 0.4s ease;
     }
 
     .splash-container {
@@ -33,38 +34,83 @@
       z-index: 2;
     }
 
-    /* Background glow effects */
-    .bg-glow {
+    /* ── Particle Field Background ── */
+    .particle-field {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .particle {
       position: absolute;
+      width: 2px;
+      height: 2px;
       border-radius: 50%;
-      filter: blur(60px);
-      opacity: 0.4;
-      animation: glowPulse 6s ease-in-out infinite;
+      background: rgba(124, 58, 237, 0.4);
+      opacity: 0;
+      animation: particleDrift linear infinite;
     }
 
-    .bg-glow-1 {
-      top: -40px;
-      left: -60px;
-      width: 200px;
-      height: 200px;
-      background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+    /* Larger accent particles */
+    .particle.accent {
+      width: 3px;
+      height: 3px;
+      background: rgba(167, 139, 250, 0.5);
+      box-shadow: 0 0 4px rgba(124, 58, 237, 0.3);
     }
 
-    .bg-glow-2 {
-      bottom: -40px;
-      right: -60px;
-      width: 200px;
-      height: 200px;
-      background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
-      animation-delay: -3s;
+    @keyframes particleDrift {
+      0% {
+        opacity: 0;
+        transform: translateY(0) translateX(0);
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-100vh) translateX(var(--sway, 20px));
+      }
     }
 
-    @keyframes glowPulse {
-      0%, 100% { opacity: 0.3; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.15); }
-    }
+    /* Generate 30 particles with staggered positions, delays, and sway */
+    .particle:nth-child(1)  { left: 3%;  bottom: -5%;  animation-duration: 12s; animation-delay: 0s;    --sway: 15px; }
+    .particle:nth-child(2)  { left: 8%;  bottom: -8%;  animation-duration: 14s; animation-delay: -2s;   --sway: -20px; }
+    .particle:nth-child(3)  { left: 13%; bottom: -3%;  animation-duration: 11s; animation-delay: -4s;   --sway: 25px; }
+    .particle:nth-child(4)  { left: 18%; bottom: -10%; animation-duration: 15s; animation-delay: -1s;   --sway: -10px; }
+    .particle:nth-child(5)  { left: 23%; bottom: -6%;  animation-duration: 13s; animation-delay: -6s;   --sway: 30px; }
+    .particle:nth-child(6)  { left: 28%; bottom: -4%;  animation-duration: 10s; animation-delay: -3s;   --sway: -25px; }
+    .particle:nth-child(7)  { left: 33%; bottom: -9%;  animation-duration: 16s; animation-delay: -8s;   --sway: 12px; }
+    .particle:nth-child(8)  { left: 38%; bottom: -2%;  animation-duration: 12s; animation-delay: -5s;   --sway: -18px; }
+    .particle:nth-child(9)  { left: 43%; bottom: -7%;  animation-duration: 14s; animation-delay: -1.5s; --sway: 22px; }
+    .particle:nth-child(10) { left: 48%; bottom: -5%;  animation-duration: 11s; animation-delay: -7s;   --sway: -15px; }
+    .particle:nth-child(11) { left: 53%; bottom: -8%;  animation-duration: 13s; animation-delay: -3.5s; --sway: 28px; }
+    .particle:nth-child(12) { left: 58%; bottom: -3%;  animation-duration: 15s; animation-delay: -9s;   --sway: -22px; }
+    .particle:nth-child(13) { left: 63%; bottom: -6%;  animation-duration: 10s; animation-delay: -2.5s; --sway: 18px; }
+    .particle:nth-child(14) { left: 68%; bottom: -10%; animation-duration: 12s; animation-delay: -6.5s; --sway: -30px; }
+    .particle:nth-child(15) { left: 73%; bottom: -4%;  animation-duration: 14s; animation-delay: -4.5s; --sway: 10px; }
+    .particle:nth-child(16) { left: 78%; bottom: -7%;  animation-duration: 16s; animation-delay: -0.5s; --sway: -12px; }
+    .particle:nth-child(17) { left: 83%; bottom: -2%;  animation-duration: 11s; animation-delay: -8.5s; --sway: 20px; }
+    .particle:nth-child(18) { left: 88%; bottom: -9%;  animation-duration: 13s; animation-delay: -5.5s; --sway: -28px; }
+    .particle:nth-child(19) { left: 93%; bottom: -5%;  animation-duration: 15s; animation-delay: -3s;   --sway: 16px; }
+    .particle:nth-child(20) { left: 97%; bottom: -8%;  animation-duration: 12s; animation-delay: -7.5s; --sway: -14px; }
+    .particle:nth-child(21) { left: 6%;  bottom: -6%;  animation-duration: 14s; animation-delay: -10s;  --sway: 24px; }
+    .particle:nth-child(22) { left: 16%; bottom: -3%;  animation-duration: 11s; animation-delay: -11s;  --sway: -20px; }
+    .particle:nth-child(23) { left: 26%; bottom: -9%;  animation-duration: 13s; animation-delay: -9.5s; --sway: 14px; }
+    .particle:nth-child(24) { left: 36%; bottom: -5%;  animation-duration: 15s; animation-delay: -12s;  --sway: -26px; }
+    .particle:nth-child(25) { left: 46%; bottom: -7%;  animation-duration: 10s; animation-delay: -6s;   --sway: 32px; }
+    .particle:nth-child(26) { left: 56%; bottom: -4%;  animation-duration: 12s; animation-delay: -4s;   --sway: -16px; }
+    .particle:nth-child(27) { left: 66%; bottom: -8%;  animation-duration: 16s; animation-delay: -2s;   --sway: 20px; }
+    .particle:nth-child(28) { left: 76%; bottom: -2%;  animation-duration: 11s; animation-delay: -8s;   --sway: -24px; }
+    .particle:nth-child(29) { left: 86%; bottom: -6%;  animation-duration: 14s; animation-delay: -10.5s;--sway: 18px; }
+    .particle:nth-child(30) { left: 96%; bottom: -10%; animation-duration: 13s; animation-delay: -5s;   --sway: -22px; }
 
-    /* Nucleus Animation */
+    /* ── Nucleus Animation (unchanged) ── */
     .nucleus-container {
       width: 80px;
       height: 80px;
@@ -170,7 +216,7 @@
       to { transform: translate(-50%, -50%) rotateX(85deg) rotateZ(600deg); }
     }
 
-    /* Text: "QuickServe AI" with flying letters */
+    /* ── Text: "QuickServe AI" with flying letters (unchanged) ── */
     .brand-text {
       display: flex;
       align-items: center;
@@ -222,7 +268,7 @@
     .letter:nth-child(12) { animation-delay: 0.85s; }
     .letter:nth-child(13) { animation-delay: 0.90s; }
 
-    /* Subtitle */
+    /* ── Subtitle (unchanged) ── */
     .subtitle {
       font-size: 1rem;
       color: rgba(255, 255, 255, 0.5);
@@ -237,47 +283,172 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Loading indicator */
-    .loading-bar {
-      width: 120px;
-      height: 2px;
-      background: rgba(124, 58, 237, 0.15);
-      border-radius: 2px;
-      overflow: hidden;
+    /* ── Real Progress Bar ── */
+    .progress-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
       opacity: 0;
       animation: fadeIn 0.4s ease forwards;
       animation-delay: 1.6s;
     }
 
+    .loading-bar {
+      width: 160px;
+      height: 3px;
+      background: rgba(124, 58, 237, 0.15);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
     .loading-bar-fill {
-      width: 40%;
+      width: 0%;
       height: 100%;
       background: linear-gradient(90deg, #7C3AED, #A78BFA);
-      border-radius: 2px;
-      animation: loadingSlide 1.5s ease-in-out infinite;
-      animation-delay: 1.6s;
+      border-radius: 3px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
     }
 
-    @keyframes loadingSlide {
-      0% { transform: translateX(-100%); }
-      50% { transform: translateX(150%); }
-      100% { transform: translateX(-100%); }
+    .loading-bar-fill.complete {
+      background: linear-gradient(90deg, #10B981, #34D399);
     }
 
-    /* Fade out when app is ready */
+    .status-text {
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 0.05em;
+      min-height: 1em;
+      transition: color 0.3s ease;
+    }
+
+    .status-text.complete {
+      color: rgba(16, 185, 129, 0.6);
+    }
+
+    /* ── Version Number ── */
+    .version-text {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.15);
+      letter-spacing: 0.08em;
+      z-index: 2;
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+      animation-delay: 1.8s;
+    }
+
+    /* ── Choreographed Exit ── */
+    body.exiting .progress-area {
+      animation: exitDown 0.25s ease forwards;
+    }
+
+    body.exiting .subtitle {
+      animation: exitDown 0.2s ease forwards;
+      animation-delay: 0.05s;
+    }
+
+    body.exiting .brand-text .letter {
+      animation: letterFlyOut 0.3s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+    }
+
+    /* Staggered exit delays (reverse order) */
+    body.exiting .letter:nth-child(13) { animation-delay: 0.05s; }
+    body.exiting .letter:nth-child(12) { animation-delay: 0.07s; }
+    body.exiting .letter:nth-child(11) { animation-delay: 0.09s; }
+    body.exiting .letter:nth-child(10) { animation-delay: 0.11s; }
+    body.exiting .letter:nth-child(9)  { animation-delay: 0.13s; }
+    body.exiting .letter:nth-child(8)  { animation-delay: 0.15s; }
+    body.exiting .letter:nth-child(7)  { animation-delay: 0.17s; }
+    body.exiting .letter:nth-child(6)  { animation-delay: 0.19s; }
+    body.exiting .letter:nth-child(5)  { animation-delay: 0.21s; }
+    body.exiting .letter:nth-child(4)  { animation-delay: 0.23s; }
+    body.exiting .letter:nth-child(3)  { animation-delay: 0.25s; }
+    body.exiting .letter:nth-child(2)  { animation-delay: 0.27s; }
+    body.exiting .letter:nth-child(1)  { animation-delay: 0.29s; }
+
+    body.exiting .nucleus-container {
+      animation: nucleusShrink 0.3s ease-in forwards;
+      animation-delay: 0.25s;
+    }
+
+    body.exiting .version-text {
+      animation: exitDown 0.15s ease forwards;
+    }
+
+    body.exiting .particle-field {
+      animation: fieldFade 0.4s ease forwards;
+      animation-delay: 0.2s;
+    }
+
+    /* Final body fade after all elements have animated */
     body.fade-out {
-      animation: fadeOut 0.3s ease forwards;
+      opacity: 0;
     }
 
-    @keyframes fadeOut {
+    @keyframes letterFlyOut {
+      from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.3);
+      }
+    }
+
+    @keyframes exitDown {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(10px); }
+    }
+
+    @keyframes nucleusShrink {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0; transform: scale(0); }
+    }
+
+    @keyframes fieldFade {
       to { opacity: 0; }
     }
   </style>
 </head>
 <body>
-  <!-- Background glows -->
-  <div class="bg-glow bg-glow-1"></div>
-  <div class="bg-glow bg-glow-2"></div>
+  <!-- Particle field background -->
+  <div class="particle-field">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle accent"></div>
+    <div class="particle"></div>
+  </div>
 
   <div class="splash-container">
     <!-- Nucleus Animation -->
@@ -308,15 +479,65 @@
     <!-- Subtitle -->
     <div class="subtitle">AI-Powered Restaurant Platform</div>
 
-    <!-- Loading indicator -->
-    <div class="loading-bar">
-      <div class="loading-bar-fill"></div>
+    <!-- Progress bar with status -->
+    <div class="progress-area">
+      <div class="loading-bar">
+        <div class="loading-bar-fill" id="progressFill"></div>
+      </div>
+      <div class="status-text" id="statusText">Initialising...</div>
     </div>
   </div>
 
+  <!-- Version number -->
+  <div class="version-text" id="versionText"></div>
+
   <script>
-    // Listen for fade-out signal from main process
+    // Update progress bar and status label — called from main process
+    function updateProgress(percent, label) {
+      const fill = document.getElementById('progressFill');
+      const text = document.getElementById('statusText');
+      if (fill) {
+        fill.style.width = percent + '%';
+        if (percent >= 100) {
+          fill.classList.add('complete');
+        }
+      }
+      if (text && label) {
+        text.textContent = label;
+        if (percent >= 100) {
+          text.classList.add('complete');
+        }
+      }
+    }
+
+    // Set version text — called from main process
+    function setVersion(version) {
+      const el = document.getElementById('versionText');
+      if (el) el.textContent = 'v' + version;
+    }
+
+    // Choreographed exit sequence
+    function startExit() {
+      // First: mark progress complete
+      updateProgress(100, 'Ready');
+
+      // After a beat, start the choreographed exit
+      setTimeout(() => {
+        document.body.classList.add('exiting');
+
+        // After exit animations complete, fade the whole body
+        setTimeout(() => {
+          document.body.classList.add('fade-out');
+        }, 500);
+      }, 200);
+    }
+
+    // Listen for signals from main process
     window.addEventListener('message', (event) => {
+      if (event.data === 'start-exit') {
+        startExit();
+      }
+      // Legacy support
       if (event.data === 'fade-out') {
         document.body.classList.add('fade-out');
       }

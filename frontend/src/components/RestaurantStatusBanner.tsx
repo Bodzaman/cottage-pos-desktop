@@ -46,6 +46,7 @@ export function RestaurantStatusBanner({
     isOnline,
     isAcceptingOrders,
     customMessage,
+    displayMessage,
     isLoading,
     error,
   } = useRestaurantAvailability();
@@ -86,7 +87,7 @@ export function RestaurantStatusBanner({
       return {
         type: 'unavailable' as const,
         icon: <WifiOff className="h-4 w-4" />,
-        text: customMessage || 'Restaurant is temporarily unavailable. Please try again shortly.',
+        text: displayMessage || customMessage || 'Restaurant is temporarily unavailable. Please try again shortly.',
         bgColor: 'bg-red-50 dark:bg-red-900/20',
         textColor: 'text-red-700 dark:text-red-400',
         borderColor: 'border-red-200 dark:border-red-800',

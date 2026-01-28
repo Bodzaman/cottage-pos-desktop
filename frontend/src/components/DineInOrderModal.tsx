@@ -37,6 +37,7 @@ import { ManageLinkedTablesDialog } from './ManageLinkedTablesDialog';
 import DineInFullReviewModal from './DineInFullReviewModal';
 import { OrderItemCard } from './OrderItemCard';
 import { toast } from 'sonner';
+import brain from 'brain';
 import { getElectronHeaders } from 'utils/electronDetection';
 import { supabase } from '@/utils/supabaseClient';
 import { EnrichedDineInOrderItem } from '../brain/data-contracts';
@@ -572,17 +573,16 @@ export function DineInOrderModal({
         return;
       }
 
-      // TODO: Replace with Supabase print queue or Electron API
-      // const response = await apiClient.print_dine_in_bill({ order_id: tableOrder.id });
-      // const result = await response.json();
+      const response = await brain.print_dine_in_bill({ order_id: tableOrder.id });
+      const result = await response.json();
 
-      // if (result.success) {
-      toast.success('🍳 Sent to kitchen', {
-        description: 'Kitchen ticket created'
-      });
-      // } else {
-      //   throw new Error(result.error || 'Failed to send to kitchen');
-      // }
+      if (result.success) {
+        toast.success('🍳 Sent to kitchen', {
+          description: 'Kitchen ticket created'
+        });
+      } else {
+        throw new Error(result.error || 'Failed to send to kitchen');
+      }
     } catch (error) {
       console.error('❌ Failed to send to kitchen:', error);
       toast.error('Failed to send to kitchen');
@@ -607,17 +607,16 @@ export function DineInOrderModal({
         console.log('🍳 [EVENT-DRIVEN] Sending to kitchen via enhanced endpoint:', eventDrivenOrder.id);
 
         // ✅ Call enhanced send-to-kitchen endpoint (marks items + creates print job)
-        // TODO: Replace with Supabase print queue or Electron API
-        // const response = await apiClient.print_dine_in_bill({ order_id: eventDrivenOrder.id });
-        // const result = await response.json();
+        const response = await brain.print_dine_in_bill({ order_id: eventDrivenOrder.id });
+        const result = await response.json();
 
-        // if (result.success) {
-        toast.success('Kitchen ticket printed successfully');
-        setShowKitchenPreviewModal(false);
-        return true;
-        // } else {
-        //   throw new Error(result.error || 'Failed to send to kitchen');
-        // }
+        if (result.success) {
+          toast.success('Kitchen ticket printed successfully');
+          setShowKitchenPreviewModal(false);
+          return true;
+        } else {
+          throw new Error(result.error || 'Failed to send to kitchen');
+        }
       }
 
       // ✅ LEGACY MODE: Use persisted table order data (same source as preview)
@@ -638,17 +637,16 @@ export function DineInOrderModal({
       console.log('🍳 [LEGACY] Sending to kitchen via enhanced endpoint:', tableOrder.id);
 
       // ✅ Call enhanced send-to-kitchen endpoint (marks items + creates print job)
-      // TODO: Replace with Supabase print queue or Electron API
-      // const response = await apiClient.print_dine_in_bill({ order_id: tableOrder.id });
-      // const result = await response.json();
+      const response = await brain.print_dine_in_bill({ order_id: tableOrder.id });
+      const result = await response.json();
 
-      // if (result.success) {
-      toast.success('Kitchen ticket printed successfully');
-      setShowKitchenPreviewModal(false);
-      return true;
-      // } else {
-      //   throw new Error(result.error || 'Print failed');
-      // }
+      if (result.success) {
+        toast.success('Kitchen ticket printed successfully');
+        setShowKitchenPreviewModal(false);
+        return true;
+      } else {
+        throw new Error(result.error || 'Print failed');
+      }
     } catch (error) {
       console.error('❌ Kitchen print failed:', error);
       toast.error('Failed to print kitchen ticket');
@@ -677,10 +675,9 @@ export function DineInOrderModal({
       try {
         // Step 1: Print bill (NEW: Dedicated DINE-IN endpoint - does NOT change status)
         console.log('📄 [AUTO-CLEAR] Step 1: Printing bill...');
-        // TODO: Replace with Supabase print queue or Electron API
-        // const billResponse = await apiClient.print_dine_in_bill({ order_id: eventDrivenOrder.id });
-        // const billResult = await billResponse.json();
-        console.log('✅ [AUTO-CLEAR] Print job skipped (apiClient removed)');
+        const billResponse = await brain.print_dine_in_bill({ order_id: eventDrivenOrder.id });
+        const billResult = await billResponse.json();
+        console.log('✅ [AUTO-CLEAR] Print job result:', billResult.success);
         
         // Step 2: Mark as completed (payment handled externally)
         console.log('✅ [AUTO-CLEAR] Step 2: Marking as completed (EXTERNAL)...');
@@ -775,18 +772,17 @@ export function DineInOrderModal({
         console.log('🖨️ [EVENT-DRIVEN] Sending bill receipt to printer:', receiptData);
 
         // Call print API with Electron headers
-        // TODO: Replace with Supabase print queue or Electron API
-        // const response = await apiClient.print_customer_receipt(receiptData, getElectronHeaders());
-        // const result = await response.json();
+        const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
+        const result = await response.json();
 
-        // if (result.success) {
-        toast.success('Bill printed successfully');
-        return true;
-        // } else {
-        //   throw new Error(result.error || 'Print failed');
-        // }
+        if (result.success) {
+          toast.success('Bill printed successfully');
+          return true;
+        } else {
+          throw new Error(result.error || 'Print failed');
+        }
       }
-      
+
       // ✅ LEGACY MODE: Use persistedTableOrders (Zustand)
       const tableOrder = persistedTableOrders[selectedTableTab];
       if (!tableOrder || !tableOrder.order_items || tableOrder.order_items.length === 0) {
@@ -840,16 +836,15 @@ export function DineInOrderModal({
       console.log('🖨️ [LEGACY] Sending bill receipt to printer:', receiptData);
 
       // Call print API with Electron headers
-      // TODO: Replace with Supabase print queue or Electron API
-      // const response = await apiClient.print_customer_receipt(receiptData, getElectronHeaders());
-      // const result = await response.json();
+      const response = await brain.print_customer_receipt(receiptData, getElectronHeaders());
+      const result = await response.json();
 
-      // if (result.success) {
-      toast.success('Bill printed successfully');
-      return true;
-      // } else {
-      //   throw new Error(result.error || 'Print failed');
-      // }
+      if (result.success) {
+        toast.success('Bill printed successfully');
+        return true;
+      } else {
+        throw new Error(result.error || 'Print failed');
+      }
     } catch (error) {
       console.error('❌ Bill print failed:', error);
       toast.error('Failed to print bill');

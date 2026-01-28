@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Minus, Settings2, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Plus, Minus, Settings2, Info, AlertTriangle } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { colors } from 'utils/designSystem';
@@ -14,6 +14,10 @@ import { StaffCustomizationModal } from 'components/StaffCustomizationModal';
 import { StaffVariantSelector } from 'components/StaffVariantSelector';
 import type { SelectedCustomization } from 'components/StaffCustomizationModal';
 import { useMenuItemImage } from 'utils/useMenuItemImage';
+import { supabase } from 'utils/supabaseClient';
+
+// Stable empty array reference to prevent unnecessary re-renders
+const EMPTY_VARIANTS: ItemVariant[] = [];
 
 interface POSMenuItemCardProps {
   item: MenuItem;
@@ -61,7 +65,49 @@ export function POSMenuItemCard({
   const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
   const [selectedVariantForCustomization, setSelectedVariantForCustomization] = useState<ItemVariant | null>(null);
   const [previewedVariant, setPreviewedVariant] = useState<ItemVariant | null>(null);
+  const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [is86d, setIs86d] = useState(item.is_available === false || item.isAvailable === false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
+
+  // Sync 86 state when item prop changes
+  useEffect(() => {
+    setIs86d(item.is_available === false || item.isAvailable === false);
+  }, [item.is_available, item.isAvailable]);
+
+  // Right-click context menu handler
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  // Close context menu on click elsewhere
+  useEffect(() => {
+    if (!showContextMenu) return;
+    const close = () => setShowContextMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+    };
+  }, [showContextMenu]);
+
+  // Toggle 86 status
+  const toggle86 = useCallback(async () => {
+    setShowContextMenu(null);
+    const newAvailable = is86d; // Flip: if 86'd, make available
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ is_available: newAvailable })
+        .eq('id', item.id);
+      if (error) throw error;
+      setIs86d(!newAvailable);
+      toast.success(newAvailable ? `${item.name} restored` : `${item.name} marked as 86'd`);
+    } catch {
+      toast.error('Failed to update item availability');
+    }
+  }, [is86d, item.id, item.name]);
 
   // Detect if description is truncated
   useEffect(() => {
@@ -72,9 +118,9 @@ export function POSMenuItemCard({
     }
   }, [item.description]);
 
-  // Get variants for this item
-  const variants = variantsByMenuItem[item.id] || [];
-  const activeVariants = variants.filter(v => v.is_active).sort((a, b) => a.price - b.price);
+  // Get variants for this item (stable reference when empty)
+  const variants = variantsByMenuItem[item.id] || EMPTY_VARIANTS;
+  const activeVariants = variants.filter(v => v.is_active).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
   const isMultiVariant = variants.length > 1;
 
   // ✅ UNIFIED PRICING: Use variantPricing utility to handle both single-price and variant items
@@ -113,6 +159,7 @@ export function POSMenuItemCard({
     context: 'pos', // Raw URLs for speed - staff needs instant loading
     enableCarousel: variantCarouselEnabled
   });
+
 
   // Spice indicators
   const spiceLevel = item.spice_indicators ? parseInt(item.spice_indicators) || 0 : 0;
@@ -173,6 +220,23 @@ export function POSMenuItemCard({
   // This respects user's chosen naming pattern (PREFIX, SUFFIX, INFIX, CUSTOM)
   const getVariantName = (variant: ItemVariant): string => {
     return variant.variant_name || variant.name || 'Standard';
+  };
+
+  // Short variant label — prioritizes protein_type_name for clean button display
+  const getShortVariantLabel = (variant: ItemVariant): string => {
+    if (variant.protein_type_name) return variant.protein_type_name;
+    const fullName = variant.variant_name || variant.name || '';
+    if (!fullName) return 'Option';
+    const itemUpper = item.name.toUpperCase().trim();
+    const fullUpper = fullName.toUpperCase().trim();
+    if (fullUpper.includes(itemUpper)) {
+      let stripped = fullUpper.replace(itemUpper, '').trim();
+      stripped = stripped.replace(/^\(.*?\)\s*/, '').replace(/\s*\(.*?\)$/, '').trim();
+      if (stripped.length > 0) {
+        return stripped.charAt(0) + stripped.slice(1).toLowerCase();
+      }
+    }
+    return fullName;
   };
 
   // Handle variant click - add to order with current quantity
@@ -422,34 +486,72 @@ export function POSMenuItemCard({
       className="group relative rounded-lg overflow-hidden border transition-all duration-300 hover:scale-[1.02] h-full flex flex-col"
       style={{
         background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(15, 15, 15, 0.95) 100%)',
-        borderColor: 'rgba(124, 93, 250, 0.2)',
-        boxShadow: '0 0 20px rgba(124, 93, 250, 0.1)'
+        borderColor: is86d ? 'rgba(239, 68, 68, 0.4)' : 'rgba(124, 93, 250, 0.2)',
+        boxShadow: is86d ? '0 0 20px rgba(239, 68, 68, 0.1)' : '0 0 20px rgba(124, 93, 250, 0.1)',
+        opacity: is86d ? 0.6 : 1,
       }}
-      whileHover={{
+      whileHover={is86d ? {} : {
         borderColor: 'rgba(124, 93, 250, 0.5)',
         boxShadow: '0 0 30px rgba(124, 93, 250, 0.3)'
       }}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: is86d ? 0.6 : 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      onContextMenu={handleContextMenu}
     >
+      {/* 86'd OVERLAY */}
+      {is86d && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px]">
+          <AlertTriangle className="h-8 w-8 text-red-400 mb-2" />
+          <span className="text-sm font-bold text-red-400 uppercase tracking-wider">86'd</span>
+          <button
+            onClick={toggle86}
+            className="mt-3 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors"
+          >
+            Restore
+          </button>
+        </div>
+      )}
+
+      {/* RIGHT-CLICK CONTEXT MENU */}
+      {showContextMenu && (
+        <div
+          className="fixed z-[200] rounded-lg shadow-xl py-1 min-w-[180px]"
+          style={{
+            left: showContextMenu.x,
+            top: showContextMenu.y,
+            backgroundColor: colors.background?.primary || '#1a1a2e',
+            border: '1px solid rgba(255,255,255,0.12)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors"
+            style={{ color: is86d ? '#34D399' : '#F87171' }}
+            onClick={toggle86}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {is86d ? 'Restore Item' : 'Mark as 86\'d (Out of Stock)'}
+          </button>
+        </div>
+      )}
+
       {/* IMAGE SECTION - Only render if item has images */}
       {hasImage && (
         <div className="relative w-full h-[150px] overflow-hidden flex-shrink-0">
           <AnimatePresence initial={false}>
             <motion.div
-              key={currentImageIndex}
+              key={imageUrl}
               className="absolute inset-0 w-full h-full"
               initial={{ opacity: 0, scale: 1.05 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
               transition={{ duration: 1.5, ease: 'easeInOut' }}
             >
-              {/* 🚀 DIRECT IMG TAG: Raw URL from hook, no additional optimization layer */}
               <img
                 src={imageUrl!}
                 alt={item.name}
-                loading="eager" // POS always eager - staff needs instant access
+                loading="eager"
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
@@ -457,7 +559,7 @@ export function POSMenuItemCard({
             </motion.div>
           </AnimatePresence>
 
-          {/* Loading skeleton */}
+          {/* Loading skeleton - only for initial image load */}
           {!imageLoaded && !imageError && (
             <div className="absolute inset-0 bg-gray-800 animate-pulse" />
           )}
@@ -722,7 +824,7 @@ export function POSMenuItemCard({
         {isMultiVariant && activeVariants.length > 0 && (
           <div className="space-y-1.5">
             {activeVariants.map((variant) => {
-              const variantName = getVariantName(variant);
+              const variantName = getShortVariantLabel(variant);
               const price = getVariantPrice(variant);
               
               return (

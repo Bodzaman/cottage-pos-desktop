@@ -4,9 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { globalColors } from '../utils/QSAIDesign';
 import { SpiceLevelDropdown } from './SpiceLevelDropdown';
-import { AllergenSelector } from './AllergenSelector';
+import { AllergenSelector, normalizeAllergenData } from './AllergenSelector';
 import { FieldError as RHFFieldError } from './FieldError';
 import type { UseFormRegister, UseFormSetValue, UseFormWatch, FieldErrors, Control } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
@@ -54,7 +53,8 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
 }) => {
   // Watch form values internally
   const formDefaultSpiceLevel = watch('default_spice_level') || 0;
-  const formAllergens = watch('allergens') || [];
+  const rawAllergens = watch('allergens');
+  const formAllergens = normalizeAllergenData(rawAllergens);
   const formAllergenWarnings = watch('allergen_warnings') || '';
   const formChefsSpecial = watch('chefs_special') || false;
   const formSpecialtyNotes = watch('specialty_notes') || '';
@@ -62,14 +62,13 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
   return (
     <div className="mb-8 p-6">
       <div className="flex items-center space-x-3 mb-6">
-        <div 
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: globalColors.purple.primary }}
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#7C3AED]"
           aria-hidden="true"
         >
           <ChefHat className="w-4 h-4 text-white" />
         </div>
-        <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>
+        <h3 className="text-lg font-semibold text-white">
           Food-Specific Settings
         </h3>
       </div>
@@ -85,7 +84,7 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
               className="w-full"
               aria-label="Default spice level for this dish"
             />
-            <p className="text-xs" style={{ color: globalColors.text.secondary }} id="spice-level-help">
+            <p className="text-xs text-gray-400" id="spice-level-help">
               Default spice level for this dish
             </p>
           </div>
@@ -95,14 +94,15 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
             <Controller
               name="allergens"
               control={control}
-              defaultValue={[]}
+              defaultValue={{}}
               render={({ field }) => (
                 <AllergenSelector
-                  selectedAllergens={field.value || []}
-                  onAllergensChange={field.onChange}
+                  allergenData={normalizeAllergenData(field.value)}
+                  onAllergenDataChange={(data) => {
+                    field.onChange(data);
+                  }}
                   allergenNotes={formAllergenWarnings}
                   onAllergenNotesChange={(notes) => setValue('allergen_warnings', notes, { shouldDirty: true })}
-                  aria-label="Select allergens present in this dish"
                 />
               )}
             />
@@ -110,7 +110,7 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
 
           {/* Chef's Special */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{ color: globalColors.text.primary }} id="chef-special-label">
+            <Label className="text-sm font-medium" id="chef-special-label">
               Special Designation
             </Label>
             <div className="flex items-center h-10 space-x-3 px-3 rounded-md border border-white/10" role="group" aria-labelledby="chef-special-label">
@@ -118,46 +118,46 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
                 id="chefs_special"
                 checked={formChefsSpecial}
                 onCheckedChange={(checked) => setValue('chefs_special', checked, { shouldDirty: true })}
-                className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-700"
+                className="data-[state=checked]:bg-[#7C3AED] data-[state=unchecked]:bg-gray-700"
                 aria-label="Mark as chef's signature dish"
                 aria-checked={formChefsSpecial}
               />
-              <Label htmlFor="chefs_special" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="chefs_special" className="text-sm cursor-pointer">
                 Chef's Special
               </Label>
             </div>
-            <p className="text-xs" style={{ color: globalColors.text.secondary }} id="chef-special-help">
+            <p className="text-xs text-gray-400" id="chef-special-help">
               Mark as chef's signature dish
             </p>
           </div>
         </div>
 
         {/* Separator */}
-        <div className="border-t border-gray-600/50" />
+        <div className="border-t border-white/[0.07]" />
 
         {/* Additional Details - Full Width */}
         <div className="space-y-6">
           {/* Chef's Notes */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="specialty_notes" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="specialty_notes" className="text-sm font-medium">
                 Chef's Notes & Special Instructions
               </Label>
-              <span className="text-xs" style={{ color: globalColors.text.secondary }} aria-live="polite" aria-atomic="true">
+              <span className="text-xs text-gray-400" aria-live="polite" aria-atomic="true">
                 {formSpecialtyNotes.length} / 500
               </span>
             </div>
             <Textarea
               id="specialty_notes"
               placeholder="Add any special preparation notes or chef recommendations"
-              className={`min-h-[80px] resize-none bg-black/20 border-white/10 ${errors.specialty_notes ? 'border-red-500' : ''}`}
+              className={`min-h-[80px] resize-none bg-surface-tertiary border-white/10 ${errors.specialty_notes ? 'border-red-500' : ''}`}
               rows={3}
               aria-label="Chef's notes and special preparation instructions"
               aria-invalid={errors.specialty_notes ? 'true' : 'false'}
               aria-describedby={`specialty-notes-help ${errors.specialty_notes ? 'specialty-notes-error' : ''}`}
               {...register('specialty_notes')}
             />
-            <p id="specialty-notes-help" className="text-xs" style={{ color: globalColors.text.secondary }}>
+            <p id="specialty-notes-help" className="text-xs text-gray-400">
               Internal notes for kitchen staff
             </p>
             <RHFFieldError error={errors.specialty_notes} id="specialty-notes-error" />

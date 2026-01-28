@@ -118,10 +118,7 @@ export function QuickNavigation({ className = '' }: QuickNavigationProps) {
         </Button>
       )}
 
-      {/* Settings Dropdown - DESKTOP FIX: Always show for desktop app compatibility */}
-      <SettingsDropdown className="" />
-
-      {/* Quick Tools Button - replaces old Settings button */}
+      {/* Quick Tools Button */}
       <Button
         variant="ghost"
         size="sm"
@@ -132,6 +129,9 @@ export function QuickNavigation({ className = '' }: QuickNavigationProps) {
         <Zap className="h-4 w-4 mr-2" />
         Quick Tools
       </Button>
+
+      {/* Settings Dropdown */}
+      <SettingsDropdown className="" />
 
       {/* Quick Tools Modal */}
       <QuickToolsModal

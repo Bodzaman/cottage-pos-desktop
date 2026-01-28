@@ -262,19 +262,74 @@ class MenuCacheDB {
 // Singleton instance
 export const menuCacheDB = new MenuCacheDB();
 
+// ============================================================================
+// ELECTRON FILE-SYSTEM CACHE TIER
+// Faster than IndexedDB and survives IndexedDB clears
+// ============================================================================
+
+const electronFileCache = {
+  async save(menuData: MenuCacheData): Promise<boolean> {
+    const api = (window as any).electronAPI;
+    if (!api?.cacheSet) return false;
+    try {
+      const result = await api.cacheSet('menu-data', {
+        ...menuData,
+        cachedAt: Date.now()
+      });
+      if (result?.success) {
+        console.log('[MenuCache] Saved to Electron file cache');
+      }
+      return result?.success || false;
+    } catch {
+      return false;
+    }
+  },
+
+  async load(): Promise<MenuCacheData | null> {
+    const api = (window as any).electronAPI;
+    if (!api?.cacheGet) return null;
+    try {
+      const result = await api.cacheGet('menu-data');
+      if (result?.success && result.data) {
+        const { cachedAt, ...menuData } = result.data;
+        const ageMin = Math.round((Date.now() - (cachedAt || 0)) / 60000);
+        console.log(`[MenuCache] Loaded from Electron file cache (${ageMin}m old)`);
+        return menuData as MenuCacheData;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+};
+
 /**
  * High-level API for menu caching
  */
 export const MenuCache = {
   /**
-   * Save menu data to cache
+   * Save menu data to cache (IndexedDB + Electron file system)
    */
-  save: (menuData: MenuCacheData) => menuCacheDB.saveMenuData(menuData),
+  save: async (menuData: MenuCacheData) => {
+    // Save to both tiers in parallel
+    const [idbResult] = await Promise.all([
+      menuCacheDB.saveMenuData(menuData),
+      electronFileCache.save(menuData)
+    ]);
+    return idbResult;
+  },
 
   /**
-   * Load menu data from cache
+   * Load menu data from cache (Electron file system first, then IndexedDB)
    */
-  load: () => menuCacheDB.loadMenuData(),
+  load: async () => {
+    // Try Electron file cache first (faster)
+    const electronData = await electronFileCache.load();
+    if (electronData) return electronData;
+
+    // Fall back to IndexedDB
+    return menuCacheDB.loadMenuData();
+  },
 
   /**
    * Check if cache is fresh

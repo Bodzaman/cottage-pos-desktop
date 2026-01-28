@@ -54,10 +54,11 @@ const CART_COLORS = {
 
 // Helper function to format currency
 const formatPrice = (price: number): string => {
+  const safePrice = typeof price === 'number' && !isNaN(price) ? price : 0;
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GBP'
-  }).format(price);
+  }).format(safePrice);
 };
 
 // Generic variant names that should be hidden (no useful info)
@@ -100,6 +101,9 @@ export function CartContent({
     totalAmount,
     currentOrderMode,
     addItem,
+    updateItem, // ✅ NEW: Import updateItem for editing cart items
+    setOrderMode, // ✅ NEW: Import for mode toggle
+    updatePricesForMode, // ✅ NEW: Import for mode toggle
     closeCart, // ✅ NEW: Import closeCart for auto-close on edit
     openCart, // ✅ NEW: Import openCart for auto-reopen after edit
     editingItemId, // ✅ NEW: Get from store instead of local state
@@ -230,23 +234,28 @@ export function CartContent({
   
   // ✅ NEW: Edit handlers
   const handleEditClick = (itemId: string) => {
-    // Close cart drawer before opening customization modal
-    closeCart();
+    // Keep cart open — modal opens on top (z-70 > cart z-60)
     setEditingItem(itemId);
   };
   
-  const handleSaveEdit = (_itemId: string, _updatedData: {
+  const handleSaveEdit = (itemId: string, updatedData: {
     variant?: any;
     customizations?: Array<{id: string; name: string; price: number}>;
     notes?: string;
     quantity?: number;
   }) => {
-    // Note: updateItem is not available in CartState - editing requires item removal and re-add
-    // For now, just close the editor
-    clearEditingItem();
+    // ✅ FIXED: Actually update the cart item using updateItem from store
+    if (updateItem) {
+      updateItem(itemId, {
+        variant: updatedData.variant,
+        customizations: updatedData.customizations,
+        notes: updatedData.notes,
+        quantity: updatedData.quantity
+      });
+    }
 
-    // Show success feedback
-    toast.success('Item updated successfully');
+    // Close the editor
+    clearEditingItem();
   };
   
   const handleCancelEdit = () => {
@@ -258,70 +267,43 @@ export function CartContent({
       {/* Scrollable items list */}
       <div className="flex-1 overflow-y-auto p-6 space-y-2">
         {items.length === 0 ? (
-          <motion.div 
-            className="text-center py-12"
+          <motion.div
+            className="text-center py-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            {/* Animated food icon */}
+            {/* Animated cart icon */}
             <motion.div
-              animate={{ 
-                y: [0, -10, 0],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="mb-6"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="mb-4"
             >
-              <ShoppingCart 
-                className="h-20 w-20 mx-auto opacity-30" 
-                style={{ color: PremiumTheme.colors.silver[400] }} 
+              <ShoppingCart
+                className="h-14 w-14 mx-auto opacity-30"
+                style={{ color: PremiumTheme.colors.silver[400] }}
               />
             </motion.div>
-            
-            <h3 className="text-xl font-semibold mb-2" style={{ color: PremiumTheme.colors.text.primary }}>
+
+            <h3 className="text-lg font-semibold mb-1" style={{ color: PremiumTheme.colors.text.primary }}>
               Your cart is empty
             </h3>
-            <p className="text-sm mb-6" style={{ color: PremiumTheme.colors.text.muted }}>
-              Ready to order? Add some delicious dishes!
+            <p className="text-sm mb-5" style={{ color: PremiumTheme.colors.text.muted }}>
+              Browse our menu to get started
             </p>
-            
-            {/* Current order mode indicator */}
-            <div className="mb-6 flex items-center justify-center gap-2">
-              <span className="text-xs" style={{ color: PremiumTheme.colors.text.muted }}>
-                Current mode:
-              </span>
-              <Badge
-                className="cursor-default"
-                style={{
-                  backgroundColor: currentOrderMode === 'delivery' 
-                    ? PremiumTheme.colors.silver[500] + '20'
-                    : PremiumTheme.colors.burgundy[500] + '20',
-                  color: currentOrderMode === 'delivery' 
-                    ? PremiumTheme.colors.silver[400]
-                    : PremiumTheme.colors.burgundy[400],
-                  border: `1px solid ${currentOrderMode === 'delivery' 
-                    ? PremiumTheme.colors.silver[500] + '40'
-                    : PremiumTheme.colors.burgundy[500] + '40'}`
-                }}
-              >
-                {currentOrderMode === 'delivery' ? '🚗 Delivery' : '🏃 Collection'}
-              </Badge>
-            </div>
-            
-            {/* Suggested actions */}
+
+            {/* Browse Menu CTA — burgundy primary */}
             {showContinueShopping && onContinueShopping && (
-              <div className="space-y-3 max-w-xs mx-auto">
+              <div className="max-w-xs mx-auto">
                 <Button
                   onClick={onContinueShopping}
                   className="w-full h-11 font-medium transition-all hover:scale-[1.02]"
                   style={{
-                    background: `linear-gradient(135deg, ${PremiumTheme.colors.silver[500]} 0%, ${PremiumTheme.colors.silver[600]} 100%)`,
-                    color: PremiumTheme.colors.dark[900],
+                    background: PremiumTheme.colors.burgundy[500],
+                    color: 'white',
                     border: 'none'
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = PremiumTheme.colors.burgundy[600]}
+                  onMouseLeave={(e) => e.currentTarget.style.background = PremiumTheme.colors.burgundy[500]}
                 >
                   <Utensils className="h-4 w-4 mr-2" />
                   Browse Menu
@@ -330,8 +312,76 @@ export function CartContent({
             )}
           </motion.div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {sortedItems.map((item) => {
+          <>
+            {/* ✅ NEW: Compact Order Mode Toggle */}
+            <div
+              className="flex items-center justify-between p-3 mb-4 rounded-lg"
+              style={{
+                backgroundColor: PremiumTheme.colors.dark[800],
+                border: `1px solid ${PremiumTheme.colors.border.light}`
+              }}
+            >
+              <span className="text-sm font-medium" style={{ color: PremiumTheme.colors.text.secondary }}>
+                Order Type
+              </span>
+              <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: PremiumTheme.colors.dark[900] }}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (currentOrderMode !== 'collection') {
+                      setOrderMode('collection');
+                      updatePricesForMode('collection');
+                      toast.success('Switched to Collection');
+                    }
+                  }}
+                  className={`h-8 px-3 text-xs font-medium transition-all ${
+                    currentOrderMode === 'collection' ? 'text-white' : ''
+                  }`}
+                  style={{
+                    backgroundColor: currentOrderMode === 'collection'
+                      ? PremiumTheme.colors.burgundy[500]
+                      : 'transparent',
+                    color: currentOrderMode === 'collection'
+                      ? PremiumTheme.colors.text.primary
+                      : PremiumTheme.colors.text.muted
+                  }}
+                  aria-label="Switch to collection"
+                  aria-pressed={currentOrderMode === 'collection'}
+                >
+                  Collection
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (currentOrderMode !== 'delivery') {
+                      setOrderMode('delivery');
+                      updatePricesForMode('delivery');
+                      toast.success('Switched to Delivery');
+                    }
+                  }}
+                  className={`h-8 px-3 text-xs font-medium transition-all ${
+                    currentOrderMode === 'delivery' ? 'text-white' : ''
+                  }`}
+                  style={{
+                    backgroundColor: currentOrderMode === 'delivery'
+                      ? PremiumTheme.colors.silver[500]
+                      : 'transparent',
+                    color: currentOrderMode === 'delivery'
+                      ? PremiumTheme.colors.dark[900]
+                      : PremiumTheme.colors.text.muted
+                  }}
+                  aria-label="Switch to delivery"
+                  aria-pressed={currentOrderMode === 'delivery'}
+                >
+                  Delivery
+                </Button>
+              </div>
+            </div>
+
+            <AnimatePresence mode="popLayout">
+              {sortedItems.map((item) => {
               // ✅ FIX: item.name already contains full variant name from cartStore
               // cartStore line 387: name: variant?.variant_name || variant?.name || item.name
               const displayName = item.name || 'Menu item';
@@ -358,24 +408,37 @@ export function CartContent({
               const isEditing = editingItemId === item.id;
               
               return (
-                <motion.div
-                  key={item.id}
-                  layout={!shouldReduceMotion}
-                  initial={shouldReduceMotion ? false : { opacity: 0, x: -20, scale: 0.95 }}
-                  animate={{ 
-                    opacity: 1, 
-                    x: 0,
-                    scale: 1
-                  }}
-                  exit={shouldReduceMotion ? undefined : { 
-                    opacity: 0, 
-                    x: 20, 
-                    scale: 0.95,
-                    transition: ANIMATION_TIMINGS.itemExit
-                  }}
-                  transition={shouldReduceMotion ? { duration: 0 } : ANIMATION_TIMINGS.itemEntry}
-                  className="group"
-                >
+                <div key={item.id} className="relative overflow-hidden rounded-xl">
+                  {/* Swipe-to-delete background */}
+                  <div className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 rounded-xl"
+                    style={{ backgroundColor: '#ef444420' }}>
+                    <Trash2 className="h-5 w-5 text-red-400" />
+                  </div>
+                  <motion.div
+                    layout={!shouldReduceMotion}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={{ left: 0.4, right: 0 }}
+                    dragDirectionLock
+                    onDragEnd={(_, info) => {
+                      if (info.offset.x < -100) removeItem(item.id);
+                    }}
+                    style={{ touchAction: 'pan-y' }}
+                    initial={shouldReduceMotion ? false : { opacity: 0, x: -20, scale: 0.95 }}
+                    animate={{
+                      opacity: 1,
+                      x: 0,
+                      scale: 1
+                    }}
+                    exit={shouldReduceMotion ? undefined : {
+                      opacity: 0,
+                      x: -200,
+                      scale: 0.95,
+                      transition: ANIMATION_TIMINGS.itemExit
+                    }}
+                    transition={shouldReduceMotion ? { duration: 0 } : ANIMATION_TIMINGS.itemEntry}
+                    className="group relative"
+                  >
                   <Card
                     className="border-0 overflow-hidden transition-all duration-300"
                     style={{
@@ -388,7 +451,7 @@ export function CartContent({
                       <div className="flex items-start space-x-3">
                         {/* Item Image with glow and hover effect */}
                         <div 
-                          className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative transition-transform duration-300 group-hover:scale-105"
+                          className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 relative transition-transform duration-300 group-hover:scale-105"
                           style={{
                             border: `1px solid ${PremiumTheme.colors.silver[400]}40`,
                             boxShadow: `0 0 12px ${PremiumTheme.colors.silver[400]}20`
@@ -415,7 +478,7 @@ export function CartContent({
                               display: ((item.variant as any)?.display_image_url || (item.variant as any)?.image_url || item.imageUrl) ? 'none' : 'flex'
                             }}
                           >
-                            <Utensils className="h-8 w-8" style={{ color: PremiumTheme.colors.text.muted }} />
+                            <Utensils className="h-6 w-6" style={{ color: PremiumTheme.colors.text.muted }} />
                           </div>
                         </div>
                         
@@ -426,28 +489,17 @@ export function CartContent({
                               {variantName}
                             </h4>
                             
-                            {/* ✅ RESTRUCTURE: Edit + Delete buttons in top-right */}
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditClick(item.id)}
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ color: PremiumTheme.colors.silver[400] }}
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                              
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeItem(item.id)}
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ color: '#ef4444' }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {/* Edit button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(item.id)}
+                              className="h-7 w-7 p-0 opacity-60 hover:opacity-100 transition-opacity"
+                              style={{ color: PremiumTheme.colors.silver[400] }}
+                              aria-label={`Edit ${item.name}`}
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                           
                           {/* Display Customizations */}
@@ -499,21 +551,23 @@ export function CartContent({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => updateQuantityDebounced(item.id, item.quantity - 1)}
+                                  onClick={() => item.quantity <= 1
+                                    ? removeItem(item.id)
+                                    : updateQuantityDebounced(item.id, item.quantity - 1)}
                                   className="h-7 w-7 p-0 transition-all"
                                   style={{
-                                    border: `1px solid ${PremiumTheme.colors.border.medium}`,
-                                    color: PremiumTheme.colors.text.secondary
+                                    border: `1px solid ${item.quantity <= 1 ? '#ef444460' : PremiumTheme.colors.border.medium}`,
+                                    color: item.quantity <= 1 ? '#ef4444' : PremiumTheme.colors.text.secondary
                                   }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = PremiumTheme.colors.dark[700]}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = item.quantity <= 1 ? '#ef444420' : PremiumTheme.colors.dark[700]}
                                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                  disabled={item.quantity <= 1}
+                                  aria-label={item.quantity <= 1 ? `Remove ${item.name} from cart` : `Decrease quantity of ${item.name}`}
                                 >
-                                  <Minus className="h-3 w-3" />
+                                  {item.quantity <= 1 ? <Trash2 className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                                 </Button>
                               </motion.div>
                               
-                              <motion.span 
+                              <motion.span
                                 key={`qty-${item.id}-${item.quantity}`}
                                 initial={shouldReduceMotion ? false : { scale: 1.3, color: CART_COLORS.success }}
                                 animate={{ scale: 1, color: PremiumTheme.colors.text.primary }}
@@ -523,6 +577,8 @@ export function CartContent({
                                   damping: 20
                                 }}
                                 className="font-medium text-base min-w-[1.5rem] text-center"
+                                aria-label={`Quantity: ${item.quantity}`}
+                                aria-live="polite"
                               >
                                 {item.quantity}
                               </motion.span>
@@ -541,6 +597,7 @@ export function CartContent({
                                   }}
                                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = PremiumTheme.colors.dark[700]}
                                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  aria-label={`Increase quantity of ${item.name}`}
                                 >
                                   <Plus className="h-3 w-3" />
                                 </Button>
@@ -580,9 +637,11 @@ export function CartContent({
                     </CardContent>
                   </Card>
                 </motion.div>
+                </div>
               );
             })}
-          </AnimatePresence>
+            </AnimatePresence>
+          </>
         )}
         
         {/* Smart Item Recommendations */}
@@ -604,7 +663,25 @@ export function CartContent({
       {/* Footer with enhanced totals */}
       {items.length > 0 && (
         <div className="border-t p-6" style={{ borderColor: PremiumTheme.colors.border.medium }}>
-          {/* Enhanced Price Breakdown */}
+          {/* Always-visible summary */}
+          <div className="flex justify-between text-sm mb-2">
+            <span style={{ color: PremiumTheme.colors.text.secondary }}>
+              {totalItems} item{totalItems !== 1 ? 's' : ''} · Subtotal
+            </span>
+            <span className="font-medium" style={{ color: PremiumTheme.colors.silver[400] }}>
+              {formatPrice(totalAmount)}
+            </span>
+          </div>
+          {currentOrderMode === 'delivery' && (
+            <div className="flex justify-between text-sm mb-3">
+              <span style={{ color: PremiumTheme.colors.text.secondary }}>Delivery</span>
+              <span className="font-medium" style={{ color: deliveryFee > 0 ? PremiumTheme.colors.silver[400] : '#22c55e' }}>
+                {deliveryFee > 0 ? formatPrice(deliveryFee) : 'FREE'}
+              </span>
+            </div>
+          )}
+
+          {/* Detailed breakdown accordion */}
           <Accordion type="single" collapsible className="mb-4">
             <AccordionItem value="price-breakdown" style={{ borderColor: PremiumTheme.colors.border.medium }}>
               <AccordionTrigger 
@@ -730,9 +807,9 @@ export function CartContent({
             </div>
           </div>
           
-          {/* NEW: Minimum Order Warning for Delivery */}
+          {/* Minimum Order Warning for Delivery */}
           {currentOrderMode === 'delivery' && !minimumOrderMet && deliveryConfig && (
-            <div 
+            <div
               className="mb-4 p-3 rounded-lg border text-center"
               style={{
                 backgroundColor: PremiumTheme.colors.burgundy[500] + '20',
@@ -741,8 +818,36 @@ export function CartContent({
               }}
             >
               <p className="text-sm font-medium">
-                Add £{(typeof amountNeededForMinimum === 'number' && !isNaN(amountNeededForMinimum) ? amountNeededForMinimum : 0).toFixed(2)} more to reach £{(typeof deliveryConfig.min_order === 'number' && !isNaN(deliveryConfig.min_order) ? deliveryConfig.min_order : 0).toFixed(2)} minimum
+                Add {formatPrice(amountNeededForMinimum)} more to reach {formatPrice(deliveryConfig.min_order)} minimum
               </p>
+            </div>
+          )}
+
+          {/* Free delivery progress nudge */}
+          {currentOrderMode === 'delivery' && deliveryFee > 0 && deliveryConfig && deliveryConfig.free_over > 0 && totalAmount < deliveryConfig.free_over && (
+            <div className="mb-3 p-2.5 rounded-lg border"
+              style={{
+                backgroundColor: PremiumTheme.colors.dark[800],
+                borderColor: PremiumTheme.colors.border.medium
+              }}>
+              <div className="flex justify-between text-xs mb-1.5">
+                <span style={{ color: PremiumTheme.colors.text.muted }}>
+                  Add {formatPrice(deliveryConfig.free_over - totalAmount)} for free delivery
+                </span>
+                <span style={{ color: '#22c55e' }}>
+                  {formatPrice(deliveryConfig.free_over)}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden"
+                style={{ backgroundColor: PremiumTheme.colors.dark[600] }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: '#22c55e' }}
+                  initial={false}
+                  animate={{ width: `${Math.min((totalAmount / deliveryConfig.free_over) * 100, 100)}%` }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                />
+              </div>
             </div>
           )}
 
@@ -782,7 +887,7 @@ export function CartContent({
                   </>
                 ) : (
                   <>
-                    Proceed to Checkout
+                    Checkout · {formatPrice(finalTotal)}
                     <ArrowRight className="h-5 w-5 ml-2" />
                   </>
                 )}
@@ -813,7 +918,7 @@ export function CartContent({
                     Sign In for Faster Checkout
                   </Button>
                 )}
-                
+
                 {/* Primary: Continue as Guest */}
                 <Button
                   onClick={handleCheckout}
@@ -846,7 +951,7 @@ export function CartContent({
                     </>
                   ) : (
                     <>
-                      Continue as Guest
+                      Checkout · {formatPrice(finalTotal)}
                       <ArrowRight className="h-5 w-5 ml-2" />
                     </>
                   )}
@@ -883,9 +988,9 @@ export function CartContent({
           
           {/* Quick info */}
           <div className="mt-4 text-center">
-            <p className="text-xs flex items-center justify-center" style={{ color: PremiumTheme.colors.text.muted }}>
-              <Clock className="h-3 w-3 mr-1" />
-              Estimated prep time: 15-20 minutes
+            <p className="text-xs flex items-center justify-center gap-1" style={{ color: PremiumTheme.colors.text.muted }}>
+              <Clock className="h-3 w-3" />
+              Est. {totalItems <= 3 ? '15-20' : totalItems <= 6 ? '20-30' : '30-45'} min{currentOrderMode === 'delivery' ? ' + delivery' : ''}
             </p>
           </div>
         </div>

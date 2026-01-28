@@ -52,9 +52,17 @@ export function OnlineOrderFilters() {
   const urgentCount = urgentOrders().length;
 
   return (
-    <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5">
+    <div
+      className="flex flex-col h-full rounded-xl overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(25,25,25,0.95) 100%)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(124,93,250,0.15)',
+        boxShadow: '0 12px 30px -8px rgba(0,0,0,0.6)',
+      }}
+    >
       {/* Header */}
-      <div className="px-4 py-3 border-b border-white/5">
+      <div className="px-4 py-3 border-b white/[0.07]">
         <h2 className="text-lg font-semibold text-white">Online Orders</h2>
         <p className="text-xs text-gray-400 mt-0.5">
           Manage incoming orders
@@ -62,7 +70,7 @@ export function OnlineOrderFilters() {
       </div>
 
       {/* Connection Status */}
-      <div className="px-4 py-3 border-b border-white/5">
+      <div className="px-4 py-3 border-b white/[0.07]">
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-400">Connection</span>
           <div className="flex items-center gap-1.5">
@@ -87,7 +95,7 @@ export function OnlineOrderFilters() {
       </div>
 
       {/* Controls */}
-      <div className="px-4 py-3 border-b border-white/5 space-y-3">
+      <div className="px-4 py-3 border-b white/[0.07] space-y-3">
         {/* Sound Toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -145,39 +153,60 @@ export function OnlineOrderFilters() {
 
         {/* Status Counts */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <div
+            className="flex items-center justify-between p-2 rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(37,99,235,0.08) 100%)',
+              border: '1px solid rgba(59,130,246,0.25)',
+              boxShadow: '0 2px 8px rgba(59,130,246,0.12)',
+            }}
+          >
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-blue-300">New</span>
+              <span className="text-sm text-blue-300 font-medium">New</span>
             </div>
-            <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 border-0">
+            <Badge variant="secondary" className="bg-blue-500/25 text-blue-300 border-0">
               {newCount}
             </Badge>
           </div>
 
-          <div className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <div
+            className="flex items-center justify-between p-2 rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(91,33,182,0.08) 100%)',
+              border: '1px solid rgba(124,58,237,0.25)',
+              boxShadow: '0 2px 8px rgba(124,58,237,0.12)',
+            }}
+          >
             <div className="flex items-center gap-2">
               <ChefHat className="w-4 h-4 text-purple-400" />
-              <span className="text-sm text-purple-300">Preparing</span>
+              <span className="text-sm text-purple-300 font-medium">Preparing</span>
             </div>
-            <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 border-0">
+            <Badge variant="secondary" className="bg-purple-500/25 text-purple-300 border-0">
               {preparingCount}
             </Badge>
           </div>
 
-          <div className="flex items-center justify-between p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+          <div
+            className="flex items-center justify-between p-2 rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(22,163,74,0.08) 100%)',
+              border: '1px solid rgba(34,197,94,0.25)',
+              boxShadow: '0 2px 8px rgba(34,197,94,0.12)',
+            }}
+          >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
-              <span className="text-sm text-green-300">Ready</span>
+              <span className="text-sm text-green-300 font-medium">Ready</span>
             </div>
-            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-0">
+            <Badge variant="secondary" className="bg-green-500/25 text-green-300 border-0">
               {readyCount}
             </Badge>
           </div>
         </div>
 
         {/* Total Active */}
-        <div className="pt-3 mt-3 border-t border-white/5">
+        <div className="pt-3 mt-3 border-t white/[0.07]">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-400">Total Active</span>
             <span className="text-lg font-bold text-white">

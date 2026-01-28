@@ -384,7 +384,10 @@ export function calculateTotalItems(items: CartItem[]): number {
  * Calculate total cart amount
  */
 export function calculateTotalAmount(items: CartItem[]): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return items.reduce((sum, item) => {
+    const price = typeof item.price === 'number' && !isNaN(item.price) ? item.price : 0;
+    return sum + price * item.quantity;
+  }, 0);
 }
 
 /**

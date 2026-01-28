@@ -11,7 +11,6 @@ import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, Cog, AlertCircle, ChevronDown, ChevronUp, Package, Star, PoundSterling, ImagePlus, X, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
-import { colors, cardStyle } from '../utils/designSystem';
 import MediaSelector from './MediaSelector';
 import { MediaItem, uploadMedia } from '../utils/mediaLibraryUtils';
 import { supabase } from '../utils/supabaseClient';
@@ -43,7 +42,7 @@ export interface MenuVariant {
 
   // Food-specific details for variants
   spice_level?: number;
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergen_notes?: string;
 
   // Dietary tags (variant-level)
@@ -405,40 +404,33 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
   };
 
   return (
-    <Card style={cardStyle}>
+    <Card className="bg-[rgba(26,26,26,0.8)] backdrop-blur-md border border-white/[0.07] rounded-lg">
       <CardHeader>
         <div className="flex items-center space-x-3">
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: colors.brand.purple }}
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#7C3AED]"
             aria-hidden="true"
           >
             <Package className="w-4 h-4 text-white" />
           </div>
           <div>
             <CardTitle
-              className="text-lg font-medium"
-              style={{ color: colors.text.primary }}
+              className="text-lg font-medium text-white"
               id="variant-management-heading"
             >
               Variant Management
             </CardTitle>
-            <p 
-              style={{ color: colors.text.secondary }}
-              className="text-xs mt-1"
+            <p
+              className="text-xs mt-1 text-gray-400"
               id="variant-management-description"
             >
               Configure different proteins, sizes, or preparations
             </p>
           </div>
           {variants.length > 0 && (
-            <Badge 
-              variant="outline" 
-              style={{ 
-                borderColor: colors.brand.purple,
-                color: colors.brand.purple,
-                marginLeft: 'auto'
-              }}
+            <Badge
+              variant="outline"
+              className="ml-auto border-[#7C3AED] text-[#7C3AED]"
               aria-label={`${variants.length} variant${variants.length !== 1 ? 's' : ''} configured`}
             >
               {variants.length} variant{variants.length !== 1 ? 's' : ''}
@@ -450,8 +442,7 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
       <CardContent className="space-y-6" aria-labelledby="variant-management-heading" aria-describedby="variant-management-description">
         {/* Auto-generation toggle - only show when variants exist */}
         {variants.length > 0 && (
-          <div className="flex items-center justify-between p-4 rounded-lg border" 
-            style={{ borderColor: colors.text.muted + '40', backgroundColor: colors.background.tertiary }}
+          <div className="flex items-center justify-between p-4 rounded-lg border border-white/[0.07] bg-surface-tertiary"
             role="group"
             aria-labelledby="auto-generate-label"
           >
@@ -463,20 +454,18 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
                   onCheckedChange={handleAutoGenerateToggle}
                   aria-describedby="auto-generate-status"
                 />
-                <Label 
-                  htmlFor="auto-generate-names" 
+                <Label
+                  htmlFor="auto-generate-names"
                   id="auto-generate-label"
-                  className="text-sm font-medium" 
-                  style={{ color: colors.text.primary }}
+                  className="text-sm font-medium text-white"
                 >
                   <span aria-hidden="true">☑️</span> Auto-generate variant names from protein types
                 </Label>
               </div>
             </div>
-            <div 
+            <div
               id="auto-generate-status"
-              className="text-xs" 
-              style={{ color: colors.text.secondary }}
+              className="text-xs text-gray-400"
               aria-live="polite"
             >
               {autoGenerateNames ? 'Names will auto-populate' : 'Manual entry mode'}
@@ -486,11 +475,7 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
 
         {/* Info box - only show when variants exist */}
         {variants.length > 0 && (
-          <div className="flex items-start gap-2 p-3 rounded-lg text-sm" 
-            style={{ 
-              backgroundColor: `${colors.brand.turquoise}20`,
-              color: colors.text.primary
-            }}
+          <div className="flex items-start gap-2 p-3 rounded-lg text-sm bg-[rgba(14,186,177,0.12)] text-white"
             role="note"
             aria-label="Variants information"
           >
@@ -504,36 +489,29 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
 
         {/* Bulk Description Actions */}
         {variants.length > 1 && (
-          <div className="p-4 rounded-lg border" 
-            style={{ borderColor: colors.text.muted + '40', backgroundColor: colors.background.secondary }}
+          <div className="p-4 rounded-lg border border-white/[0.07] bg-[rgba(26,26,26,0.6)]"
             role="group"
             aria-labelledby="bulk-description-heading"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <Package className="h-4 w-4" style={{ color: colors.brand.gold }} aria-hidden="true" />
-                <Label 
+                <Package className="h-4 w-4 text-amber-400" aria-hidden="true" />
+                <Label
                   id="bulk-description-heading"
-                  className="text-sm font-medium" 
-                  style={{ color: colors.text.primary }}
+                  className="text-sm font-medium text-white"
                 >
                   Bulk Description Actions
                 </Label>
               </div>
-              <Badge 
-                variant="outline" 
-                className="text-xs"
-                style={{ 
-                  backgroundColor: `${colors.brand.gold}20`,
-                  borderColor: colors.brand.gold,
-                  color: colors.brand.gold 
-                }}
+              <Badge
+                variant="outline"
+                className="text-xs bg-amber-500/10 border-amber-400 text-amber-400"
                 aria-label={`${variants.length} variants`}
               >
                 {variants.length} variants
               </Badge>
             </div>
-            
+
             <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Bulk description actions">
               {baseItemDescription && (
                 <Button
@@ -541,38 +519,28 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
                   variant="outline"
                   size="sm"
                   onClick={applyBaseDescriptionToAll}
-                  className="flex items-center space-x-1"
-                  style={{ 
-                    borderColor: colors.brand.purple + '40',
-                    backgroundColor: colors.brand.purple + '10',
-                    color: colors.brand.purple 
-                  }}
+                  className="flex items-center space-x-1 border-[rgba(124,58,237,0.4)] bg-[rgba(124,58,237,0.1)] text-[#7C3AED]"
                   aria-label="Apply base item description to all variants"
                 >
                   <span className="mr-1" aria-hidden="true">✨</span>
                   Apply base to all
                 </Button>
               )}
-              
+
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={removeAllDescriptions}
-                className="flex items-center space-x-1"
-                style={{ 
-                  borderColor: colors.text.muted + '40',
-                  backgroundColor: colors.background.tertiary,
-                  color: colors.text.secondary 
-                }}
+                className="flex items-center space-x-1 border-white/[0.07] bg-surface-tertiary text-gray-400"
                 aria-label="Remove descriptions from all variants"
               >
                 <span className="mr-1" aria-hidden="true">×</span>
                 Remove all descriptions
               </Button>
             </div>
-            
-            <p className="text-xs mt-2" style={{ color: colors.text.secondary }} aria-hidden="true">
+
+            <p className="text-xs mt-2 text-gray-400" aria-hidden="true">
               💡 Apply changes to all variants at once for efficiency
             </p>
           </div>
@@ -599,24 +567,21 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
         )}
 
         {variants.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed rounded-lg"
-            style={{ borderColor: colors.text.muted + '40' }}
+          <div className="text-center py-8 border-2 border-dashed border-white/[0.1] rounded-lg"
             role="status"
             aria-label="No variants created"
           >
-            {/* Defensive: use Cog icon, and guard in case of any import issue */}
             {typeof Cog === 'function' ? (
-              <Cog className="mx-auto h-12 w-12" style={{ color: colors.text.muted }} aria-hidden="true" />
+              <Cog className="mx-auto h-12 w-12 text-gray-600" aria-hidden="true" />
             ) : (
-              <div className="mx-auto h-12 w-12 rounded-full border" style={{ borderColor: colors.text.muted + '40' }} aria-hidden="true" />
+              <div className="mx-auto h-12 w-12 rounded-full border border-white/[0.1]" aria-hidden="true" />
             )}
-            <p className="mt-2 text-sm" style={{ color: colors.text.secondary }}>No variants created yet</p>
+            <p className="mt-2 text-sm text-gray-400">No variants created yet</p>
             <Button
               type="button"
               variant="outline"
-              className="mt-2"
+              className="mt-2 border-[#7C3AED] text-[#7C3AED]"
               onClick={addVariant}
-              style={{ borderColor: colors.brand.purple, color: colors.brand.purple }}
               aria-label="Add first variant"
             >
               <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -673,8 +638,7 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
               type="button"
               variant="outline"
               onClick={addVariant}
-              className="w-full"
-              style={{ borderColor: colors.brand.purple, color: colors.brand.purple }}
+              className="w-full border-[#7C3AED] text-[#7C3AED]"
               aria-label="Add another variant to this menu item"
             >
               <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -684,9 +648,8 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
         )}
 
         {variants.length > 0 && (
-          <div 
-            className="text-xs space-y-1 pt-2 border-t" 
-            style={{ borderColor: colors.text.muted + '40', color: colors.text.secondary }}
+          <div
+            className="text-xs space-y-1 pt-2 border-t border-white/[0.07] text-gray-400"
             role="note"
             aria-label="Variant tips"
           >
@@ -699,37 +662,30 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
 
         {/* Bulk Image Actions */}
         {variants.length > 1 && (
-          <div 
-            className="p-4 rounded-lg border" 
-            style={{ borderColor: colors.text.muted + '40', backgroundColor: colors.background.secondary }}
+          <div
+            className="p-4 rounded-lg border border-white/[0.07] bg-[rgba(26,26,26,0.6)]"
             role="group"
             aria-labelledby="bulk-image-heading"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <ImagePlus className="h-4 w-4" style={{ color: colors.brand.turquoise }} aria-hidden="true" />
-                <Label 
+                <ImagePlus className="h-4 w-4 text-[#0EBAB1]" aria-hidden="true" />
+                <Label
                   id="bulk-image-heading"
-                  className="text-sm font-medium" 
-                  style={{ color: colors.text.primary }}
+                  className="text-sm font-medium text-white"
                 >
                   Bulk Image Actions
                 </Label>
               </div>
-              <Badge 
-                variant="outline" 
-                className="text-xs"
-                style={{ 
-                  backgroundColor: `${colors.brand.turquoise}20`,
-                  borderColor: colors.brand.turquoise,
-                  color: colors.brand.turquoise 
-                }}
+              <Badge
+                variant="outline"
+                className="text-xs bg-[rgba(14,186,177,0.12)] border-[#0EBAB1] text-[#0EBAB1]"
                 aria-label={`${variants.length} variants`}
               >
                 {variants.length} variants
               </Badge>
             </div>
-            
+
             <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Bulk image actions">
               {baseItemImage && (
                 <Button
@@ -737,38 +693,28 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
                   variant="outline"
                   size="sm"
                   onClick={applyBaseImageToAll}
-                  className="flex items-center space-x-1"
-                  style={{ 
-                    borderColor: colors.brand.purple + '40',
-                    backgroundColor: colors.brand.purple + '10',
-                    color: colors.brand.purple 
-                  }}
+                  className="flex items-center space-x-1 border-[rgba(124,58,237,0.4)] bg-[rgba(124,58,237,0.1)] text-[#7C3AED]"
                   aria-label="Apply base item image to all variants"
                 >
                   <span className="mr-1" aria-hidden="true">✨</span>
                   Apply base image to all
                 </Button>
               )}
-              
+
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={removeAllImages}
-                className="flex items-center space-x-1"
-                style={{ 
-                  borderColor: colors.text.muted + '40',
-                  backgroundColor: colors.background.tertiary,
-                  color: colors.text.secondary 
-                }}
+                className="flex items-center space-x-1 border-white/[0.07] bg-surface-tertiary text-gray-400"
                 aria-label="Remove images from all variants"
               >
                 <span className="mr-1" aria-hidden="true">×</span>
                 Remove all variant images
               </Button>
             </div>
-            
-            <p className="text-xs mt-2" style={{ color: colors.text.secondary }} aria-hidden="true">
+
+            <p className="text-xs mt-2 text-gray-400" aria-hidden="true">
               🖼️ Manage images across all variants efficiently
             </p>
           </div>

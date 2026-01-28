@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Download, Clock } from 'lucide-react';
-import { globalColors } from '../utils/QSAIDesign';
 
 // Save Template Dialog
 interface SaveTemplateDialogProps {
@@ -25,13 +24,13 @@ export const SaveTemplateDialog = React.memo<SaveTemplateDialogProps>(({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-700">
+      <DialogContent className="bg-[rgba(26,26,26,0.95)] backdrop-blur-md border border-white/[0.07]">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
-            <Download className="h-5 w-5 text-purple-500" />
+            <Download className="h-5 w-5 text-[#7C3AED]" />
             Save as Template
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogDescription className="text-gray-400">
             Save this form configuration for quick reuse later. Templates preserve all settings except item ID.
           </DialogDescription>
         </DialogHeader>
@@ -44,7 +43,7 @@ export const SaveTemplateDialog = React.memo<SaveTemplateDialogProps>(({
             value={templateName}
             onChange={(e) => onTemplateNameChange(e.target.value)}
             placeholder="e.g., Standard Curry Template"
-            className="mt-2 bg-gray-800 border-gray-700 text-white"
+            className="mt-2 bg-surface-tertiary border-white/10 text-white"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -60,17 +59,14 @@ export const SaveTemplateDialog = React.memo<SaveTemplateDialogProps>(({
               onOpenChange(false);
               onTemplateNameChange('');
             }}
-            className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+            className="bg-surface-tertiary text-white border-white/[0.07] hover:bg-white/[0.05]"
           >
             Cancel
           </Button>
           <Button
             onClick={onSave}
             disabled={!templateName.trim()}
-            style={{
-              backgroundColor: globalColors.purple.primary,
-              color: globalColors.text.primary
-            }}
+            className="bg-[#7C3AED] hover:bg-[#5B21B6] text-white"
           >
             Save Template
           </Button>
@@ -106,13 +102,13 @@ export const DraftRestoreDialog = React.memo<DraftRestoreDialogProps>(({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-700">
+      <DialogContent className="bg-[rgba(26,26,26,0.95)] backdrop-blur-md border border-white/[0.07]">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Clock className="h-5 w-5 text-green-500" />
             Draft Found
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogDescription className="text-gray-400">
             {draftData && (
               <>
                 A draft was auto-saved on{' '}
@@ -140,17 +136,14 @@ export const DraftRestoreDialog = React.memo<DraftRestoreDialogProps>(({
           <Button
             variant="outline"
             onClick={onDiscard}
-            className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+            className="bg-surface-tertiary text-white border-white/[0.07] hover:bg-white/[0.05]"
           >
             Discard Draft
           </Button>
           <Button
             onClick={onRestore}
             disabled={!draftData}
-            style={{
-              backgroundColor: globalColors.purple.primary,
-              color: globalColors.text.primary
-            }}
+            className="bg-[#7C3AED] hover:bg-[#5B21B6] text-white"
           >
             Restore Draft
           </Button>
@@ -176,15 +169,15 @@ export const CancelConfirmationDialog = React.memo<CancelConfirmationDialogProps
 }) => {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-gray-900 border-gray-700">
+      <AlertDialogContent className="bg-[rgba(26,26,26,0.95)] backdrop-blur-md border border-white/[0.07]">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-white">Unsaved Changes</AlertDialogTitle>
-          <AlertDialogDescription className="text-gray-300">
+          <AlertDialogDescription className="text-gray-400">
             You have unsaved changes. Are you sure you want to cancel? All changes will be lost.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700">
+          <AlertDialogCancel className="bg-surface-tertiary text-white border-white/[0.07] hover:bg-white/[0.05]">
             Continue Editing
           </AlertDialogCancel>
           <AlertDialogAction

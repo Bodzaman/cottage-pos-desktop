@@ -10,10 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  ArrowLeft, 
-  CreditCard, 
-  Truck, 
+import { RestaurantStatusBanner } from './RestaurantStatusBanner';
+import {
+  ArrowLeft,
+  CreditCard,
+  Truck,
   Store,
   MapPin,
   Clock,
@@ -28,8 +29,10 @@ import {
   X,
   Check,
   AlertCircle,
-  Loader2
+  Loader2,
+  Edit2
 } from 'lucide-react';
+import { TimeSlotSelector } from './TimeSlotSelector';
 import { toast } from 'sonner';
 import { useCartStore } from '../utils/cartStore';
 import { useSimpleAuth } from '../utils/simple-auth-context';
@@ -87,17 +90,47 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
   } | null>(null);
   const [isValidatingDelivery, setIsValidatingDelivery] = useState(false);
   
-  // Collection info state
-  const [collectionTime, setCollectionTime] = useState('');
+  // Collection notes state
   const [collectionNotes, setCollectionNotes] = useState('');
-  
-  // Delivery timing state
-  const [deliveryTime, setDeliveryTime] = useState('asap');
-  const [customDeliveryTime, setCustomDeliveryTime] = useState('');
+
+  // ✅ NEW: Unified time slot selection for both delivery and collection
+  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   
   // Promo code state
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
+
+  // Inline field validation state
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const validateField = (field: string, value: string): boolean => {
+    let error = '';
+    switch (field) {
+      case 'firstName': case 'lastName':
+        error = value.trim() ? '' : `${field === 'firstName' ? 'First' : 'Last'} name is required`;
+        break;
+      case 'phone':
+        error = /^[\d\s+()-]{10,}$/.test(value) ? '' : 'Valid phone number required';
+        break;
+      case 'email':
+        error = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? '' : 'Valid email required';
+        break;
+      case 'postcode':
+        error = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(value.trim()) ? '' : 'Valid UK postcode required';
+        break;
+      case 'street':
+        error = value.trim() ? '' : 'Street address is required';
+        break;
+    }
+    setFieldErrors(prev => ({ ...prev, [field]: error }));
+    return !error;
+  };
+
+  // ✅ NEW: Minimum order state
+  const [minOrderAmount, setMinOrderAmount] = useState(25.0); // Default £25
+
+  // ✅ NEW: Allow authenticated users to edit their info
+  const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [promoValidation, setPromoValidation] = useState<{
     valid: boolean;
     message: string;
@@ -111,13 +144,13 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
   const discount = promoDiscount;
   const total = Math.max(0, subtotal + deliveryFee - discount);
   
-  // Load restaurant settings for delivery fee
+  // Load restaurant settings for delivery fee and minimum order
   useEffect(() => {
     const loadDeliverySettings = async () => {
       try {
         const response = await brain.get_restaurant_settings();
         const result = await response.json();
-        
+
         if (result.success && result.settings?.delivery?.fee) {
           const fee = result.settings.delivery.fee;
           console.log('🚚 CheckoutView: Loaded real delivery fee:', fee);
@@ -129,10 +162,27 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
         console.error('❌ CheckoutView: Error loading delivery settings:', error);
         // Keep default £3 fee on error
       }
+
+      // ✅ NEW: Also fetch minimum order from delivery config
+      try {
+        const configResponse = await brain.get_delivery_config();
+        const configData = await configResponse.json();
+        if (configData.min_order) {
+          setMinOrderAmount(configData.min_order);
+          console.log('🚚 CheckoutView: Loaded minimum order:', configData.min_order);
+        }
+      } catch (error) {
+        console.error('❌ CheckoutView: Error loading delivery config:', error);
+        // Keep default £25 minimum
+      }
     };
-    
+
     loadDeliverySettings();
   }, []);
+
+  // ✅ NEW: Calculate if minimum order is met (for delivery only)
+  const minimumOrderMet = orderType === 'delivery' ? subtotal >= minOrderAmount : true;
+  const amountNeededForMinimum = orderType === 'delivery' ? Math.max(0, minOrderAmount - subtotal) : 0;
   
   // ✅ UPDATED: Real-time delivery validation with strict blocking
   useEffect(() => {
@@ -244,53 +294,50 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
     return () => clearTimeout(timeout);
   }, [promoCode, subtotal]);
   
-  // Validation
+  // ✅ NEW: Handle time slot selection
+  const handleTimeSelect = (time: string, date?: string) => {
+    setSelectedTime(time);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  // Validation — inline errors on each field
   const validateOrder = () => {
     if (items.length === 0) {
       toast.error('Your cart is empty');
       return false;
     }
-    
-    // Customer info validation - USING NEW HOOK
-    if (!customerData.firstName.trim()) {
-      toast.error('First name is required');
+
+    const fields = ['firstName', 'lastName', 'phone', 'email'];
+    if (orderType === 'delivery') fields.push('street', 'postcode');
+
+    let firstErrorField = '';
+    let hasErrors = false;
+
+    fields.forEach(f => {
+      const val = (f === 'street' || f === 'postcode')
+        ? (deliveryAddress as any)[f] || ''
+        : (customerData as any)[f] || '';
+      if (!validateField(f, val)) {
+        hasErrors = true;
+        if (!firstErrorField) firstErrorField = f;
+      }
+    });
+
+    // Delivery-specific checks
+    if (orderType === 'delivery' && deliveryValidation && !deliveryValidation.valid) {
+      toast.error(`Delivery not available: ${deliveryValidation.message}`);
       return false;
     }
-    if (!customerData.lastName.trim()) {
-      toast.error('Last name is required');
+
+    if (hasErrors) {
+      const el = document.getElementById(`field-${firstErrorField}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast.error('Please fix the highlighted fields');
       return false;
     }
-    if (!customerData.phone.trim()) {
-      toast.error('Phone number is required');
-      return false;
-    }
-    if (!customerData.email.trim()) {
-      toast.error('Email address is required');
-      return false;
-    }
-    
-    // Order type specific validation
-    if (orderType === 'delivery') {
-      if (!deliveryAddress.street.trim()) {
-        toast.error('Delivery address is required');
-        return false;
-      }
-      if (!deliveryAddress.city.trim()) {
-        toast.error('City is required');
-        return false;
-      }
-      if (!deliveryAddress.postcode.trim()) {
-        toast.error('Postcode is required');
-        return false;
-      }
-      
-      // Check postcode validation
-      if (deliveryValidation && !deliveryValidation.valid) {
-        toast.error(`Delivery not available: ${deliveryValidation.message}`);
-        return false;
-      }
-    }
-    
+
     return true;
   };
   
@@ -362,13 +409,19 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
             city: deliveryAddress.city || 'London',
             postal_code: deliveryAddress.postcode
           } : undefined,
-          scheduledTime: undefined // TODO: Add time selection
+          // ✅ NEW: Include selected time slot
+          scheduledTime: selectedTime === 'ASAP' ? 'ASAP' : selectedTime || undefined,
+          scheduledDate: selectedDate || undefined
         },
-        total: totalAmount,
+        total: total,
         subtotal: subtotal,
         delivery_fee: deliveryFee,
+        discount: discount,
+        promo_code: promoCode.trim() || undefined,
         tip_amount: 0,
-        order_notes: undefined,
+        order_notes: orderType === 'delivery'
+          ? deliveryAddress.notes || undefined
+          : collectionNotes || undefined,
         // Include customer data for guest checkout support
         customer: {
           firstName: customerData.firstName,
@@ -509,46 +562,100 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
         </div>
       </div>
       
+      {/* Restaurant availability banner */}
+      {!isCheckingAvailability && !isAcceptingOrders && (
+        <RestaurantStatusBanner className="flex-shrink-0 relative z-10" />
+      )}
+
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto relative z-10">
         <div className="container mx-auto px-6 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Order Details & Customer Info */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Order Type Selection */}
-              <Card 
-                className="border backdrop-blur-xl"
-                style={{
-                  background: 'rgba(23, 25, 29, 0.6)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <CardHeader>
-                  <CardTitle className="text-[#EAECEF] font-serif">Order Type</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RadioGroup value={orderType} onValueChange={(value: 'delivery' | 'collection') => setOrderType(value)}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="collection" id="collection" className="border-white/20 text-[#8B1538]" />
-                      <Label htmlFor="collection" className="text-[#B7BDC6] flex items-center cursor-pointer hover:text-[#EAECEF] transition-colors">
-                        <Store className="w-4 h-4 mr-2" />
-                        Collection (Free)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="delivery" id="delivery" className="border-white/20 text-[#8B1538]" />
-                      <Label htmlFor="delivery" className="text-[#B7BDC6] flex items-center cursor-pointer hover:text-[#EAECEF] transition-colors">
-                        <Truck className="w-4 h-4 mr-2" />
-                        Delivery (£{realDeliveryFee.toFixed(2)})
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </CardContent>
-              </Card>
+              {/* Order Type Toggle - Compact */}
+              <div className="space-y-3">
+                <div
+                  className="flex items-center justify-between p-4 rounded-xl border backdrop-blur-xl"
+                  style={{
+                    background: 'rgba(23, 25, 29, 0.6)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  <span className="text-sm font-medium text-[#B7BDC6]">Order Type</span>
+                  <div className="flex gap-1 p-1 rounded-lg bg-black/30">
+                    <button
+                      className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                        orderType === 'collection' ? "bg-[#8B1538] text-white" : "text-[#B7BDC6] hover:text-white")}
+                      onClick={() => setOrderType('collection')}
+                    >
+                      Collection
+                    </button>
+                    <button
+                      className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                        orderType === 'delivery' ? "bg-[#8B1538] text-white" : "text-[#B7BDC6] hover:text-white")}
+                      onClick={() => setOrderType('delivery')}
+                    >
+                      Delivery {realDeliveryFee > 0 ? `(£${realDeliveryFee.toFixed(2)})` : ''}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Minimum order warning for delivery */}
+                {orderType === 'delivery' && !minimumOrderMet && (
+                  <Alert
+                    style={{
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                      borderColor: 'rgba(245, 158, 11, 0.3)',
+                      color: '#f59e0b'
+                    }}
+                  >
+                    <AlertCircle className="h-4 w-4" style={{ color: '#f59e0b' }} />
+                    <AlertTitle style={{ color: '#f59e0b' }}>Minimum Order Required</AlertTitle>
+                    <AlertDescription style={{ color: '#fbbf24' }}>
+                      Delivery orders require a minimum of £{minOrderAmount.toFixed(2)}.
+                      Add £{amountNeededForMinimum.toFixed(2)} more to your order, or switch to Collection.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
               
               {/* Customer Information */}
-              <Card 
+              {isAuthenticated && !isEditingCustomerInfo ? (
+                /* Compact profile summary for authenticated users */
+                <Card
+                  className="border backdrop-blur-xl"
+                  style={{
+                    background: 'rgba(23, 25, 29, 0.6)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#8B1538]/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-[#8B1538]" />
+                        </div>
+                        <div>
+                          <p className="text-[#EAECEF] font-medium">
+                            {customerData.firstName} {customerData.lastName}
+                          </p>
+                          <p className="text-xs text-[#B7BDC6]">
+                            {customerData.email} · {customerData.phone}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-[#B7BDC6] hover:text-white"
+                        onClick={() => setIsEditingCustomerInfo(true)}>
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+              <Card
                 className="border backdrop-blur-xl"
                 style={{
                   background: 'rgba(23, 25, 29, 0.6)',
@@ -559,65 +666,91 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-[#EAECEF] font-serif">Customer Information</CardTitle>
-                    {!isAuthenticated && (
-                      <Button
-                        onClick={onNavigateToAuth}
-                        variant="outline"
-                        size="sm"
-                        className="border-[#8B1538] text-[#8B1538] hover:bg-[#8B1538] hover:text-white transition-all duration-200"
-                      >
-                        <User className="w-4 h-4 mr-2" />
-                        Sign In
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {isAuthenticated && (
+                        <Button
+                          onClick={() => setIsEditingCustomerInfo(false)}
+                          variant="outline"
+                          size="sm"
+                          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white transition-all duration-200"
+                        >
+                          <Check className="w-4 h-4 mr-2" />
+                          Done
+                        </Button>
+                      )}
+                      {!isAuthenticated && (
+                        <Button
+                          onClick={onNavigateToAuth}
+                          variant="outline"
+                          size="sm"
+                          className="border-[#8B1538] text-[#8B1538] hover:bg-[#8B1538] hover:text-white transition-all duration-200"
+                        >
+                          <User className="w-4 h-4 mr-2" />
+                          Sign In
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label className="text-[#B7BDC6]">First Name *</Label>
                       <Input
+                        id="field-firstName"
                         value={customerData.firstName}
-                        onChange={(e) => updateCustomerData({ firstName: e.target.value })}
-                        className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
-                        disabled={isAuthenticated}
+                        onChange={(e) => { updateCustomerData({ firstName: e.target.value }); if (fieldErrors.firstName) validateField('firstName', e.target.value); }}
+                        onBlur={(e) => validateField('firstName', e.target.value)}
+                        className={cn("bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200", fieldErrors.firstName ? "border-red-500/60" : "border-white/20")}
+                        disabled={isAuthenticated && !isEditingCustomerInfo}
                         placeholder="Enter first name"
                       />
+                      {fieldErrors.firstName && <p className="text-xs text-red-400">{fieldErrors.firstName}</p>}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label className="text-[#B7BDC6]">Last Name *</Label>
                       <Input
+                        id="field-lastName"
                         value={customerData.lastName}
-                        onChange={(e) => updateCustomerData({ lastName: e.target.value })}
-                        className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
-                        disabled={isAuthenticated}
+                        onChange={(e) => { updateCustomerData({ lastName: e.target.value }); if (fieldErrors.lastName) validateField('lastName', e.target.value); }}
+                        onBlur={(e) => validateField('lastName', e.target.value)}
+                        className={cn("bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200", fieldErrors.lastName ? "border-red-500/60" : "border-white/20")}
+                        disabled={isAuthenticated && !isEditingCustomerInfo}
                         placeholder="Enter last name"
                       />
+                      {fieldErrors.lastName && <p className="text-xs text-red-400">{fieldErrors.lastName}</p>}
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label className="text-[#B7BDC6]">Phone Number *</Label>
                     <Input
+                      id="field-phone"
                       value={customerData.phone}
-                      onChange={(e) => updateCustomerData({ phone: e.target.value })}
-                      className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
-                      disabled={isAuthenticated}
+                      onChange={(e) => { updateCustomerData({ phone: e.target.value }); if (fieldErrors.phone) validateField('phone', e.target.value); }}
+                      onBlur={(e) => validateField('phone', e.target.value)}
+                      className={cn("bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200", fieldErrors.phone ? "border-red-500/60" : "border-white/20")}
+                      disabled={isAuthenticated && !isEditingCustomerInfo}
                       placeholder="Enter phone number"
                     />
+                    {fieldErrors.phone && <p className="text-xs text-red-400">{fieldErrors.phone}</p>}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label className="text-[#B7BDC6]">Email Address *</Label>
                     <Input
+                      id="field-email"
                       value={customerData.email}
-                      onChange={(e) => updateCustomerData({ email: e.target.value })}
-                      className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
-                      disabled={isAuthenticated}
+                      onChange={(e) => { updateCustomerData({ email: e.target.value }); if (fieldErrors.email) validateField('email', e.target.value); }}
+                      onBlur={(e) => validateField('email', e.target.value)}
+                      className={cn("bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200", fieldErrors.email ? "border-red-500/60" : "border-white/20")}
+                      disabled={isAuthenticated && !isEditingCustomerInfo}
                       placeholder="Enter email address"
                     />
+                    {fieldErrors.email && <p className="text-xs text-red-400">{fieldErrors.email}</p>}
                   </div>
                 </CardContent>
               </Card>
-              
+              )}
+
               {/* Delivery/Collection Details */}
               <Card 
                 className="border backdrop-blur-xl"
@@ -635,14 +768,17 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                 <CardContent className="space-y-4">
                   {orderType === 'delivery' ? (
                     <>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         <Label className="text-[#B7BDC6]">Street Address *</Label>
                         <Input
+                          id="field-street"
                           value={deliveryAddress.street}
-                          onChange={(e) => updateDeliveryAddress({ street: e.target.value })}
-                          className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
+                          onChange={(e) => { updateDeliveryAddress({ street: e.target.value }); if (fieldErrors.street) validateField('street', e.target.value); }}
+                          onBlur={(e) => validateField('street', e.target.value)}
+                          className={cn("bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200", fieldErrors.street ? "border-red-500/60" : "border-white/20")}
                           placeholder="Enter street address"
                         />
+                        {fieldErrors.street && <p className="text-xs text-red-400">{fieldErrors.street}</p>}
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -654,17 +790,17 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                             placeholder="Enter city"
                           />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <Label className="text-[#B7BDC6]">Postcode *</Label>
                           <div className="relative">
                             <Input
+                              id="field-postcode"
                               value={deliveryAddress.postcode}
-                              onChange={(e) => updateDeliveryAddress({ postcode: e.target.value })}
+                              onChange={(e) => { updateDeliveryAddress({ postcode: e.target.value }); if (fieldErrors.postcode) validateField('postcode', e.target.value); }}
+                              onBlur={(e) => validateField('postcode', e.target.value)}
                               className={cn(
                                 "bg-white/10 backdrop-blur-sm border text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200",
-                                deliveryValidation && !deliveryValidation.valid && "border-red-500",
-                                deliveryValidation && deliveryValidation.valid && "border-green-500",
-                                !deliveryValidation && "border-white/20"
+                                fieldErrors.postcode ? "border-red-500/60" : deliveryValidation && !deliveryValidation.valid ? "border-red-500" : deliveryValidation && deliveryValidation.valid ? "border-green-500" : "border-white/20"
                               )}
                               placeholder="Enter postcode"
                             />
@@ -674,8 +810,20 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                               </div>
                             )}
                           </div>
+                          {fieldErrors.postcode && <p className="text-xs text-red-400">{fieldErrors.postcode}</p>}
                         </div>
                       </div>
+
+                      {/* ✅ NEW: Time Slot Selector for Delivery */}
+                      <div className="mt-4">
+                        <TimeSlotSelector
+                          orderType="DELIVERY"
+                          selectedTime={selectedTime}
+                          selectedDate={selectedDate}
+                          onTimeSelect={handleTimeSelect}
+                        />
+                      </div>
+
                       <div className="space-y-2">
                         <Label className="text-[#B7BDC6]">Delivery Notes</Label>
                         <Textarea
@@ -689,15 +837,14 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                     </>
                   ) : (
                     <>
-                      <div className="space-y-2">
-                        <Label className="text-[#B7BDC6]">Collection Time</Label>
-                        <Input
-                          value={collectionTime}
-                          onChange={(e) => setCollectionTime(e.target.value)}
-                          className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200"
-                          placeholder="When would you like to collect? (e.g., 7:30 PM)"
-                        />
-                      </div>
+                      {/* ✅ NEW: Time Slot Selector for Collection */}
+                      <TimeSlotSelector
+                        orderType="COLLECTION"
+                        selectedTime={selectedTime}
+                        selectedDate={selectedDate}
+                        onTimeSelect={handleTimeSelect}
+                      />
+
                       <div className="space-y-2">
                         <Label className="text-[#B7BDC6]">Collection Notes</Label>
                         <Textarea
@@ -805,7 +952,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                             {/* Price and Remove */}
                             <div className="text-right flex flex-col items-end space-y-1">
                               <p className="text-[#EAECEF] font-medium text-sm">
-                                £{(item.price * item.quantity).toFixed(2)}
+                                £{((item.price || 0) * item.quantity).toFixed(2)}
                               </p>
                               <Button
                                 variant="ghost"
@@ -881,7 +1028,7 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                       <div className="relative">
                         <Input
                           value={promoCode}
-                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoValidation(null); }}
                           placeholder="Enter promo code"
                           className="bg-white/10 backdrop-blur-sm border border-white/20 text-[#EAECEF] placeholder:text-[#B7BDC6]/60 focus:border-[#8B1538] focus:ring-1 focus:ring-[#8B1538] transition-all duration-200 pr-10"
                         />
@@ -892,6 +1039,10 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                         )}
                       </div>
                       
+                      {/* Promo early feedback */}
+                      {promoCode.length > 0 && promoCode.length < 3 && !promoValidation && (
+                        <p className="text-xs text-[#B7BDC6]">Enter at least 3 characters</p>
+                      )}
                       {/* Promo validation feedback */}
                       {promoValidation && (
                         <div className={cn(
@@ -940,17 +1091,26 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
                       </div>
                     </div>
                     
-                    {/* Checkout Button */}
+                    {/* Checkout Button - ✅ UPDATED: Also check minimum order */}
                     <Button
                       onClick={handleCheckout}
-                      disabled={isSubmitting || (orderType === 'delivery' && deliveryValidation && !deliveryValidation.valid)}
-                      className="w-full bg-gradient-to-r from-[#8B1538] to-[#7A1230] hover:from-[#7A1230] hover:to-[#691025] text-white border-0 shadow-lg mt-6 transition-all duration-200"
+                      disabled={
+                        isSubmitting ||
+                        (orderType === 'delivery' && deliveryValidation && !deliveryValidation.valid) ||
+                        (orderType === 'delivery' && !minimumOrderMet)
+                      }
+                      className="w-full bg-gradient-to-r from-[#8B1538] to-[#7A1230] hover:from-[#7A1230] hover:to-[#691025] text-white border-0 shadow-lg mt-6 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       size="lg"
                     >
                       {isSubmitting ? (
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           <span>Processing...</span>
+                        </div>
+                      ) : orderType === 'delivery' && !minimumOrderMet ? (
+                        <div className="flex items-center space-x-2">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Minimum £{minOrderAmount.toFixed(2)} Required</span>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-2">
@@ -970,8 +1130,30 @@ export function CheckoutView({ onNavigateToMenu, onNavigateToAuth, className }: 
           </div>
         </div>
         
-        {/* Bottom padding to ensure checkout button is always accessible */}
-        <div className="h-16"></div>
+        {/* Bottom padding for sticky mobile bar */}
+        <div className="h-32 lg:h-16"></div>
+      </div>
+
+      {/* Sticky mobile checkout bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t backdrop-blur-xl"
+        style={{
+          background: 'rgba(11, 12, 14, 0.95)',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-[#B7BDC6]">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+            <span className="text-lg font-bold text-[#EAECEF]">£{total.toFixed(2)}</span>
+          </div>
+          <Button
+            onClick={handleCheckout}
+            className="w-full h-11 bg-[#8B1538] hover:bg-[#6B1028] text-white font-semibold"
+            disabled={isSubmitting || (orderType === 'delivery' && !minimumOrderMet)}
+          >
+            {isSubmitting ? 'Processing...' : orderType === 'delivery' && !minimumOrderMet ? `Minimum £${minOrderAmount.toFixed(2)} Required` : 'Proceed to Payment'}
+          </Button>
+        </div>
       </div>
     </div>
   );

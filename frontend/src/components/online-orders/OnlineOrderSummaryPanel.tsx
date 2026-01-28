@@ -64,9 +64,23 @@ export function OnlineOrderSummaryPanel({
   // Empty state
   if (!order) {
     return (
-      <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5">
+      <div
+        className="flex flex-col h-full rounded-xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(25,25,25,0.95) 100%)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(124,93,250,0.15)',
+          boxShadow: '0 12px 30px -8px rgba(0,0,0,0.6)',
+        }}
+      >
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+            style={{
+              background: 'rgba(124,93,250,0.08)',
+              border: '1px solid rgba(124,93,250,0.15)',
+            }}
+          >
             <Inbox className="w-8 h-8 text-gray-500" />
           </div>
           <h3 className="text-lg font-medium text-gray-300 mb-2">
@@ -85,9 +99,17 @@ export function OnlineOrderSummaryPanel({
   const isReady = order.status === 'READY';
 
   return (
-    <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5">
+    <div
+      className="flex flex-col h-full rounded-xl overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(25,25,25,0.95) 100%)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(124,93,250,0.15)',
+        boxShadow: '0 12px 30px -8px rgba(0,0,0,0.6)',
+      }}
+    >
       {/* Header */}
-      <div className="px-4 py-3 border-b border-white/5">
+      <div className="px-4 py-3 border-b border-white/[0.07]">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className={cn('w-2.5 h-2.5 rounded-full', STATUS_COLORS[order.status])} />
@@ -163,7 +185,7 @@ export function OnlineOrderSummaryPanel({
           {/* Delivery Address */}
           {order.orderType === 'DELIVERY' && order.deliveryAddress && (
             <>
-              <Separator className="bg-white/5" />
+              <Separator className="bg-white/[0.07]" />
               <div className="space-y-2">
                 <h3 className="font-medium text-xs text-gray-500 uppercase tracking-wider">
                   Delivery Address
@@ -177,7 +199,7 @@ export function OnlineOrderSummaryPanel({
           )}
 
           {/* Order Items */}
-          <Separator className="bg-white/5" />
+          <Separator className="bg-white/[0.07]" />
           <div className="space-y-2">
             <h3 className="font-medium text-xs text-gray-500 uppercase tracking-wider">
               Items ({order.items.length})
@@ -220,13 +242,13 @@ export function OnlineOrderSummaryPanel({
           {/* Special Instructions */}
           {order.specialInstructions && (
             <>
-              <Separator className="bg-white/5" />
+              <Separator className="bg-white/[0.07]" />
               <div className="space-y-2">
                 <h3 className="font-medium text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5" />
                   Instructions
                 </h3>
-                <p className="text-sm text-gray-300 bg-white/5 p-2 rounded">
+                <p className="text-sm text-gray-300 bg-white/[0.07] p-2 rounded">
                   {order.specialInstructions}
                 </p>
               </div>
@@ -236,7 +258,7 @@ export function OnlineOrderSummaryPanel({
           {/* Allergen Notes */}
           {order.allergenNotes && (
             <>
-              <Separator className="bg-white/5" />
+              <Separator className="bg-white/[0.07]" />
               <div className="space-y-2">
                 <h3 className="font-medium text-xs text-red-400 uppercase tracking-wider flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -250,7 +272,7 @@ export function OnlineOrderSummaryPanel({
           )}
 
           {/* Order Summary */}
-          <Separator className="bg-white/5" />
+          <Separator className="bg-white/[0.07]" />
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-gray-400">
               <span>Subtotal</span>
@@ -262,7 +284,7 @@ export function OnlineOrderSummaryPanel({
                 <span>{formatCurrency(order.deliveryFee)}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-white pt-2 border-t border-white/5">
+            <div className="flex justify-between font-bold text-white pt-2 border-t border-white/[0.07]">
               <span>Total</span>
               <span className="text-lg">{formatCurrency(order.total)}</span>
             </div>
@@ -279,7 +301,7 @@ export function OnlineOrderSummaryPanel({
       </ScrollArea>
 
       {/* Action Buttons */}
-      <div className="p-3 border-t border-white/5 space-y-2">
+      <div className="p-3 border-t border-white/[0.07] space-y-2">
         {isNew && (
           <div className="flex gap-2">
             <Button
@@ -326,7 +348,7 @@ export function OnlineOrderSummaryPanel({
         <Button
           variant="outline"
           size="sm"
-          className="w-full border-white/10 text-gray-300 hover:bg-white/5"
+          className="w-full border-white/10 text-gray-300 hover:bg-white/[0.07]"
           onClick={() => onPrint?.(order.id)}
         >
           <Printer className="w-3.5 h-3.5 mr-1.5" />

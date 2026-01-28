@@ -795,6 +795,7 @@ Always use functions to perform cart operations.`;
       // Diagnostic logging for iOS debugging
       console.log(`[GeminiVoice] Mic pipeline ready, AudioContext state: ${this.mic.audioContext?.state}`);
       console.log(`[GeminiVoice] MediaStream active: ${this.mic.mediaStream?.active}, tracks: ${this.mic.mediaStream?.getAudioTracks().length}`);
+      console.log(`[GeminiVoice] Sample rates - actual: ${this.mic.actualSampleRate}Hz, target: ${this.mic.targetSampleRate}Hz`);
 
       // Keep legacy fields populated for internal teardown compatibility
       this.audioContext = this.mic?.audioContext || null;

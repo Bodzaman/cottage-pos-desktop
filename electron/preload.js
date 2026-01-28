@@ -30,5 +30,71 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Platform info
     platform: process.platform,
-    version: process.versions
+    version: process.versions,
+
+    // Local file-system cache (instant cold starts)
+    cacheSet: (key, data) => ipcRenderer.invoke('cache-set', key, data),
+    cacheGet: (key) => ipcRenderer.invoke('cache-get', key),
+    cacheClear: (key) => ipcRenderer.invoke('cache-clear', key),
+
+    // Crash recovery state persistence
+    saveCrashState: (state) => ipcRenderer.invoke('save-crash-state', state),
+    getCrashState: () => ipcRenderer.invoke('get-crash-state'),
+    clearCrashState: () => ipcRenderer.invoke('clear-crash-state'),
+
+    // Sleep/Wake lifecycle events
+    onSystemResume: (callback) => {
+        ipcRenderer.on('system-resumed', () => callback());
+    },
+    onSystemSuspend: (callback) => {
+        ipcRenderer.on('system-suspended', () => callback());
+    },
+    removeSystemResumeListener: () => {
+        ipcRenderer.removeAllListeners('system-resumed');
+    },
+    removeSystemSuspendListener: () => {
+        ipcRenderer.removeAllListeners('system-suspended');
+    },
+
+    // Receipt history for reprint
+    saveReceiptHistory: (receipt) => ipcRenderer.invoke('save-receipt-history', receipt),
+    getReceiptHistory: () => ipcRenderer.invoke('get-receipt-history'),
+
+    // Printer status monitoring
+    getPrinterStatus: () => ipcRenderer.invoke('get-printer-status'),
+    onPrinterStatus: (callback) => {
+        ipcRenderer.on('printer-status-update', (event, status) => callback(status));
+    },
+    removePrinterStatusListener: () => {
+        ipcRenderer.removeAllListeners('printer-status-update');
+    },
+
+    // Printer role configuration (multi-printer routing)
+    getPrinterRoles: () => ipcRenderer.invoke('get-printer-roles'),
+    savePrinterRoles: (roles) => ipcRenderer.invoke('save-printer-roles', roles),
+    testPrintRole: (role) => ipcRenderer.invoke('test-print-role', role),
+
+    // Window title (dynamic from restaurant settings)
+    setWindowTitle: (title) => ipcRenderer.invoke('set-window-title', title),
+
+    // Multi-monitor workspace management
+    getDisplays: () => ipcRenderer.invoke('get-displays'),
+    getWorkspaceLayout: () => ipcRenderer.invoke('get-workspace-layout'),
+    saveWorkspaceLayout: (layout) => ipcRenderer.invoke('save-workspace-layout', layout),
+    applyWorkspaceLayout: (layout) => ipcRenderer.invoke('apply-workspace-layout', layout),
+    onDisplaysChanged: (callback) => {
+        ipcRenderer.on('displays-changed', () => callback());
+    },
+    removeDisplaysChangedListener: () => {
+        ipcRenderer.removeAllListeners('displays-changed');
+    },
+
+    // Native notifications (Windows 10/11 action center)
+    showNotification: (data) => ipcRenderer.invoke('show-native-notification', data),
+    onNotificationClicked: (callback) => {
+        ipcRenderer.on('notification-clicked', (event, data) => callback(data));
+    },
+    removeNotificationClickedListener: () => {
+        ipcRenderer.removeAllListeners('notification-clicked');
+    }
 });

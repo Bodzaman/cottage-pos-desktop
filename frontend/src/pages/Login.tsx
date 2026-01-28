@@ -14,6 +14,7 @@ import { SocialLoginButton } from "components/SocialLoginButton";
 import { AuthTheme } from "utils/authTheme";
 import { useSimpleAuth } from "utils/simple-auth-context";
 import { useGlobalKeyboardShortcuts } from "utils/useKeyboardShortcuts";
+import { SEO } from "components/SEO";
 
 export default function Login() {
   const { signIn, signInWithGoogle, isLoading } = useSimpleAuth();
@@ -106,7 +107,8 @@ export default function Login() {
 
   return (
     <AuthLayout>
-      <motion.div 
+      <SEO title="Sign In" description="Sign in to your Cottage Tandoori account to order online, track orders, and manage your profile." path="/login" noindex={true} />
+      <motion.div
         variants={AuthTheme.animations.containerFade}
         initial="hidden"
         animate="visible"

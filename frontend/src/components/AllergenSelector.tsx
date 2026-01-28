@@ -1,137 +1,249 @@
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { globalColors } from '../utils/QSAIDesign';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../utils/supabaseClient';
 
-// Standard allergen list with emojis for Indian restaurant context
-const STANDARD_ALLERGENS = [
-  { key: 'dairy', label: '🥛 Dairy', description: '(milk, ghee, yogurt, paneer, cream)' },
-  { key: 'tree_nuts', label: '🌰 Tree Nuts', description: '(cashews, almonds, pistachios)' },
-  { key: 'peanuts', label: '🥜 Peanuts', description: '' },
-  { key: 'gluten', label: '🌾 Gluten', description: '(wheat, naan, roti)' },
-  { key: 'eggs', label: '🥚 Eggs', description: '(in some breads, preparations)' },
-  { key: 'fish', label: '🐟 Fish', description: '' },
-  { key: 'shellfish', label: '🦐 Shellfish/Crustaceans', description: '' },
-  { key: 'soy', label: '🫘 Soy', description: '(soy sauce, tofu)' },
-  { key: 'sesame', label: '🌱 Sesame', description: '(sesame oil, tahini)' },
-  { key: 'mustard', label: '🟡 Mustard', description: '(mustard seeds/oil)' },
-  { key: 'celery', label: '🥬 Celery', description: '' },
-  { key: 'molluscs', label: '🦪 Molluscs', description: '' }
-] as const;
+// Allergen status type
+export type AllergenStatus = 'contains' | 'may_contain';
+export type AllergenData = Record<string, AllergenStatus>;
+
+// Fallback allergen list matching the 14 UK major allergens in allergen_definitions table
+const FALLBACK_ALLERGENS = [
+  { id: 'celery', name: 'Celery', icon_name: '🥬', sort_order: 1 },
+  { id: 'gluten', name: 'Gluten (Cereals)', icon_name: '🌾', sort_order: 2 },
+  { id: 'crustaceans', name: 'Crustaceans', icon_name: '🦐', sort_order: 3 },
+  { id: 'eggs', name: 'Eggs', icon_name: '🥚', sort_order: 4 },
+  { id: 'fish', name: 'Fish', icon_name: '🐟', sort_order: 5 },
+  { id: 'lupin', name: 'Lupin', icon_name: '🌿', sort_order: 6 },
+  { id: 'milk', name: 'Milk (Dairy)', icon_name: '🥛', sort_order: 7 },
+  { id: 'molluscs', name: 'Molluscs', icon_name: '🦪', sort_order: 8 },
+  { id: 'mustard', name: 'Mustard', icon_name: '🟡', sort_order: 9 },
+  { id: 'nuts', name: 'Tree Nuts', icon_name: '🌰', sort_order: 10 },
+  { id: 'peanuts', name: 'Peanuts', icon_name: '🥜', sort_order: 11 },
+  { id: 'sesame', name: 'Sesame', icon_name: '🌱', sort_order: 12 },
+  { id: 'soya', name: 'Soya', icon_name: '🫘', sort_order: 13 },
+  { id: 'sulphites', name: 'Sulphur Dioxide / Sulphites', icon_name: '🧪', sort_order: 14 },
+];
+
+interface AllergenDefinition {
+  id: string;
+  name: string;
+  icon_name: string | null;
+  sort_order: number;
+}
 
 export interface AllergenSelectorProps {
-  selectedAllergens: string[];
-  onAllergensChange: (allergens: string[]) => void;
+  /** JSONB allergen data: { "gluten": "contains", "nuts": "may_contain" } */
+  allergenData: AllergenData;
+  onAllergenDataChange: (data: AllergenData) => void;
   allergenNotes?: string;
   onAllergenNotesChange?: (notes: string) => void;
   className?: string;
 }
 
 /**
- * AllergenSelector Component
- * 
- * Multi-select checkbox system for standardized allergen selection
- * with additional free text field for special notes.
+ * Normalize legacy data formats to the current JSONB format.
+ * Handles: string[] (old format) -> Record (new format treating all as "contains")
+ */
+export function normalizeAllergenData(raw: unknown): AllergenData {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    // Legacy string array format -> treat all as "contains"
+    const result: AllergenData = {};
+    for (const key of raw) {
+      if (typeof key === 'string') result[key] = 'contains';
+    }
+    return result;
+  }
+  if (typeof raw === 'object') {
+    return raw as AllergenData;
+  }
+  return {};
+}
+
+const STATUS_CYCLE: Array<AllergenStatus | null> = [null, 'contains', 'may_contain'];
+
+function getNextStatus(current: AllergenStatus | undefined): AllergenStatus | null {
+  const idx = current ? STATUS_CYCLE.indexOf(current) : 0;
+  return STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+}
+
+const STATUS_STYLES = {
+  contains: {
+    bg: 'rgba(239, 68, 68, 0.15)',
+    border: 'rgba(239, 68, 68, 0.4)',
+    text: '#EF4444',
+    label: 'Contains',
+  },
+  may_contain: {
+    bg: 'rgba(245, 158, 11, 0.15)',
+    border: 'rgba(245, 158, 11, 0.4)',
+    text: '#F59E0B',
+    label: 'May Contain',
+  },
+  none: {
+    bg: 'rgba(0, 0, 0, 0.2)',
+    border: 'rgba(255, 255, 255, 0.1)',
+    text: 'rgba(255, 255, 255, 0.5)',
+    label: 'Not Set',
+  },
+};
+
+/**
+ * AllergenSelector Component - 3-State System
+ *
+ * Click cycles: Not Set -> Contains (red) -> May Contain (amber) -> Not Set
+ * Fetches allergen list from allergen_definitions table with fallback.
+ * Outputs JSONB format: { "gluten": "contains", "nuts": "may_contain" }
  */
 export function AllergenSelector({
-  selectedAllergens = [],
-  onAllergensChange,
+  allergenData = {},
+  onAllergenDataChange,
   allergenNotes = '',
   onAllergenNotesChange,
   className = ''
 }: AllergenSelectorProps) {
 
-  const handleAllergenToggle = (allergenKey: string, checked: boolean) => {
-    if (checked) {
-      // Add allergen if not already selected
-      if (!selectedAllergens.includes(allergenKey)) {
-        onAllergensChange([...selectedAllergens, allergenKey]);
-      }
+  // Fetch allergen definitions from DB
+  const { data: allergenDefs } = useQuery<AllergenDefinition[]>({
+    queryKey: ['allergen_definitions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('allergen_definitions')
+        .select('id, name, icon_name, sort_order')
+        .order('sort_order');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 30, // 30 min cache
+  });
+
+  const allergens = allergenDefs && allergenDefs.length > 0 ? allergenDefs : FALLBACK_ALLERGENS;
+
+  const handleAllergenCycle = useCallback((allergenId: string) => {
+    const current = allergenData[allergenId];
+    const next = getNextStatus(current);
+    const updated = { ...allergenData };
+    if (next === null) {
+      delete updated[allergenId];
     } else {
-      // Remove allergen
-      onAllergensChange(selectedAllergens.filter(key => key !== allergenKey));
+      updated[allergenId] = next;
     }
+    onAllergenDataChange(updated);
+  }, [allergenData, onAllergenDataChange]);
+
+  const containsList = Object.entries(allergenData).filter(([, v]) => v === 'contains');
+  const mayContainList = Object.entries(allergenData).filter(([, v]) => v === 'may_contain');
+
+  const getAllergenName = (id: string) => {
+    const def = allergens.find(a => a.id === id);
+    return def ? `${def.icon_name || ''} ${def.name}` : id;
   };
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Allergen Checkboxes */}
+      {/* Allergen Grid */}
       <div className="space-y-3">
         <Label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
-          Select Allergens Present
+          Allergen Information
         </Label>
-        
-        {/* Grid layout for allergens - 2 columns on larger screens */}
+        <p className="text-xs" style={{ color: globalColors.text.secondary }}>
+          Click to cycle: <span style={{ color: STATUS_STYLES.none.text }}>Not Set</span>{' '}
+          <span style={{ color: STATUS_STYLES.contains.text }}>Contains</span>{' '}
+          <span style={{ color: STATUS_STYLES.may_contain.text }}>May Contain</span>{' '}
+          Not Set
+        </p>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {STANDARD_ALLERGENS.map((allergen) => {
-            const isSelected = selectedAllergens.includes(allergen.key);
-            
+          {allergens.map((allergen) => {
+            const status = allergenData[allergen.id];
+            const style = status ? STATUS_STYLES[status] : STATUS_STYLES.none;
+
             return (
-              <div key={allergen.key} className="flex items-start space-x-3 p-3 rounded-lg border transition-colors"
-                   style={{
-                     backgroundColor: isSelected ? 'rgba(91, 33, 182, 0.1)' : 'rgba(0, 0, 0, 0.2)',
-                     borderColor: isSelected ? 'rgba(91, 33, 182, 0.3)' : 'rgba(255, 255, 255, 0.1)'
-                   }}>
-                <Checkbox
-                  id={`allergen-${allergen.key}`}
-                  checked={isSelected}
-                  onCheckedChange={(checked) => handleAllergenToggle(allergen.key, checked as boolean)}
-                  className="mt-0.5"
-                  style={{
-                    backgroundColor: isSelected ? globalColors.purple.primary : 'transparent',
-                    borderColor: isSelected ? globalColors.purple.primary : 'rgba(255, 255, 255, 0.3)'
-                  }}
-                />
+              <button
+                key={allergen.id}
+                type="button"
+                onClick={() => handleAllergenCycle(allergen.id)}
+                className="flex items-center space-x-3 p-3 rounded-lg border transition-all text-left hover:scale-[1.01]"
+                style={{
+                  backgroundColor: style.bg,
+                  borderColor: style.border,
+                }}
+              >
+                <span className="text-lg flex-shrink-0" aria-hidden="true">
+                  {allergen.icon_name || ''}
+                </span>
                 <div className="flex-1 min-w-0">
-                  <Label 
-                    htmlFor={`allergen-${allergen.key}`}
-                    className="text-sm font-medium cursor-pointer"
+                  <span
+                    className="text-sm font-medium block"
                     style={{ color: globalColors.text.primary }}
                   >
-                    {allergen.label}
-                  </Label>
-                  {allergen.description && (
-                    <p className="text-xs mt-1" style={{ color: globalColors.text.secondary }}>
-                      {allergen.description}
-                    </p>
-                  )}
+                    {allergen.name}
+                  </span>
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: style.text }}
+                  >
+                    {style.label}
+                  </span>
                 </div>
-              </div>
+                {status && (
+                  <span
+                    className="flex-shrink-0 w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: style.text }}
+                  />
+                )}
+              </button>
             );
           })}
         </div>
-        
-        {/* Selected allergens summary */}
-        {selectedAllergens.length > 0 && (
-          <div className="p-3 rounded-lg" 
-               style={{ 
-                 backgroundColor: 'rgba(239, 68, 68, 0.1)', 
-                 border: '1px solid rgba(239, 68, 68, 0.2)' 
-               }}>
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-sm font-medium" style={{ color: '#EF4444' }}>⚠️ Contains:</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selectedAllergens.map(key => {
-                const allergen = STANDARD_ALLERGENS.find(a => a.key === key);
-                return allergen ? (
-                  <span key={key} 
-                        className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
-                        style={{ 
-                          backgroundColor: 'rgba(239, 68, 68, 0.2)', 
-                          color: '#EF4444' 
-                        }}>
-                    {allergen.label}
-                  </span>
-                ) : null;
-              })}
-            </div>
-          </div>
-        )}
       </div>
-      
+
+      {/* Summary */}
+      {(containsList.length > 0 || mayContainList.length > 0) && (
+        <div className="space-y-2">
+          {containsList.length > 0 && (
+            <div className="p-3 rounded-lg"
+                 style={{
+                   backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                   border: '1px solid rgba(239, 68, 68, 0.2)'
+                 }}>
+              <span className="text-sm font-medium" style={{ color: '#EF4444' }}>Contains:</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {containsList.map(([key]) => (
+                  <span key={key}
+                        className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#EF4444' }}>
+                    {getAllergenName(key)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {mayContainList.length > 0 && (
+            <div className="p-3 rounded-lg"
+                 style={{
+                   backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                   border: '1px solid rgba(245, 158, 11, 0.2)'
+                 }}>
+              <span className="text-sm font-medium" style={{ color: '#F59E0B' }}>May Contain:</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {mayContainList.map(([key]) => (
+                  <span key={key}
+                        className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                        style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B' }}>
+                    {getAllergenName(key)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Additional Notes Field */}
       {onAllergenNotesChange && (
         <div className="space-y-2">
@@ -147,7 +259,7 @@ export function AllergenSelector({
             rows={2}
           />
           <p className="text-xs" style={{ color: globalColors.text.secondary }}>
-            Any additional allergen information not covered by the checkboxes above
+            Any additional allergen information not covered above
           </p>
         </div>
       )}
@@ -157,19 +269,15 @@ export function AllergenSelector({
 
 // Export allergen utilities for use in display components
 export const getAllergenLabel = (allergenKey: string): string => {
-  const allergen = STANDARD_ALLERGENS.find(a => a.key === allergenKey);
-  return allergen ? allergen.label : allergenKey;
+  const allergen = FALLBACK_ALLERGENS.find(a => a.id === allergenKey);
+  return allergen ? `${allergen.icon_name} ${allergen.name}` : allergenKey;
 };
 
 export const getAllergenEmoji = (allergenKey: string): string => {
-  const allergen = STANDARD_ALLERGENS.find(a => a.key === allergenKey);
-  if (!allergen) return '⚠️';
-  
-  // Extract emoji from label
-  const emojiMatch = allergen.label.match(/^(🥛|🌰|🥜|🌾|🥚|🐟|🦐|🫘|🌱|🟡|🥬|🦪)/);
-  return emojiMatch ? emojiMatch[1] : '⚠️';
+  const allergen = FALLBACK_ALLERGENS.find(a => a.id === allergenKey);
+  return allergen?.icon_name || '';
 };
 
-export const ALLERGEN_KEYS = STANDARD_ALLERGENS.map(a => a.key);
+export const ALLERGEN_KEYS = FALLBACK_ALLERGENS.map(a => a.id);
 
 export default AllergenSelector;

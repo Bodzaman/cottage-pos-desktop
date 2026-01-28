@@ -144,24 +144,29 @@ export function FlexibleBillingModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={closeFlexibleBillingModal}>
-      <DialogContent 
-        className="max-w-4xl max-h-[90dvh] overflow-y-auto"
+      <DialogContent
+        className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col p-0"
         style={{
           background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(15, 13, 35, 0.98) 100%)',
           backdropFilter: 'blur(8px)',
           border: '1px solid rgba(124, 93, 250, 0.3)',
         }}
       >
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-white flex items-center gap-3">
-            <Receipt className="w-6 h-6 text-purple-400" />
-            Billing Options for Linked Tables
-          </DialogTitle>
-          <DialogDescription className="text-gray-300">
-            Choose how to handle billing for {linkedTables.length + 1} linked tables with {orderItems.length} total items
-          </DialogDescription>
-        </DialogHeader>
+        {/* Fixed Header */}
+        <div className="shrink-0 p-6 pb-4">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-white flex items-center gap-3">
+              <Receipt className="w-6 h-6 text-purple-400" />
+              Billing Options for Linked Tables
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Choose how to handle billing for {linkedTables.length + 1} linked tables with {orderItems.length} total items
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
+        {/* Scrollable Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6">
         <div className="space-y-6">
           {/* Table Summary */}
           <Card style={{
@@ -376,8 +381,12 @@ export function FlexibleBillingModal({
             </Card>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+        </div>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="shrink-0 border-t border-purple-500/20 px-6 py-4">
+          <div className="flex justify-end gap-3">
             <Button
               variant="outline"
               onClick={closeFlexibleBillingModal}

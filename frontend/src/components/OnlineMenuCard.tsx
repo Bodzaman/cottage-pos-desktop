@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ShoppingCart, Utensils, Minus, Plus, Check, MousePointer, Info, ChevronRight, Sparkles, Star, X, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronUp, ShoppingCart, Utensils, Minus, Plus, Check, MousePointer, Info, ChevronRight, Sparkles, Star, X, ChevronLeft, SlidersHorizontal } from 'lucide-react';
 import type { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
 import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
 import { CustomerCustomizationModal, SelectedCustomization } from './CustomerCustomizationModal';
@@ -32,6 +32,35 @@ interface OnlineMenuCardProps {
   galleryCompact?: boolean; // NEW: compact gallery mode
 }
 
+/** Extract the short differentiator from a variant for card display.
+ *  Priority: protein_type_name ("Chicken") → strip item.name from variant_name → full variant_name */
+const getShortVariantLabel = (variant: ItemVariant, itemName: string): string => {
+  // Best case: protein_type_name is clean and short ("Chicken", "Lamb", "Paneer")
+  if (variant.protein_type_name) {
+    return variant.protein_type_name;
+  }
+
+  const fullName = variant.variant_name || variant.name || '';
+  if (!fullName) return 'Option';
+
+  // Try stripping the item name to get just the differentiator
+  // e.g. "CHICKEN SHASHLICK BHUNA (medium strength sauce)" - "SHASHLICK BHUNA" → "CHICKEN"
+  const itemUpper = itemName.toUpperCase().trim();
+  const fullUpper = fullName.toUpperCase().trim();
+
+  if (fullUpper.includes(itemUpper)) {
+    let stripped = fullUpper.replace(itemUpper, '').trim();
+    // Remove leading/trailing parenthetical info (e.g. "(medium strength sauce)")
+    stripped = stripped.replace(/^\(.*?\)\s*/, '').replace(/\s*\(.*?\)$/, '').trim();
+    if (stripped.length > 0) {
+      // Title-case the result
+      return stripped.charAt(0) + stripped.slice(1).toLowerCase();
+    }
+  }
+
+  return fullName;
+};
+
 /**
  * Customer-facing menu card for OnlineOrders
  * Premium ruby design with image on top, clean layout
@@ -50,7 +79,7 @@ export function OnlineMenuCard({
 }: OnlineMenuCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  // isDescriptionExpanded removed — descriptions now always 2-line clamped
   const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false); // NEW
@@ -58,6 +87,9 @@ export function OnlineMenuCard({
   // Phase 2 micro-interactions state
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  // Phase 3: Add-to-cart success flash
+  const [justAdded, setJustAdded] = useState(false);
+  const justAddedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ariaLiveMessage, setAriaLiveMessage] = useState('');
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [hasShownTooltip, setHasShownTooltip] = useState(false);
@@ -70,10 +102,6 @@ export function OnlineMenuCard({
   const [isPaused, setIsPaused] = useState(false);
   const [manualControl, setManualControl] = useState(false);
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // ✅ Description truncation detection
-  const descriptionRef = useRef<HTMLParagraphElement>(null);
-  const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
 
   // Premium Ruby/Burgundy Theme
   const themeColors = {
@@ -172,11 +200,11 @@ export function OnlineMenuCard({
   
   // Determine which image to display - PRIORITIZE CAROUSEL IMAGES
   // Priority: 1) Carousel variant images, 2) Base item image, 3) Fallback
-  const displayImage = currentVariantImage 
-    || item.image_url 
+  const displayImage = currentVariantImage
+    || item.image_url
     || fallbackImage;
-  
-  const activeVariants = variants.filter(v => (v as any).is_active !== false).sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+
+  const activeVariants = variants.filter(v => (v as any).is_active !== false).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
   const isMultiVariant = activeVariants.length > 0; // rely on actual variants presence
   const isQuickPick = enableQuickPick && activeVariants.length > quickPickThreshold;
   const VISIBLE_COUNT = 4;
@@ -186,8 +214,16 @@ export function OnlineMenuCard({
     isMultiVariant ? activeVariants[0]?.id : undefined
   );
 
+  // Sync variant selection when variants load asynchronously
+  useEffect(() => {
+    if (isMultiVariant && !selectedVariantId && activeVariants.length > 0) {
+      const defaultVariant = activeVariants.find(v => (v as any).is_default) || activeVariants[0];
+      setSelectedVariantId(defaultVariant.id);
+    }
+  }, [activeVariants.length]);
+
   const [quantity, setQuantity] = useState(1);
-  
+
   // Add cart store
   const { addItem } = useCartStore();
 
@@ -284,19 +320,6 @@ export function OnlineMenuCard({
     };
   }, []);
 
-  // ✅ NEW: Detect if description is truncated
-  useEffect(() => {
-    if (!descriptionRef.current || !item.description) {
-      setIsDescriptionTruncated(false);
-      return;
-    }
-    
-    // Check if content is truncated (scrollHeight > clientHeight)
-    const element = descriptionRef.current;
-    const isTruncated = element.scrollHeight > element.clientHeight;
-    setIsDescriptionTruncated(isTruncated);
-  }, [item.description, galleryCompact, isMultiVariant]);
-
   const handleCardImageClick = () => {
     if (galleryCompact) {
       setIsInfoModalOpen(true);
@@ -317,10 +340,7 @@ export function OnlineMenuCard({
     setIsCustomizationModalOpen(true);
   };
 
-  const toggleDescription = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDescriptionExpanded(!isDescriptionExpanded);
-  };
+  // toggleDescription removed — descriptions now always 2-line clamped
 
   // Handle showing the helper tooltip once on first hover/focus
   const showTooltipOnce = () => {
@@ -335,8 +355,7 @@ export function OnlineMenuCard({
 
   // Unified selection handler (click + keyboard)
   const handleVariantSelect = (variant: ItemVariant) => {
-    // Priority 1: variant_name (database-generated), Priority 2: name (custom override), Priority 3: protein_type_name
-    const variantLabel = variant.variant_name || variant.name || variant.protein_type_name || 'Option';
+    const variantLabel = getShortVariantLabel(variant, item.name);
     setSelectedVariantId(variant.id);
 
     // 🎠 NEW: Jump carousel to selected variant's image
@@ -389,36 +408,62 @@ export function OnlineMenuCard({
   return (
     <motion.div
       className={cn(
-        "flex flex-col overflow-hidden",
+        "relative flex flex-col overflow-hidden",
         "bg-gradient-to-br from-black/40 via-black/30 to-black/40",
         "backdrop-blur-sm",
         "border border-gold-400/20",
         "rounded-2xl shadow-xl",
         "hover:border-gold-400/40 hover:shadow-2xl hover:shadow-gold-500/10",
         "transition-all duration-300",
-        isMultiVariant ? "min-h-[640px]" : "min-h-[480px]" // Conditional heights
+        // No min-height — cards size to content naturally
       )}
       style={{
         backgroundColor: themeColors.cardBg,
-        borderColor: themeColors.borderColor,
+        borderColor: (item.is_available === false || item.isAvailable === false) ? 'rgba(239, 68, 68, 0.3)' : themeColors.borderColor,
+        opacity: (item.is_available === false || item.isAvailable === false) ? 0.7 : 1,
       }}
     >
+      {/* Add-to-cart success flash overlay */}
+      <AnimatePresence>
+        {justAdded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-2xl pointer-events-none"
+          >
+            <div className="flex items-center gap-2">
+              <Check className="h-6 w-6 text-emerald-400" />
+              <span className="text-sm font-medium text-white">Added!</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 86'd / Unavailable overlay */}
+      {(item.is_available === false || item.isAvailable === false) && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/70 backdrop-blur-[2px] rounded-2xl">
+          <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Unavailable</span>
+          <span className="text-xs text-red-300/70 mt-1">Currently out of stock</span>
+        </div>
+      )}
+
       {/* Image Section - TOP (Fixed Height) */}
       <div 
-        className="relative w-full h-[280px] overflow-hidden shrink-0" 
+        className="relative w-full h-[160px] sm:h-[180px] overflow-hidden shrink-0"
         onClick={handleCardImageClick}
         onMouseEnter={variantImages.length > 1 ? handleMouseEnter : undefined}
         onMouseLeave={variantImages.length > 1 ? handleMouseLeave : undefined}
       >
-        {/* ✅ Carousel Animation Wrapper (matches POS pattern) */}
         <AnimatePresence initial={false}>
           <motion.div
-            key={currentIndex}
+            key={displayImage}
+            className="absolute inset-0 w-full h-full"
             initial={{ opacity: 0, scale: 1.05 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 1.5, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full"
             drag={variantImages.length > 1 ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
@@ -449,7 +494,7 @@ export function OnlineMenuCard({
               e.stopPropagation();
               handlePrevious();
             }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-all duration-200 hover:scale-110"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/15 backdrop-blur-md border border-white/25 hover:bg-white/30 text-white transition-all duration-200 hover:scale-110"
             aria-label="Previous variant"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -463,7 +508,7 @@ export function OnlineMenuCard({
               e.stopPropagation();
               handleNext();
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-all duration-200 hover:scale-110"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/15 backdrop-blur-md border border-white/25 hover:bg-white/30 text-white transition-all duration-200 hover:scale-110"
             aria-label="Next variant"
           >
             <ChevronRight className="w-5 h-5" />
@@ -493,7 +538,7 @@ export function OnlineMenuCard({
         )}
         
         {/* Gradient Overlay at Bottom */}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
         
         {/* Spice Level Badge */}
         {spiceLevel > 0 && (
@@ -511,7 +556,7 @@ export function OnlineMenuCard({
 
         {/* Dietary Tags */}
         {item.dietary_tags && item.dietary_tags.length > 0 && (
-          <div className="absolute top-14 left-3 flex flex-wrap gap-2">
+          <div className="absolute top-10 left-3 flex flex-wrap gap-1.5">
             {item.dietary_tags.slice(0, 3).map((tag, index) => (
               <span
                 key={index}
@@ -529,20 +574,7 @@ export function OnlineMenuCard({
           </div>
         )}
         
-        {/* Price Badge - Bottom Right */}
-        <div className="absolute bottom-3 right-3">
-          <div 
-            className="px-4 py-2 rounded-lg backdrop-blur-md font-bold text-lg"
-            style={{
-              backgroundColor: `${themeColors.primary}90`,
-              color: '#FFFFFF',
-              border: `2px solid ${themeColors.primary}`,
-              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }}
-          >
-            £{displayPrice.toFixed(2)}
-          </div>
-        </div>
+        {/* Price moved to content title row */}
         <div className="absolute top-3 right-3">
           <FavoriteHeartButton 
             menuItemId={item.id}
@@ -557,26 +589,28 @@ export function OnlineMenuCard({
 
       {/* Content Section - EXPANDS TO FILL SPACE */}
       <div className="flex flex-col flex-1 p-4 gap-3">
-        {/* Title + Info */}
-        <div className="flex items-start justify-between gap-3">
-          <h3 
-            className="text-xl font-bold leading-tight"
+        {/* Title + Price + Info */}
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            className="text-lg font-bold leading-tight flex-1 min-w-0"
             style={{ color: PremiumTheme.colors.text.primary }}
           >
             {item.name}
           </h3>
-          {/* Info button only in compact gallery */}
-          {galleryCompact && (
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-lg font-bold tabular-nums text-white">
+              £{displayPrice.toFixed(2)}
+            </span>
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground"
               aria-label={`Open info for ${item.name}`}
               onClick={(e) => { e.stopPropagation(); setIsInfoModalOpen(true); }}
             >
-              <Info className="h-5 w-5" />
+              <Info className="h-4 w-4" />
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Variant Area */}
@@ -621,7 +655,7 @@ export function OnlineMenuCard({
                           showAllVariants ? activeVariants : activeVariants.slice(0, VISIBLE_COUNT)
                         ).map((variant) => {
                           // Priority 1: variant_name (database-generated), Priority 2: name (custom override), Priority 3: protein_type_name
-                          const variantLabel = variant.variant_name || variant.name || variant.protein_type_name || 'Option';
+                          const variantLabel = getShortVariantLabel(variant, item.name);
                           const variantPrice = getModeAwareVariantPrice(variant);
                           const isSelected = variant.id === selectedVariantId;
                           return (
@@ -678,7 +712,7 @@ export function OnlineMenuCard({
                          onMouseLeave={() => setTooltipOpen(false)}
                        >
                          {activeVariants.map((variant) => {
-                           const variantLabel = variant.name || variant.variant_name || variant.protein_type_name || 'Option';
+                           const variantLabel = getShortVariantLabel(variant, item.name);
                            const variantPrice = getModeAwareVariantPrice(variant);
                            const isSelected = variant.id === selectedVariantId;
                            return (
@@ -755,67 +789,14 @@ export function OnlineMenuCard({
           ) : null
         ) : null}
 
-        {/* Description with See More (hidden in compact gallery) */}
-        {!galleryCompact && item.description && (
-          <div className="space-y-1">
-            <p
-              className={cn(
-                "text-sm leading-relaxed",
-                !isDescriptionExpanded && "line-clamp-2"
-              )}
-              style={{ color: PremiumTheme.colors.text.muted }}
-            >
-              {item.description}
-            </p>
-            {item.description.length > 100 && (
-              <button
-                onClick={toggleDescription}
-                className="text-sm font-semibold hover:underline transition-all flex items-center gap-1"
-                style={{ color: themeColors.primary }}
-              >
-                {isDescriptionExpanded ? (
-                  <>
-                    <span>See Less</span>
-                    <ChevronUp className="h-3 w-3" />
-                  </>
-                ) : (
-                  <>
-                    <span>See More...</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Compact Gallery: Description with conditional truncation */}
-        {galleryCompact && item.description && (
-          <div className={cn("px-1", isMultiVariant && "space-y-1")}>
-            <p
-              ref={descriptionRef}
-              className={cn(
-                "text-sm leading-relaxed",
-                isMultiVariant && "line-clamp-2"
-              )}
-              style={{ color: PremiumTheme.colors.text.muted }}
-            >
-              {item.description}
-            </p>
-            {isMultiVariant && isDescriptionTruncated && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsInfoModalOpen(true);
-                }}
-                className="text-sm font-medium hover:underline transition-all inline-flex items-center gap-1"
-                style={{ color: PremiumTheme.colors.gold[400] }}
-                aria-label={`View full description for ${item.name}`}
-              >
-                <span>... See more</span>
-              </button>
-            )}
-          </div>
+        {/* Description — full for single-variant, 2-line clamped for multi-variant */}
+        {item.description && (
+          <p
+            className={cn("text-xs leading-relaxed", isMultiVariant && "line-clamp-2")}
+            style={{ color: PremiumTheme.colors.text.muted }}
+          >
+            {item.description}
+          </p>
         )}
 
         {/* Gallery Compact: Inline Protein Chips */}
@@ -832,7 +813,7 @@ export function OnlineMenuCard({
                     onMouseLeave={() => setTooltipOpen(false)}
                   >
                     {activeVariants.map((variant) => {
-                      const variantLabel = variant.name || variant.variant_name || variant.protein_type_name || 'Option';
+                      const variantLabel = getShortVariantLabel(variant, item.name);
                       const variantPrice = getModeAwareVariantPrice(variant);
                       const isSelected = variant.id === selectedVariantId;
                       return (
@@ -902,123 +883,97 @@ export function OnlineMenuCard({
           </div>
         )}
 
-        {/* 🎯 Invisible Spacer - ONLY for single items (pushes buttons to bottom) */}
-        {!isMultiVariant && <div className="flex-1" />}
-
-        {/* Action Buttons - ANCHORED TO BOTTOM */}
-        <div className="flex flex-col gap-2.5 mt-auto">
-          {/* Inline Controls Row - Quantity + Secondary Actions */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Quantity Controls - Left Side */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-[#8B1538] text-white hover:bg-[#8B1538]/10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (quantity > 1) setQuantity(quantity - 1);
-                }}
+        {/* Action Row - Quantity Stepper + CTA */}
+        <div className="flex flex-col gap-1.5 mt-auto">
+          <div className="flex items-center gap-2">
+            {/* Compact quantity stepper */}
+            <div className="flex items-center border border-[#8B1538]/40 rounded-lg overflow-hidden shrink-0">
+              <button
+                className="h-9 w-9 flex items-center justify-center hover:bg-[#8B1538]/10 text-white transition-colors disabled:opacity-40"
+                onClick={(e) => { e.stopPropagation(); if (quantity > 1) setQuantity(quantity - 1); }}
                 disabled={quantity <= 1}
                 aria-label="Decrease quantity"
               >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <span className="text-lg font-semibold min-w-[2rem] text-center" style={{ color: PremiumTheme.colors.text.primary }}>
-                {quantity}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-[#8B1538] text-white hover:bg-[#8B1538]/10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setQuantity(quantity + 1);
-                }}
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <span className="w-8 text-center text-sm font-semibold text-white">{quantity}</span>
+              <button
+                className="h-9 w-9 flex items-center justify-center hover:bg-[#8B1538]/10 text-white transition-colors"
+                onClick={(e) => { e.stopPropagation(); setQuantity(quantity + 1); }}
                 aria-label="Increase quantity"
               >
-                <Plus className="h-4 w-4" />
-              </Button>
+                <Plus className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            {/* Secondary Actions - Right Side */}
-            <div className="flex items-center gap-2">
-              {/* Customise Button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 px-3"
-                style={{
-                  color: PremiumTheme.colors.gold[400]
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  
-                  if (galleryCompact && isMultiVariant) {
-                    // Multi-variant items in gallery compact → CustomerVariantSelector
-                    setIsCustomerVariantSelectorOpen(true);
-                  } else {
-                    // Single items or list mode → CustomerCustomizationModal
-                    setIsCustomizationModalOpen(true);
+            {/* CTA button */}
+            <Button
+              className={cn(
+                "flex-1 h-9 bg-[#8B1538] hover:bg-[#6B1028] text-white text-sm font-semibold",
+                ctaDisabled && 'opacity-60 cursor-not-allowed hover:bg-[#8B1538]'
+              )}
+              disabled={ctaDisabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                let variantForCart: any = null;
+                if (isMultiVariant) {
+                  const baseVariant = selectedVariant || activeVariants[0] || null;
+                  if (baseVariant) {
+                    variantForCart = baseVariant;
                   }
-                }}
-                aria-label={`Customise ${item.name} with special requests`}
-              >
-                <Utensils className="h-4 w-4" />
-                <span className="ml-1.5">Customise</span>
-              </Button>
-            </div>
+                } else {
+                  variantForCart = {
+                    id: `default-${item.id}`,
+                    name: item.name,
+                    price: getModeAwareItemPrice(),
+                    price_delivery: item.price_delivery ?? item.price_takeaway ?? item.price ?? 0
+                  };
+                }
+                addItem(item, variantForCart, quantity, '');
+                const message = quantity > 1 ? `Added ${quantity} items to cart!` : 'Added to cart!';
+                toast.success(message);
+                setQuantity(1);
+                // Flash success overlay on card
+                setJustAdded(true);
+                if (justAddedTimerRef.current) clearTimeout(justAddedTimerRef.current);
+                justAddedTimerRef.current = setTimeout(() => setJustAdded(false), 800);
+              }}
+              aria-label={ctaDisabled ? 'Select an option' : `Add to cart £${(displayPrice * quantity).toFixed(2)}`}
+            >
+              <ShoppingCart className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+              <span className="truncate">
+                {ctaDisabled ? 'Select an option' : `Add • £${(displayPrice * quantity).toFixed(2)}`}
+              </span>
+            </Button>
           </div>
 
-          {/* Selected price mirror (near CTA) */}
-          {!galleryCompact && (
-            <div className="text-center text-sm" style={{ color: PremiumTheme.colors.text.secondary }}>
-              {isMultiVariant && selectedVariant ? (
-                <span>Selected: {selectedVariantLabel} • £{displayPrice.toFixed(2)}</span>
-              ) : (
-                <span>Price: £{displayPrice.toFixed(2)}</span>
-              )}
-            </div>
-          )}
-
-          {/* Add to Cart Button - Full Width */}
-          <Button
-            className={cn(
-              "w-full bg-[#8B1538] hover:bg-[#6B1028] text-white",
-              ctaDisabled && 'opacity-60 cursor-not-allowed hover:bg-[#8B1538]'
-            )}
-            disabled={ctaDisabled}
+          {/* Customise CTA */}
+          <button
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border transition-all duration-200 self-start hover:scale-[1.03] active:scale-[0.97]"
+            style={{
+              color: PremiumTheme.colors.gold[400],
+              borderColor: PremiumTheme.colors.gold[400],
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = PremiumTheme.colors.gold[400];
+              e.currentTarget.style.color = '#1a1a1a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = PremiumTheme.colors.gold[400];
+            }}
             onClick={(e) => {
               e.stopPropagation();
-              // ✅ FIX: Pass complete variant object instead of reconstructed one
-              // This preserves variant_name, price_delivery, and all other fields
-              let variantForCart: any = null;
-              if (isMultiVariant) {
-                const baseVariant = selectedVariant || activeVariants[0] || null;
-                if (baseVariant) {
-                  // Use complete variant object directly
-                  variantForCart = baseVariant;
-                }
+              if (galleryCompact && isMultiVariant) {
+                setIsCustomerVariantSelectorOpen(true);
               } else {
-                // Synthetic variant for single items with proper price_delivery field
-                variantForCart = {
-                  id: `default-${item.id}`,
-                  name: item.name,
-                  price: getModeAwareItemPrice(),
-                  price_delivery: item.price_delivery ?? item.price_takeaway ?? item.price ?? 0
-                };
+                setIsCustomizationModalOpen(true);
               }
-
-              addItem(item, variantForCart, quantity, '');
-              const message = quantity > 1 ? `Added ${quantity} items to cart!` : 'Added to cart!';
-              toast.success(message);
-              setQuantity(1); // Reset to 1 after adding
             }}
-            aria-label={ctaLabel}
           >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            {ctaLabel}
-          </Button>
+            <SlidersHorizontal className="h-3 w-3" />
+            Customise
+          </button>
         </div>
       </div>
 
@@ -1082,6 +1037,7 @@ export function OnlineMenuCard({
           }}
           selectedVariant={selectedVariantId ? itemVariants.find(v => v.id === selectedVariantId) : undefined}
           mode={mode}
+          initialQuantity={quantity}
         />
       )}
     </motion.div>

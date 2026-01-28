@@ -253,6 +253,14 @@ export const globalColors = {
 // Export as QSAITheme for semantic naming
 export const QSAITheme = globalColors;
 
+// POS Glass Panel - vibrant glassmorphism matching ResponsivePOSShell
+export const posGlassPanel = {
+  background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(25,25,25,0.95) 100%)',
+  backdropFilter: 'blur(10px)',
+  border: '1px solid rgba(124,93,250,0.15)',
+  boxShadow: '0 12px 30px -8px rgba(0,0,0,0.6)',
+};
+
 // Panel styling
 export const panelStyle = {
   background: colors.background.panel,

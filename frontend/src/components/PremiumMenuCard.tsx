@@ -50,6 +50,24 @@ const getVariantDisplayName = (variant: ItemVariant): string => {
   return 'Standard';
 };
 
+// Helper to get short variant label — prioritizes protein_type_name for clean display
+// Strips the item name from variant_name to show just the protein (e.g., "CHICKEN TIKKA MASALA" → "Chicken")
+const getShortVariantLabel = (variant: ItemVariant, itemName: string): string => {
+  if (variant.protein_type_name) return variant.protein_type_name;
+  const fullName = variant.variant_name || variant.name || '';
+  if (!fullName) return 'Option';
+  const itemUpper = itemName.toUpperCase().trim();
+  const fullUpper = fullName.toUpperCase().trim();
+  if (fullUpper.includes(itemUpper)) {
+    let stripped = fullUpper.replace(itemUpper, '').trim();
+    stripped = stripped.replace(/^\(.*?\)\s*/, '').replace(/\s*\(.*?\)$/, '').trim();
+    if (stripped.length > 0) {
+      return stripped.charAt(0) + stripped.slice(1).toLowerCase();
+    }
+  }
+  return fullName;
+};
+
 interface PremiumMenuCardProps {
   item: MenuItem;
   mode?: 'delivery' | 'collection' | 'dine-in'; // OnlineOrders mode
@@ -276,7 +294,7 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
 
   // For compatibility with existing code that uses displayImage
   const displayImage = imageUrl;
-  
+
   // **CORRECT PRICING LOGIC**
   // Support both OnlineOrders (mode) and POS (orderType)
   const getDisplayPrice = (): number => {
@@ -581,49 +599,51 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
         animate={{ opacity: 1, y: 0 }}
       >
         {/* Image Thumbnail with Carousel Animation */}
-        <div className="relative w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
-          <AnimatePresence initial={false}>
-            <motion.div
-              key={currentImageIndex}
-              className="absolute inset-0 w-full h-full"
-              initial={{ opacity: 0, scale: 1.05 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              transition={{ duration: 1.5, ease: 'easeInOut' }}
-            >
-              <img
-                src={displayImage}
-                alt={item.name}
-                loading="lazy"
-                className="w-full h-full object-cover"
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
-              />
-            </motion.div>
-          </AnimatePresence>
-          {/* Loading skeleton */}
-          {!imageLoaded && !imageError && (
-            <div className="absolute inset-0 bg-gray-800 animate-pulse" />
-          )}
-          {/* Error fallback */}
-          {imageError && (
-            <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-              <span className="text-xs text-gray-500">No image</span>
-            </div>
-          )}
-          {spiceLevel > 0 && (
-            <div
-              className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-xs font-medium backdrop-blur-sm"
-              style={{
-                backgroundColor: `${spiceColor}20`,
-                border: `1px solid ${spiceColor}40`,
-                color: spiceColor
-              }}
-            >
-              {spiceEmoji}
-            </div>
-          )}
-        </div>
+        {hasImage && (
+          <div className="relative w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={imageUrl}
+                className="absolute inset-0 w-full h-full"
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                transition={{ duration: 1.5, ease: 'easeInOut' }}
+              >
+                <img
+                  src={displayImage!}
+                  alt={item.name}
+                  loading="lazy"
+                  className="w-full h-full object-cover"
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              </motion.div>
+            </AnimatePresence>
+            {/* Loading skeleton */}
+            {!imageLoaded && !imageError && (
+              <div className="absolute inset-0 bg-gray-800 animate-pulse" />
+            )}
+            {/* Error fallback */}
+            {imageError && (
+              <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
+                <span className="text-xs text-gray-500">No image</span>
+              </div>
+            )}
+            {spiceLevel > 0 && (
+              <div
+                className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-xs font-medium backdrop-blur-sm"
+                style={{
+                  backgroundColor: `${spiceColor}20`,
+                  border: `1px solid ${spiceColor}40`,
+                  color: spiceColor
+                }}
+              >
+                {spiceEmoji}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -1061,19 +1081,23 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
       {hasImage ? (
         <div className="absolute inset-0">
           <AnimatePresence initial={false}>
-            <motion.img
-              key={currentImageIndex}
-              src={imageUrl!}
-              alt={item.name}
-              loading={isPOSContext ? "eager" : "lazy"}
-              className="w-full h-full object-cover"
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageError(true)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <motion.div
+              key={imageUrl}
+              className="absolute inset-0 w-full h-full"
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
               transition={{ duration: 1.0, ease: 'easeInOut' }}
-            />
+            >
+              <img
+                src={imageUrl!}
+                alt={item.name}
+                loading={isPOSContext ? "eager" : "lazy"}
+                className="w-full h-full object-cover"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+            </motion.div>
           </AnimatePresence>
           {/* Loading skeleton */}
           {!imageLoaded && !imageError && (
@@ -1126,7 +1150,7 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
             {sortedVariants.map((variant) => {
               const currentQty = variantQuantities[variant.id] || 1;
               const variantPrice = getVariantPrice(variant);
-              const displayName = getVariantDisplayName(variant);
+              const displayName = getShortVariantLabel(variant, item.name);
 
               return (
                 <div

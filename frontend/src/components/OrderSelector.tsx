@@ -129,7 +129,7 @@ function OrderTypeButton({
 
   return (
     <motion.div
-      className="relative"
+      className="relative group"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.1 }}
@@ -171,6 +171,16 @@ function OrderTypeButton({
         aria-label={`Switch to ${label} mode`}
         aria-pressed={isActive}
       >
+        {/* Shimmer overlay */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+          style={{
+            background: 'linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+            animation: 'pos-button-shimmer 2s infinite',
+            borderRadius: '12px',
+          }}
+        />
+
         {/* Notification Badge */}
         {notificationCount > 0 && (
           <motion.div

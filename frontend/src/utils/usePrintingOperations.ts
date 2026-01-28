@@ -17,6 +17,7 @@ import {
 } from './electronPrintService';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
 import { findRootSection, FIXED_SECTIONS } from './sectionMapping';
+import { saveReceiptToHistory } from 'components/pos/ReprintDialog';
 
 /**
  * Hook: usePrintingOperations
@@ -340,6 +341,15 @@ export function usePrintingOperations(
             description: `Sent to ${result.printer || 'thermal printer'}`
           });
           console.log('✅ [HYBRID] Direct receipt print successful:', result);
+          // Save to receipt history for reprint functionality
+          saveReceiptToHistory(customerData_, {
+            orderNumber,
+            orderType,
+            total: customerData_.total,
+            tableNumber: selectedTableNumber || undefined,
+            customerName: customerData_.customerName,
+            itemCount: orderItems.length
+          });
           return true;
         } else {
           console.warn('⚠️ [HYBRID] Direct receipt print failed, trying queue fallback:', result.error);
@@ -493,6 +503,14 @@ export function usePrintingOperations(
             description: `Sent to ${result.printer || 'thermal printer'}`
           });
           console.log('✅ [HYBRID] Direct bill print successful:', result);
+          // Save to receipt history for reprint functionality
+          saveReceiptToHistory(billData, {
+            orderNumber: billData.orderNumber || `T${selectedTableNumber}`,
+            orderType: 'DINE-IN',
+            total: billData.total,
+            tableNumber: selectedTableNumber,
+            itemCount: orderItems.length
+          });
           return true;
         } else {
           console.warn('⚠️ [HYBRID] Direct bill print failed, trying queue fallback:', result.error);

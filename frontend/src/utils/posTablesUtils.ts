@@ -1,17 +1,11 @@
-import { API_URL } from '../utils/environment';
+import brain from 'brain';
 
 // Programmatic migration function that can be called without UI
 export const migrateTablesNow = async () => {
   try {
-    const response = await fetch(`${API_URL}/routes/pos-tables/migrate-tables-now`, {
-      method: "POST",
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
+    const response = await (brain as any).migrate_tables_now({});
     const data = await response.json();
-    
+
     if (!data.success) {
       console.error("Migration failed:", data.message, data.details);
       return {
@@ -20,7 +14,7 @@ export const migrateTablesNow = async () => {
         details: data.details
       };
     }
-    
+
     return {
       success: true,
       message: "Migration completed successfully",

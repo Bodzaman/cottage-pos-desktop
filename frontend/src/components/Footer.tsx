@@ -102,9 +102,12 @@ export function Footer({ variant = 'full' }: FooterProps) {
     { to: "/contact", label: "Contact" }
   ] : [
     { to: "/", label: "Home" },
-    { to: "/Menu", label: "Menu" },
-    { to: "/Gallery", label: "Gallery" },
-    { to: "/About", label: "About Us" }
+    { to: "/online-orders", label: "Menu" },
+    { to: "/gallery", label: "Gallery" },
+    { to: "/about", label: "About Us" },
+    { to: "/blog", label: "Blog" },
+    { to: "/faq", label: "FAQ" },
+    { to: "/allergens", label: "Allergen Info" },
   ];
   
   return (

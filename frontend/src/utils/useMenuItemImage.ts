@@ -36,6 +36,8 @@ interface UseMenuItemImageResult {
   totalImages: number;
   /** All collected image URLs */
   allImageUrls: string[];
+  /** True once all carousel images have been preloaded into browser cache */
+  imagesPreloaded: boolean;
 }
 
 /**
@@ -78,6 +80,12 @@ export function useMenuItemImage({
   // ============================================================================
   // STEP 1: Collect all available image URLs
   // ============================================================================
+  // Stable key derived from variant image URLs to avoid recalculating on array reference changes
+  const variantsImageKey = useMemo(
+    () => variants.map(v => v.image_url || '').join('|'),
+    [variants]
+  );
+
   const allImageUrls = useMemo(() => {
     const images: string[] = [];
 
@@ -94,7 +102,44 @@ export function useMenuItemImage({
     });
 
     return images;
-  }, [item.image_url, variants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.image_url, variantsImageKey]);
+
+  // ============================================================================
+  // STEP 1.5: Preload all carousel images into browser cache
+  // ============================================================================
+  const [imagesPreloaded, setImagesPreloaded] = useState(allImageUrls.length <= 1);
+
+  useEffect(() => {
+    // Single or no images — nothing to preload
+    if (allImageUrls.length <= 1) {
+      setImagesPreloaded(true);
+      return;
+    }
+
+    setImagesPreloaded(false);
+    let loadedCount = 0;
+    const total = allImageUrls.length;
+
+    const imageElements = allImageUrls.map((src) => {
+      const img = new Image();
+      img.src = src;
+      const onDone = () => {
+        loadedCount++;
+        if (loadedCount >= total) setImagesPreloaded(true);
+      };
+      img.onload = onDone;
+      img.onerror = onDone; // Count errors as loaded to prevent blocking
+      return img;
+    });
+
+    return () => {
+      imageElements.forEach((img) => {
+        img.onload = null;
+        img.onerror = null;
+      });
+    };
+  }, [allImageUrls]);
 
   // ============================================================================
   // STEP 2: Carousel state management
@@ -108,10 +153,10 @@ export function useMenuItemImage({
     }
   }, [allImageUrls.length, currentIndex]);
 
-  // Carousel rotation effect
+  // Carousel rotation effect — gated on preloading completion
   useEffect(() => {
-    // Don't run carousel if disabled or only one image
-    if (!enableCarousel || allImageUrls.length <= 1) {
+    // Don't run carousel if disabled, only one image, or images not yet preloaded
+    if (!enableCarousel || allImageUrls.length <= 1 || !imagesPreloaded) {
       return;
     }
 
@@ -120,7 +165,7 @@ export function useMenuItemImage({
     }, carouselInterval);
 
     return () => clearInterval(interval);
-  }, [enableCarousel, allImageUrls.length, carouselInterval]);
+  }, [enableCarousel, allImageUrls.length, carouselInterval, imagesPreloaded]);
 
   // ============================================================================
   // STEP 3: Get current raw image URL
@@ -155,7 +200,8 @@ export function useMenuItemImage({
     isCarouselActive: enableCarousel && allImageUrls.length > 1,
     currentImageIndex: currentIndex,
     totalImages: allImageUrls.length,
-    allImageUrls
+    allImageUrls,
+    imagesPreloaded
   };
 }
 

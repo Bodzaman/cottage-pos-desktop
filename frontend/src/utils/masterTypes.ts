@@ -139,7 +139,7 @@ export interface MenuItemVariant {
 
   // Spice and allergen info
   spice_level?: number | null;
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergen_notes?: string | null;
 
   // Display flags
@@ -421,7 +421,7 @@ export interface MenuItemFormData {
   // ✅ NEW: Food-specific fields (matches database schema)
   spice_level?: number; // Replaces old default_spice_level
   default_spice_level?: number; // Legacy alias for spice_level
-  allergens?: string[]; // Existing allergens array
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null; // Existing allergens array
   allergen_info?: string; // Legacy allergen info text field
   allergen_warnings?: string; // New: Text warnings for allergens
   specialty_notes?: string; // New: Chef's notes (max 1000 chars)

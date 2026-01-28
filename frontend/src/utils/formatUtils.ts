@@ -123,3 +123,11 @@ export const snakeToTitleCase = (str: string): string => {
 export const formatOrderCode = (id: string | number, prefix: string = 'ORD'): string => {
   return `${prefix}-${String(id).padStart(4, '0')}`;
 };
+
+/**
+ * Format a price/amount as GBP currency
+ * Alias for formatCurrency for semantic clarity in cart/checkout contexts
+ * @param amount - The amount to format
+ * @returns Formatted price string (e.g., "£15.99")
+ */
+export const formatPrice = formatCurrency;

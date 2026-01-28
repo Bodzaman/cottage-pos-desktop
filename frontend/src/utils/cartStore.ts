@@ -228,6 +228,12 @@ export const useCartStore = create<CartState>()(persist(
     closeChatCart: () => {
       set({ isChatCartOpen: false });
     },
+    openChatCart: () => {
+      set({
+        isChatCartOpen: true,
+        isCartOpen: false // Mutual exclusivity: close main cart
+      });
+    },
     toggleChatCart: () => {
       const isOpen = get().isChatCartOpen;
       set({ isChatCartOpen: !isOpen });
@@ -383,6 +389,61 @@ export const useCartStore = create<CartState>()(persist(
 
       // Track analytics
       trackItemRemoved(item.menuItemId, item.name, 'user_action');
+    },
+
+    // ✅ NEW: Update an existing cart item (variant, customizations, notes, quantity)
+    updateItem: (itemId: string, updates: Partial<CartItem>) => {
+      const item = get().items.find(i => i.id === itemId);
+
+      if (!item) {
+        toast.error('Item not found in cart');
+        return;
+      }
+
+      set((state) => {
+        const currentMode = state.currentOrderMode;
+        const newItems = state.items.map(i => {
+          if (i.id !== itemId) return i;
+
+          // Calculate new price if variant changed
+          let newPrice = i.price;
+          if (updates.variant && updates.variant !== i.variant) {
+            const variantPrice = updates.variant.price ?? updates.variant.priceDelivery ?? updates.variant.priceTakeaway;
+            if (variantPrice !== undefined) {
+              newPrice = getPriceForMode(
+                currentMode,
+                updates.variant.priceDelivery ?? updates.variant.price_delivery,
+                updates.variant.priceTakeaway ?? updates.variant.price_takeaway ?? variantPrice,
+                variantPrice
+              );
+            }
+          }
+
+          // Calculate customizations price adjustment
+          let customizationsTotal = 0;
+          if (updates.customizations) {
+            customizationsTotal = updates.customizations.reduce((sum, c) => sum + (c.price || 0), 0);
+          } else if (i.customizations) {
+            customizationsTotal = i.customizations.reduce((sum, c) => sum + (c.price || 0), 0);
+          }
+
+          return {
+            ...i,
+            ...updates,
+            price: newPrice,
+            orderMode: currentMode
+          };
+        });
+
+        return {
+          items: newItems,
+          totalItems: calculateTotalItems(newItems),
+          totalAmount: calculateTotalAmount(newItems),
+          lastSavedAt: Date.now()
+        };
+      });
+
+      toast.success(`${item.name} updated`);
     },
 
     // Debounced version for rapid clicking

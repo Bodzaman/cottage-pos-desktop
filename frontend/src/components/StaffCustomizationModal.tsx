@@ -1,16 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, Check, Search, UtensilsCrossed, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { X, Plus, Minus, Check, Search, UtensilsCrossed } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
@@ -64,7 +60,6 @@ export function StaffCustomizationModal({
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
   const [prevTotal, setPrevTotal] = useState(0);
   const notesInputRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -129,13 +124,6 @@ export function StaffCustomizationModal({
     
     return groups;
   }, [filteredCustomizations]);
-
-  // Open all accordion groups when modal opens and groups are computed
-  useEffect(() => {
-    if (isOpen && Object.keys(groupedCustomizations).length > 0) {
-      setOpenAccordionItems(Object.keys(groupedCustomizations));
-    }
-  }, [isOpen, groupedCustomizations]);
 
   // Calculate base price based on order type
   const basePrice = useMemo(() => {
@@ -294,14 +282,9 @@ export function StaffCustomizationModal({
     }
   }, [quantity]);
 
-  // Handle chip removal and jump to group
-  const handleRemoveChip = (customizationId: string, groupName?: string) => {
+  // Handle chip removal
+  const handleRemoveChip = (customizationId: string) => {
     setSelectedCustomizations(prev => prev.filter(c => c.id !== customizationId));
-    
-    // Optionally expand the group if it's collapsed
-    if (groupName && !openAccordionItems.includes(groupName)) {
-      setOpenAccordionItems(prev => [...prev, groupName]);
-    }
   };
 
   return (
@@ -364,7 +347,7 @@ export function StaffCustomizationModal({
             />
             <Input
               type="text"
-              placeholder="Search add-ons..."
+              placeholder="Search options..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -378,257 +361,93 @@ export function StaffCustomizationModal({
           </div>
           {debouncedSearchQuery && (
             <p className="text-xs mt-2" style={{ color: POS_THEME.textMuted }}>
-              {Object.keys(groupedCustomizations).length} group(s) • {filteredCustomizations.length} option(s) found
+              {filteredCustomizations.length} result{filteredCustomizations.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-          {/* Customization Groups as Accordion */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-5">
           {Object.keys(groupedCustomizations).length > 0 ? (
-            <Accordion 
-              type="multiple" 
-              value={openAccordionItems}
-              onValueChange={setOpenAccordionItems}
-              className="space-y-3"
-            >
+            <div className="space-y-5">
               {Object.entries(groupedCustomizations).map(([groupName, items]) => {
                 const groupSelectionCount = selectedCustomizations.filter(c => c.group === groupName).length;
                 const hasExclusiveItems = items.some(item => item.is_exclusive);
-                
+
                 return (
-                  <AccordionItem 
-                    key={groupName} 
-                    value={groupName}
-                    className="border rounded-lg"
-                    style={{
-                      borderColor: POS_THEME.border,
-                      background: POS_THEME.backgroundLight
-                    }}
-                  >
-                    <AccordionTrigger 
-                      className="px-4 hover:no-underline"
-                      style={{ color: POS_THEME.text }}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <h3 
-                          className="text-lg font-semibold"
-                          style={{ color: POS_THEME.primary }}
-                        >
-                          {groupName}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs"
+                  <div key={groupName} className="space-y-3">
+                    {/* Section Header */}
+                    <div className="flex items-baseline gap-2">
+                      <h3
+                        className="text-base font-semibold"
+                        style={{ color: POS_THEME.primary }}
+                      >
+                        {groupName}
+                      </h3>
+                      <span className="text-xs" style={{ color: POS_THEME.textMuted }}>
+                        {hasExclusiveItems ? 'Choose one' : 'Choose any'}
+                        {groupSelectionCount > 0 && ` (${groupSelectionCount} selected)`}
+                      </span>
+                    </div>
+
+                    {/* Pill / Chip Options */}
+                    <div className="flex flex-wrap gap-2">
+                      {items.map(customization => {
+                        const isSelected = selectedCustomizations.some(c => c.id === customization.id);
+                        const hasPrice = (customization.price ?? 0) > 0;
+
+                        return (
+                          <motion.button
+                            key={customization.id}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-medium transition-all min-h-[44px] cursor-pointer"
+                            )}
                             style={{
-                              borderColor: POS_THEME.primary,
-                              color: POS_THEME.primary
+                              background: isSelected
+                                ? POS_THEME.primary
+                                : POS_THEME.backgroundLight,
+                              borderColor: isSelected
+                                ? POS_THEME.primary
+                                : POS_THEME.border,
+                              color: isSelected
+                                ? POS_THEME.text
+                                : POS_THEME.textMuted
                             }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => {
+                              if (hasExclusiveItems) {
+                                // Single choice: deselect others in group first
+                                setSelectedCustomizations(prev => prev.filter(c => c.group !== groupName));
+                                if (!isSelected) {
+                                  handleCustomizationToggle(customization, true);
+                                }
+                              } else {
+                                handleCustomizationToggle(customization, !isSelected);
+                              }
+                            }}
+                            role="option"
+                            aria-selected={isSelected}
                           >
-                            {items.length} {items.length === 1 ? 'option' : 'options'}
-                          </Badge>
-                          {groupSelectionCount > 0 && (
-                            <Badge 
-                              className="text-xs"
-                              style={{
-                                background: POS_THEME.success,
-                                color: POS_THEME.text
-                              }}
-                            >
-                              {groupSelectionCount} selected
-                            </Badge>
-                          )}
-                          {hasExclusiveItems && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge 
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{
-                                      borderColor: POS_THEME.primaryLight,
-                                      color: POS_THEME.primaryLight
-                                    }}
-                                  >
-                                    Choice
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent 
-                                  className="bg-gray-900 text-white border-gray-700"
-                                >
-                                  Select one option from this group
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      {hasExclusiveItems ? (
-                        <RadioGroup
-                          value={selectedCustomizations.find(c => c.group === groupName)?.id}
-                          onValueChange={(value) => {
-                            const customization = items.find(item => item.id === value);
-                            if (customization) {
-                              // Deselect all in this group first
-                              setSelectedCustomizations(prev => prev.filter(c => c.group !== groupName));
-                              // Select the new one
-                              handleCustomizationToggle(customization, true);
-                            }
-                          }}
-                          className="space-y-2 pt-2"
-                        >
-                          {items.map(customization => {
-                            const isSelected = selectedCustomizations.some(c => c.id === customization.id);
-                            const hasPrice = (customization.price ?? 0) > 0;
-                            
-                            return (
-                              <motion.div
-                                key={customization.id}
-                                className={cn(
-                                  "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
-                                  isSelected 
-                                    ? "border-opacity-100" 
-                                    : "border-opacity-30 hover:border-opacity-60"
-                                )}
-                                style={{
-                                  background: isSelected 
-                                    ? `linear-gradient(135deg, ${POS_THEME.primary}40 0%, ${POS_THEME.background} 100%)`
-                                    : POS_THEME.backgroundLight,
-                                  borderColor: isSelected 
-                                    ? POS_THEME.primary
-                                    : POS_THEME.border
-                                }}
-                                whileHover={{ scale: 1.01 }}
-                                role="option"
-                                aria-selected={isSelected}
-                              >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <RadioGroupItem
-                                    value={customization.id}
-                                    className="data-[state=checked]:bg-[#7C5DFA] data-[state=checked]:border-[#7C5DFA]"
-                                  />
-                                  <Label
-                                    htmlFor={customization.id}
-                                    className="cursor-pointer font-medium flex-1"
-                                    style={{ color: POS_THEME.text }}
-                                  >
-                                    {customization.name}
-                                    {customization.description && (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span className="ml-2 inline-flex">
-                                              <Info className="h-3 w-3" style={{ color: POS_THEME.textMuted }} />
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="bg-gray-900 text-white border-gray-700">
-                                            {customization.description}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </Label>
-                                </div>
-                                {hasPrice && (
-                                  <span 
-                                    className="text-sm font-semibold"
-                                    style={{ color: POS_THEME.primary }}
-                                  >
-                                    +£{customization.price?.toFixed(2)}
-                                  </span>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </RadioGroup>
-                      ) : (
-                        <div className="space-y-2 pt-2">
-                          {items.map(customization => {
-                            const isSelected = selectedCustomizations.some(c => c.id === customization.id);
-                            const hasPrice = (customization.price ?? 0) > 0;
-                            
-                            return (
-                              <motion.div
-                                key={customization.id}
-                                className={cn(
-                                  "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
-                                  isSelected 
-                                    ? "border-opacity-100" 
-                                    : "border-opacity-30 hover:border-opacity-60"
-                                )}
-                                style={{
-                                  background: isSelected 
-                                    ? `linear-gradient(135deg, ${POS_THEME.primary}40 0%, ${POS_THEME.background} 100%)`
-                                    : POS_THEME.backgroundLight,
-                                  borderColor: isSelected 
-                                    ? POS_THEME.primary
-                                    : POS_THEME.border
-                                }}
-                                whileHover={{ scale: 1.01 }}
-                                onClick={() => handleCustomizationToggle(customization, !isSelected)}
-                                role="option"
-                                aria-selected={isSelected}
-                              >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <Checkbox
-                                    id={customization.id}
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => 
-                                      handleCustomizationToggle(customization, checked as boolean)
-                                    }
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="data-[state=checked]:bg-[#7C5DFA] data-[state=checked]:border-[#7C5DFA]"
-                                  />
-                                  <Label
-                                    htmlFor={customization.id}
-                                    className="cursor-pointer font-medium flex-1"
-                                    style={{ color: POS_THEME.text }}
-                                  >
-                                    {customization.name}
-                                    {customization.description && (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span className="ml-2 inline-flex">
-                                              <Info className="h-3 w-3" style={{ color: POS_THEME.textMuted }} />
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="bg-gray-900 text-white border-gray-700">
-                                            {customization.description}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </Label>
-                                </div>
-                                {hasPrice && (
-                                  <span 
-                                    className="text-sm font-semibold"
-                                    style={{ color: POS_THEME.primary }}
-                                  >
-                                    +£{customization.price?.toFixed(2)}
-                                  </span>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
+                            {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                            <span>{customization.name}</span>
+                            {hasPrice && (
+                              <span className="opacity-75">+£{customization.price?.toFixed(2)}</span>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
-            </Accordion>
+            </div>
           ) : (
-            <div 
+            <div
               className="text-center py-8"
               style={{ color: POS_THEME.textMuted }}
             >
-              {searchQuery ? 'No add-ons found matching your search.' : 'No add-ons available for this item.'}
+              {searchQuery ? 'No options found matching your search.' : 'No options available for this item.'}
             </div>
           )}
 
@@ -677,7 +496,7 @@ export function StaffCustomizationModal({
                       background: POS_THEME.primary,
                       color: POS_THEME.text
                     }}
-                    onClick={() => handleRemoveChip(custom.id, custom.group)}
+                    onClick={() => handleRemoveChip(custom.id)}
                   >
                     <span>{custom.name}</span>
                     {custom.price_adjustment > 0 && (

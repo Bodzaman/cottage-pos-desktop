@@ -131,7 +131,7 @@ export const variantSchema = z.object({
   
   // Food-specific fields
   spice_level: spiceLevelValidator.nullable(),
-  allergens: z.array(z.string()).optional().nullable(),
+  allergens: z.record(z.string(), z.enum(['contains', 'may_contain'])).optional().nullable(),
   allergen_notes: z.string().optional().nullable(),
   
   // Dietary information flags
@@ -201,7 +201,7 @@ const baseMenuItemSchema = z.object({
  */
 const foodSpecificSchema = z.object({
   spice_level: spiceLevelValidator,
-  allergens: z.array(z.string()).optional(),
+  allergens: z.record(z.string(), z.enum(['contains', 'may_contain'])).optional().nullable(),
   allergen_warnings: z.string().optional().or(z.literal('')),
   specialty_notes: z.string().max(1000).optional().or(z.literal('')),
   chefs_special: z.boolean().optional(),

@@ -375,20 +375,23 @@ export function POSUnifiedPaymentModal({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="max-w-2xl border-gray-700 text-white overflow-hidden"
+      <DialogContent
+        className="max-w-2xl max-h-[85dvh] border-gray-700 text-white overflow-hidden flex flex-col p-0"
         style={styles.frostedGlassStyle}
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-xl font-bold">
-            <CreditCard className="h-6 w-6" style={{ color: QSAITheme.purple.primary }} />
-            {getStepTitle()}
-          </DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Payment processing for order total £{totalWithTip.toFixed(2)}
-          </DialogDescription>
-        </DialogHeader>
-        
+        <div className="shrink-0 p-6 pb-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+              <CreditCard className="h-6 w-6" style={{ color: QSAITheme.purple.primary }} />
+              {getStepTitle()}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Payment processing for order total £{totalWithTip.toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
         <AnimatePresence mode="wait">
           {/* Step 1: Tip Selection */}
           {currentStep === PaymentStep.TIP_SELECTION && (
@@ -599,7 +602,7 @@ export function POSUnifiedPaymentModal({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.1 }}
               transition={{ duration: 0.3 }}
-              className="text-center py-12"
+              className="text-center py-12 relative"
             >
               <motion.div
                 initial={{ scale: 0 }}
@@ -710,6 +713,7 @@ export function POSUnifiedPaymentModal({
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </DialogContent>
       
       {/* Adyen Card Terminal Modal */}

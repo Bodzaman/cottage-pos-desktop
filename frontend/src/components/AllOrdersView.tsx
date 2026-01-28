@@ -1,452 +1,211 @@
-
-
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { 
-  ChevronLeft, Search, RefreshCw, Filter, Calendar, 
-  Package, Truck, Users, Clock, ChefHat, Phone,
-  CreditCard, MapPin, User, Eye, Edit, Trash2
+import {
+  ChevronLeft, Search, RefreshCw, AlertCircle,
+  ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 
-// Core imports
 import brain from 'brain';
-import { colors } from '../utils/designSystem';
-import { globalColors } from '../utils/QSAIDesign';
-import { formatCurrency } from '../utils/formatters';
+import { colors } from '../utils/InternalDesignSystem';
+import { OrdersTable } from './orders/OrdersTable';
+import { OrderSubTabs } from './orders/OrderSubTabs';
+import { OrderCustomerCRM } from './orders/CustomerPreviewCard';
+import { OrderData } from './OrderDetailDialog';
 
-// Types
 interface POSViewProps {
   onBack?: () => void;
 }
 
-interface AllOrder {
-  order_id: string;  // Changed from 'id' to match API response
-  order_number: string;
-  order_type: 'DINE-IN' | 'DELIVERY' | 'COLLECTION' | 'WAITING';
-  order_source: 'POS' | 'ONLINE' | 'CUSTOMER_ONLINE_MENU' | 'AI_VOICE' | 'WEBSITE';
-  status: string;
-  customer_name?: string;
-  customer_phone?: string;
-  table_number?: number;
-  total: number;
-  payment_method?: string;
-  created_at: string;
-  completed_at?: string;
-  items: any[];
-  notes?: string;
+type PrimaryTab = 'all' | 'dine-in' | 'takeaway' | 'online';
+
+const TAKEAWAY_SUB_TABS = [
+  { value: 'all', label: 'All' },
+  { value: 'WAITING', label: 'Waiting' },
+  { value: 'COLLECTION', label: 'Collection' },
+  { value: 'DELIVERY', label: 'Delivery' },
+];
+
+const ONLINE_SUB_TABS = [
+  { value: 'all', label: 'All' },
+  { value: 'COLLECTION', label: 'Collection' },
+  { value: 'DELIVERY', label: 'Delivery' },
+];
+
+interface OrderDataWithCRM extends OrderData {
+  customerCRM?: OrderCustomerCRM | null;
+  rawOrderType?: string;
 }
 
-interface FilterState {
-  orderType: string;
-  orderSource: string;
-  paymentMethod: string;
-  status: string;
-  dateRange: {
-    from: Date | undefined;
-    to: Date | undefined;
+const convertBackendOrder = (backendOrder: any): OrderDataWithCRM => {
+  const typeMapping: Record<string, "delivery" | "pickup" | "dine-in"> = {
+    "DELIVERY": "delivery",
+    "COLLECTION": "pickup",
+    "DINE-IN": "dine-in",
+    "WAITING": "pickup",
   };
-}
 
-/**
- * Comprehensive All Orders View Component
- * 
- * Replaces both the Reconciliation page and POSDesktop "Reports" view with a unified
- * interface showing ALL order types and sources in one place.
- * 
- * Features:
- * - Shows ALL order types: DINE-IN, DELIVERY, COLLECTION, WAITING
- * - Shows ALL order sources: POS, ONLINE, CUSTOMER_ONLINE_MENU, AI_VOICE, WEBSITE
- * - Advanced filtering by type, source, payment method, status, date range
- * - Real-time data from brain.get_orders() endpoint
- * - Full order management actions: view details, update status, refunds
- * - Consistent experience between standalone page and POSDesktop integration
- */
+  const sourceMapping: Record<string, "online" | "pos"> = {
+    "ONLINE": "online",
+    "POS": "pos",
+    "CUSTOMER_ONLINE_MENU": "online",
+    "WEBSITE": "online",
+  };
+
+  const customerCRM = backendOrder.customer_data
+    ? {
+        id: backendOrder.customer_data.id,
+        first_name: backendOrder.customer_data.first_name,
+        last_name: backendOrder.customer_data.last_name,
+        phone: backendOrder.customer_data.phone,
+        customer_reference_number: backendOrder.customer_data.customer_reference_number,
+        total_orders: backendOrder.customer_data.total_orders,
+        total_spend: backendOrder.customer_data.total_spend,
+        last_order_at: backendOrder.customer_data.last_order_at,
+        tags: backendOrder.customer_data.tags,
+        notes_summary: backendOrder.customer_data.notes_summary,
+      }
+    : null;
+
+  return {
+    id: backendOrder.order_id,
+    orderNumber: backendOrder.order_number || backendOrder.order_id,
+    type: typeMapping[backendOrder.order_type] || "delivery",
+    source: (sourceMapping[backendOrder.order_source] || "pos") as any,
+    status: backendOrder.status?.toLowerCase() as any || "pending",
+    total: backendOrder.total,
+    rawOrderType: backendOrder.order_type,
+    items: backendOrder.items?.map((item: any) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      variant: item.variant_name || undefined,
+      notes: item.notes || undefined,
+    })) || [],
+    customer: {
+      name: backendOrder.customer_name || "Walk-in",
+      phone: backendOrder.customer_phone || "",
+      email: backendOrder.customer_email || undefined,
+    },
+    address: backendOrder.order_type === "DELIVERY" ? {
+      addressLine1: "Address on file",
+      city: "",
+      postcode: "",
+    } : undefined,
+    payment: {
+      method: backendOrder.payment?.method?.toLowerCase() as any || "card",
+      status: "paid" as any,
+      amount: backendOrder.total,
+      reference: backendOrder.payment?.transaction_id || undefined,
+    },
+    timestamps: {
+      created: backendOrder.created_at,
+      updated: backendOrder.completed_at !== backendOrder.created_at ? backendOrder.completed_at : undefined,
+    },
+    tableNumber: backendOrder.table_number || undefined,
+    customerCRM,
+  };
+};
+
 export function AllOrdersView({ onBack }: POSViewProps) {
-  // State Management
-  const [orders, setOrders] = useState<AllOrder[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<AllOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<AllOrder | null>(null);
-  const [showOrderDialog, setShowOrderDialog] = useState(false);
-  
-  // Filter State
-  const [filters, setFilters] = useState<FilterState>({
-    orderType: 'ALL',
-    orderSource: 'ALL',
-    paymentMethod: 'ALL',
-    status: 'ALL',
-    dateRange: {
-      from: undefined,
-      to: undefined
-    }
-  });
-
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [activeTab, setActiveTab] = useState<PrimaryTab>('all');
+  const [subTab, setSubTab] = useState('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [orders, setOrders] = useState<OrderDataWithCRM[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
-  // ============================================================================
-  // DATA FETCHING
-  // ============================================================================
+  const buildQueryParams = useCallback(() => {
+    const params: Record<string, any> = { page, page_size: pageSize };
 
-  const fetchAllOrders = useCallback(async () => {
+    switch (activeTab) {
+      case 'dine-in':
+        params.order_type = 'DINE-IN';
+        break;
+      case 'takeaway':
+        params.order_source = 'POS';
+        if (subTab !== 'all') params.order_type = subTab;
+        break;
+      case 'online':
+        params.order_source = 'ONLINE';
+        if (subTab !== 'all') params.order_type = subTab;
+        break;
+    }
+
+    if (selectedStatus !== 'all') params.status = selectedStatus.toUpperCase();
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+
+    return params;
+  }, [activeTab, subTab, page, pageSize, selectedStatus, searchQuery]);
+
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // Use the comprehensive orders endpoint to get ALL orders
-      const response = await (brain as any).get_orders({
-        page,
-        page_size: pageSize,
-        search: searchQuery || undefined,
-        order_type: filters.orderType === 'ALL' ? undefined : filters.orderType,
-        order_source: filters.orderSource === 'ALL' ? undefined : filters.orderSource,
-        payment_method: filters.paymentMethod === 'ALL' ? undefined : filters.paymentMethod,
-        status: filters.status === 'ALL' ? undefined : filters.status
-      });
-      
+      const params = buildQueryParams();
+      const response = await brain.get_orders(params);
       const data = await response.json();
-      
-      // OrderListResponse has orders and total_count directly, no success field
-      setOrders(data.orders || []);
-      setTotalCount(data.total_count || 0);
-      
-      // Log for debugging
-      console.log('AllOrdersView: Fetched orders:', {
-        count: data.orders?.length || 0,
-        totalCount: data.total_count || 0,
-        filters
-      });
+
+      let converted = data.orders?.map(convertBackendOrder) || [];
+      if (activeTab === 'takeaway' && subTab === 'all') {
+        converted = converted.filter((o: OrderDataWithCRM) => o.rawOrderType !== 'DINE-IN');
+      }
+
+      setOrders(converted);
+      setTotalCount(data.total_count || converted.length);
     } catch (error) {
-      console.error('AllOrdersView: Failed to fetch orders:', error);
+      console.error('Error fetching orders:', error);
       toast.error('Failed to load orders');
       setOrders([]);
       setTotalCount(0);
     } finally {
       setIsLoading(false);
-      setRefreshing(false);
     }
-  }, [page, pageSize, searchQuery, filters]);
+  }, [buildQueryParams, activeTab, subTab]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchAllOrders();
-  }, [fetchAllOrders]);
-
-  // ============================================================================
-  // FILTERING & SEARCH
-  // ============================================================================
-
-  // Apply local filtering for immediate UI response
   useEffect(() => {
-    let filtered = [...orders];
-    
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => 
-        order.order_number.toLowerCase().includes(query) ||
-        order.customer_name?.toLowerCase().includes(query) ||
-        order.customer_phone?.includes(query) ||
-        order.status.toLowerCase().includes(query)
-      );
-    }
-    
-    setFilteredOrders(filtered);
-  }, [orders, searchQuery]);
+    fetchOrders();
+  }, [activeTab, subTab, page, pageSize, selectedStatus]);
 
-  // Debounced search and filter changes
   useEffect(() => {
-    const delayedFetch = setTimeout(() => {
-      setPage(1); // Reset to first page when filters change
-      fetchAllOrders();
-    }, 300);
-    
-    return () => clearTimeout(delayedFetch);
-  }, [searchQuery, filters]);
+    const timer = setTimeout(() => { setPage(1); fetchOrders(); }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Initial data load
-  useEffect(() => {
-    fetchAllOrders();
-  }, []);
-
-  // ============================================================================
-  // ORDER ACTIONS
-  // ============================================================================
-
-  const handleViewOrder = (order: AllOrder) => {
-    setSelectedOrder(order);
-    setShowOrderDialog(true);
+  const handleTabChange = (tab: PrimaryTab) => {
+    setActiveTab(tab);
+    setSubTab('all');
+    setPage(1);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
-    try {
-      const response = await (brain as any).update_order_status({
-        order_id: orderId,
-        status: newStatus
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        toast.success(`Order status updated to ${newStatus}`);
-        fetchAllOrders(); // Refresh data
-      } else {
-        toast.error('Failed to update order status');
-      }
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('Error updating order status');
-    }
+  const handleViewOrder = (order: OrderData) => {
+    toast.success(`Viewing order ${order.orderNumber}`);
   };
 
-  // ============================================================================
-  // UTILITY FUNCTIONS
-  // ============================================================================
-
-  const getOrderTypeIcon = (orderType: string) => {
-    switch (orderType) {
-      case 'DINE-IN': return <Users className="h-4 w-4" />;
-      case 'DELIVERY': return <Truck className="h-4 w-4" />;
-      case 'COLLECTION': return <Package className="h-4 w-4" />;
-      case 'WAITING': return <Clock className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
-    }
+  const handlePrintOrder = (order: OrderData) => {
+    toast.success(`Printing order ${order.orderNumber}`);
   };
 
-  const getOrderSourceIcon = (orderSource: string) => {
-    switch (orderSource) {
-      case 'POS': return <ChefHat className="h-4 w-4" />;
-      case 'ONLINE': 
-      case 'CUSTOMER_ONLINE_MENU':
-      case 'WEBSITE': return <User className="h-4 w-4" />;
-      case 'AI_VOICE': return <Phone className="h-4 w-4" />;
-      default: return <User className="h-4 w-4" />;
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'pending': return 'bg-yellow-500';
-      case 'confirmed': return 'bg-blue-500';
-      case 'preparing': return 'bg-purple-500';
-      case 'ready': return 'bg-green-500';
-      case 'completed': return 'bg-gray-500';
-      case 'cancelled': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  // ============================================================================
-  // RENDER FUNCTIONS
-  // ============================================================================
-
-  const renderOrderCard = (order: AllOrder) => (
-    <Card key={order.order_id} className="mb-4 border-0" style={{ 
-      backgroundColor: colors.background.tertiary,
-      borderLeft: `4px solid ${globalColors.purple.primary}`
-    }}>
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              {getOrderTypeIcon(order.order_type)}
-              <span className="font-semibold text-white">{order.order_number}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              {getOrderSourceIcon(order.order_source)}
-              <span className="text-sm text-gray-400">{order.order_source}</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Badge className={`${getStatusColor(order.status)} text-white`}>
-              {order.status}
-            </Badge>
-            <span className="font-bold text-white">{formatCurrency(order.total)}</span>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div>
-            <span className="text-gray-400">Customer:</span>
-            <p className="text-white">{order.customer_name || 'Walk-in'}</p>
-          </div>
-          <div>
-            <span className="text-gray-400">Phone:</span>
-            <p className="text-white">{order.customer_phone || 'N/A'}</p>
-          </div>
-          <div>
-            <span className="text-gray-400">Table:</span>
-            <p className="text-white">{order.table_number || 'N/A'}</p>
-          </div>
-          <div>
-            <span className="text-gray-400">Payment:</span>
-            <p className="text-white">{order.payment_method || 'Cash'}</p>
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-600">
-          <div className="text-sm text-gray-400">
-            Created: {new Date(order.created_at).toLocaleString()}
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleViewOrder(order)}
-              className="text-white border-gray-600 hover:bg-gray-700"
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              View
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleUpdateOrderStatus(order.order_id, 'completed')}
-              className="text-white border-gray-600 hover:bg-gray-700"
-            >
-              <Edit className="h-4 w-4 mr-1" />
-              Update
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderFilterBar = () => (
-    <Card className="mb-6 border-0" style={{ backgroundColor: colors.background.secondary }}>
-      <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search orders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-700 border-gray-600 text-white"
-            />
-          </div>
-          
-          {/* Order Type Filter */}
-          <Select value={filters.orderType} onValueChange={(value) => setFilters(prev => ({ ...prev, orderType: value }))}>
-            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue placeholder="Order Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Types</SelectItem>
-              <SelectItem value="DINE-IN">Dine-In</SelectItem>
-              <SelectItem value="DELIVERY">Delivery</SelectItem>
-              <SelectItem value="COLLECTION">Collection</SelectItem>
-              <SelectItem value="WAITING">Waiting</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Order Source Filter */}
-          <Select value={filters.orderSource} onValueChange={(value) => setFilters(prev => ({ ...prev, orderSource: value }))}>
-            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue placeholder="Order Source" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Sources</SelectItem>
-              <SelectItem value="POS">POS</SelectItem>
-              <SelectItem value="ONLINE">Online</SelectItem>
-              <SelectItem value="CUSTOMER_ONLINE_MENU">Online Menu</SelectItem>
-              <SelectItem value="AI_VOICE">AI Voice</SelectItem>
-              <SelectItem value="WEBSITE">Website</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Status Filter */}
-          <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
-            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Refresh Button */}
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderStatsCards = () => {
-    const totalOrders = filteredOrders.length;
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.total, 0);
-    const ordersByType = filteredOrders.reduce((acc, order) => {
-      acc[order.order_type] = (acc[order.order_type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const ordersBySource = filteredOrders.reduce((acc, order) => {
-      acc[order.order_source] = (acc[order.order_source] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-0" style={{ backgroundColor: colors.background.tertiary }}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-white">{totalOrders}</div>
-            <div className="text-sm text-gray-400">Total Orders</div>
-          </CardContent>
-        </Card>
-        <Card className="border-0" style={{ backgroundColor: colors.background.tertiary }}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-white">{formatCurrency(totalRevenue)}</div>
-            <div className="text-sm text-gray-400">Total Revenue</div>
-          </CardContent>
-        </Card>
-        <Card className="border-0" style={{ backgroundColor: colors.background.tertiary }}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-white">{Object.keys(ordersByType).length}</div>
-            <div className="text-sm text-gray-400">Order Types</div>
-          </CardContent>
-        </Card>
-        <Card className="border-0" style={{ backgroundColor: colors.background.tertiary }}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-white">{Object.keys(ordersBySource).length}</div>
-            <div className="text-sm text-gray-400">Order Sources</div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
-
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
+  const primaryTabs: { value: PrimaryTab; label: string }[] = [
+    { value: 'all', label: 'All Orders' },
+    { value: 'dine-in', label: 'Dine-In' },
+    { value: 'takeaway', label: 'Takeaway' },
+    { value: 'online', label: 'Online' },
+  ];
 
   return (
     <div className="h-full overflow-auto" style={{ backgroundColor: colors.background.primary }}>
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-6 space-y-4">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             {onBack && (
               <Button
@@ -460,55 +219,163 @@ export function AllOrdersView({ onBack }: POSViewProps) {
               </Button>
             )}
             <div>
-              <h1 className="text-3xl font-bold text-white">
-                All Orders
-              </h1>
-              <p className="text-gray-400">
-                Unified view of all orders from every source and type
-              </p>
+              <h1 className="text-2xl font-bold text-white">All Orders</h1>
+              <p className="text-sm text-gray-500">Order History & Management</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className="text-white border-gray-600">
-              {totalCount} Total Orders
-            </Badge>
-          </div>
+          <Badge variant="outline" className="text-white border-gray-600">
+            {totalCount} orders
+          </Badge>
         </div>
 
-        {/* Stats Cards */}
-        {renderStatsCards()}
+        {/* Primary Tabs */}
+        <div className="flex flex-col gap-0">
+          <div className="flex gap-1 bg-[#111] rounded-lg p-1 w-fit">
+            {primaryTabs.map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => handleTabChange(tab.value)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab.value
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'takeaway' && (
+            <OrderSubTabs tabs={TAKEAWAY_SUB_TABS} activeTab={subTab} onChange={val => { setSubTab(val); setPage(1); }} />
+          )}
+          {activeTab === 'online' && (
+            <OrderSubTabs tabs={ONLINE_SUB_TABS} activeTab={subTab} onChange={val => { setSubTab(val); setPage(1); }} />
+          )}
+        </div>
 
         {/* Filter Bar */}
-        {renderFilterBar()}
-
-        {/* Orders List */}
         <Card className="border-0" style={{ backgroundColor: colors.background.secondary }}>
-          <CardHeader>
-            <CardTitle className="text-white flex items-center justify-between">
-              <span>Orders ({filteredOrders.length})</span>
-              {isLoading && (
-                <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8">
-                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-400">Loading all orders...</p>
+          <CardContent className="p-3">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search order #, customer, phone..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-white/5 border-white/10 text-white text-sm h-9"
+                />
               </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-8 w-8 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-400">No orders found matching your criteria</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredOrders.map(renderOrderCard)}
-              </div>
-            )}
+
+              <Select value={selectedStatus} onValueChange={val => { setSelectedStatus(val); setPage(1); }}>
+                <SelectTrigger className="w-36 bg-white/5 border-white/10 text-white text-sm h-9">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a1a] border-white/10 text-white">
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="preparing">Preparing</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchOrders}
+                disabled={isLoading}
+                className="bg-white/5 border-white/10 text-white h-9"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Orders Table */}
+        {isLoading ? (
+          <Card className="border-0" style={{ backgroundColor: colors.background.secondary }}>
+            <CardContent className="text-center py-12">
+              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-3 text-gray-500" />
+              <p className="text-gray-500 text-sm">Loading orders...</p>
+            </CardContent>
+          </Card>
+        ) : orders.length === 0 ? (
+          <Card className="border-0" style={{ backgroundColor: colors.background.secondary }}>
+            <CardContent className="flex flex-col items-center justify-center p-12">
+              <AlertCircle className="h-10 w-10 text-gray-600 mb-3" />
+              <h3 className="text-lg font-semibold text-white mb-1">No Orders Found</h3>
+              <p className="text-gray-500 text-sm text-center max-w-md">
+                No orders match your current filters.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 bg-white/5 border-white/10 text-white"
+                onClick={() => { setSearchQuery(''); setSelectedStatus('all'); setSubTab('all'); }}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Reset Filters
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-0" style={{ backgroundColor: colors.background.secondary }}>
+            <CardContent className="p-0">
+              <OrdersTable
+                orders={orders}
+                onViewOrder={handleViewOrder}
+                onPrintOrder={handlePrintOrder}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pagination */}
+        {orders.length > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-500">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(p - 1, 1))}
+                disabled={page === 1}
+                className="h-8 w-8 p-0 bg-white/5 border-white/10 text-white"
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-gray-400">{page} / {totalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                disabled={page === totalPages}
+                className="h-8 w-8 p-0 bg-white/5 border-white/10 text-white"
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </Button>
+              <Select value={pageSize.toString()} onValueChange={val => { setPageSize(Number(val)); setPage(1); }}>
+                <SelectTrigger className="w-16 h-8 bg-white/5 border-white/10 text-white text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a1a] border-white/10 text-white">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

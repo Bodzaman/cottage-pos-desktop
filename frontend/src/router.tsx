@@ -2,6 +2,7 @@ import { lazy, type ReactNode, Suspense } from "react";
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { userRoutes } from "./user-routes";
 import { AppProvider } from "components/AppProvider";
+import { AnalyticsPageTracker } from "components/AnalyticsPageTracker";
 
 export const SuspenseWrapper = ({ children }: { children: ReactNode }) => {
   return <Suspense>{children}</Suspense>;
@@ -17,6 +18,7 @@ export const router = createBrowserRouter(
     {
       element: (
         <AppProvider>
+          <AnalyticsPageTracker />
           <SuspenseWrapper>
             <Outlet />
           </SuspenseWrapper>

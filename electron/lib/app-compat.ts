@@ -86,20 +86,83 @@ export const apiClient = {
   // ============================================================================
   // CRITICAL: POS Settings - return sensible defaults
   // ============================================================================
-  get_pos_settings: async () => mockResponse({
-    settings: {
-      service_charge: { enabled: false, percentage: 10.0 },
-      delivery_charge: { enabled: true, amount: 3.50 },
+  get_pos_settings: async () => {
+    console.log('🔄 [app-compat] get_pos_settings - querying Supabase');
+    const DEFAULT_POS_SETTINGS = {
+      service_charge: { enabled: false, percentage: 10.0, print_on_receipt: true },
+      delivery_charge: { enabled: true, amount: 3.50, print_on_receipt: true },
       delivery: {
         radius_miles: 6.0,
         minimum_order_value: 15.0,
         allowed_postcodes: ["RH20", "BN5", "RH13", "BN6", "RH14"]
       },
-      variant_carousel_enabled: true
-    }
-  }),
+      variant_carousel_enabled: true,
+      urgency_settings: {
+        enabled: true,
+        stale_order_hours: 2,
+        in_kitchen_high_minutes: 20,
+        seated_medium_minutes: 15,
+        ordering_medium_minutes: 10
+      }
+    };
+    try {
+      const { data, error } = await supabase
+        .from('pos_settings')
+        .select('settings')
+        .eq('id', 1)
+        .single();
 
-  save_pos_settings: async (data: any) => mockResponse({ success: true }),
+      if (error || !data) {
+        console.warn('⚠️ [app-compat] pos_settings not found, using defaults');
+        return mockResponse({ settings: DEFAULT_POS_SETTINGS });
+      }
+
+      console.log('✅ [app-compat] pos_settings loaded from DB');
+      return mockResponse({ settings: { ...DEFAULT_POS_SETTINGS, ...data.settings } });
+    } catch (error) {
+      console.error('❌ [app-compat] get_pos_settings exception:', error);
+      return mockResponse({ settings: DEFAULT_POS_SETTINGS });
+    }
+  },
+
+  save_pos_settings: async (data: any) => {
+    console.log('📝 [app-compat] save_pos_settings called:', data);
+    try {
+      const settings = data?.settings || data;
+
+      // Check if row exists
+      const { data: existing } = await supabase
+        .from('pos_settings')
+        .select('id')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('pos_settings')
+          .update({ settings, updated_at: new Date().toISOString() })
+          .eq('id', 1);
+        if (error) {
+          console.error('❌ [app-compat] save_pos_settings update error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+      } else {
+        const { error } = await supabase
+          .from('pos_settings')
+          .insert({ id: 1, settings, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+        if (error) {
+          console.error('❌ [app-compat] save_pos_settings insert error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+      }
+
+      console.log('✅ [app-compat] POS settings saved');
+      return mockResponse({ success: true, message: 'POS settings saved successfully' });
+    } catch (error) {
+      console.error('❌ [app-compat] save_pos_settings exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // CRITICAL: Menu/POS Bundle - return failure to trigger Supabase fallback
@@ -426,34 +489,99 @@ export const apiClient = {
   get_orders: async (params: any) => {
     console.log('📋 [app-compat] get_orders called:', params);
     try {
-      const { order_type, status, limit = 50, offset = 0 } = params || {};
+      const { page = 1, page_size = 20, order_type, order_source, status, search } = params || {};
+      const offset = (page - 1) * page_size;
 
-      // Query regular orders from 'orders' table
+      // Query orders with joins matching backend format
       let ordersQuery = supabase
         .from('orders')
-        .select('*', { count: 'exact' })
+        .select(
+          '*, order_items(*), customers(id,first_name,last_name,phone,customer_reference_number,total_orders,total_spend,last_order_at,tags,notes_summary)',
+          { count: 'exact' }
+        )
         .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        .range(offset, offset + page_size - 1);
 
       if (order_type) {
         ordersQuery = ordersQuery.eq('order_type', order_type);
       }
+      if (order_source) {
+        ordersQuery = ordersQuery.eq('order_source', order_source);
+      }
       if (status) {
         ordersQuery = ordersQuery.eq('status', status);
+      }
+      if (search) {
+        const q = `%${search}%`;
+        ordersQuery = ordersQuery.or(`customer_name.ilike.${q},order_number.ilike.${q},customer_phone.ilike.${q}`);
       }
 
       const { data: orders, error, count } = await ordersQuery;
 
       if (error) {
         console.error('❌ [app-compat] Failed to get orders:', error);
-        return mockResponse({ orders: [], total: 0, error: error.message }, false);
+        return mockResponse({ orders: [], total_count: 0, error: error.message }, false);
       }
 
-      console.log(`✅ [app-compat] Loaded ${orders?.length || 0} orders (total: ${count})`);
-      return mockResponse({ orders: orders || [], total: count || 0 });
+      // Transform raw Supabase rows to match backend response format
+      const transformedOrders = (orders || []).map((row: any) => {
+        // Process order items: prefer order_items relation, fallback to JSON items column
+        const orderItemsRelation = row.order_items || [];
+        let items: any[] = [];
+        if (orderItemsRelation.length > 0) {
+          items = orderItemsRelation.map((item: any) => ({
+            item_id: item.item_id || `item_${items.length + 1}`,
+            name: item.item_name || '',
+            quantity: item.quantity || 1,
+            price: parseFloat(item.unit_price || 0),
+            variant_name: item.variant_name || null,
+            notes: item.special_instructions || '',
+          }));
+        } else {
+          const jsonItems = row.items || [];
+          items = (Array.isArray(jsonItems) ? jsonItems : []).map((item: any) => ({
+            item_id: item.id || `item_${items.length + 1}`,
+            name: item.name || '',
+            quantity: item.quantity || 1,
+            price: parseFloat(item.price || 0),
+            variant_name: item.variant || null,
+            notes: item.notes || '',
+          }));
+        }
+
+        return {
+          order_id: row.id,
+          order_number: row.order_number || '',
+          customer_name: row.customer_name || '',
+          customer_phone: row.customer_phone || '',
+          customer_email: row.customer_email || '',
+          customer_id: row.customer_id,
+          customer_data: row.customers || null,
+          order_type: row.order_type || '',
+          order_source: row.order_source || '',
+          status: row.status || '',
+          table_number: row.table_number,
+          items,
+          subtotal: parseFloat(row.subtotal || 0),
+          tax: parseFloat(row.tax_amount || 0),
+          total: parseFloat(row.total_amount || 0),
+          payment: {
+            method: row.payment_method || '',
+            amount: parseFloat(row.total_amount || 0),
+            status: row.payment_status === 'paid' ? 'completed' : 'pending',
+            transaction_id: row.payment_reference || null,
+          },
+          created_at: row.created_at,
+          completed_at: row.updated_at || row.created_at,
+          special_instructions: row.special_instructions || '',
+        };
+      });
+
+      console.log(`✅ [app-compat] Loaded ${transformedOrders.length} orders (total: ${count})`);
+      return mockResponse({ orders: transformedOrders, total_count: count || 0 });
     } catch (error) {
       console.error('❌ [app-compat] Exception in get_orders:', error);
-      return mockResponse({ orders: [], total: 0, error: (error as Error).message }, false);
+      return mockResponse({ orders: [], total_count: 0, error: (error as Error).message }, false);
     }
   },
 
@@ -636,12 +764,76 @@ export const apiClient = {
     }
   },
 
-  get_online_orders: async (params: any) => mockResponse({ orders: [], total: 0 }),
+  get_online_orders: async (params: any) => {
+    console.log('🔄 [app-compat] get_online_orders - querying Supabase', params);
+    try {
+      const { page = 1, page_size = 100, status } = params || {};
+      const offset = (page - 1) * page_size;
+
+      // Build query for online orders (not POS-created)
+      let query = supabase
+        .from('orders')
+        .select('*', { count: 'exact' })
+        .neq('order_source', 'POS')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + page_size - 1);
+
+      // Apply status filter if provided
+      if (status && status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      const { data: orders, error, count } = await query;
+
+      if (error) {
+        console.error('❌ [app-compat] get_online_orders error:', error);
+        return mockResponse({ orders: [], total: 0 });
+      }
+
+      console.log(`✅ [app-compat] get_online_orders loaded ${orders?.length || 0} orders (total: ${count})`);
+      return mockResponse({ orders: orders || [], total: count || 0 });
+    } catch (error) {
+      console.error('❌ [app-compat] get_online_orders exception:', error);
+      return mockResponse({ orders: [], total: 0 });
+    }
+  },
 
   // ============================================================================
   // CRITICAL: Payments - basic stubs
   // ============================================================================
-  process_cash_payment: async (data: any) => mockResponse({ success: true }),
+  process_cash_payment: async (data: any) => {
+    console.log('💵 [app-compat] process_cash_payment:', data);
+    try {
+      const { order_id, amount, payment_method = 'cash' } = data || {};
+
+      // If we have an order_id, update its payment status
+      if (order_id) {
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            payment_status: 'PAID',
+            payment_method: payment_method,
+            payment_amount: amount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('order_id', order_id);
+
+        if (error) {
+          console.error('❌ [app-compat] process_cash_payment update error:', error);
+        }
+      }
+
+      return mockResponse({
+        success: true,
+        payment_method: 'cash',
+        payment_status: 'PAID',
+        transaction_id: `cash_${Date.now()}`,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] process_cash_payment error:', error);
+      return mockResponse({ success: true, payment_method: 'cash' });
+    }
+  },
 
   create_payment_intent: async (data: any) => {
     // Check if running in Electron with IPC available
@@ -701,9 +893,84 @@ export const apiClient = {
     });
   },
 
-  create_payment_intent2: async (data: any) => mockResponse({ success: true }),
+  create_payment_intent2: async (data: any) => {
+    console.log('💳 [app-compat] create_payment_intent2:', data);
+    try {
+      const { payment_method, order_id, amount } = data || {};
 
-  get_payment_config: async () => mockResponse({ configured: false }),
+      // For cash payments, just record the payment status
+      if (payment_method === 'cash' || payment_method === 'CASH') {
+        if (order_id) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'PAID',
+              payment_method: 'cash',
+              payment_amount: amount,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('order_id', order_id);
+        }
+
+        return mockResponse({
+          success: true,
+          payment_method: 'cash',
+          payment_status: 'PAID',
+          transaction_id: `cash_${Date.now()}`,
+        });
+      }
+
+      // For card payments, delegate to Electron IPC
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.stripeCreatePaymentIntent) {
+        try {
+          const result = await electronAPI.stripeCreatePaymentIntent(data);
+          if (result.success) {
+            return mockResponse(result);
+          }
+          return mockResponse({
+            success: false,
+            message: result.error || 'Failed to create payment intent',
+          }, false);
+        } catch (ipcError) {
+          console.error('❌ [app-compat] create_payment_intent2 IPC error:', ipcError);
+          return mockResponse({
+            success: false,
+            message: (ipcError as Error).message,
+          }, false);
+        }
+      }
+
+      // Fallback for hybrid mode
+      if (isHybridMode) {
+        const result = await callBackendAPI('/routes/stripe/create-payment-intent', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        return mockResponse(result);
+      }
+
+      return mockResponse({
+        success: false,
+        message: 'Payment processing not available',
+      }, false);
+    } catch (error) {
+      console.error('❌ [app-compat] create_payment_intent2 error:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  get_payment_config: async () => {
+    const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+    const electronAPI = (window as any).electronAPI;
+    const hasElectronStripe = !!electronAPI?.stripeCreatePaymentIntent;
+
+    return mockResponse({
+      configured: !!(stripeKey || hasElectronStripe || isHybridMode),
+      stripe_configured: !!stripeKey || hasElectronStripe,
+      cash_enabled: true,
+    });
+  },
 
   get_stripe_publishable_key: async () => {
     // Try environment variable first (same pattern as Google Maps)
@@ -728,7 +995,32 @@ export const apiClient = {
     return mockResponse({ publishable_key: null });
   },
 
-  confirm_payment: async (data: any) => mockResponse({ success: true }),
+  confirm_payment: async (data: any) => {
+    console.log('✅ [app-compat] confirm_payment:', data);
+    try {
+      // Try Electron IPC first (Stripe card confirmation)
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.stripeConfirmPayment) {
+        const result = await electronAPI.stripeConfirmPayment(data);
+        return mockResponse(result);
+      }
+
+      // Fallback for hybrid mode
+      if (isHybridMode) {
+        const result = await callBackendAPI('/routes/stripe/confirm-payment', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        return mockResponse(result);
+      }
+
+      // For cash payments, confirmation is a no-op (already recorded)
+      return mockResponse({ success: true, payment_status: 'confirmed' });
+    } catch (error) {
+      console.error('❌ [app-compat] confirm_payment error:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // LOGGING & ANALYTICS - No-ops (silent)
@@ -788,16 +1080,112 @@ export const apiClient = {
   // ============================================================================
   // RESTAURANT SETTINGS
   // ============================================================================
-  get_restaurant_settings: async () => mockResponse({
-    settings: {
-      name: 'Cottage Tandoori',
-      phone: '',
-      address: '',
-      opening_hours: {}
-    }
-  }),
+  get_restaurant_settings: async () => {
+    console.log('🔄 [app-compat] get_restaurant_settings - querying Supabase');
+    try {
+      const { data, error } = await supabase
+        .from('restaurant_settings')
+        .select('settings')
+        .eq('id', 1)
+        .single();
 
-  save_restaurant_settings: async (data: any) => mockResponse({ success: true }),
+      if (error || !data) {
+        console.warn('⚠️ [app-compat] get_restaurant_settings: no data found, using defaults');
+        return mockResponse({
+          settings: {
+            name: 'Cottage Tandoori',
+            phone: '',
+            address: '',
+            opening_hours: {},
+            onlineOrders: {
+              processing: { autoApproveOrders: true, autoPrintOnAccept: true },
+              notifications: { playSound: true, soundVolume: 75, repeatUntilAcknowledged: false },
+            }
+          }
+        });
+      }
+
+      console.log('✅ [app-compat] get_restaurant_settings loaded from DB');
+      return mockResponse(data);
+    } catch (error) {
+      console.error('❌ [app-compat] get_restaurant_settings exception:', error);
+      return mockResponse({
+        settings: {
+          name: 'Cottage Tandoori',
+          phone: '',
+          address: '',
+          opening_hours: {}
+        }
+      });
+    }
+  },
+
+  save_restaurant_settings: async (data: any) => {
+    console.log('📝 [app-compat] save_restaurant_settings called:', data);
+    try {
+      // Fetch existing settings for deep merge
+      const { data: existingRow } = await supabase
+        .from('restaurant_settings')
+        .select('settings')
+        .eq('id', 1)
+        .maybeSingle();
+
+      let mergedSettings = existingRow?.settings || {};
+
+      // Deep merge incoming data
+      if (data?.settings) {
+        mergedSettings = { ...mergedSettings, ...data.settings };
+      }
+      if (data?.profile) {
+        mergedSettings.business_profile = {
+          ...(mergedSettings.business_profile || {}),
+          ...data.profile,
+        };
+      }
+      if (data?.delivery) {
+        // Validate coordinates if provided
+        if (data.delivery.restaurant_location) {
+          const { lat, lng } = data.delivery.restaurant_location;
+          if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            data.delivery.restaurant_location = { lat: 50.91806074772868, lng: -0.4556764022106669 };
+          }
+        }
+        mergedSettings.delivery = {
+          ...(mergedSettings.delivery || {}),
+          ...data.delivery,
+        };
+      }
+      if (data?.operation_hours || data?.opening_hours) {
+        mergedSettings.opening_hours = data.operation_hours || data.opening_hours;
+      }
+
+      // Upsert
+      if (existingRow) {
+        const { error } = await supabase
+          .from('restaurant_settings')
+          .update({ settings: mergedSettings, updated_at: new Date().toISOString() })
+          .eq('id', 1);
+        if (error) {
+          console.error('❌ [app-compat] save_restaurant_settings update error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+      } else {
+        const { error } = await supabase
+          .from('restaurant_settings')
+          .insert({ id: 1, settings: mergedSettings, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+        if (error) {
+          console.error('❌ [app-compat] save_restaurant_settings insert error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+      }
+
+      console.log('✅ [app-compat] Restaurant settings saved');
+      return mockResponse({ success: true, message: 'Settings saved successfully' });
+    } catch (error) {
+      console.error('❌ [app-compat] save_restaurant_settings exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // PASSWORD/AUTH
@@ -1223,22 +1611,321 @@ export const apiClient = {
 
   list_table_orders: async (params: any) => mockResponse({ table_orders: [] }),
 
-  create_table_order: async (data: any) => mockResponse({
-    success: true,
-    order_id: `TBL-${Date.now()}`
-  }),
+  create_table_order: async (data: any) => {
+    console.log('📝 [app-compat] create_table_order called:', data);
+    try {
+      const tableNumber = data?.table_number;
+      const guestCount = data?.guest_count || 1;
+      const linkedTables = data?.linked_tables || [];
 
-  update_table_order: async (params: any, data?: any) => mockResponse({ success: true }),
+      const { data: newOrder, error } = await supabase
+        .from('table_orders')
+        .insert({
+          table_number: tableNumber,
+          order_items: [],
+          status: 'active',
+          guest_count: guestCount,
+          linked_tables: linkedTables,
+        })
+        .select()
+        .single();
 
-  complete_table_order: async (params: any) => mockResponse({ success: true }),
+      if (error) {
+        console.error('❌ [app-compat] create_table_order error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
 
-  reset_table_to_available: async (params: any) => mockResponse({ success: true }),
+      // Update table status to OCCUPIED
+      await supabase.from('pos_tables').update({ status: 'OCCUPIED' }).eq('table_number', tableNumber);
+      for (const lt of linkedTables) {
+        await supabase.from('pos_tables').update({ status: 'OCCUPIED' }).eq('table_number', lt);
+      }
 
-  add_items_to_table: async (params: any, items: any) => mockResponse({ success: true }),
+      console.log('✅ [app-compat] Table order created:', newOrder.id);
+      return mockResponse({ success: true, order_id: newOrder.id, table_order: newOrder });
+    } catch (error) {
+      console.error('❌ [app-compat] create_table_order exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
-  link_tables: async (params: any) => mockResponse({ success: true }),
+  update_table_order: async (params: any, data?: any) => {
+    console.log('📝 [app-compat] update_table_order called:', params);
+    try {
+      const tableNumber = params?.table_number || data?.table_number;
+      const items = data?.items || data?.order_items || params?.items || params?.order_items;
 
-  unlink_table: async (params: any) => mockResponse({ success: true }),
+      if (!tableNumber) {
+        return mockResponse({ success: false, message: 'Table number required' }, false);
+      }
+
+      const updateFields: any = {};
+      if (items !== undefined) updateFields.order_items = items;
+      if (data?.guest_count !== undefined) updateFields.guest_count = data.guest_count;
+      if (data?.status !== undefined) updateFields.status = data.status;
+
+      const { data: updated, error } = await supabase
+        .from('table_orders')
+        .update(updateFields)
+        .eq('table_number', tableNumber)
+        .eq('status', 'active')
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] update_table_order error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Table order updated:', tableNumber);
+      return mockResponse({ success: true, table_order: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] update_table_order exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  complete_table_order: async (params: any) => {
+    console.log('📝 [app-compat] complete_table_order called:', params);
+    try {
+      const tableNumber = params?.table_number;
+      if (!tableNumber) {
+        return mockResponse({ success: false, message: 'Table number required' }, false);
+      }
+
+      // Check if table is part of a linked group
+      const { data: table } = await supabase
+        .from('pos_tables')
+        .select('linked_table_group_id')
+        .eq('table_number', tableNumber)
+        .single();
+
+      let allTableNumbers = [tableNumber];
+
+      if (table?.linked_table_group_id) {
+        const { data: groupTables } = await supabase
+          .from('pos_tables')
+          .select('table_number')
+          .eq('linked_table_group_id', table.linked_table_group_id);
+        if (groupTables && groupTables.length > 0) {
+          allTableNumbers = groupTables.map((t: any) => t.table_number);
+        }
+      }
+
+      // Also check orders table for linked_tables
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, linked_tables, table_group_id')
+        .eq('table_number', tableNumber)
+        .in('status', ['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeOrder?.linked_tables && activeOrder.linked_tables.length > 0) {
+        allTableNumbers = [...new Set([...allTableNumbers, ...activeOrder.linked_tables])];
+      }
+
+      // Find all active order IDs for cleanup
+      const { data: activeOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .in('table_number', allTableNumbers)
+        .in('status', ['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT']);
+
+      const orderIds = activeOrders?.map((o: any) => o.id) || [];
+
+      // Delete customer_tabs for these orders
+      if (orderIds.length > 0) {
+        await supabase.from('customer_tabs').delete().in('order_id', orderIds);
+      }
+      // Also delete orphaned tabs by table_number
+      await supabase.from('customer_tabs').delete().in('table_number', allTableNumbers).eq('status', 'active');
+
+      // Complete all table_orders in the group
+      await supabase
+        .from('table_orders')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .in('table_number', allTableNumbers)
+        .eq('status', 'active');
+
+      // Mark orders as COMPLETED
+      if (orderIds.length > 0) {
+        await supabase
+          .from('orders')
+          .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
+          .in('id', orderIds);
+      }
+
+      // Reset all tables in the group
+      await supabase
+        .from('pos_tables')
+        .update({
+          status: 'AVAILABLE',
+          is_linked_table: false,
+          is_linked_primary: false,
+          linked_table_group_id: null,
+          linked_with_tables: [],
+        })
+        .in('table_number', allTableNumbers);
+
+      console.log('✅ [app-compat] complete_table_order: Completed and reset', allTableNumbers.length, 'tables:', allTableNumbers);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] complete_table_order exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  reset_table_to_available: async (params: any) => {
+    console.log('📝 [app-compat] reset_table_to_available called:', params);
+    try {
+      const tableNumber = params?.table_number;
+      if (!tableNumber) {
+        return mockResponse({ success: false, message: 'Table number required' }, false);
+      }
+
+      // Cancel any active orders for this table
+      await supabase
+        .from('table_orders')
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+        .eq('table_number', tableNumber)
+        .eq('status', 'active');
+
+      // Reset table status
+      await supabase.from('pos_tables').update({ status: 'AVAILABLE' }).eq('table_number', tableNumber);
+
+      console.log('✅ [app-compat] Table reset to available:', tableNumber);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] reset_table_to_available exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  add_items_to_table: async (params: any, items?: any) => {
+    console.log('📝 [app-compat] add_items_to_table called:', params);
+    try {
+      const tableNumber = params?.table_number;
+      const newItems = items || params?.items || params?.order_items || [];
+
+      if (!tableNumber) {
+        return mockResponse({ success: false, message: 'Table number required' }, false);
+      }
+
+      // Get current active order
+      const { data: currentOrder, error: fetchError } = await supabase
+        .from('table_orders')
+        .select('*')
+        .eq('table_number', tableNumber)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (fetchError || !currentOrder) {
+        return mockResponse({ success: false, message: `No active order for table ${tableNumber}` }, false);
+      }
+
+      // Merge items
+      const updatedItems = [...(currentOrder.order_items || []), ...newItems];
+
+      const { data: updated, error: updateError } = await supabase
+        .from('table_orders')
+        .update({ order_items: updatedItems })
+        .eq('id', currentOrder.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return mockResponse({ success: false, error: updateError.message }, false);
+      }
+
+      console.log('✅ [app-compat] Added', newItems.length, 'items to table', tableNumber);
+      return mockResponse({ success: true, table_order: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] add_items_to_table exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  link_tables: async (params: any) => {
+    console.log('📝 [app-compat] link_tables called:', params);
+    try {
+      const tableNumbers: number[] = params?.table_numbers || params?.tables || [];
+      const primaryTable = params?.primary_table || tableNumbers[0];
+
+      if (tableNumbers.length < 2) {
+        return mockResponse({ success: false, message: 'At least 2 tables required to link' }, false);
+      }
+
+      const groupId = `group-${Date.now()}`;
+
+      // Update all tables in the group
+      for (const tn of tableNumbers) {
+        await supabase
+          .from('pos_tables')
+          .update({
+            is_linked_table: true,
+            is_linked_primary: tn === primaryTable,
+            linked_table_group_id: groupId,
+            linked_with_tables: tableNumbers.filter((t: number) => t !== tn),
+            status: 'OCCUPIED',
+          })
+          .eq('table_number', tn);
+      }
+
+      console.log('✅ [app-compat] Tables linked:', tableNumbers, 'group:', groupId);
+      return mockResponse({ success: true, group_id: groupId });
+    } catch (error) {
+      console.error('❌ [app-compat] link_tables exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  unlink_table: async (params: any) => {
+    console.log('📝 [app-compat] unlink_table called:', params);
+    try {
+      const tableNumber = params?.table_number;
+      if (!tableNumber) {
+        return mockResponse({ success: false, message: 'Table number required' }, false);
+      }
+
+      // Get the table's linked group
+      const { data: table } = await supabase
+        .from('pos_tables')
+        .select('is_linked_primary, linked_table_group_id, linked_with_tables')
+        .eq('table_number', tableNumber)
+        .single();
+
+      if (!table?.linked_table_group_id) {
+        return mockResponse({ success: true }); // Not linked, nothing to do
+      }
+
+      // Get all tables in the group
+      const { data: groupTables } = await supabase
+        .from('pos_tables')
+        .select('table_number')
+        .eq('linked_table_group_id', table.linked_table_group_id);
+
+      const tableNumbers = groupTables?.map((t: any) => t.table_number) || [tableNumber];
+
+      // Reset linked flags for ALL tables in the group (keep them OCCUPIED)
+      await supabase
+        .from('pos_tables')
+        .update({
+          is_linked_table: false,
+          is_linked_primary: false,
+          linked_table_group_id: null,
+          linked_with_tables: [],
+        })
+        .in('table_number', tableNumbers);
+
+      console.log('✅ [app-compat] Unlinked', tableNumbers.length, 'tables from group');
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] unlink_table exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   get_enriched_order_items: async (params: any) => {
     console.log('📦 [app-compat] get_enriched_order_items called:', params);
@@ -1593,38 +2280,583 @@ export const apiClient = {
     }
   },
 
-  print_dine_in_bill: async (params: any) => mockResponse({ success: true }),
+  print_dine_in_bill: async (params: any) => {
+    console.log('📄 [app-compat] print_dine_in_bill called:', params);
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.printReceiptESCPOS) {
+      try {
+        // If order_id provided, fetch order data from Supabase
+        let orderData = params;
+        if (params?.order_id && !params?.items) {
+          const { data: order } = await supabase
+            .from('table_orders')
+            .select('*')
+            .eq('id', params.order_id)
+            .single();
+          if (order) {
+            orderData = { ...params, ...order };
+          }
+        }
 
-  print_customer_receipt: async (data: any, headers?: any) => mockResponse({ success: true }),
+        const normalizedData = {
+          type: 'kitchen',
+          receiptData: {
+            orderNumber: orderData.order_number || orderData.orderNumber || `T${orderData.table_number || ''}`,
+            orderType: 'DINE-IN',
+            items: orderData.order_items || orderData.items || [],
+            tableNumber: orderData.table_number || orderData.tableNumber,
+            guestCount: orderData.guest_count || orderData.guestCount,
+            serverName: orderData.server_name || orderData.serverName,
+            timestamp: new Date().toISOString(),
+            notes: orderData.special_instructions || orderData.notes,
+          }
+        };
 
-  update_order_notes: async (params: any) => mockResponse({ success: true }),
+        console.log('📋 [app-compat] Normalized dine-in bill data:', normalizedData);
+        const result = await electronAPI.printReceiptESCPOS(normalizedData);
+        console.log('✅ [app-compat] Dine-in bill printed:', result);
+        return mockResponse({ success: true, result });
+      } catch (error) {
+        console.error('❌ [app-compat] Dine-in bill print failed:', error);
+        return mockResponse({ success: false, error: (error as Error).message }, false);
+      }
+    }
+    console.warn('⚠️ [app-compat] Electron print API not available for dine-in bill');
+    return mockResponse({ success: false, error: 'Electron print API not available' }, false);
+  },
+
+  print_customer_receipt: async (data: any, headers?: any) => {
+    console.log('🧾 [app-compat] print_customer_receipt called:', data);
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.printReceiptESCPOS) {
+      try {
+        const normalizedData = {
+          type: 'customer',
+          receiptData: {
+            orderNumber: data.orderNumber || data.order_number,
+            orderType: data.orderType || data.order_type || 'DINE-IN',
+            items: data.items || [],
+            tableNumber: data.template_data?.tableNumber || data.tableNumber || data.table_number,
+            guestCount: data.template_data?.guestCount || data.guestCount || data.guest_count,
+            serverName: data.serverName || data.server_name,
+            timestamp: new Date().toISOString(),
+            notes: data.specialInstructions || data.notes,
+            subtotal: data.template_data?.subtotal || data.subtotal || data.sub_total,
+            tax: data.tax || data.tax_amount,
+            total: data.template_data?.total || data.total || data.total_amount,
+            paymentMethod: data.template_data?.paymentMethod || data.paymentMethod || data.payment_method,
+            customerName: data.customerName || data.customer_name,
+          }
+        };
+
+        console.log('📋 [app-compat] Normalized customer receipt data:', normalizedData);
+        const result = await electronAPI.printReceiptESCPOS(normalizedData);
+        console.log('✅ [app-compat] Customer receipt printed:', result);
+        return mockResponse({ success: true, result });
+      } catch (error) {
+        console.error('❌ [app-compat] Customer receipt print failed:', error);
+        return mockResponse({ success: false, error: (error as Error).message }, false);
+      }
+    }
+    console.warn('⚠️ [app-compat] Electron print API not available for customer receipt');
+    return mockResponse({ success: false, error: 'Electron print API not available' }, false);
+  },
+
+  update_order_notes: async (params: any) => {
+    console.log('📝 [app-compat] update_order_notes called:', params);
+    try {
+      const orderId = params?.order_id || params?.orderId;
+      const notes = params?.notes || params?.special_instructions || '';
+
+      if (!orderId) {
+        return mockResponse({ success: false, message: 'Order ID required' }, false);
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          special_instructions: notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('❌ [app-compat] update_order_notes error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Order notes updated:', orderId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] update_order_notes exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // CUSTOMER TABS
   // ============================================================================
-  create_customer_tab: async (data: any) => mockResponse({ success: true, tab_id: `TAB-${Date.now()}` }),
+  create_customer_tab: async (data: any) => {
+    console.log('📝 [app-compat] create_customer_tab called:', data);
+    try {
+      const tableNumber = data?.table_number;
+      const tabName = data?.tab_name || `Customer ${Date.now()}`;
 
-  list_customer_tabs_for_table: async (params: any) => mockResponse({ tabs: [] }),
+      // Check for existing active tab with same name on same table
+      const { data: existing } = await supabase
+        .from('customer_tabs')
+        .select('id')
+        .eq('table_number', tableNumber)
+        .eq('tab_name', tabName)
+        .eq('status', 'active')
+        .maybeSingle();
 
-  add_items_to_customer_tab: async (params: any, items?: any) => mockResponse({ success: true }),
+      if (existing) {
+        console.warn('⚠️ [app-compat] Duplicate tab name on table:', tabName, tableNumber);
+        return mockResponse({
+          success: false,
+          message: `Tab '${tabName}' already exists for Table ${tableNumber}`,
+        }, false);
+      }
 
-  update_customer_tab: async (params: any, updates?: any) => mockResponse({ success: true }),
+      const { data: newTab, error } = await supabase
+        .from('customer_tabs')
+        .insert({
+          table_number: tableNumber,
+          tab_name: tabName,
+          order_id: data?.order_id || null,
+          order_items: [],
+          status: 'active',
+          guest_id: data?.guest_id || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-  close_customer_tab: async (params: any) => mockResponse({ success: true }),
+      if (error) {
+        console.error('❌ [app-compat] create_customer_tab error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
 
-  split_customer_tab: async (params: any) => mockResponse({ success: true }),
+      console.log('✅ [app-compat] Customer tab created:', newTab.id);
+      return mockResponse({
+        success: true,
+        message: `Tab '${tabName}' created`,
+        tab_id: newTab.id,
+        customer_tab: newTab,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] create_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
-  split_tab: async (params: any) => mockResponse({ success: true, tabs: [] }),
+  list_customer_tabs_for_table: async (params: any) => {
+    console.log('📋 [app-compat] list_customer_tabs_for_table called:', params);
+    try {
+      const tableNumber = params?.table_number;
+      if (!tableNumber) {
+        return mockResponse({ tabs: [] });
+      }
 
-  merge_customer_tabs: async (params: any) => mockResponse({ success: true }),
+      const { data: tabs, error } = await supabase
+        .from('customer_tabs')
+        .select('*')
+        .eq('table_number', tableNumber)
+        .eq('status', 'active')
+        .order('created_at', { ascending: true });
 
-  merge_tabs: async (params: any) => mockResponse({ success: true }),
+      if (error) {
+        console.error('❌ [app-compat] list_customer_tabs error:', error);
+        return mockResponse({ tabs: [] });
+      }
 
-  move_items_between_customer_tabs: async (params: any) => mockResponse({ success: true }),
+      console.log(`✅ [app-compat] Found ${tabs?.length || 0} tabs for table ${tableNumber}`);
+      return mockResponse({ tabs: tabs || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] list_customer_tabs exception:', error);
+      return mockResponse({ tabs: [] });
+    }
+  },
 
-  move_items_between_tabs: async (params: any) => mockResponse({ success: true }),
+  add_items_to_customer_tab: async (params: any, items?: any) => {
+    console.log('📝 [app-compat] add_items_to_customer_tab called:', params);
+    try {
+      const tabId = params?.tab_id || params?.id;
+      const newItems = items || params?.items || [];
 
-  delete_customer_tab: async (params: any) => mockResponse({ success: true }),
+      if (!tabId) {
+        return mockResponse({ success: false, message: 'Tab ID required' }, false);
+      }
+
+      // Fetch existing tab
+      const { data: existingTab, error: fetchError } = await supabase
+        .from('customer_tabs')
+        .select('*')
+        .eq('id', tabId)
+        .single();
+
+      if (fetchError || !existingTab) {
+        console.error('❌ [app-compat] Tab not found:', tabId);
+        return mockResponse({ success: false, message: `Tab not found: ${tabId}` }, false);
+      }
+
+      // Add timestamps to new items and append
+      const timestampedItems = newItems.map((item: any) => ({
+        ...item,
+        created_at: item.created_at || new Date().toISOString(),
+      }));
+      const updatedItems = [...(existingTab.order_items || []), ...timestampedItems];
+
+      const { data: updated, error: updateError } = await supabase
+        .from('customer_tabs')
+        .update({
+          order_items: updatedItems,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tabId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ [app-compat] add_items_to_customer_tab update error:', updateError);
+        return mockResponse({ success: false, error: updateError.message }, false);
+      }
+
+      console.log(`✅ [app-compat] Added ${newItems.length} items to tab ${tabId}`);
+      return mockResponse({
+        success: true,
+        message: `Added ${newItems.length} items to customer tab`,
+        customer_tab: updated,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] add_items_to_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  update_customer_tab: async (params: any, updates?: any) => {
+    console.log('📝 [app-compat] update_customer_tab called:', params, updates);
+    try {
+      const tabId = params?.tabId || params?.tab_id || params?.id;
+      const updateData = updates || params;
+
+      if (!tabId) {
+        return mockResponse({ success: false, message: 'Tab ID required' }, false);
+      }
+
+      const updateFields: any = { updated_at: new Date().toISOString() };
+      if (updateData?.tab_name !== undefined) updateFields.tab_name = updateData.tab_name;
+      if (updateData?.order_items !== undefined) updateFields.order_items = updateData.order_items;
+      if (updateData?.status !== undefined) updateFields.status = updateData.status;
+      if (updateData?.guest_id !== undefined) updateFields.guest_id = updateData.guest_id;
+      if (updateData?.order_id !== undefined) updateFields.order_id = updateData.order_id;
+
+      const { data: updated, error } = await supabase
+        .from('customer_tabs')
+        .update(updateFields)
+        .eq('id', tabId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] update_customer_tab error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customer tab updated:', tabId);
+      return mockResponse({ success: true, customer_tab: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] update_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  close_customer_tab: async (params: any) => {
+    console.log('📝 [app-compat] close_customer_tab called:', params);
+    try {
+      const tabId = params?.tabId || params?.tab_id || params?.id;
+
+      if (!tabId) {
+        return mockResponse({ success: false, message: 'Tab ID required' }, false);
+      }
+
+      const { data: updated, error } = await supabase
+        .from('customer_tabs')
+        .update({
+          status: 'paid',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tabId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] close_customer_tab error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customer tab closed:', tabId);
+      return mockResponse({ success: true, customer_tab: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] close_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  split_customer_tab: async (params: any) => {
+    console.log('📝 [app-compat] split_customer_tab called:', params);
+    try {
+      const sourceTabId = params?.source_tab_id || params?.sourceTabId || params?.tab_id;
+      const newTabName = params?.new_tab_name || params?.newTabName || `Split ${Date.now()}`;
+      const itemIndices: number[] = params?.item_indices || params?.itemIndices || [];
+      const guestId = params?.guest_id || params?.guestId || null;
+
+      if (!sourceTabId || itemIndices.length === 0) {
+        return mockResponse({ success: false, message: 'Source tab ID and item indices required' }, false);
+      }
+
+      // Fetch source tab
+      const { data: sourceTab, error: fetchError } = await supabase
+        .from('customer_tabs')
+        .select('*')
+        .eq('id', sourceTabId)
+        .single();
+
+      if (fetchError || !sourceTab) {
+        return mockResponse({ success: false, message: 'Source tab not found' }, false);
+      }
+
+      const sourceItems = sourceTab.order_items || [];
+      const movedItems: any[] = [];
+      const remainingItems: any[] = [];
+
+      sourceItems.forEach((item: any, index: number) => {
+        if (itemIndices.includes(index)) {
+          movedItems.push(item);
+        } else {
+          remainingItems.push(item);
+        }
+      });
+
+      if (movedItems.length === 0) {
+        return mockResponse({ success: false, message: 'No valid items to split' }, false);
+      }
+
+      // Create new tab with moved items
+      const { data: newTab, error: insertError } = await supabase
+        .from('customer_tabs')
+        .insert({
+          table_number: sourceTab.table_number,
+          tab_name: newTabName,
+          order_id: sourceTab.order_id,
+          order_items: movedItems,
+          status: 'active',
+          guest_id: guestId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        return mockResponse({ success: false, error: insertError.message }, false);
+      }
+
+      // Update source tab with remaining items
+      await supabase
+        .from('customer_tabs')
+        .update({
+          order_items: remainingItems,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', sourceTabId);
+
+      console.log('✅ [app-compat] Tab split: moved', movedItems.length, 'items to new tab', newTab.id);
+      return mockResponse({
+        success: true,
+        source_tab: { ...sourceTab, order_items: remainingItems },
+        new_tab: newTab,
+        tabs: [{ ...sourceTab, order_items: remainingItems }, newTab],
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] split_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  split_tab: async (params: any) => {
+    // Alias for split_customer_tab
+    return apiClient.split_customer_tab(params);
+  },
+
+  merge_customer_tabs: async (params: any) => {
+    console.log('📝 [app-compat] merge_customer_tabs called:', params);
+    try {
+      const sourceTabId = params?.source_tab_id || params?.sourceTabId;
+      const targetTabId = params?.target_tab_id || params?.targetTabId;
+
+      if (!sourceTabId || !targetTabId) {
+        return mockResponse({ success: false, message: 'Source and target tab IDs required' }, false);
+      }
+
+      // Fetch both tabs
+      const { data: sourceTabs, error: fetchError } = await supabase
+        .from('customer_tabs')
+        .select('*')
+        .in('id', [sourceTabId, targetTabId]);
+
+      if (fetchError || !sourceTabs || sourceTabs.length < 2) {
+        return mockResponse({ success: false, message: 'Could not find both tabs' }, false);
+      }
+
+      const sourceTab = sourceTabs.find((t: any) => t.id === sourceTabId);
+      const targetTab = sourceTabs.find((t: any) => t.id === targetTabId);
+
+      if (!sourceTab || !targetTab) {
+        return mockResponse({ success: false, message: 'Tab not found' }, false);
+      }
+
+      // Merge items from source into target
+      const mergedItems = [...(targetTab.order_items || []), ...(sourceTab.order_items || [])];
+
+      const { data: updatedTarget, error: updateError } = await supabase
+        .from('customer_tabs')
+        .update({
+          order_items: mergedItems,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetTabId)
+        .select()
+        .single();
+
+      if (updateError) {
+        return mockResponse({ success: false, error: updateError.message }, false);
+      }
+
+      // Delete source tab
+      await supabase
+        .from('customer_tabs')
+        .delete()
+        .eq('id', sourceTabId);
+
+      console.log('✅ [app-compat] Tabs merged: source', sourceTabId, '→ target', targetTabId);
+      return mockResponse({
+        success: true,
+        merged_tab: updatedTarget,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] merge_customer_tabs exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  merge_tabs: async (params: any) => {
+    // Alias for merge_customer_tabs
+    return apiClient.merge_customer_tabs(params);
+  },
+
+  move_items_between_customer_tabs: async (params: any) => {
+    console.log('📝 [app-compat] move_items_between_customer_tabs called:', params);
+    try {
+      const sourceTabId = params?.source_tab_id || params?.sourceTabId;
+      const targetTabId = params?.target_tab_id || params?.targetTabId;
+      const itemIndices: number[] = params?.item_indices || params?.itemIndices || [];
+
+      if (!sourceTabId || !targetTabId || itemIndices.length === 0) {
+        return mockResponse({ success: false, message: 'Source tab, target tab, and item indices required' }, false);
+      }
+
+      // Fetch both tabs
+      const { data: tabs, error: fetchError } = await supabase
+        .from('customer_tabs')
+        .select('*')
+        .in('id', [sourceTabId, targetTabId]);
+
+      if (fetchError || !tabs || tabs.length < 2) {
+        return mockResponse({ success: false, message: 'Could not find both tabs' }, false);
+      }
+
+      const sourceTab = tabs.find((t: any) => t.id === sourceTabId);
+      const targetTab = tabs.find((t: any) => t.id === targetTabId);
+
+      if (!sourceTab || !targetTab) {
+        return mockResponse({ success: false, message: 'Tab not found' }, false);
+      }
+
+      const sourceItems = sourceTab.order_items || [];
+      const movedItems: any[] = [];
+      const remainingItems: any[] = [];
+
+      sourceItems.forEach((item: any, index: number) => {
+        if (itemIndices.includes(index)) {
+          movedItems.push(item);
+        } else {
+          remainingItems.push(item);
+        }
+      });
+
+      if (movedItems.length === 0) {
+        return mockResponse({ success: false, message: 'No valid items to move' }, false);
+      }
+
+      const updatedTargetItems = [...(targetTab.order_items || []), ...movedItems];
+
+      // Update both tabs
+      const { error: sourceError } = await supabase
+        .from('customer_tabs')
+        .update({ order_items: remainingItems, updated_at: new Date().toISOString() })
+        .eq('id', sourceTabId);
+
+      const { error: targetError } = await supabase
+        .from('customer_tabs')
+        .update({ order_items: updatedTargetItems, updated_at: new Date().toISOString() })
+        .eq('id', targetTabId);
+
+      if (sourceError || targetError) {
+        return mockResponse({ success: false, message: 'Failed to update tabs' }, false);
+      }
+
+      console.log('✅ [app-compat] Moved', movedItems.length, 'items from', sourceTabId, '→', targetTabId);
+      return mockResponse({ success: true, moved_count: movedItems.length });
+    } catch (error) {
+      console.error('❌ [app-compat] move_items_between_customer_tabs exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  move_items_between_tabs: async (params: any) => {
+    // Alias for move_items_between_customer_tabs
+    return apiClient.move_items_between_customer_tabs(params);
+  },
+
+  delete_customer_tab: async (params: any) => {
+    console.log('📝 [app-compat] delete_customer_tab called:', params);
+    try {
+      const tabId = params?.tabId || params?.tab_id || params?.id;
+
+      if (!tabId) {
+        return mockResponse({ success: false, message: 'Tab ID required' }, false);
+      }
+
+      const { error } = await supabase
+        .from('customer_tabs')
+        .delete()
+        .eq('id', tabId);
+
+      if (error) {
+        console.error('❌ [app-compat] delete_customer_tab error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customer tab deleted:', tabId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] delete_customer_tab exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // RECEIPT TEMPLATES
@@ -2029,9 +3261,80 @@ export const apiClient = {
 
   upload_general_file: async (data: any) => mockResponse({ success: true, url: '' }),
 
-  upload_menu_image: async (data: any) => mockResponse({ success: true, url: '' }),
+  upload_menu_image: async (data: any) => {
+    console.log('📸 [app-compat] upload_menu_image called');
+    try {
+      // data can be FormData (from ImageUploader) or an object with file info
+      let file: File | null = null;
+      let assetCategory = 'menu-item';
+      let altText = '';
+      let menuItemName = '';
 
-  upload_optimized_menu_image: async (data: any) => mockResponse({ success: true, url: '' }),
+      if (data instanceof FormData) {
+        file = data.get('file') as File;
+        assetCategory = (data.get('asset_category') as string) || 'menu-item';
+        altText = (data.get('alt_text') as string) || '';
+        menuItemName = (data.get('menu_item_name') as string) || '';
+      } else if (data?.file) {
+        file = data.file;
+        assetCategory = data.asset_category || 'menu-item';
+        altText = data.alt_text || '';
+        menuItemName = data.menu_item_name || '';
+      }
+
+      if (!file) {
+        return mockResponse({ success: false, error: 'No file provided' }, false);
+      }
+
+      // Generate unique filename
+      const ext = file.name.split('.').pop() || 'jpg';
+      const timestamp = Date.now();
+      const safeName = (menuItemName || file.name).replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
+      const filePath = `${assetCategory}/${timestamp}_${safeName}.${ext}`;
+
+      // Read file as ArrayBuffer for Supabase upload
+      const arrayBuffer = await file.arrayBuffer();
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('menu-images')
+        .upload(filePath, arrayBuffer, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('❌ [app-compat] Supabase storage upload error:', uploadError);
+        return mockResponse({ success: false, error: uploadError.message }, false);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('menu-images')
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData?.publicUrl || '';
+
+      console.log('✅ [app-compat] Menu image uploaded:', publicUrl);
+      return mockResponse({
+        success: true,
+        asset_id: filePath,
+        file_url: publicUrl,
+        thumbnail_url: publicUrl, // Supabase doesn't auto-generate thumbnails
+        file_size: file.size,
+        thumbnail_size: file.size,
+        mime_type: file.type,
+        dimensions: { width: 0, height: 0 }, // Would need image decode to get real dimensions
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] upload_menu_image exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  upload_optimized_menu_image: async (data: any) => {
+    // Alias — same as upload_menu_image (no server-side optimization in Electron mode)
+    return apiClient.upload_menu_image(data);
+  },
 
   upload_avatar_image: async (data: any) => mockResponse({ success: true, url: '' }),
 
@@ -2172,9 +3475,97 @@ export const apiClient = {
   // ============================================================================
   // CUSTOMER DATA
   // ============================================================================
-  lookup_customer: async (params: any) => mockResponse({ customer: null }),
+  lookup_customer: async (params: any) => {
+    console.log('🔄 [app-compat] lookup_customer called:', params);
+    try {
+      const { phone, email, customer_reference } = params || {};
 
-  get_customer_profile: async (params: any) => mockResponse({ profile: null }),
+      if (!phone && !email && !customer_reference) {
+        return mockResponse({ success: false, customer: null });
+      }
+
+      // Build query based on provided params
+      let query = supabase.from('customers').select('*');
+
+      if (phone) {
+        // Normalize phone number for search (remove spaces, dashes)
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '');
+        query = query.or(`phone.ilike.%${normalizedPhone}%,phone_normalized.eq.${normalizedPhone}`);
+      } else if (email) {
+        query = query.ilike('email', `%${email}%`);
+      } else if (customer_reference) {
+        query = query.eq('customer_reference', customer_reference);
+      }
+
+      const { data: customers, error } = await query.limit(1);
+
+      if (error) {
+        console.error('❌ [app-compat] lookup_customer error:', error);
+        return mockResponse({ success: false, customer: null });
+      }
+
+      const customer = customers && customers.length > 0 ? customers[0] : null;
+      console.log(`✅ [app-compat] lookup_customer result:`, customer ? customer.id : 'not found');
+      return mockResponse({ success: !!customer, customer });
+    } catch (error) {
+      console.error('❌ [app-compat] lookup_customer exception:', error);
+      return mockResponse({ success: false, customer: null });
+    }
+  },
+
+  get_customer_profile: async (params: any) => {
+    console.log('🔄 [app-compat] get_customer_profile called:', params);
+    try {
+      const { customer_id, comprehensive } = params || {};
+
+      if (!customer_id) {
+        return mockResponse({ success: false, profile: null });
+      }
+
+      // Fetch customer
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customer_id)
+        .single();
+
+      if (customerError) {
+        console.error('❌ [app-compat] get_customer_profile error:', customerError);
+        return mockResponse({ success: false, profile: null });
+      }
+
+      let result: any = { success: true, customer, profile: customer };
+
+      // If comprehensive, fetch additional data
+      if (comprehensive) {
+        // Fetch default address
+        const { data: addresses } = await supabase
+          .from('customer_addresses')
+          .select('*')
+          .eq('customer_id', customer_id)
+          .eq('is_default', true)
+          .limit(1);
+
+        result.default_address = addresses && addresses.length > 0 ? addresses[0] : null;
+
+        // Fetch recent orders
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('*')
+          .or(`customer_id.eq.${customer_id},customer_phone.eq.${customer.phone || ''}`)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        result.recent_orders = orders || [];
+      }
+
+      console.log(`✅ [app-compat] get_customer_profile result:`, customer.id);
+      return mockResponse(result);
+    } catch (error) {
+      console.error('❌ [app-compat] get_customer_profile exception:', error);
+      return mockResponse({ success: false, profile: null });
+    }
+  },
 
   get_customer_preferences: async (params: any) => mockResponse({ preferences: {} }),
 
@@ -2201,6 +3592,250 @@ export const apiClient = {
   add_favorite_to_list: async (params: any) => mockResponse({ success: true }),
 
   remove_favorite_from_list: async (params: any) => mockResponse({ success: true }),
+
+  // ============================================================================
+  // CRM - Customer Relationship Management
+  // ============================================================================
+  crm_search_customers: async (params: any) => {
+    console.log('🔄 [app-compat] crm_search_customers called:', params);
+    try {
+      const { query, limit = 10 } = params || {};
+
+      if (!query || query.length < 2) {
+        return mockResponse({ customers: [], total: 0 });
+      }
+
+      // Search customers by name, phone, or email
+      const searchTerm = `%${query}%`;
+      const { data: customers, error, count } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact' })
+        .or(`name.ilike.${searchTerm},phone.ilike.${searchTerm},email.ilike.${searchTerm}`)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('❌ [app-compat] crm_search_customers error:', error);
+        return mockResponse({ customers: [], total: 0 });
+      }
+
+      console.log(`✅ [app-compat] crm_search_customers found ${customers?.length || 0} customers`);
+      return mockResponse({ customers: customers || [], total: count || 0 });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_search_customers exception:', error);
+      return mockResponse({ customers: [], total: 0 });
+    }
+  },
+
+  crm_get_customer_profile: async (params: any) => {
+    console.log('🔄 [app-compat] crm_get_customer_profile called:', params);
+    try {
+      const { customer_id } = params || {};
+
+      if (!customer_id) {
+        return mockResponse({ success: false, profile: null });
+      }
+
+      // Fetch customer with comprehensive data
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customer_id)
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] crm_get_customer_profile error:', error);
+        return mockResponse({ success: false, profile: null });
+      }
+
+      // Fetch order stats
+      const { data: orderStats } = await supabase
+        .from('orders')
+        .select('id, total_amount, created_at')
+        .or(`customer_id.eq.${customer_id},customer_phone.eq.${customer.phone || ''}`)
+        .order('created_at', { ascending: false });
+
+      const profile = {
+        ...customer,
+        total_orders: orderStats?.length || 0,
+        total_spent: orderStats?.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0) || 0,
+        last_order_date: orderStats && orderStats.length > 0 ? orderStats[0].created_at : null,
+      };
+
+      console.log(`✅ [app-compat] crm_get_customer_profile loaded:`, customer_id);
+      return mockResponse({ success: true, profile });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_get_customer_profile exception:', error);
+      return mockResponse({ success: false, profile: null });
+    }
+  },
+
+  crm_get_customer_timeline: async (params: any) => {
+    console.log('🔄 [app-compat] crm_get_customer_timeline called:', params);
+    try {
+      const { customer_id, limit = 50 } = params || {};
+
+      if (!customer_id) {
+        return mockResponse({ timeline: [] });
+      }
+
+      // Fetch from customer_touchpoints table
+      const { data: touchpoints, error } = await supabase
+        .from('customer_touchpoints')
+        .select('*')
+        .eq('customer_id', customer_id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('❌ [app-compat] crm_get_customer_timeline error:', error);
+        return mockResponse({ timeline: [] });
+      }
+
+      console.log(`✅ [app-compat] crm_get_customer_timeline loaded ${touchpoints?.length || 0} events`);
+      return mockResponse({ timeline: touchpoints || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_get_customer_timeline exception:', error);
+      return mockResponse({ timeline: [] });
+    }
+  },
+
+  crm_get_customer_notes: async (params: any) => {
+    console.log('🔄 [app-compat] crm_get_customer_notes called:', params);
+    try {
+      const { customer_id } = params || {};
+
+      if (!customer_id) {
+        return mockResponse({ notes: [] });
+      }
+
+      // Fetch notes from customer_notes table
+      const { data: notes, error } = await supabase
+        .from('customer_notes')
+        .select('*')
+        .eq('customer_id', customer_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // Table might not exist, return empty array
+        console.warn('⚠️ [app-compat] crm_get_customer_notes - table may not exist:', error.message);
+        return mockResponse({ notes: [] });
+      }
+
+      console.log(`✅ [app-compat] crm_get_customer_notes loaded ${notes?.length || 0} notes`);
+      return mockResponse({ notes: notes || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_get_customer_notes exception:', error);
+      return mockResponse({ notes: [] });
+    }
+  },
+
+  crm_add_customer_note: async (params: any) => {
+    console.log('🔄 [app-compat] crm_add_customer_note called:', params);
+    try {
+      const { customer_id, note, author } = params || {};
+
+      if (!customer_id || !note) {
+        return mockResponse({ success: false, error: 'customer_id and note required' }, false);
+      }
+
+      // Insert note
+      const { data: newNote, error } = await supabase
+        .from('customer_notes')
+        .insert({
+          customer_id,
+          note,
+          author: author || 'POS Staff',
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] crm_add_customer_note error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log(`✅ [app-compat] crm_add_customer_note added:`, newNote?.id);
+      return mockResponse({ success: true, note: newNote });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_add_customer_note exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  crm_get_customer_orders: async (params: any) => {
+    console.log('🔄 [app-compat] crm_get_customer_orders called:', params);
+    try {
+      const { customer_id, limit = 20 } = params || {};
+
+      if (!customer_id) {
+        return mockResponse({ orders: [] });
+      }
+
+      // First get customer to get phone for matching
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('phone')
+        .eq('id', customer_id)
+        .single();
+
+      // Fetch orders by customer_id or phone
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (customer?.phone) {
+        query = query.or(`customer_id.eq.${customer_id},customer_phone.eq.${customer.phone}`);
+      } else {
+        query = query.eq('customer_id', customer_id);
+      }
+
+      const { data: orders, error } = await query;
+
+      if (error) {
+        console.error('❌ [app-compat] crm_get_customer_orders error:', error);
+        return mockResponse({ orders: [] });
+      }
+
+      console.log(`✅ [app-compat] crm_get_customer_orders loaded ${orders?.length || 0} orders`);
+      return mockResponse({ orders: orders || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_get_customer_orders exception:', error);
+      return mockResponse({ orders: [] });
+    }
+  },
+
+  crm_get_full_order: async (params: any) => {
+    console.log('🔄 [app-compat] crm_get_full_order called:', params);
+    try {
+      const { order_id } = params || {};
+
+      if (!order_id) {
+        return mockResponse({ success: false, order: null });
+      }
+
+      // Fetch complete order
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', order_id)
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] crm_get_full_order error:', error);
+        return mockResponse({ success: false, order: null });
+      }
+
+      console.log(`✅ [app-compat] crm_get_full_order loaded:`, order_id);
+      return mockResponse({ success: true, order });
+    } catch (error) {
+      console.error('❌ [app-compat] crm_get_full_order exception:', error);
+      return mockResponse({ success: false, order: null });
+    }
+  },
 
   // ============================================================================
   // CART
@@ -2562,7 +4197,49 @@ export const apiClient = {
   // ============================================================================
   get_order_tracking_details: async (params: any) => mockResponse({ details: null }),
 
-  update_order_tracking_status: async (params: any) => mockResponse({ success: true }),
+  update_order_tracking_status: async (params: any) => {
+    console.log('🔄 [app-compat] update_order_tracking_status called:', params);
+    try {
+      const { order_id, new_status, notes } = params || {};
+
+      if (!order_id || !new_status) {
+        console.error('❌ [app-compat] update_order_tracking_status: order_id and new_status required');
+        return mockResponse({ success: false, error: 'order_id and new_status required' }, false);
+      }
+
+      // Build update object
+      const updateData: any = {
+        status: new_status,
+        updated_at: new Date().toISOString(),
+        status_updated_at: new Date().toISOString(),
+      };
+
+      // Add rejection reason if provided and status is cancelled/rejected
+      if (notes && (new_status === 'CANCELLED' || new_status === 'REJECTED')) {
+        updateData.rejection_reason = notes;
+        updateData.auto_rejected_at = new Date().toISOString();
+      }
+
+      // Update the order
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', order_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] update_order_tracking_status error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log(`✅ [app-compat] Order ${order_id} status updated to ${new_status}`);
+      return mockResponse({ success: true, order: data });
+    } catch (error) {
+      console.error('❌ [app-compat] update_order_tracking_status exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // MENU CORPUS / RAG / AI CONTEXT
@@ -2646,7 +4323,23 @@ export const apiClient = {
 
   process_print_queue: async (params: any) => mockResponse({ success: true, processed_count: 0 }),
 
-  place_order: async (data: any) => mockResponse({ success: true, order_id: `ORD-${Date.now()}` }),
+  place_order: async (data: any) => {
+    // Delegate to create_pos_order (used by outbox sync manager for offline order recovery)
+    console.log('📝 [app-compat] place_order delegating to create_pos_order');
+    return apiClient.create_pos_order({
+      order_type: data.order_type || 'COLLECTION',
+      table_number: data.table_number,
+      guest_count: data.guest_count,
+      items: data.items,
+      total_amount: data.total_amount,
+      customer_name: data.customer_data?.first_name
+        ? `${data.customer_data.first_name} ${data.customer_data.last_name || ''}`.trim()
+        : 'Walk-in Customer',
+      customer_phone: data.customer_data?.phone,
+      payment_method: data.payment_method || 'cash',
+      notes: data.notes,
+    });
+  },
 
   place_order_example: async (data: any) => mockResponse({ success: true }),
 
@@ -2654,7 +4347,115 @@ export const apiClient = {
 
   process_payment2: async (data: any) => mockResponse({ success: true }),
 
-  get_current_business_rules: async () => mockResponse({ rules: {} }),
+  get_current_business_date: async () => {
+    console.log('📅 [app-compat] get_current_business_date called');
+    try {
+      const { data: configData } = await supabase
+        .from('z_report_config')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      const cutoffTime = configData?.business_day_cutoff || '05:00:00';
+      const cutoffParts = cutoffTime.split(':').map(Number);
+      const cutoffMinutes = cutoffParts[0] * 60 + cutoffParts[1];
+
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      let bizDate: string;
+      if (nowMinutes < cutoffMinutes) {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        bizDate = yesterday.toISOString().split('T')[0];
+      } else {
+        bizDate = now.toISOString().split('T')[0];
+      }
+
+      const periodStart = `${bizDate}T${cutoffTime}`;
+      const nextDay = new Date(bizDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      const periodEnd = `${nextDayStr}T${cutoffTime}`;
+
+      console.log('✅ [app-compat] get_current_business_date:', bizDate);
+      return mockResponse({
+        success: true,
+        data: { business_date: bizDate, period_start: periodStart, period_end: periodEnd },
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] get_current_business_date exception:', error);
+      // Fallback to today
+      const today = new Date().toISOString().split('T')[0];
+      return mockResponse({
+        success: true,
+        data: { business_date: today, period_start: `${today}T05:00:00`, period_end: `${today}T05:00:00` },
+      });
+    }
+  },
+
+  get_current_business_rules: async () => {
+    console.log('🔄 [app-compat] get_current_business_rules - querying Supabase');
+    try {
+      const { data: settingsRow, error } = await supabase
+        .from('restaurant_settings')
+        .select('settings')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error || !settingsRow) {
+        console.warn('⚠️ [app-compat] No restaurant settings found for business rules');
+        return mockResponse({
+          success: true,
+          data: {
+            restaurant: { name: 'Cottage Tandoori', address: '', postcode: '', phone: '', email: '' },
+            delivery: { enabled: true, radius_km: 9.65, radius_miles: 6.0, min_order: 15.0, delivery_fee: 2.5, postcodes: [] },
+            kitchen: { is_open: true, message: '' },
+            opening_hours: [],
+            messages: { greeting: '', closing: '', busy_message: '' },
+          },
+        });
+      }
+
+      const s = settingsRow.settings || {};
+      const radiusKm = s.delivery?.radius_km || 9.65;
+
+      console.log('✅ [app-compat] Business rules loaded from restaurant_settings');
+      return mockResponse({
+        success: true,
+        data: {
+          restaurant: {
+            name: s.business_profile?.name || 'Cottage Tandoori',
+            address: s.business_profile?.address || '',
+            postcode: s.business_profile?.postcode || '',
+            phone: s.business_profile?.phone || '',
+            email: s.business_profile?.email || '',
+          },
+          delivery: {
+            enabled: s.delivery?.enabled ?? true,
+            radius_km: radiusKm,
+            radius_miles: Math.round((radiusKm / 1.60934) * 10) / 10,
+            min_order: s.delivery?.min_order || 15.0,
+            delivery_fee: s.delivery?.fee || s.delivery?.delivery_fee || 2.5,
+            postcodes: s.delivery?.postcodes || [],
+          },
+          kitchen: {
+            is_open: s.kitchen_status?.open ?? true,
+            message: s.kitchen_status?.message || '',
+          },
+          opening_hours: s.opening_hours || [],
+          messages: {
+            greeting: s.ai_messages?.greeting || '',
+            closing: s.ai_messages?.closing || '',
+            busy_message: s.ai_messages?.busy_message || '',
+          },
+        },
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] get_current_business_rules exception:', error);
+      return mockResponse({ success: false, rules: {} }, false);
+    }
+  },
 
   check_analytics_health: async () => mockResponse({ healthy: true }),
 
@@ -2677,7 +4478,2030 @@ export const apiClient = {
   validate_opening_hours: async (params: any) => mockResponse({ valid: true }),
 
   // Helper to get base URL (not used in desktop mode)
-  getBaseUrl: () => '',
+  
+  // ============================================================================
+  // AUTO-GENERATED STUBS (2026-01-27)
+  // These methods were auto-generated by sync-electron.js
+  // Implement real Supabase queries as needed
+  // ============================================================================
+  abbreviate_text: async (params: any) => mockResponse({ success: true }),
+
+  activate_corpus_version: async (params: any) => mockResponse({ success: true }),
+
+  add_cart_ai_columns: async (params: any) => mockResponse({ success: true }),
+
+  add_customer_reference_field: async (params: any) => mockResponse({ success: true }),
+
+  add_gender_field: async (params: any) => mockResponse({ success: true }),
+
+  add_hierarchical_columns: async (params: any) => mockResponse({ success: true }),
+
+  add_is_available_column: async (params: any) => mockResponse({ success: true }),
+
+  add_linking_columns: async (params: any) => mockResponse({ success: true }),
+
+  add_menu_ai_rls: async (params: any) => mockResponse({ success: true }),
+
+  add_optimization_columns: async (params: any) => mockResponse({ success: true }),
+
+  add_order_timing_fields: async (params: any) => mockResponse({ success: true }),
+
+  add_terminal_payment_columns: async (params: any) => mockResponse({ success: true }),
+
+  add_variant_name_column: async (params: any) => mockResponse({ success: true }),
+
+  admin_counts: async (params: any) => mockResponse({ success: true }),
+
+  agent_profiles_health: async (params: any) => mockResponse({ healthy: true }),
+
+  ai_customizations_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  ai_recommendations_health: async (params: any) => mockResponse({ healthy: true }),
+
+  analyze_category_migration: async (params: any) => mockResponse({ success: true }),
+
+  analyze_database_tables: async (params: any) => mockResponse({ success: true }),
+
+  analyze_pos_dependencies: async (params: any) => mockResponse({ success: true }),
+
+  analyze_pos_desktop_dependencies: async (params: any) => mockResponse({ success: true }),
+
+  analyze_table_items: async (params: any) => mockResponse({ success: true }),
+
+  apply_category_template: async (params: any) => mockResponse({ success: true }),
+
+  apply_promo_code: async (params: any) => mockResponse({ success: true }),
+
+  audit_report: async (params: any) => mockResponse({ success: true }),
+
+  auth_sync_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  auto_link_unused_media: async (params: any) => mockResponse({ success: true }),
+
+  auto_process_print_queue: async (params: any) => mockResponse({ success: true }),
+
+  auto_sync_on_set_meal_change: async (params: any) => mockResponse({ success: true }),
+
+  backfill_ai_avatars: async (params: any) => mockResponse({ success: true }),
+
+  backfill_customers: async (params: any) => mockResponse({ success: true }),
+
+  backfill_existing_variants: async (params: any) => mockResponse({ success: true }),
+
+  backfill_legacy: async (params: any) => mockResponse({ success: true }),
+
+  backfill_menu_images: async (params: any) => mockResponse({ success: true }),
+
+  batch_analyze_menu_items: async (params: any) => mockResponse({ success: true }),
+
+  batch_generate_variants: async (params: any) => mockResponse({ success: true }),
+
+  batch_update_pricing: async (params: any) => mockResponse({ success: true }),
+
+  bulk_delete_items: async (params: any) => mockResponse({ success: true }),
+
+  bulk_update_media_tags: async (params: any) => mockResponse({ success: true }),
+
+  bulk_update_order_tracking: async (params: any) => mockResponse({ success: true }),
+
+  calculate_delivery: async (params: any) => mockResponse({ success: true }),
+
+  calculate_order_fees: async (params: any) => mockResponse({ success: true }),
+
+  cancel_customer_order: async (params: any) => mockResponse({ success: true }),
+
+  cart_remove: async (params: any) => mockResponse({ success: true }),
+
+  chat_cart_context_health: async (params: any) => mockResponse({ healthy: true }),
+
+  chat_stream: async (params: any) => mockResponse({ success: true }),
+
+  chatbot_prompts_health: async (params: any) => mockResponse({ healthy: true }),
+
+  check_all_schemas_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_all_services: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_and_fix_storage_permissions: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_auth_triggers: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_can_cancel_order: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_categories_print_fields: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_chat_analytics_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_chatbot_prompts_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_chatbot_table: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_corpus_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_customer_tabs_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_database_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_device_trust: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_favorite_lists_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_is_available_column: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_kds_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_latest_release: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_media_asset_usage: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_ai_fields_exist: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_ai_fields_exist2: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_customizations_table: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_images_schema_v2: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_structure_schema_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_menu_system_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_missing_variants: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_optimization_columns: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_order_items_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_order_timing_fields: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_order_tracking_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_payment_link_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_pos_access: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_pos_auth_setup: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_pos_tables_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_profiles_constraints: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_schema_migrations: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_schema_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_service_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_specific_service: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_streaming_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_structured_streaming_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_table_exists: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_table_orders_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_tables_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_user_roles_table_exists: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_user_trusted_device: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_variant_food_details_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_variant_name_pattern_schema: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_variant_name_status: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  check_voice_menu_matching_health: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  clean_duplicate_categories: async (params: any) => mockResponse({ success: true }),
+
+  cleanup_safe_tables: async (params: any) => mockResponse({ success: true }),
+
+  cleanup_table_test_items: async (params: any) => mockResponse({ success: true }),
+
+  clear_all_pending_changes: async (params: any) => mockResponse({ success: true }),
+
+  clear_cache: async (params: any) => mockResponse({ success: true }),
+
+  clear_health_cache: async (params: any) => mockResponse({ healthy: true }),
+
+  clear_image_cache: async (params: any) => mockResponse({ success: true }),
+
+  clear_performance_metrics: async (params: any) => mockResponse({ success: true }),
+
+  compare_npm_packages: async (params: any) => mockResponse({ success: true }),
+
+  create_base_cache: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_cart_table: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_chatbot_prompt: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_customer_address: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_electron_repository: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_execute_sql_rpc: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_file: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_menu_customizations_table: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_menu_unified_view: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_menu_variants_rpc: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_online_order: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_optimized_function: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_pos_order: async (params: any) => {
+    console.log('📝 [app-compat] create_pos_order called:', params);
+    try {
+      const orderNumber = params.order_id || `POS-${Date.now().toString(36).toUpperCase()}`;
+      const orderType = (params.order_type || 'COLLECTION').toUpperCase();
+
+      // Optional CRM lookup by phone
+      let customerId = params.customer_id || null;
+      if (!customerId && params.customer_phone) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('phone', params.customer_phone)
+          .maybeSingle();
+        if (customer) customerId = customer.id;
+      }
+
+      // Insert order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          order_type: orderType,
+          order_source: 'POS',
+          status: params.status || 'pending',
+          customer_name: params.customer_name || 'Walk-in Customer',
+          customer_phone: params.customer_phone || null,
+          customer_email: params.customer_email || null,
+          customer_id: customerId,
+          items: params.items || [],
+          subtotal: params.subtotal || 0,
+          tax_amount: params.tax_amount || 0,
+          delivery_fee: params.delivery_fee || 0,
+          total_amount: params.total_amount || params.total || 0,
+          payment_method: params.payment_method || 'cash',
+          payment_status: params.payment_status || 'paid',
+          special_instructions: params.notes || params.special_instructions || null,
+          delivery_address: params.delivery_address || null,
+          table_number: params.table_number || null,
+          guest_count: params.guest_count || null,
+          visibility: 'staff_only',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('❌ [app-compat] create_pos_order insert error:', orderError);
+        return mockResponse({ success: false, error: orderError.message }, false);
+      }
+
+      // Insert order items if provided
+      if (params.items && params.items.length > 0) {
+        const orderItems = params.items.map((item: any) => ({
+          order_id: order.id,
+          item_name: item.name || item.item_name,
+          menu_item_id: item.menu_item_id || item.item_id || null,
+          category_id: item.category_id || null,
+          quantity: item.quantity || 1,
+          unit_price: item.price || item.unit_price || 0,
+          total_price: (item.price || item.unit_price || 0) * (item.quantity || 1),
+          line_total: (item.price || item.unit_price || 0) * (item.quantity || 1),
+          notes: item.notes || null,
+          item_source: 'pos_system',
+          preparation_status: 'pending',
+          created_at: new Date().toISOString(),
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.warn('⚠️ [app-compat] order_items insert error (order still created):', itemsError);
+        }
+      }
+
+      console.log('✅ [app-compat] POS order created:', order.id, orderNumber);
+      return mockResponse({
+        success: true,
+        message: 'Order created successfully',
+        order_id: orderNumber,
+        order_number: orderNumber,
+        database_order_id: order.id,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] create_pos_order exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  create_pos_table: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_print_job: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_print_queue_job: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_print_template: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_printer_release: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_promo_code: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_protein_type: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_release: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_repository: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_repository_file: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_section_parent_records: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_setup_intent: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_sms_payment_link: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_v8_epos_sdk_release: async (params: any) => mockResponse({ success: true, id: null }),
+
+  create_variant_name_trigger: async (params: any) => mockResponse({ success: true, id: null }),
+
+  customer_context_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  customer_profile_health: async (params: any) => mockResponse({ healthy: true }),
+
+  debug_menu_customizations: async (params: any) => mockResponse({ success: true }),
+
+  delete_cache: async (params: any) => mockResponse({ success: true }),
+
+  delete_cash_drawer_operation: async (params: any) => {
+    console.log('🗑️ [app-compat] delete_cash_drawer_operation called:', params);
+    try {
+      const operationId = params?.operation_id;
+      if (!operationId) {
+        return mockResponse({ success: false, error: 'Missing operation_id' }, false);
+      }
+      const { error } = await supabase
+        .from('cash_drawer_operations')
+        .delete()
+        .eq('id', operationId);
+      if (error) {
+        console.error('❌ [app-compat] delete_cash_drawer_operation error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+      console.log('✅ [app-compat] delete_cash_drawer_operation success');
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] delete_cash_drawer_operation exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  delete_chatbot_prompt: async (params: any) => mockResponse({ success: true }),
+
+  delete_customer_address: async (params: any) => mockResponse({ success: true }),
+
+  delete_payment_method: async (params: any) => mockResponse({ success: true }),
+
+  delete_print_job: async (params: any) => mockResponse({ success: true }),
+
+  delete_print_queue_job: async (params: any) => mockResponse({ success: true }),
+
+  delete_printer_release: async (params: any) => mockResponse({ success: true }),
+
+  delete_promo_code: async (params: any) => mockResponse({ success: true }),
+
+  delete_protein_type: async (params: any) => mockResponse({ success: true }),
+
+  delete_release: async (params: any) => mockResponse({ success: true }),
+
+  delete_single_item: async (params: any) => mockResponse({ success: true }),
+
+  delete_template_preview: async (params: any) => mockResponse({ success: true }),
+
+  diagnose_customers_fk: async (params: any) => mockResponse({ success: true }),
+
+  diagnose_menu_items: async (params: any) => mockResponse({ success: true }),
+
+  diagnose_signup_error: async (params: any) => mockResponse({ success: true }),
+
+  direct_initialize_tables: async (params: any) => mockResponse({ success: true }),
+
+  discover_epson_printers: async (params: any) => mockResponse({ success: true }),
+
+  download_cottage_icon: async (params: any) => mockResponse({ success: true }),
+
+  download_printer_service_package: async (params: any) => mockResponse({ success: true }),
+
+  drop_cart_unique_constraint: async (params: any) => mockResponse({ success: true }),
+
+  drop_loyalty_token_constraint: async (params: any) => mockResponse({ success: true }),
+
+  drop_menu_unified_view: async (params: any) => mockResponse({ success: true }),
+
+  drop_menu_variants_rpc: async (params: any) => mockResponse({ success: true }),
+
+  drop_old_tables: async (params: any) => mockResponse({ success: true }),
+
+  drop_optimized_function: async (params: any) => mockResponse({ success: true }),
+
+  email_receipt: async (params: any) => mockResponse({ success: true }),
+
+  emit_event_endpoint: async (params: any) => mockResponse({ success: true }),
+
+  enable_rls_and_policies: async (params: any) => mockResponse({ success: true }),
+
+  execute_category_migration: async (params: any) => mockResponse({ success: true }),
+
+  execute_migration: async (params: any) => mockResponse({ success: true }),
+
+  execute_simple_migration: async (params: any) => mockResponse({ success: true }),
+
+  execute_sql_endpoint: async (params: any) => mockResponse({ success: true }),
+
+  execute_sql_safe: async (params: any) => mockResponse({ success: true }),
+
+  extend_cache: async (params: any) => mockResponse({ success: true }),
+
+  favorite_lists_health: async (params: any) => mockResponse({ healthy: true }),
+
+  finalize_cutover: async (params: any) => mockResponse({ success: true }),
+
+  finalize_z_report: async (params: any) => {
+    console.log('📋 [app-compat] finalize_z_report called:', params);
+    try {
+      const { business_date, actual_cash, notes, closed_by, verified_by } = params || {};
+      if (!business_date) {
+        return mockResponse({ success: false, message: 'Missing business_date' }, false);
+      }
+
+      // First generate the current report data
+      const generateResponse = await apiClient.generate_z_report({ business_date });
+      const generateData = await generateResponse.json();
+      if (!generateData.success || !generateData.data) {
+        return mockResponse({ success: false, message: 'Failed to generate report data' }, false);
+      }
+      const reportData = generateData.data;
+
+      // Calculate variance
+      const expectedCash = reportData.cash_drawer?.expected_cash ?? 0;
+      const variance = actual_cash != null ? Math.round((actual_cash - expectedCash) * 100) / 100 : null;
+
+      // Generate report number
+      const { data: existingReport } = await supabase
+        .from('z_reports')
+        .select('id, report_number')
+        .eq('business_date', business_date)
+        .maybeSingle();
+
+      let reportNumber = existingReport?.report_number;
+      if (!reportNumber) {
+        const { count } = await supabase
+          .from('z_reports')
+          .select('*', { count: 'exact', head: true });
+        reportNumber = `Z-${String((count || 0) + 1).padStart(6, '0')}`;
+      }
+
+      // Prepare upsert data
+      const now = new Date().toISOString();
+      const upsertData: any = {
+        business_date,
+        report_number: reportNumber,
+        period_start: reportData.period_start,
+        period_end: reportData.period_end,
+        gross_sales: reportData.gross_sales || 0,
+        net_sales: reportData.net_sales || 0,
+        total_refunds: reportData.total_refunds || 0,
+        total_discounts: reportData.total_discounts || 0,
+        total_service_charge: reportData.total_service_charge || 0,
+        total_tips: reportData.total_tips || 0,
+        total_orders: reportData.total_orders || 0,
+        total_guests: reportData.total_guests || 0,
+        total_tables_served: reportData.total_tables_served || 0,
+        avg_order_value: reportData.avg_order_value || 0,
+        channel_breakdown: reportData.channel_breakdown || {},
+        payment_breakdown: reportData.payment_breakdown || {},
+        cash_sales: reportData.payment_breakdown?.cash?.sales || 0,
+        cash_refunds: reportData.payment_breakdown?.cash?.refunds || 0,
+        card_sales: reportData.payment_breakdown?.card?.sales || 0,
+        card_refunds: reportData.payment_breakdown?.card?.refunds || 0,
+        online_sales: reportData.payment_breakdown?.online?.sales || 0,
+        online_refunds: reportData.payment_breakdown?.online?.refunds || 0,
+        opening_float: reportData.cash_drawer?.opening_float || 100,
+        paid_outs: reportData.cash_drawer?.paid_outs || 0,
+        paid_ins: reportData.cash_drawer?.paid_ins || 0,
+        safe_drops: reportData.cash_drawer?.safe_drops || 0,
+        expected_cash: expectedCash,
+        actual_cash: actual_cash ?? null,
+        cash_variance: variance,
+        is_finalized: true,
+        finalized_at: now,
+        finalized_by_name: closed_by || null,
+        verified_by: verified_by || null,
+        notes: notes || null,
+        updated_at: now,
+      };
+
+      if (existingReport?.id) {
+        upsertData.id = existingReport.id;
+      }
+
+      const { data: savedReport, error } = await supabase
+        .from('z_reports')
+        .upsert(upsertData, { onConflict: 'business_date' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] finalize_z_report upsert error:', error);
+        return mockResponse({ success: false, message: error.message }, false);
+      }
+
+      // Return updated report data
+      const finalizedData = {
+        ...reportData,
+        id: savedReport?.id,
+        report_number: reportNumber,
+        is_finalized: true,
+        finalized_at: now,
+        notes: notes || null,
+        cash_drawer: {
+          ...reportData.cash_drawer,
+          actual_cash: actual_cash,
+          variance: variance,
+        },
+      };
+
+      console.log('✅ [app-compat] finalize_z_report success:', reportNumber);
+      return mockResponse({ success: true, data: finalizedData });
+    } catch (error) {
+      console.error('❌ [app-compat] finalize_z_report exception:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  fix_customer_favorites_schema: async (params: any) => mockResponse({ success: true }),
+
+  fix_customers_fk: async (params: any) => mockResponse({ success: true }),
+
+  fix_customers_rls_policies: async (params: any) => mockResponse({ success: true }),
+
+  fix_database_foreign_keys: async (params: any) => mockResponse({ success: true }),
+
+  fix_duplicate_variant_names: async (params: any) => mockResponse({ success: true }),
+
+  fix_foreign_key: async (params: any) => mockResponse({ success: true }),
+
+  fix_menu_customizations_error: async (params: any) => mockResponse({ success: true }),
+
+  fix_menu_customizations_schema: async (params: any) => mockResponse({ success: true }),
+
+  fix_order_items_schema: async (params: any) => mockResponse({ success: true }),
+
+  fix_parent_id_column: async (params: any) => mockResponse({ success: true }),
+
+  fix_schema_column_mismatch: async (params: any) => mockResponse({ success: true }),
+
+  force_refresh_menu: async (params: any) => mockResponse({ success: true }),
+
+  full_run: async (params: any) => mockResponse({ success: true }),
+
+  full_setup: async (params: any) => mockResponse({ success: true }),
+
+  gdpr_export: async (params: any) => mockResponse({ success: true }),
+
+  gemini_cache_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  generate_ai_content_suggestion: async (params: any) => mockResponse({ success: true }),
+
+  generate_ai_content_suggestion2: async (params: any) => mockResponse({ success: true }),
+
+  generate_ai_recommendations: async (params: any) => mockResponse({ success: true }),
+
+  generate_all_codes: async (params: any) => mockResponse({ success: true }),
+
+  generate_audit_report: async (params: any) => mockResponse({ success: true }),
+
+  generate_item_code: async (params: any) => mockResponse({ success: true }),
+
+  generate_menu_item_code: async (params: any) => mockResponse({ success: true }),
+
+  generate_order_number: async (params: any) => mockResponse({ success: true }),
+
+  generate_receipt: async (params: any) => mockResponse({ success: true }),
+
+  generate_receipt_html: async (params: any) => mockResponse({ success: true }),
+
+  generate_reference_numbers_for_existing_customers: async (params: any) => mockResponse({ success: true }),
+
+  generate_static_map: async (params: any) => mockResponse({ success: true }),
+
+  generate_structured_response: async (params: any) => mockResponse({ success: true }),
+
+  generate_template_preview: async (params: any) => mockResponse({ success: true }),
+
+  generate_variant_code: async (params: any) => mockResponse({ success: true }),
+
+  generate_z_report: async (params: any) => {
+    console.log('📊 [app-compat] generate_z_report called:', params);
+    try {
+      const { business_date } = params || {};
+
+      // Get config for cutoff time
+      const { data: configData } = await supabase
+        .from('z_report_config')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      const cutoffTime = configData?.business_day_cutoff || '05:00:00';
+      const timezone = configData?.timezone || 'Europe/London';
+      const defaultFloat = configData?.default_float ?? 100.0;
+
+      // Calculate business date if not provided
+      let bizDate = business_date;
+      if (!bizDate) {
+        const now = new Date();
+        const cutoffParts = cutoffTime.split(':').map(Number);
+        const cutoffMinutes = cutoffParts[0] * 60 + cutoffParts[1];
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        if (nowMinutes < cutoffMinutes) {
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          bizDate = yesterday.toISOString().split('T')[0];
+        } else {
+          bizDate = now.toISOString().split('T')[0];
+        }
+      }
+
+      // Calculate period start/end
+      const periodStart = `${bizDate}T${cutoffTime}`;
+      const nextDay = new Date(bizDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      const periodEnd = `${nextDayStr}T${cutoffTime}`;
+
+      // Query orders within the business date period
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .gte('created_at', periodStart)
+        .lt('created_at', periodEnd)
+        .not('status', 'in', '("CANCELLED","PENDING")')
+        .in('payment_status', ['completed', 'paid', 'PAID']);
+
+      if (ordersError) {
+        console.error('❌ [app-compat] generate_z_report orders query error:', ordersError);
+        return mockResponse({ success: false, message: ordersError.message }, false);
+      }
+
+      const orderList = orders || [];
+
+      // Query refunds
+      const { data: refunds } = await supabase
+        .from('payment_refunds')
+        .select('*')
+        .gte('created_at', periodStart)
+        .lt('created_at', periodEnd)
+        .eq('status', 'completed');
+
+      const refundList = refunds || [];
+
+      // Aggregate channel breakdown
+      const channelBreakdown: any = {
+        dine_in: { count: 0, total: 0, tables: new Set(), guests: 0 },
+        pos_waiting: { count: 0, total: 0 },
+        pos_collection: { count: 0, total: 0 },
+        pos_delivery: { count: 0, total: 0 },
+        online_collection: { count: 0, total: 0 },
+        online_delivery: { count: 0, total: 0 },
+        ai_voice: { count: 0, total: 0 },
+      };
+
+      // Aggregate payment breakdown
+      const paymentBreakdown: any = {
+        cash: { sales: 0, refunds: 0, net: 0, count: 0 },
+        card: { sales: 0, refunds: 0, net: 0, count: 0 },
+        online: { sales: 0, refunds: 0, net: 0, count: 0 },
+        other: { sales: 0, refunds: 0, net: 0, count: 0 },
+      };
+
+      let grossSales = 0;
+      let totalDiscounts = 0;
+      let totalServiceCharge = 0;
+      let totalTips = 0;
+      const onlineSources = ['ONLINE', 'CUSTOMER_ONLINE_ORDER', 'CUSTOMER_ONLINE_MENU', 'WEBSITE'];
+
+      for (const order of orderList) {
+        const amount = parseFloat(order.total_amount || order.total || '0');
+        const source = (order.order_source || '').toUpperCase();
+        const type = (order.order_type || '').toUpperCase().replace('-', '_');
+        const payMethod = (order.payment_method || '').toUpperCase();
+
+        grossSales += amount;
+        totalDiscounts += parseFloat(order.discount_amount || '0');
+        totalServiceCharge += parseFloat(order.service_charge || '0');
+        totalTips += parseFloat(order.tip_amount || '0');
+
+        // Channel classification
+        if (source === 'AI_VOICE') {
+          channelBreakdown.ai_voice.count++;
+          channelBreakdown.ai_voice.total += amount;
+        } else if (source === 'POS') {
+          if (type === 'DINE_IN' || type === 'DINE-IN') {
+            channelBreakdown.dine_in.count++;
+            channelBreakdown.dine_in.total += amount;
+            if (order.table_number) channelBreakdown.dine_in.tables.add(order.table_number);
+            channelBreakdown.dine_in.guests += parseInt(order.guest_count || '0');
+          } else if (type === 'WAITING') {
+            channelBreakdown.pos_waiting.count++;
+            channelBreakdown.pos_waiting.total += amount;
+          } else if (type === 'COLLECTION') {
+            channelBreakdown.pos_collection.count++;
+            channelBreakdown.pos_collection.total += amount;
+          } else if (type === 'DELIVERY') {
+            channelBreakdown.pos_delivery.count++;
+            channelBreakdown.pos_delivery.total += amount;
+          } else {
+            channelBreakdown.pos_collection.count++;
+            channelBreakdown.pos_collection.total += amount;
+          }
+        } else if (onlineSources.includes(source)) {
+          if (type === 'DELIVERY') {
+            channelBreakdown.online_delivery.count++;
+            channelBreakdown.online_delivery.total += amount;
+          } else {
+            channelBreakdown.online_collection.count++;
+            channelBreakdown.online_collection.total += amount;
+          }
+        } else {
+          channelBreakdown.pos_collection.count++;
+          channelBreakdown.pos_collection.total += amount;
+        }
+
+        // Payment classification
+        if (payMethod === 'CASH') {
+          paymentBreakdown.cash.sales += amount;
+          paymentBreakdown.cash.count++;
+        } else if (payMethod === 'CARD') {
+          paymentBreakdown.card.sales += amount;
+          paymentBreakdown.card.count++;
+        } else if (['ONLINE', 'STRIPE'].includes(payMethod)) {
+          paymentBreakdown.online.sales += amount;
+          paymentBreakdown.online.count++;
+        } else {
+          paymentBreakdown.other.sales += amount;
+          paymentBreakdown.other.count++;
+        }
+      }
+
+      // Process refunds
+      let totalRefunds = 0;
+      for (const refund of refundList) {
+        const refundAmount = parseFloat(refund.amount || '0');
+        totalRefunds += refundAmount;
+        const refundMethod = (refund.payment_method || 'card').toUpperCase();
+        if (refundMethod === 'CASH') {
+          paymentBreakdown.cash.refunds += refundAmount;
+        } else if (refundMethod === 'CARD') {
+          paymentBreakdown.card.refunds += refundAmount;
+        } else if (['ONLINE', 'STRIPE'].includes(refundMethod)) {
+          paymentBreakdown.online.refunds += refundAmount;
+        } else {
+          paymentBreakdown.card.refunds += refundAmount; // default to card
+        }
+      }
+
+      // Calculate net for each payment method
+      for (const key of Object.keys(paymentBreakdown)) {
+        paymentBreakdown[key].net = Math.round((paymentBreakdown[key].sales - paymentBreakdown[key].refunds) * 100) / 100;
+        paymentBreakdown[key].sales = Math.round(paymentBreakdown[key].sales * 100) / 100;
+        paymentBreakdown[key].refunds = Math.round(paymentBreakdown[key].refunds * 100) / 100;
+      }
+
+      // Convert dine_in tables Set to count
+      const tablesServed = channelBreakdown.dine_in.tables.size;
+      const totalGuests = channelBreakdown.dine_in.guests;
+      channelBreakdown.dine_in.tables = tablesServed;
+
+      // Round channel totals
+      for (const key of Object.keys(channelBreakdown)) {
+        channelBreakdown[key].total = Math.round(channelBreakdown[key].total * 100) / 100;
+      }
+
+      // Query cash drawer operations
+      const { data: drawerOps } = await supabase
+        .from('cash_drawer_operations')
+        .select('*')
+        .eq('business_date', bizDate)
+        .order('created_at', { ascending: true });
+
+      const drawerOpsList = drawerOps || [];
+      let openingFloat = defaultFloat;
+      let paidOuts = 0;
+      let paidIns = 0;
+      let safeDrops = 0;
+
+      for (const op of drawerOpsList) {
+        const opAmount = parseFloat(op.amount || '0');
+        switch (op.operation_type) {
+          case 'FLOAT': openingFloat = opAmount; break;
+          case 'PAID_OUT': paidOuts += opAmount; break;
+          case 'PAID_IN': paidIns += opAmount; break;
+          case 'DROP': safeDrops += opAmount; break;
+        }
+      }
+
+      const cashSales = paymentBreakdown.cash.sales;
+      const cashRefunds = paymentBreakdown.cash.refunds;
+      const expectedCash = Math.round((openingFloat + cashSales - cashRefunds - paidOuts + paidIns - safeDrops) * 100) / 100;
+
+      // Check if already finalized
+      const { data: existingReport } = await supabase
+        .from('z_reports')
+        .select('*')
+        .eq('business_date', bizDate)
+        .maybeSingle();
+
+      const netSales = Math.round((grossSales - totalRefunds - totalDiscounts) * 100) / 100;
+      const totalOrders = orderList.length;
+      const avgOrderValue = totalOrders > 0 ? Math.round((grossSales / totalOrders) * 100) / 100 : 0;
+
+      const reportData: any = {
+        id: existingReport?.id || null,
+        report_number: existingReport?.report_number || null,
+        business_date: bizDate,
+        period_start: periodStart,
+        period_end: periodEnd,
+        gross_sales: Math.round(grossSales * 100) / 100,
+        net_sales: netSales,
+        total_refunds: Math.round(totalRefunds * 100) / 100,
+        total_discounts: Math.round(totalDiscounts * 100) / 100,
+        total_service_charge: Math.round(totalServiceCharge * 100) / 100,
+        total_tips: Math.round(totalTips * 100) / 100,
+        total_orders: totalOrders,
+        total_guests: totalGuests,
+        total_tables_served: tablesServed,
+        avg_order_value: avgOrderValue,
+        channel_breakdown: channelBreakdown,
+        payment_breakdown: paymentBreakdown,
+        cash_drawer: {
+          opening_float: openingFloat,
+          cash_sales: cashSales,
+          cash_refunds: cashRefunds,
+          paid_outs: paidOuts,
+          paid_ins: paidIns,
+          safe_drops: safeDrops,
+          expected_cash: expectedCash,
+          actual_cash: existingReport?.actual_cash ?? null,
+          variance: existingReport?.cash_variance ?? null,
+          operations: drawerOpsList,
+        },
+        is_finalized: existingReport?.is_finalized || false,
+        finalized_at: existingReport?.finalized_at || null,
+        notes: existingReport?.notes || null,
+      };
+
+      console.log(`✅ [app-compat] generate_z_report: ${totalOrders} orders, gross=${grossSales.toFixed(2)}`);
+      return mockResponse({ success: true, data: reportData });
+    } catch (error) {
+      console.error('❌ [app-compat] generate_z_report exception:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  get_abbreviation_dictionary: async (params: any) => mockResponse({ abbreviationdictionary: null }),
+
+  get_active_corpus: async (params: any) => mockResponse({ activecorpus: [], total: 0 }),
+
+  get_active_prompt: async (params: any) => mockResponse({ activeprompt: null }),
+
+  get_admin_lock_status: async (params: any) => mockResponse({ adminlockstatus: [], total: 0 }),
+
+  get_agent_by_id: async (params: any) => mockResponse({ agentbyid: null }),
+
+  get_ai_settings_status: async (params: any) => mockResponse({ aisettingsstatus: [], total: 0 }),
+
+  get_ai_voice_settings: async (params: any) => mockResponse({ aivoicesettings: [], total: 0 }),
+
+  get_all_agents: async (params: any) => mockResponse({ allagents: [], total: 0 }),
+
+  get_all_order_samples: async (params: any) => mockResponse({ allordersamples: [], total: 0 }),
+
+  get_auto_sync_config_endpoint: async (params: any) => mockResponse({ autosyncconfigendpoint: null }),
+
+  get_available_models: async (params: any) => mockResponse({ availablemodels: [], total: 0 }),
+
+  get_available_variables_endpoint: async (params: any) => mockResponse({ availablevariablesendpoint: null }),
+
+  get_business_data_endpoint: async (params: any) => mockResponse({ businessdataendpoint: null }),
+
+  get_cache_stats: async (params: any) => mockResponse({ cachestats: [], total: 0 }),
+
+  get_cart_metrics: async (params: any) => mockResponse({ cartmetrics: [], total: 0 }),
+
+  get_cart_summary: async (params: any) => mockResponse({ cartsummary: null }),
+
+  get_cart_summary_text: async (params: any) => mockResponse({ cartsummarytext: null }),
+
+  get_cart_table_status: async (params: any) => mockResponse({ carttablestatus: [], total: 0 }),
+
+  get_categories: async (params: any) => mockResponse({ categories: [], total: 0 }),
+
+  get_category_diagnostics: async (params: any) => mockResponse({ categorydiagnostics: [], total: 0 }),
+
+  get_category_items: async (params: any) => mockResponse({ categoryitems: [], total: 0 }),
+
+  get_category_section_mappings: async (params: any) => mockResponse({ categorysectionmappings: [], total: 0 }),
+
+  get_chat_cart_context: async (params: any) => mockResponse({ chatcartcontext: null }),
+
+  get_chatbot_prompt: async (params: any) => mockResponse({ chatbotprompt: null }),
+
+  get_code_standards: async (params: any) => mockResponse({ codestandards: [], total: 0 }),
+
+  get_context_summary: async (params: any) => mockResponse({ contextsummary: null }),
+
+  get_corpus_versions: async (params: any) => mockResponse({ corpusversions: [], total: 0 }),
+
+  get_customer_addresses: async (params: any) => mockResponse({ customeraddresses: [], total: 0 }),
+
+  get_customer_context_summary: async (params: any) => mockResponse({ customercontextsummary: null }),
+
+  get_customer_count: async (params: any) => mockResponse({ customercount: null }),
+
+  get_customer_profile_post: async (params: any) => mockResponse({ customerprofilepost: null }),
+
+  get_customer_reference: async (params: any) => mockResponse({ customerreference: null }),
+
+  get_customer_tab: async (params: any) => mockResponse({ customertab: null }),
+
+  get_customizations_for_item: async (params: any) => mockResponse({ customizationsforitem: null }),
+
+  get_delivery_zones_endpoint: async (params: any) => mockResponse({ deliveryzonesendpoint: null }),
+
+  get_email_verification_status: async (params: any) => mockResponse({ emailverificationstatus: [], total: 0 }),
+
+  get_enriched_favorites: async (params: any) => mockResponse({ enrichedfavorites: [], total: 0 }),
+
+  get_file_sha: async (params: any) => mockResponse({ filesha: null }),
+
+  get_full_menu_context: async (params: any) => mockResponse({ fullmenucontext: null }),
+
+  get_full_specification: async (params: any) => mockResponse({ fullspecification: null }),
+
+  get_gallery_menu_items: async (params: any) => mockResponse({ gallerymenuitems: [], total: 0 }),
+
+  get_github_user: async (params: any) => mockResponse({ githubuser: null }),
+
+  get_google_live_voice_settings: async (params: any) => mockResponse({ googlelivevoicesettings: [], total: 0 }),
+
+  get_health_check_template: async (params: any) => mockResponse({ healthchecktemplate: null }),
+
+  get_health_history: async (params: any) => mockResponse({ healthhistory: null }),
+
+  get_health_status: async (params: any) => mockResponse({ healthstatus: [], total: 0 }),
+
+  get_hierarchical_stats: async (params: any) => mockResponse({ hierarchicalstats: [], total: 0 }),
+
+  get_icon_info: async (params: any) => mockResponse({ iconinfo: null }),
+
+  get_installation_bundle: async (params: any) => mockResponse({ installationbundle: null }),
+
+  get_installer_files_status: async (params: any) => mockResponse({ installerfilesstatus: [], total: 0 }),
+
+  get_item_details: async (params: any) => mockResponse({ itemdetails: [], total: 0 }),
+
+  get_item_section_order: async (params: any) => mockResponse({ itemsectionorder: null }),
+
+  get_job_logs: async (params: any) => mockResponse({ joblogs: [], total: 0 }),
+
+  get_latest_combined_installer: async (params: any) => mockResponse({ latestcombinedinstaller: null }),
+
+  get_latest_failed_run_logs: async (params: any) => mockResponse({ latestfailedrunlogs: [], total: 0 }),
+
+  get_latest_pos_release: async (params: any) => mockResponse({ latestposrelease: null }),
+
+  get_latest_printer_release: async (params: any) => mockResponse({ latestprinterrelease: null }),
+
+  get_latest_release: async (params: any) => mockResponse({ latestrelease: null }),
+
+  get_live_calls: async (params: any) => mockResponse({ livecalls: [], total: 0 }),
+
+  get_lock_status: async (params: any) => mockResponse({ lockstatus: [], total: 0 }),
+
+  get_map_image_proxy: async (params: any) => mockResponse({ mapimageproxy: null }),
+
+  get_master_switch_status: async (params: any) => mockResponse({ masterswitchstatus: [], total: 0 }),
+
+  get_master_toggle: async (params: any) => mockResponse({ mastertoggle: null }),
+
+  get_media_usage_summary: async (params: any) => mockResponse({ mediausagesummary: null }),
+
+  get_menu_cache_stats: async (params: any) => mockResponse({ menucachestats: [], total: 0 }),
+
+  get_menu_corpus_debug: async (params: any) => mockResponse({ menucorpusdebug: null }),
+
+  get_menu_corpus_health: async (params: any) => mockResponse({ menucorpushealth: null }),
+
+  get_menu_data_status: async (params: any) => mockResponse({ menudatastatus: [], total: 0 }),
+
+  get_menu_data_summary: async (params: any) => mockResponse({ menudatasummary: null }),
+
+  get_menu_delta_sync: async (params: any) => mockResponse({ menudeltasync: null }),
+
+  get_menu_for_voice_agent: async (params: any) => mockResponse({ menuforvoiceagent: null }),
+
+  get_menu_for_voice_agent_html: async (params: any) => mockResponse({ menuforvoiceagenthtml: null }),
+
+  get_menu_for_voice_agent_text: async (params: any) => mockResponse({ menuforvoiceagenttext: null }),
+
+  get_menu_print_settings: async (params: any) => mockResponse({ menuprintsettings: [], total: 0 }),
+
+  get_menu_text_for_rag: async (params: any) => mockResponse({ menutextforrag: null }),
+
+  get_migration_history_endpoint: async (params: any) => mockResponse({ migrationhistoryendpoint: null }),
+
+  get_next_display_order: async (params: any) => mockResponse({ nextdisplayorder: null }),
+
+  get_offline_sync_status: async (params: any) => mockResponse({ offlinesyncstatus: [], total: 0 }),
+
+  get_onboarding_status: async (params: any) => mockResponse({ onboardingstatus: [], total: 0 }),
+
+  get_optimized_image: async (params: any) => mockResponse({ optimizedimage: null }),
+
+  get_optimized_menu: async (params: any) => mockResponse({ optimizedmenu: null }),
+
+  get_order_history: async (params: any) => mockResponse({ orderhistory: null }),
+
+  get_order_items: async (params: any) => mockResponse({ orderitems: [], total: 0 }),
+
+  get_order_sample: async (params: any) => mockResponse({ ordersample: null }),
+
+  get_orders_by_status: async (params: any) => mockResponse({ ordersbystatus: [], total: 0 }),
+
+  get_package_info: async (params: any) => mockResponse({ packageinfo: null }),
+
+  get_payment_notifications_main: async (params: any) => mockResponse({ paymentnotificationsmain: null }),
+
+  get_pending_changes: async (params: any) => mockResponse({ pendingchanges: [], total: 0 }),
+
+  get_performance_report: async (params: any) => mockResponse({ performancereport: null }),
+
+  get_personalization_settings: async (params: any) => mockResponse({ personalizationsettings: [], total: 0 }),
+
+  get_pos_desktop_version: async (params: any) => mockResponse({ posdesktopversion: null }),
+
+  get_powershell_install_script: async (params: any) => mockResponse({ powershellinstallscript: null }),
+
+  get_powershell_uninstall_script: async (params: any) => mockResponse({ powershelluninstallscript: null }),
+
+  get_print_job: async (params: any) => mockResponse({ printjob: null }),
+
+  get_print_job_stats: async (params: any) => mockResponse({ printjobstats: [], total: 0 }),
+
+  get_print_queue_job: async (params: any) => mockResponse({ printqueuejob: null }),
+
+  get_print_queue_job_stats: async (params: any) => mockResponse({ printqueuejobstats: [], total: 0 }),
+
+  get_print_queue_jobs: async (params: any) => mockResponse({ printqueuejobs: [], total: 0 }),
+
+  get_print_request_templates: async (params: any) => mockResponse({ printrequesttemplates: [], total: 0 }),
+
+  get_printer_capabilities: async (params: any) => mockResponse({ printercapabilities: [], total: 0 }),
+
+  get_printer_status: async (params: any) => mockResponse({ printerstatus: [], total: 0 }),
+
+  get_printing_system_status: async (params: any) => mockResponse({ printingsystemstatus: [], total: 0 }),
+
+  get_profile_image: async (params: any) => mockResponse({ profileimage: null }),
+
+  get_protein_type: async (params: any) => mockResponse({ proteintype: null }),
+
+  get_protein_types: async (params: any) => mockResponse({ proteintypes: [], total: 0 }),
+
+  get_public_restaurant_info: async (params: any) => mockResponse({ publicrestaurantinfo: null }),
+
+  get_public_restaurant_text: async (params: any) => mockResponse({ publicrestauranttext: null }),
+
+  get_queue_status: async (params: any) => mockResponse({ queuestatus: [], total: 0 }),
+
+  get_raw_performance_metrics: async (params: any) => mockResponse({ rawperformancemetrics: [], total: 0 }),
+
+  get_real_menu_data: async (params: any) => mockResponse({ realmenudata: null }),
+
+  get_real_menu_data_enhanced: async (params: any) => mockResponse({ realmenudataenhanced: null }),
+
+  get_real_time_sync_status: async (params: any) => mockResponse({ realtimesyncstatus: [], total: 0 }),
+
+  get_receipt: async (params: any) => mockResponse({ receipt: null }),
+
+  get_recent_print_jobs: async (params: any) => mockResponse({ recentprintjobs: [], total: 0 }),
+
+  get_repository_info: async (params: any) => mockResponse({ repositoryinfo: null }),
+
+  get_restaurant_config: async (params: any) => mockResponse({ restaurantconfig: null }),
+
+  get_restaurant_details_for_voice_agent: async (params: any) => mockResponse({ restaurantdetailsforvoiceagent: null }),
+
+  get_restaurant_info_text_for_rag: async (params: any) => mockResponse({ restaurantinfotextforrag: null }),
+
+  get_restaurant_profile_for_voice_agent: async (params: any) => mockResponse({ restaurantprofileforvoiceagent: null }),
+
+  get_restaurant_profile_for_voice_agent_html: async (params: any) => mockResponse({ restaurantprofileforvoiceagenthtml: null }),
+
+  get_restaurant_profile_for_voice_agent_text: async (params: any) => mockResponse({ restaurantprofileforvoiceagenttext: null }),
+
+  get_sample_order_data_endpoint: async (params: any) => mockResponse({ sampleorderdataendpoint: null }),
+
+  get_schema_health: async (params: any) => mockResponse({ schemahealth: null }),
+
+  get_sequence_status: async (params: any) => mockResponse({ sequencestatus: [], total: 0 }),
+
+  get_service_charge_config_endpoint: async (params: any) => mockResponse({ servicechargeconfigendpoint: null }),
+
+  get_service_specification: async (params: any) => mockResponse({ servicespecification: null }),
+
+  get_session_metrics: async (params: any) => mockResponse({ sessionmetrics: [], total: 0 }),
+
+  get_shared_favorite_list: async (params: any) => mockResponse({ sharedfavoritelist: [], total: 0 }),
+
+  get_signature_dishes: async (params: any) => mockResponse({ signaturedishes: [], total: 0 }),
+
+  get_source_file: async (params: any) => mockResponse({ sourcefile: null }),
+
+  get_specification: async (params: any) => mockResponse({ specification: null }),
+
+  get_static_maps_config: async (params: any) => mockResponse({ staticmapsconfig: null }),
+
+  get_status_options: async (params: any) => mockResponse({ statusoptions: [], total: 0 }),
+
+  get_supabase_config: async (params: any) => mockResponse({ supabaseconfig: null }),
+
+  get_sync_status_endpoint: async (params: any) => mockResponse({ syncstatusendpoint: null }),
+
+  get_table_order: async (params: any) => mockResponse({ tableorder: null }),
+
+  get_table_session_status: async (params: any) => mockResponse({ tablesessionstatus: [], total: 0 }),
+
+  get_tables_config: async (params: any) => mockResponse({ tablesconfig: null }),
+
+  get_template_status: async (params: any) => mockResponse({ templatestatus: [], total: 0 }),
+
+  get_test_info: async (params: any) => mockResponse({ testinfo: null }),
+
+  get_test_status: async (params: any) => mockResponse({ teststatus: [], total: 0 }),
+
+  get_user_orders: async (params: any) => mockResponse({ userorders: [], total: 0 }),
+
+  get_voice_agent_customizations: async (params: any) => mockResponse({ voiceagentcustomizations: [], total: 0 }),
+
+  get_voice_agent_data: async (params: any) => mockResponse({ voiceagentdata: null }),
+
+  get_workflow_run_jobs: async (params: any) => mockResponse({ workflowrunjobs: [], total: 0 }),
+
+  get_z_report_config: async () => {
+    console.log('⚙️ [app-compat] get_z_report_config called');
+    try {
+      const { data, error } = await supabase
+        .from('z_report_config')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error || !data) {
+        console.warn('⚠️ [app-compat] get_z_report_config: using defaults');
+        return mockResponse({
+          success: true,
+          data: { business_day_cutoff: '05:00:00', default_float: 100.0, timezone: 'Europe/London', require_drawer_count: true },
+        });
+      }
+
+      console.log('✅ [app-compat] get_z_report_config loaded');
+      return mockResponse({ success: true, data });
+    } catch (error) {
+      console.error('❌ [app-compat] get_z_report_config exception:', error);
+      return mockResponse({
+        success: true,
+        data: { business_day_cutoff: '05:00:00', default_float: 100.0, timezone: 'Europe/London', require_drawer_count: true },
+      });
+    }
+  },
+
+  google_live_voice_status: async (params: any) => mockResponse({ success: true }),
+
+  health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  identity_approve_link: async (params: any) => {
+    console.log('✅ [app-compat] identity_approve_link called:', params);
+    try {
+      const linkId = params?.link_id;
+      if (!linkId) return mockResponse({ success: false, error: 'Missing link_id' }, false);
+
+      const { error } = await supabase
+        .from('customer_identity_links')
+        .update({
+          status: 'approved',
+          reviewed_by: params?.reviewer_id || null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', linkId);
+
+      if (error) {
+        console.error('❌ [app-compat] identity_approve_link error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] identity_approve_link exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  identity_get_link_queue: async (params: any) => {
+    console.log('🔗 [app-compat] identity_get_link_queue called:', params);
+    try {
+      const { status, tier, limit = 100, offset = 0 } = params || {};
+
+      let query = supabase
+        .from('customer_identity_links')
+        .select(`
+          *,
+          source_customer:customers!customer_identity_links_source_customer_id_fkey(id, name, phone, email, total_orders, total_spent),
+          target_customer:customers!customer_identity_links_target_customer_id_fkey(id, name, phone, email, total_orders, total_spent)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (status && status !== 'all') {
+        query = query.eq('status', status);
+      }
+      if (tier && tier !== 'all') {
+        query = query.eq('match_tier', tier);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('❌ [app-compat] identity_get_link_queue error:', error);
+        return mockResponse({ success: true, links: [], total: 0 });
+      }
+
+      console.log(`✅ [app-compat] identity_get_link_queue: ${data?.length || 0} links`);
+      return mockResponse({ success: true, links: data || [], total: count || 0 });
+    } catch (error) {
+      console.error('❌ [app-compat] identity_get_link_queue exception:', error);
+      return mockResponse({ success: true, links: [], total: 0 });
+    }
+  },
+
+  identity_get_stats: async (params: any) => {
+    console.log('📊 [app-compat] identity_get_stats called');
+    try {
+      const { data, error } = await supabase
+        .from('customer_identity_links')
+        .select('status');
+
+      if (error) {
+        console.error('❌ [app-compat] identity_get_stats error:', error);
+        return mockResponse({ success: true, by_status: { pending: 0, approved: 0, rejected: 0, auto_linked: 0, merged: 0 } });
+      }
+
+      const byStatus: Record<string, number> = { pending: 0, approved: 0, rejected: 0, auto_linked: 0, merged: 0 };
+      for (const row of (data || [])) {
+        const s = row.status || 'pending';
+        byStatus[s] = (byStatus[s] || 0) + 1;
+      }
+
+      console.log('✅ [app-compat] identity_get_stats:', byStatus);
+      return mockResponse({ success: true, by_status: byStatus });
+    } catch (error) {
+      console.error('❌ [app-compat] identity_get_stats exception:', error);
+      return mockResponse({ success: true, by_status: { pending: 0, approved: 0, rejected: 0, auto_linked: 0, merged: 0 } });
+    }
+  },
+
+  identity_reject_link: async (params: any) => {
+    console.log('❌ [app-compat] identity_reject_link called:', params);
+    try {
+      const linkId = params?.link_id;
+      if (!linkId) return mockResponse({ success: false, error: 'Missing link_id' }, false);
+
+      const { error } = await supabase
+        .from('customer_identity_links')
+        .update({
+          status: 'rejected',
+          reviewed_by: params?.reviewer_id || null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', linkId);
+
+      if (error) {
+        console.error('❌ [app-compat] identity_reject_link error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] identity_reject_link exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  import_avatars_from_storage: async (params: any) => mockResponse({ success: true }),
+
+  init_clients_and_core_tables: async (params: any) => mockResponse({ success: true }),
+
+  init_pos_settings: async (params: any) => mockResponse({ success: true }),
+
+  init_simple_chatbot_table: async (params: any) => mockResponse({ success: true }),
+
+  initialize_ai_voice_settings: async (params: any) => mockResponse({ success: true }),
+
+  initialize_default_assignments: async (params: any) => mockResponse({ success: true }),
+
+  initialize_default_promos: async (params: any) => mockResponse({ success: true }),
+
+  initialize_fee_configs: async (params: any) => mockResponse({ success: true }),
+
+  initialize_google_live_voice_settings: async (params: any) => mockResponse({ success: true }),
+
+  initialize_onboarding: async (params: any) => mockResponse({ success: true }),
+
+  initialize_schema_migrations: async (params: any) => mockResponse({ success: true }),
+
+  initialize_unified_agent_config: async (params: any) => mockResponse({ success: true }),
+
+  invalidate_menu_cache: async (params: any) => mockResponse({ success: true }),
+
+  invalidate_offline_cache: async (params: any) => mockResponse({ success: true }),
+
+  investigate_menu_schema: async (params: any) => mockResponse({ success: true }),
+
+  link_media_to_menu_integration: async (params: any) => mockResponse({ success: true }),
+
+  list_all_tables: async (params: any) => mockResponse({ all_tables: [], total: 0 }),
+
+  list_available_models: async (params: any) => mockResponse({ available_models: [], total: 0 }),
+
+  list_caches: async (params: any) => mockResponse({ caches: [], total: 0 }),
+
+  list_chatbot_prompts: async (params: any) => mockResponse({ chatbot_prompts: [], total: 0 }),
+
+  list_payment_methods: async (params: any) => mockResponse({ payment_methods: [], total: 0 }),
+
+  list_pending_payments: async (params: any) => mockResponse({ pending_payments: [], total: 0 }),
+
+  list_print_templates: async (params: any) => mockResponse({ print_templates: [], total: 0 }),
+
+  list_promo_codes: async (params: any) => mockResponse({ promo_codes: [], total: 0 }),
+
+  list_protein_types: async (params: any) => mockResponse({ protein_types: [], total: 0 }),
+
+  list_recent_events: async (params: any) => mockResponse({ recent_events: [], total: 0 }),
+
+  list_releases: async (params: any) => mockResponse({ releases: [], total: 0 }),
+
+  list_rls_policies: async (params: any) => mockResponse({ rls_policies: [], total: 0 }),
+
+  list_supported_functions: async (params: any) => mockResponse({ supported_functions: [], total: 0 }),
+
+  list_trusted_devices: async (params: any) => mockResponse({ trusted_devices: [], total: 0 }),
+
+  list_workflow_runs: async (params: any) => mockResponse({ workflow_runs: [], total: 0 }),
+
+  lock_legacy_and_views: async (params: any) => mockResponse({ success: true }),
+
+  log_escalation: async (params: any) => mockResponse({ success: true }),
+
+  log_message: async (params: any) => mockResponse({ success: true }),
+
+  log_session_end: async (params: any) => mockResponse({ success: true }),
+
+  log_session_start: async (params: any) => mockResponse({ success: true }),
+
+  lookup_menu_item_by_code: async (params: any) => mockResponse({ success: true }),
+
+  lookup_postcode_schema: async (params: any) => mockResponse({ success: true }),
+
+  make_loyalty_token_nullable: async (params: any) => mockResponse({ success: true }),
+
+  mark_notifications_processed_main: async (params: any) => mockResponse({ success: true }),
+
+  mark_payment_as_paid: async (params: any) => mockResponse({ success: true }),
+
+  mark_tour_complete: async (params: any) => mockResponse({ success: true }),
+
+  mark_wizard_complete: async (params: any) => mockResponse({ success: true }),
+
+  media_integration_cleanup_orphaned: async (params: any) => mockResponse({ success: true }),
+
+  media_integration_update_tracking: async (params: any) => mockResponse({ success: true }),
+
+  media_integration_verify_relationships: async (params: any) => mockResponse({ success: true }),
+
+  menu_image_upload_health: async (params: any) => mockResponse({ healthy: true }),
+
+  menu_media_core_cleanup_orphaned: async (params: any) => mockResponse({ success: true }),
+
+  menu_media_core_link_to_item: async (params: any) => mockResponse({ success: true }),
+
+  menu_media_core_update_tracking: async (params: any) => mockResponse({ success: true }),
+
+  menu_media_core_verify_relationships: async (params: any) => mockResponse({ success: true }),
+
+  menu_media_optimizer_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  migrate_fix_table_statuses: async (params: any) => mockResponse({ success: true }),
+
+  migrate_profiles_to_customers: async (params: any) => mockResponse({ success: true }),
+
+  migrate_tables_now: async (params: any) => {
+    console.log('🔄 [app-compat] migrate_tables_now - setting up POS tables schema');
+    try {
+      // Step 1: Ensure pos_tables_config exists and has defaults
+      const { data: existingConfig } = await supabase
+        .from('pos_tables_config')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingConfig) {
+        await supabase
+          .from('pos_tables_config')
+          .insert({ total_tables: 10, max_seats_per_table: 4 });
+        console.log('✅ [app-compat] Created default pos_tables_config');
+      }
+
+      // Step 2: Check if pos_tables has data
+      const { data: existingTables, count } = await supabase
+        .from('pos_tables')
+        .select('table_number', { count: 'exact' })
+        .limit(1);
+
+      if (!count || count === 0) {
+        // Seed default 10 tables
+        const defaultTables = [
+          { table_number: 1, capacity: 2, status: 'available' },
+          { table_number: 2, capacity: 4, status: 'available' },
+          { table_number: 3, capacity: 2, status: 'available' },
+          { table_number: 4, capacity: 6, status: 'available' },
+          { table_number: 5, capacity: 4, status: 'available' },
+          { table_number: 6, capacity: 4, status: 'available' },
+          { table_number: 7, capacity: 2, status: 'available' },
+          { table_number: 8, capacity: 8, status: 'available' },
+          { table_number: 9, capacity: 4, status: 'available' },
+          { table_number: 10, capacity: 6, status: 'available' },
+        ];
+
+        const { error: insertError } = await supabase
+          .from('pos_tables')
+          .upsert(defaultTables, { onConflict: 'table_number' });
+
+        if (insertError) {
+          console.error('❌ [app-compat] Failed to seed pos_tables:', insertError);
+          return mockResponse({
+            success: false,
+            message: 'Failed to seed tables',
+            details: { error: insertError.message },
+          }, false);
+        }
+        console.log('✅ [app-compat] Seeded 10 default tables');
+      }
+
+      // Verify tables exist
+      const { count: finalCount } = await supabase
+        .from('pos_tables')
+        .select('table_number', { count: 'exact' })
+        .limit(1);
+
+      return mockResponse({
+        success: true,
+        message: 'Migration completed successfully',
+        details: {
+          tables_count: finalCount || 0,
+          setup_result: { success: true },
+        },
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] migrate_tables_now error:', error);
+      return mockResponse({
+        success: false,
+        message: (error as Error).message,
+        details: { error: (error as Error).message },
+      }, false);
+    }
+  },
+
+  migrate_variant_names_to_title_case: async (params: any) => mockResponse({ success: true }),
+
+  natural_language_search: async (params: any) => mockResponse({ success: true }),
+
+  populate_category_prefixes: async (params: any) => mockResponse({ success: true }),
+
+  populate_missing_variants: async (params: any) => mockResponse({ success: true }),
+
+  populate_sample_menu_data_endpoint: async (params: any) => mockResponse({ success: true }),
+
+  populate_sample_menu_data_v2: async (params: any) => mockResponse({ success: true }),
+
+  pos_heartbeat: async (params: any) => {
+    console.log('💓 [app-compat] pos_heartbeat - updating pos_status table');
+    try {
+      const now = new Date().toISOString();
+      const updateData: any = {
+        last_heartbeat_at: now,
+        updated_at: now,
+      };
+
+      // Include custom message if provided
+      if (params?.custom_message !== undefined) {
+        updateData.custom_message = params.custom_message || null;
+      }
+
+      // Check if row exists
+      const { data: existing } = await supabase
+        .from('pos_status')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing row
+        await supabase
+          .from('pos_status')
+          .update(updateData)
+          .eq('id', existing.id);
+      } else {
+        // Create first row
+        updateData.is_accepting_orders = true;
+        await supabase
+          .from('pos_status')
+          .insert(updateData);
+      }
+
+      return mockResponse({
+        success: true,
+        message: 'Heartbeat received',
+        last_heartbeat_at: now,
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] pos_heartbeat error:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  pos_settings_diagnostics: async (params: any) => mockResponse({ success: true }),
+
+  preflight_check: async (params: any) => mockResponse({ success: true }),
+
+  preview_migration: async (params: any) => mockResponse({ success: true }),
+
+  preview_prompt: async (params: any) => mockResponse({ success: true }),
+
+  print_epson: async (params: any) => mockResponse({ success: true }),
+
+  print_kitchen_and_customer: async (params: any) => mockResponse({ success: true }),
+
+  print_kitchen_thermal: async (params: any) => mockResponse({ success: true }),
+
+  print_receipt_thermal: async (params: any) => mockResponse({ success: true }),
+
+  print_rich_template: async (params: any) => mockResponse({ success: true }),
+
+  print_test_receipt: async (params: any) => mockResponse({ success: true }),
+
+  print_with_template: async (params: any) => mockResponse({ success: true }),
+
+  print_z_report: async (params: any) => {
+    console.log('🖨️ [app-compat] print_z_report called (Electron - delegating to thermal printer if available)');
+    // On Electron, printing is handled by the Electron main process via IPC
+    // For now, return success and let the UI handle print via window.electronAPI if available
+    try {
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.printZReport) {
+        await (window as any).electronAPI.printZReport(params?.report_data);
+        return mockResponse({ success: true, message: 'Sent to printer' });
+      }
+      return mockResponse({ success: true, message: 'Print not available in this environment' });
+    } catch (error) {
+      console.error('❌ [app-compat] print_z_report exception:', error);
+      return mockResponse({ success: false, message: 'Print failed' }, false);
+    }
+  },
+
+  process_failed_print_jobs: async (params: any) => mockResponse({ success: true }),
+
+  process_final_bill_for_table: async (params: any) => mockResponse({ success: true }),
+
+  process_print_queue_jobs: async (params: any) => mockResponse({ success: true }),
+
+  process_template_variables: async (params: any) => mockResponse({ success: true }),
+
+  process_template_with_sample: async (params: any) => mockResponse({ success: true }),
+
+  prompt_generator_health: async (params: any) => mockResponse({ healthy: true }),
+
+  publish_corpus: async (params: any) => mockResponse({ success: true }),
+
+  publish_prompt: async (params: any) => mockResponse({ success: true }),
+
+  publish_voice_settings: async (params: any) => mockResponse({ success: true }),
+
+  push_printer_service_to_github_endpoint: async (params: any) => mockResponse({ success: true }),
+
+  real_time_sync_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  receipt_generator_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  record_menu_change: async (params: any) => mockResponse({ success: true }),
+
+  record_cash_drawer_operation: async (params: any) => {
+    console.log('💰 [app-compat] record_cash_drawer_operation called:', params);
+    try {
+      const { operation_type, amount, reason, reference, staff_name, business_date } = params || {};
+      if (!operation_type || amount == null) {
+        return mockResponse({ success: false, error: 'Missing operation_type or amount' }, false);
+      }
+
+      // Calculate business date if not provided
+      let bizDate = business_date;
+      if (!bizDate) {
+        const configResponse = await apiClient.get_current_business_date();
+        const configData = await configResponse.json();
+        bizDate = configData?.data?.business_date || new Date().toISOString().split('T')[0];
+      }
+
+      const { data, error } = await supabase
+        .from('cash_drawer_operations')
+        .insert({
+          operation_type,
+          amount: parseFloat(amount),
+          reason: reason || null,
+          reference: reference || null,
+          staff_name: staff_name || null,
+          business_date: bizDate,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] record_cash_drawer_operation error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] record_cash_drawer_operation success:', data?.id);
+      return mockResponse({ success: true, operation: data });
+    } catch (error) {
+      console.error('❌ [app-compat] record_cash_drawer_operation exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  refresh_schema_cache: async (params: any) => mockResponse({ success: true }),
+
+  regenerate_all_variant_names: async (params: any) => mockResponse({ success: true }),
+
+  rename_customer_tab: async (params: any) => mockResponse({ success: true }),
+
+  reorder_siblings: async (params: any) => mockResponse({ success: true }),
+
+  reset_code_system: async (params: any) => mockResponse({ success: true }),
+
+  reset_menu_structure: async (params: any) => mockResponse({ success: true }),
+
+  reset_table_completely: async (params: any) => mockResponse({ success: true }),
+
+  reset_template_assignment: async (params: any) => mockResponse({ success: true }),
+
+  retry_item_migration: async (params: any) => mockResponse({ success: true }),
+
+  revoke_device: async (params: any) => mockResponse({ success: true }),
+
+  revoke_user_device: async (params: any) => mockResponse({ success: true }),
+
+  rollback: async (params: any) => mockResponse({ success: true }),
+
+  rollback_category_migration: async (params: any) => mockResponse({ success: true }),
+
+  run_batch_generation: async (params: any) => mockResponse({ success: true }),
+
+  run_customization_test: async (params: any) => mockResponse({ success: true }),
+
+  run_full_migration: async (params: any) => mockResponse({ success: true }),
+
+  run_full_test_suite: async (params: any) => mockResponse({ success: true }),
+
+  run_table_diagnostics: async (params: any) => mockResponse({ success: true }),
+
+  save_menu_print_settings: async (params: any) => mockResponse({ success: true }),
+
+  save_tables_config: async (params: any) => mockResponse({ success: true }),
+
+  schema_migrate_menu_images_v2: async (params: any) => mockResponse({ success: true }),
+
+  select_agent: async (params: any) => mockResponse({ success: true }),
+
+  send_order_confirmation_email: async (params: any) => mockResponse({ success: true }),
+
+  send_realtime_notification: async (params: any) => mockResponse({ success: true }),
+
+  set_active_prompt: async (params: any) => mockResponse({ success: true }),
+
+  set_default_payment_method: async (params: any) => mockResponse({ success: true }),
+
+  set_master_switch: async (params: any) => mockResponse({ success: true }),
+
+  setup_all_schemas_batch: async (params: any) => mockResponse({ success: true }),
+
+  setup_chat_analytics_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_chatbot_prompts_table: async (params: any) => mockResponse({ success: true }),
+
+  setup_corpus_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_database_procedures: async (params: any) => mockResponse({ success: true }),
+
+  setup_delivery_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_favorite_lists_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_kitchen_display_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_categories_parent_relationship: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_database: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_images_schema_v2: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_item_codes: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_structure_alter_table_function: async (params: any) => mockResponse({ success: true }),
+
+  setup_menu_tables2: async (params: any) => mockResponse({ success: true }),
+
+  setup_onboarding_database: async (params: any) => mockResponse({ success: true }),
+
+  setup_order_tracking_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_pos_auth_tables: async (params: any) => mockResponse({ success: true }),
+
+  setup_pos_tables_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_profile_images_infrastructure: async (params: any) => mockResponse({ success: true }),
+
+  setup_publish_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_set_meals_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_simple_payment_tracking: async (params: any) => mockResponse({ success: true }),
+
+  setup_special_instructions_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_table_orders_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_trigger: async (params: any) => mockResponse({ success: true }),
+
+  setup_trusted_device_tables: async (params: any) => mockResponse({ success: true }),
+
+  setup_user_roles_rls: async (params: any) => mockResponse({ success: true }),
+
+  setup_variant_food_details_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_variant_name_pattern_schema: async (params: any) => mockResponse({ success: true }),
+
+  setup_variant_name_trigger: async (params: any) => mockResponse({ success: true }),
+
+  setup_variants_food_details: async (params: any) => mockResponse({ success: true }),
+
+  share_favorite_list: async (params: any) => mockResponse({ success: true }),
+
+  show_menu_item: async (params: any) => mockResponse({ success: true }),
+
+  show_menu_item_health: async (params: any) => mockResponse({ healthy: true }),
+
+  sort_order_items_by_sections: async (params: any) => mockResponse({ success: true }),
+
+  stream_chat: async (params: any) => mockResponse({ success: true }),
+
+  stripe_webhook: async (params: any) => mockResponse({ success: true }),
+
+  suggest_kitchen_names: async (params: any) => mockResponse({ success: true }),
+
+  supabase_manager_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  supabase_pos_login: async (params: any) => mockResponse({ success: true }),
+
+  sync_counters_with_database: async (params: any) => mockResponse({ success: true }),
+
+  sync_electron_builder_config: async (params: any) => mockResponse({ success: true }),
+
+  sync_installer_files: async (params: any) => mockResponse({ success: true }),
+
+  sync_menu_changes_now: async (params: any) => mockResponse({ success: true }),
+
+  sync_pos_files: async (params: any) => mockResponse({ success: true }),
+
+  sync_printer_service: async (params: any) => mockResponse({ success: true }),
+
+  sync_printer_workflow_files: async (params: any) => mockResponse({ success: true }),
+
+  sync_set_meals_to_menu: async (params: any) => mockResponse({ success: true }),
+
+  test_ai_settings_sync: async (params: any) => mockResponse({ success: true }),
+
+  test_ai_voice_connection: async (params: any) => mockResponse({ success: true }),
+
+  test_all_cart_operations: async (params: any) => mockResponse({ success: true }),
+
+  test_all_printers: async (params: any) => mockResponse({ success: true }),
+
+  test_all_voice_functions: async (params: any) => mockResponse({ success: true }),
+
+  test_batch_variants_dry_run: async (params: any) => mockResponse({ success: true }),
+
+  test_category_filter: async (params: any) => mockResponse({ success: true }),
+
+  test_comprehensive_menu_sql_function: async (params: any) => mockResponse({ success: true }),
+
+  test_customizations_end_to_end: async (params: any) => mockResponse({ success: true }),
+
+  test_customizations_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  test_customizations_schema_fix: async (params: any) => mockResponse({ success: true }),
+
+  test_customizations_with_real_item: async (params: any) => mockResponse({ success: true }),
+
+  test_google_live_voice_call: async (params: any) => mockResponse({ success: true }),
+
+  test_menu_customizations_query: async (params: any) => mockResponse({ success: true }),
+
+  test_menu_unified_view: async (params: any) => mockResponse({ success: true }),
+
+  test_menu_variants_rpc: async (params: any) => mockResponse({ success: true }),
+
+  test_mode_any: async (params: any) => mockResponse({ success: true }),
+
+  test_mode_any_health_check: async (params: any) => mockResponse({ healthy: true }),
+
+  test_mode_any_multiturn: async (params: any) => mockResponse({ success: true }),
+
+  test_optimized_function: async (params: any) => mockResponse({ success: true }),
+
+  test_print: async (params: any) => mockResponse({ success: true }),
+
+  test_print_simple_data: async (params: any) => mockResponse({ success: true }),
+
+  test_print_unified: async (params: any) => mockResponse({ success: true }),
+
+  test_safety_validation: async (params: any) => mockResponse({ success: true }),
+
+  test_sql_function_menu_tables: async (params: any) => mockResponse({ success: true }),
+
+  test_tier1_crud: async (params: any) => mockResponse({ success: true }),
+
+  test_tier2_ddl: async (params: any) => mockResponse({ success: true }),
+
+  test_tier3_advanced: async (params: any) => mockResponse({ success: true }),
+
+  test_voice_executor: async (params: any) => mockResponse({ success: true }),
+
+  toggle_ai_assistant: async (params: any) => mockResponse({ success: true }),
+
+  trust_device_for_user: async (params: any) => mockResponse({ success: true }),
+
+  unified_agent_config_status: async (params: any) => mockResponse({ success: true }),
+
+  unlink_media: async (params: any) => mockResponse({ success: true }),
+
+  unpublish_prompt: async (params: any) => mockResponse({ success: true }),
+
+  update_abbreviation_dictionary: async (params: any) => mockResponse({ success: true }),
+
+  update_ai_voice_settings: async (params: any) => mockResponse({ success: true }),
+
+  update_auto_sync_config: async (params: any) => mockResponse({ success: true }),
+
+  update_categories_print_fields: async (params: any) => mockResponse({ success: true }),
+
+  update_chatbot_prompt: async (params: any) => mockResponse({ success: true }),
+
+  update_delivery_zones: async (params: any) => mockResponse({ success: true }),
+
+  update_email_step: async (params: any) => mockResponse({ success: true }),
+
+  update_existing_agents_gender: async (params: any) => mockResponse({ success: true }),
+
+  update_file_mapping: async (params: any) => mockResponse({ success: true }),
+
+  update_google_live_voice_settings: async (params: any) => mockResponse({ success: true }),
+
+  update_item_customizations: async (params: any) => mockResponse({ success: true }),
+
+  update_item_quantity: async (params: any) => mockResponse({ success: true }),
+
+  update_menu_items_schema: async (params: any) => mockResponse({ success: true }),
+
+  update_menu_items_with_ai_fields: async (params: any) => mockResponse({ success: true }),
+
+  update_menu_items_with_ai_fields2: async (params: any) => mockResponse({ success: true }),
+
+  update_pos_desktop: async (params: any) => mockResponse({ success: true }),
+
+  update_pos_table_status: async (params: any) => mockResponse({ success: true }),
+
+  update_print_job_status: async (params: any) => mockResponse({ success: true }),
+
+  update_print_queue_job_status: async (params: any) => mockResponse({ success: true }),
+
+  update_protein_type: async (params: any) => mockResponse({ success: true }),
+
+  update_service_charge_config: async (params: any) => mockResponse({ success: true }),
+
+  update_z_report_config: async (params: any) => {
+    console.log('⚙️ [app-compat] update_z_report_config called:', params);
+    try {
+      const { error } = await supabase
+        .from('z_report_config')
+        .upsert({ id: 1, ...params }, { onConflict: 'id' });
+
+      if (error) {
+        console.error('❌ [app-compat] update_z_report_config error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] update_z_report_config success');
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] update_z_report_config exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  upload_menu_item_image: async (params: any) => mockResponse({ success: true }),
+
+  upload_primary_agent_avatar: async (params: any) => mockResponse({ success: true }),
+
+  upload_release_asset: async (params: any) => mockResponse({ success: true }),
+
+  validate_avatar_limit: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_code_standard: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_code_unique: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_customization: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_menu_item: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_order: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_reference_system: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  validate_structured_prompts: async (params: any) => mockResponse({ valid: true, success: true }),
+
+  verify_cart_ai_schema: async (params: any) => mockResponse({ success: true }),
+
+  verify_category_migration: async (params: any) => mockResponse({ success: true }),
+
+  verify_database_procedures: async (params: any) => mockResponse({ success: true }),
+
+  verify_execute_sql_rpc: async (params: any) => mockResponse({ success: true }),
+
+  verify_migration: async (params: any) => mockResponse({ success: true }),
+
+  verify_password_with_device: async (params: any) => mockResponse({ success: true }),
+
+  verify_schema: async (params: any) => mockResponse({ success: true }),
+
+  verify_simple_migration: async (params: any) => mockResponse({ success: true }),
+
+  verify_terminal_payment_schema: async (params: any) => mockResponse({ success: true }),
+
+  verify_trigger_setup: async (params: any) => mockResponse({ success: true }),
+
+  verify_variant_names: async (params: any) => mockResponse({ success: true }),
+
+  voice_agent_core_health: async (params: any) => mockResponse({ healthy: true }),
+
+  voice_session_health: async (params: any) => mockResponse({ healthy: true }),
+
+getBaseUrl: () => '',
 };
 
 // Database stub - Desktop uses Supabase directly

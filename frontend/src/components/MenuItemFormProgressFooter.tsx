@@ -2,7 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Save, X, Loader2, Info, CheckCircle2 } from 'lucide-react';
+import { Save, X, Loader2, Info, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { FormStep, calculateFormProgress, getNextIncompleteStep } from '../utils/menuFormSteps';
 import { toast } from 'sonner';
@@ -107,8 +108,8 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
   return (
     <div
       className={cn(
-        'bg-gray-900/95 backdrop-blur-md',
-        'border-t border-white/10',
+        'bg-[rgba(15,15,15,0.85)] backdrop-blur-2xl',
+        'border-t border-white/[0.07]',
         'shadow-2xl',
         className
       )}
@@ -122,7 +123,7 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
                 {canSave ? (
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 ) : (
-                  <Info className="w-4 h-4 text-purple-400" />
+                  <Info className="w-4 h-4 text-[#A78BFA]" />
                 )}
                 <span className="text-sm font-medium text-white">
                   {canSave ? (
@@ -142,12 +143,12 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
             <Progress
               value={progress}
               className={cn(
-                'h-2 bg-gray-800',
+                'h-2 bg-[rgba(30,30,30,0.6)]',
                 canSave && 'bg-green-900/30'
               )}
               indicatorClassName={cn(
                 'transition-all duration-500',
-                canSave ? 'bg-green-500' : 'bg-purple-500'
+                canSave ? 'bg-green-500' : 'bg-[#7C3AED]'
               )}
             />
           </div>
@@ -157,11 +158,11 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
         {!canSave && nextStep && (
           <Alert
             className={cn(
-              'mb-4 border-purple-500/30 bg-purple-500/10',
+              'mb-4 border-[rgba(124,58,237,0.3)] bg-[rgba(124,58,237,0.1)]',
               hasErrors && 'border-red-500/30 bg-red-500/10'
             )}
           >
-            <Info className="h-4 w-4 text-purple-400" />
+            <Info className="h-4 w-4 text-[#A78BFA]" />
             <AlertDescription className="text-sm">
               <div className="flex items-center justify-between">
                 <div>
@@ -183,7 +184,7 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
                     variant="ghost"
                     size="sm"
                     onClick={() => onScrollToStep(nextStep.id)}
-                    className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20"
+                    className="text-[#A78BFA] hover:text-white hover:bg-[rgba(124,58,237,0.15)]"
                   >
                     Go to section →
                   </Button>
@@ -213,11 +214,50 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
             variant="outline"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="border-white/20 hover:bg-white/5 text-white"
+            className="border-white/[0.1] hover:bg-white/[0.05] text-white"
           >
             <X className="mr-2 h-4 w-4" />
             Cancel
           </Button>
+
+          {/* Keyboard Shortcuts Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-white hover:bg-white/[0.05]"
+                aria-label="Keyboard shortcuts"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="center"
+              className="w-72 bg-[rgba(26,26,26,0.95)] border-white/[0.07] p-4 backdrop-blur-xl"
+            >
+              <h4 className="text-sm font-semibold text-white mb-3">Keyboard Shortcuts</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {[
+                  ['Ctrl+S', 'Save form'],
+                  ['Ctrl+Enter', 'Submit form'],
+                  ['Ctrl+D', 'Duplicate item'],
+                  ['Ctrl+Shift+R', 'Reset form'],
+                  ['Esc', 'Cancel'],
+                  ['Tab', 'Next field'],
+                ].map(([key, label]) => (
+                  <React.Fragment key={key}>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-gray-300 text-xs font-mono text-center">
+                      {key}
+                    </kbd>
+                    <span className="text-gray-400 text-xs">{label}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Save Button */}
           <Button
@@ -227,8 +267,8 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
             className={cn(
               'min-w-[200px] font-semibold',
               canSave && !hasErrors
-                ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
-                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                ? 'bg-[#7C3AED] hover:bg-[#5B21B6] text-white'
+                : 'bg-[rgba(30,30,30,0.6)] text-gray-500 cursor-not-allowed'
             )}
           >
             {isSubmitting ? (

@@ -21,6 +21,13 @@ export type OrderSource = 'WEBSITE' | 'CHATBOT' | 'APP';
 export type UrgencyLevel = 'NORMAL' | 'WARNING' | 'CRITICAL' | 'OVERDUE';
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+// Payment statuses that indicate payment has been confirmed
+const PAID_STATUSES = new Set(['PAID', 'AUTHORIZED', 'CAPTURED']);
+
+function isPaymentConfirmed(paymentStatus: string | undefined): boolean {
+  return PAID_STATUSES.has((paymentStatus || '').toUpperCase());
+}
+
 export interface OrderItem {
   id: string;
   name: string;
@@ -65,6 +72,12 @@ interface OnlineOrdersRealtimeState {
   lastSync: Date | null;
   connectionStatus: ConnectionStatus;
   subscriptionChannel: any | null;
+
+  // Timers for recovery and urgency
+  _syncInterval: ReturnType<typeof setInterval> | null;
+  _urgencyInterval: ReturnType<typeof setInterval> | null;
+  _reconnectHandler: (() => void) | null;
+  _retryCount: number;
 
   // Sound settings
   soundEnabled: boolean;
@@ -131,8 +144,31 @@ function mapApiStatus(apiStatus: string): OnlineOrderStatus {
     'collected': 'COMPLETED',
     'CANCELLED': 'CANCELLED',
     'cancelled': 'CANCELLED',
+    'PAYMENT_FAILED': 'CANCELLED',
+    'payment_failed': 'CANCELLED',
   };
-  return statusMap[apiStatus] || 'NEW';
+
+  const mapped = statusMap[apiStatus];
+  if (!mapped) {
+    console.warn(`[OnlineOrders] Unknown order status: "${apiStatus}" — defaulting to NEW`);
+  }
+  return mapped || 'NEW';
+}
+
+function calculateUrgency(
+  minutesWaiting: number,
+  minutesUntilTimeout: number | undefined
+): UrgencyLevel {
+  if (minutesUntilTimeout !== undefined) {
+    if (minutesUntilTimeout <= 0) return 'OVERDUE';
+    if (minutesUntilTimeout <= 2) return 'CRITICAL';
+    if (minutesUntilTimeout <= 5) return 'WARNING';
+  } else if (minutesWaiting > 8) {
+    return 'CRITICAL';
+  } else if (minutesWaiting > 5) {
+    return 'WARNING';
+  }
+  return 'NORMAL';
 }
 
 function transformOrder(rawOrder: any): OnlineOrder {
@@ -148,21 +184,7 @@ function transformOrder(rawOrder: any): OnlineOrder {
     ? Math.floor((acceptanceDeadline.getTime() - now.getTime()) / 60000)
     : undefined;
 
-  // Calculate urgency level
-  let urgencyLevel: UrgencyLevel = 'NORMAL';
-  if (minutesUntilTimeout !== undefined) {
-    if (minutesUntilTimeout <= 0) {
-      urgencyLevel = 'OVERDUE';
-    } else if (minutesUntilTimeout <= 2) {
-      urgencyLevel = 'CRITICAL';
-    } else if (minutesUntilTimeout <= 5) {
-      urgencyLevel = 'WARNING';
-    }
-  } else if (minutesWaiting > 8) {
-    urgencyLevel = 'CRITICAL';
-  } else if (minutesWaiting > 5) {
-    urgencyLevel = 'WARNING';
-  }
+  const urgencyLevel = calculateUrgency(minutesWaiting, minutesUntilTimeout);
 
   return {
     id: rawOrder.id,
@@ -204,6 +226,10 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
   lastSync: null,
   connectionStatus: 'disconnected',
   subscriptionChannel: null,
+  _syncInterval: null,
+  _urgencyInterval: null,
+  _reconnectHandler: null,
+  _retryCount: 0,
   soundEnabled: true,
   soundVolume: 75,
   lastNotifiedCount: 0,
@@ -261,8 +287,12 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
         const ordersMap: Record<string, OnlineOrder> = {};
         data.orders.forEach((rawOrder: any) => {
           const order = transformOrder(rawOrder);
-          // Only include non-completed orders
-          if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') {
+          // Only include non-completed orders with confirmed payment
+          if (
+            order.status !== 'COMPLETED' &&
+            order.status !== 'CANCELLED' &&
+            isPaymentConfirmed(order.paymentStatus)
+          ) {
             ordersMap[order.id] = order;
           }
         });
@@ -445,9 +475,19 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
 
   // Initialize realtime subscription
   initializeRealtime: () => {
+    // Clean up previous resources
     const existingChannel = get().subscriptionChannel;
     if (existingChannel) {
       supabase.removeChannel(existingChannel);
+    }
+    if (get()._syncInterval) {
+      clearInterval(get()._syncInterval!);
+    }
+    if (get()._urgencyInterval) {
+      clearInterval(get()._urgencyInterval!);
+    }
+    if (get()._reconnectHandler && typeof window !== 'undefined') {
+      window.removeEventListener('supabase-reconnected', get()._reconnectHandler!);
     }
 
     set({ connectionStatus: 'connecting' });
@@ -463,7 +503,7 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
           filter: 'order_source=eq.CUSTOMER_ONLINE_ORDER',
         },
         (payload) => {
-          console.log('New online order received:', payload);
+          console.log('[OnlineOrders] New order received:', payload.new?.order_number);
           get().handleOrderInsert(payload.new);
         }
       )
@@ -476,7 +516,7 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
           filter: 'order_source=eq.CUSTOMER_ONLINE_ORDER',
         },
         (payload) => {
-          console.log('Online order updated:', payload);
+          console.log('[OnlineOrders] Order updated:', payload.new?.order_number);
           get().handleOrderUpdate(payload.new);
         }
       )
@@ -489,22 +529,72 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
           filter: 'order_source=eq.CUSTOMER_ONLINE_ORDER',
         },
         (payload) => {
-          console.log('Online order deleted:', payload);
+          console.log('[OnlineOrders] Order deleted:', (payload.old as any)?.id);
           get().handleOrderDelete((payload.old as any).id);
         }
       )
       .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
+        console.log('[OnlineOrders] Realtime subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          set({ connectionStatus: 'connected' });
+          set({ connectionStatus: 'connected', _retryCount: 0 });
         } else if (status === 'CHANNEL_ERROR') {
           set({ connectionStatus: 'error' });
+          // Retry with exponential backoff (max 30s)
+          const retryCount = get()._retryCount;
+          const delay = Math.min(5000 * Math.pow(2, retryCount), 30000);
+          console.warn(`[OnlineOrders] Channel error — retrying in ${delay}ms (attempt ${retryCount + 1})`);
+          set({ _retryCount: retryCount + 1 });
+          setTimeout(() => get().initializeRealtime(), delay);
         } else if (status === 'CLOSED') {
           set({ connectionStatus: 'disconnected' });
         }
       });
 
     set({ subscriptionChannel: channel });
+
+    // --- Fix 2: Periodic sync fallback (every 2 minutes) ---
+    const syncInterval = setInterval(() => {
+      console.log('[OnlineOrders] Periodic sync — fetching orders');
+      get().fetchOrders();
+    }, 120_000);
+
+    // --- Fix 3: Urgency recalculation (every 30 seconds) ---
+    const urgencyInterval = setInterval(() => {
+      const currentOrders = get().orders;
+      const orderIds = Object.keys(currentOrders);
+      if (orderIds.length === 0) return;
+
+      const now = new Date();
+      const updatedOrders: Record<string, OnlineOrder> = {};
+
+      for (const [id, order] of Object.entries(currentOrders)) {
+        const minutesWaiting = Math.floor((now.getTime() - order.createdAt.getTime()) / 60000);
+        const minutesUntilTimeout = order.acceptanceDeadline
+          ? Math.floor((order.acceptanceDeadline.getTime() - now.getTime()) / 60000)
+          : undefined;
+        const urgencyLevel = calculateUrgency(minutesWaiting, minutesUntilTimeout);
+
+        updatedOrders[id] = { ...order, minutesWaiting, minutesUntilTimeout, urgencyLevel };
+      }
+
+      set({ orders: updatedOrders });
+    }, 30_000);
+
+    // --- Fix 2: Listen for supabase reconnect events (sleep/wake recovery) ---
+    const reconnectHandler = () => {
+      console.log('[OnlineOrders] Supabase reconnected — reinitializing');
+      get().initializeRealtime();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('supabase-reconnected', reconnectHandler);
+    }
+
+    set({
+      subscriptionChannel: channel,
+      _syncInterval: syncInterval,
+      _urgencyInterval: urgencyInterval,
+      _reconnectHandler: reconnectHandler,
+    });
 
     // Initial fetch
     get().fetchOrders();
@@ -515,13 +605,35 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
     const channel = get().subscriptionChannel;
     if (channel) {
       supabase.removeChannel(channel);
-      set({ subscriptionChannel: null, connectionStatus: 'disconnected' });
     }
+    if (get()._syncInterval) {
+      clearInterval(get()._syncInterval!);
+    }
+    if (get()._urgencyInterval) {
+      clearInterval(get()._urgencyInterval!);
+    }
+    if (get()._reconnectHandler && typeof window !== 'undefined') {
+      window.removeEventListener('supabase-reconnected', get()._reconnectHandler!);
+    }
+    set({
+      subscriptionChannel: null,
+      connectionStatus: 'disconnected',
+      _syncInterval: null,
+      _urgencyInterval: null,
+      _reconnectHandler: null,
+      _retryCount: 0,
+    });
   },
 
   // Handle new order from realtime
   handleOrderInsert: async (rawOrder: any) => {
     const order = transformOrder(rawOrder);
+
+    // Don't show orders until payment is confirmed
+    if (!isPaymentConfirmed(rawOrder.payment_status)) {
+      console.log(`[OnlineOrders] Order ${order.orderNumber} skipped — payment_status: ${rawOrder.payment_status} (waiting for payment confirmation)`);
+      return;
+    }
 
     // Only add non-completed orders
     if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') {
@@ -550,7 +662,7 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
           const autoPrintEnabled = onlineOrdersSettings?.processing?.autoPrintOnAccept ?? true;
 
           if (autoPrintEnabled) {
-            console.log('Auto-printing kitchen ticket for auto-approved order:', order.orderNumber);
+            console.log('[OnlineOrders] Auto-printing kitchen ticket for auto-approved order:', order.orderNumber);
             await createPrintJobForOrder({
               id: order.id,
               orderNumber: order.orderNumber,
@@ -568,14 +680,14 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
             });
           }
         } catch (error) {
-          console.error('Failed to auto-print order:', error);
+          console.error('[OnlineOrders] Failed to auto-print order:', error);
         }
       }
     }
   },
 
   // Handle order update from realtime
-  handleOrderUpdate: (rawOrder: any) => {
+  handleOrderUpdate: async (rawOrder: any) => {
     const order = transformOrder(rawOrder);
 
     if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
@@ -585,8 +697,60 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
         delete newOrders[order.id];
         return { orders: newOrders };
       });
-    } else {
-      // Update existing order
+      return;
+    }
+
+    // Check if this order was previously hidden (unpaid) and is now paid
+    const wasInStore = !!get().orders[order.id];
+    const paymentNowConfirmed = isPaymentConfirmed(rawOrder.payment_status);
+
+    if (!wasInStore && paymentNowConfirmed) {
+      // Order just got paid — treat as new arrival (play sound, add to store)
+      console.log(`[OnlineOrders] Order ${order.orderNumber} payment confirmed — adding to POS`);
+      set(state => ({
+        orders: {
+          ...state.orders,
+          [order.id]: order,
+        },
+      }));
+
+      // Play notification sound
+      if ((order.status === 'NEW' || order.status === 'CONFIRMED') && get().soundEnabled) {
+        playOnlineOrderMP3(get().soundVolume);
+      }
+
+      // Auto-print for auto-approved orders
+      if (order.status === 'CONFIRMED') {
+        try {
+          const settingsResponse = await brain.get_restaurant_settings();
+          const settingsData = await settingsResponse.json();
+          const onlineOrdersSettings = settingsData?.settings?.onlineOrders;
+          const autoPrintEnabled = onlineOrdersSettings?.processing?.autoPrintOnAccept ?? true;
+
+          if (autoPrintEnabled) {
+            console.log('[OnlineOrders] Auto-printing kitchen ticket for paid order:', order.orderNumber);
+            await createPrintJobForOrder({
+              id: order.id,
+              orderNumber: order.orderNumber,
+              orderType: order.orderType,
+              items: order.items,
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              customerEmail: order.customerEmail,
+              deliveryAddress: order.deliveryAddress,
+              subtotal: order.subtotal,
+              deliveryFee: order.deliveryFee,
+              total: order.total,
+              specialInstructions: order.specialInstructions,
+              allergenNotes: order.allergenNotes,
+            });
+          }
+        } catch (error) {
+          console.error('[OnlineOrders] Failed to auto-print order:', error);
+        }
+      }
+    } else if (wasInStore) {
+      // Normal update — order was already visible, just update its data
       set(state => ({
         orders: {
           ...state.orders,
@@ -594,6 +758,7 @@ export const useOnlineOrdersRealtimeStore = create<OnlineOrdersRealtimeState>((s
         },
       }));
     }
+    // If not in store and not paid, silently ignore the update
   },
 
   // Handle order delete from realtime

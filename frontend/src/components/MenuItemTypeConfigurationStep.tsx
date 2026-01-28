@@ -25,7 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { colors } from 'utils/designSystem';
+// Admin portal purple from InternalDesignSystem
+const ADMIN_PURPLE = '#7C3AED';
 import { cn } from '@/lib/utils';
 import type { MenuItemConfiguration, PricingMode } from 'utils/menuItemConfiguration';
 
@@ -52,7 +53,7 @@ const ITEM_TYPES = [
     title: 'Food',
     description: 'Starters, mains, sides',
     icon: UtensilsCrossed,
-    color: colors.brand.purple,
+    color: ADMIN_PURPLE,
   },
   {
     id: 'drinks_wine' as ItemType,
@@ -134,7 +135,7 @@ export function MenuItemTypeConfigurationStep({
   const selectedPricingInfo = PRICING_MODES.find((p) => p.id === selectedPricingMode);
 
   return (
-    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'rgba(124, 93, 250, 0.2)' }}>
+    <div className="border border-[rgba(124,58,237,0.2)] rounded-lg overflow-hidden">
       {/* Header - always visible */}
       <button
         type="button"
@@ -142,8 +143,8 @@ export function MenuItemTypeConfigurationStep({
         className={cn(
           "w-full flex items-center justify-between p-4 transition-colors",
           isExpanded
-            ? "bg-[rgba(124,93,250,0.1)]"
-            : "bg-[rgba(124,93,250,0.05)] hover:bg-[rgba(124,93,250,0.08)]"
+            ? "bg-[rgba(124,58,237,0.1)]"
+            : "bg-[rgba(124,58,237,0.05)] hover:bg-[rgba(124,58,237,0.08)]"
         )}
       >
         <div className="flex items-center gap-3">
@@ -152,7 +153,7 @@ export function MenuItemTypeConfigurationStep({
               "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
               isComplete
                 ? "bg-emerald-500 text-white"
-                : "bg-[rgba(124,93,250,0.3)] text-white"
+                : "bg-[rgba(124,58,237,0.3)] text-white"
             )}
           >
             {isComplete ? <Check className="h-4 w-4" /> : "1"}
@@ -207,13 +208,13 @@ export function MenuItemTypeConfigurationStep({
                     className={cn(
                       "relative p-4 rounded-lg border-2 transition-all text-center",
                       isSelected
-                        ? "border-[#7C5DFA] bg-[rgba(124,93,250,0.15)]"
-                        : "border-[rgba(255,255,255,0.1)] hover:border-[rgba(124,93,250,0.4)] bg-[rgba(30,30,30,0.5)]",
+                        ? "border-[#7C3AED] bg-[rgba(124,58,237,0.15)]"
+                        : "border-[rgba(255,255,255,0.1)] hover:border-[rgba(124,58,237,0.4)] bg-[rgba(30,30,30,0.5)]",
                       isLocked && "opacity-60 cursor-not-allowed"
                     )}
                   >
                     {isSelected && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#7C5DFA] flex items-center justify-center">
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#7C3AED] flex items-center justify-center">
                         <Check className="h-3 w-3 text-white" />
                       </div>
                     )}
@@ -248,20 +249,20 @@ export function MenuItemTypeConfigurationStep({
                       className={cn(
                         "relative p-4 rounded-lg border-2 transition-all text-left",
                         isSelected
-                          ? "border-[#7C5DFA] bg-[rgba(124,93,250,0.15)]"
-                          : "border-[rgba(255,255,255,0.1)] hover:border-[rgba(124,93,250,0.4)] bg-[rgba(30,30,30,0.5)]",
+                          ? "border-[#7C3AED] bg-[rgba(124,58,237,0.15)]"
+                          : "border-[rgba(255,255,255,0.1)] hover:border-[rgba(124,58,237,0.4)] bg-[rgba(30,30,30,0.5)]",
                         isLocked && "opacity-60 cursor-not-allowed"
                       )}
                     >
                       {isSelected && (
-                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#7C5DFA] flex items-center justify-center">
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#7C3AED] flex items-center justify-center">
                           <Check className="h-3 w-3 text-white" />
                         </div>
                       )}
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-medium text-white text-sm">{mode.title}</h4>
                         {mode.recommended && (
-                          <Badge className="bg-[#7C5DFA] text-white text-[10px] px-1.5 py-0">
+                          <Badge className="bg-[#7C3AED] text-white text-[10px] px-1.5 py-0">
                             Recommended
                           </Badge>
                         )}

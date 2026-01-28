@@ -33,7 +33,7 @@ import { toast } from 'sonner';
 import { VariantDescriptionField } from 'components/VariantDescriptionField';
 import { VariantImageField } from 'components/VariantImageField';
 import { MenuItemPricing } from 'components/MenuItemPricing';
-import { AllergenSelector } from 'components/AllergenSelector';
+import { AllergenSelector, normalizeAllergenData } from 'components/AllergenSelector';
 import { cn } from '@/lib/utils';
 import { 
   generateVariantName, 
@@ -70,7 +70,7 @@ export interface MenuVariant {
   is_nut_free?: boolean;
   featured?: boolean;
   // 🆕 Food-specific details (variant-level)
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergen_notes?: string;
 }
 
@@ -871,8 +871,8 @@ export const VariantRow: React.FC<VariantRowProps> = ({
                   Allergens
                 </Label>
                 <AllergenSelector
-                  selectedAllergens={variant.allergens || []}
-                  onAllergensChange={(allergens) => onUpdate('allergens', allergens)}
+                  allergenData={normalizeAllergenData(variant.allergens)}
+                  onAllergenDataChange={(data) => onUpdate('allergens', data)}
                   allergenNotes={variant.allergen_notes || ''}
                   onAllergenNotesChange={(notes) => onUpdate('allergen_notes', notes)}
                 />

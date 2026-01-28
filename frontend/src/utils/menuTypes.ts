@@ -115,7 +115,7 @@ export interface ItemVariant {
   spiceLevel?: number; // CamelCase alias
   spice_level_override?: number; // Variant-specific spice override
   spiceLevelOverride?: number; // CamelCase alias
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergen_notes?: string;
   allergenNotes?: string; // CamelCase alias
   dietary_tags_override?: string[];

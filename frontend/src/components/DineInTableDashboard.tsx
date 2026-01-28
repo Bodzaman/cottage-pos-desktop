@@ -14,7 +14,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Loader2, Users, Clock, Armchair } from 'lucide-react';
 import { toast } from 'sonner';
-import { QSAITheme } from '../utils/QSAIDesign';
+import { QSAITheme, posGlassPanel } from '../utils/QSAIDesign';
 import { TableDashboardCard } from './TableDashboardCard';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
@@ -50,7 +50,7 @@ interface DineInTableDashboardProps {
  */
 function TableDashboardSkeleton() {
   return (
-    <div className="h-full w-full flex items-center justify-center bg-[#121212]">
+    <div className="h-full w-full flex items-center justify-center rounded-xl" style={{ ...posGlassPanel }}>
       <div className="flex flex-col items-center gap-3">
         <Loader2
           className="h-8 w-8 animate-spin"
@@ -69,7 +69,7 @@ function TableDashboardSkeleton() {
  */
 function EmptyTablesState() {
   return (
-    <div className="h-full w-full flex items-center justify-center bg-[#121212]">
+    <div className="h-full w-full flex items-center justify-center rounded-xl" style={{ ...posGlassPanel }}>
       <div className="text-center">
         <p
           className="text-lg font-semibold"
@@ -132,8 +132,10 @@ function FloorSummaryHeader({ enrichedTables }: FloorSummaryProps) {
     <div
       className="flex items-center justify-center gap-8 py-3 px-4 mb-4 rounded-lg"
       style={{
-        background: 'rgba(124, 93, 250, 0.08)',
-        border: '1px solid rgba(124, 93, 250, 0.2)'
+        background: 'rgba(124, 93, 250, 0.12)',
+        backdropFilter: 'blur(6px)',
+        border: '1px solid rgba(124, 93, 250, 0.25)',
+        boxShadow: '0 4px 12px rgba(124, 93, 250, 0.1)',
       }}
     >
       {/* Tables Seated */}
@@ -351,8 +353,8 @@ export function DineInTableDashboard({
     <div
       className="h-full w-full overflow-hidden flex justify-center"
       style={{
-        background: '#121212',
-        borderRadius: '8px'
+        ...posGlassPanel,
+        borderRadius: '12px',
       }}
     >
       {/* Centered Container with Max Width */}

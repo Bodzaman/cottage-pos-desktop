@@ -104,13 +104,17 @@ export function OnlineOrderCard({
   return (
     <Card
       className={cn(
-        'relative overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md',
+        'relative overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg',
         'border-l-4',
         URGENCY_BORDER_COLORS[order.urgencyLevel],
         order.urgencyLevel === 'CRITICAL' && 'animate-pulse',
         order.urgencyLevel === 'OVERDUE' && 'ring-2 ring-red-500/50',
         isSelected && 'ring-2 ring-purple-500 bg-purple-500/5'
       )}
+      style={{
+        background: 'linear-gradient(135deg, rgba(20,20,20,0.95) 0%, rgba(28,28,28,0.9) 100%)',
+        borderColor: 'rgba(124,93,250,0.1)',
+      }}
       onClick={handleClick}
     >
       <CardContent className="p-3 space-y-2">

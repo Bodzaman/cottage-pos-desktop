@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useSimpleAuth } from "utils/simple-auth-context";
 import { useWebsiteData } from "utils/useWebsiteData";
+import { SEO } from "components/SEO";
+import { PAGE_SEO } from "utils/seoData";
 
 export default function About() {
   const { isAdmin } = useSimpleAuth();
@@ -33,6 +35,7 @@ export default function About() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PremiumTheme.colors.background.primary, color: PremiumTheme.colors.text.primary }}>
+      <SEO title={PAGE_SEO.about.title} description={PAGE_SEO.about.description} path="/about" />
       {/* Navbar */}
       <div className="Navbar">
         <UniversalHeader 

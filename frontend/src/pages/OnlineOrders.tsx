@@ -49,6 +49,8 @@ import { ErrorBoundary } from 'components/ErrorBoundary';
 import { OnlineOrdersErrorFallback } from 'components/OnlineOrdersErrorFallback';
 import { logError, createCartErrorContext } from 'utils/errorLogger';
 import { RestaurantStatusBanner } from 'components/RestaurantStatusBanner';
+import { SEO } from 'components/SEO';
+import { PAGE_SEO } from 'utils/seoData';
 
 // Add view mode type
 type ViewMode = 'gallery' | 'compact';
@@ -1114,6 +1116,7 @@ export default function OnlineOrders() {
           color: PremiumTheme.colors.text.primary
         }}
       >
+        <SEO title={PAGE_SEO.onlineOrders.title} description={PAGE_SEO.onlineOrders.description} path="/online-orders" />
         {/* Universal Header with PUBLIC_NAV context for full navigation - Z-INDEX: 50 */}
         <div
           ref={headerRef}

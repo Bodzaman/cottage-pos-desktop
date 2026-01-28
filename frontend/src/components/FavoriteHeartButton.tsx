@@ -104,12 +104,12 @@ export function FavoriteHeartButton({
       onClick={toggleFavorite}
       disabled={isLoading}
       className={`
-        ${sizeClasses[size]} 
-        rounded-md bg-black/50 transition-all duration-200 
+        ${sizeClasses[size]}
+        rounded-full bg-white/15 backdrop-blur-md border border-white/25 transition-all duration-200
         flex items-center justify-center
         ${ isItemFavorited
-          ? 'text-red-500 hover:bg-black/60' 
-          : 'text-white/80 hover:text-white hover:bg-black/60'
+          ? 'text-red-500 hover:bg-white/25'
+          : 'text-white hover:bg-white/25'
         }
         ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}
         ${className}

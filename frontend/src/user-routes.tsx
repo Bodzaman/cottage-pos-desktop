@@ -37,6 +37,12 @@ const Unauthorized = lazy(() => import("./pages/Unauthorized.tsx"));
 const UpdateKDS = lazy(() => import("./pages/UpdateKDS.tsx"));
 const UpdatePOSDesktop = lazy(() => import("./pages/UpdatePOSDesktop.tsx"));
 const WebsiteManagement = lazy(() => import("./pages/WebsiteManagement.tsx"));
+const CustomerDisplay = lazy(() => import("./pages/CustomerDisplay.tsx"));
+const FAQ = lazy(() => import("./pages/FAQ.tsx"));
+const Allergens = lazy(() => import("./pages/Allergens.tsx"));
+const Blog = lazy(() => import("./pages/Blog.tsx"));
+const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
+const ZReport = lazy(() => import("./pages/ZReport.tsx"));
 export const userRoutes: RouteObject[] = [
 
 
@@ -93,5 +99,10 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/update-pos-desktop", element: <UpdatePOSDesktop />},
 	{ path: "/updateposdesktop", element: <UpdatePOSDesktop />},
 	{ path: "/website-management", element: <WebsiteManagement />},
+	{ path: "/customer-display", element: <CustomerDisplay />},
+	{ path: "/faq", element: <FAQ />},
+	{ path: "/allergens", element: <Allergens />},
+	{ path: "/blog", element: <Blog />},
+	{ path: "/blog/:slug", element: <BlogPost />},
 
 ];

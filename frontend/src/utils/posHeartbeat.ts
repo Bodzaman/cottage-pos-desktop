@@ -13,6 +13,7 @@
  * - Runs in both Electron and web browser (for dev/testing)
  */
 
+import brain from 'brain';
 import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager';
 
 // ============================================================================
@@ -21,9 +22,6 @@ import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager'
 
 /** How often to send heartbeat (in milliseconds) */
 const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 60 seconds
-
-/** Backend heartbeat endpoint */
-const HEARTBEAT_ENDPOINT = '/routes/pos/heartbeat';
 
 // ============================================================================
 // STATE
@@ -48,20 +46,14 @@ async function sendHeartbeat(): Promise<boolean> {
       return false;
     }
 
-    const response = await fetch(HEARTBEAT_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}),
-    });
+    const response = await (brain as any).pos_heartbeat({});
+    const data = await response.json();
 
-    if (!response.ok) {
-      console.warn(`[Heartbeat] Failed: ${response.status} ${response.statusText}`);
+    if (!data.success) {
+      console.warn('[Heartbeat] Failed:', data.message || 'Unknown error');
       return false;
     }
 
-    const data = await response.json();
     console.debug('[Heartbeat] Sent successfully:', data.last_heartbeat_at);
     return true;
   } catch (error) {

@@ -39,11 +39,11 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
   onResetForm
 }) => {
   return (
-    <Card className="mb-6 bg-gray-900/50 border-purple-500/20">
+    <Card className="mb-6 bg-[rgba(26,26,26,0.6)] backdrop-blur-md border border-white/[0.07]">
       <CardContent className="pt-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-400" aria-hidden="true" />
+            <Sparkles className="h-5 w-5 text-[#A78BFA]" aria-hidden="true" />
             <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
           </div>
           <div className="flex items-center gap-2" role="toolbar" aria-label="Menu item quick actions">
@@ -54,7 +54,7 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
                 variant="outline"
                 size="sm"
                 onClick={onDuplicateItem}
-                className="border-purple-500/30 hover:bg-purple-500/10"
+                className="border-[rgba(124,58,237,0.3)] hover:bg-[rgba(124,58,237,0.1)]"
                 aria-label="Duplicate this menu item"
               >
                 <Copy className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -68,7 +68,7 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
               variant="outline"
               size="sm"
               onClick={onSaveAsTemplate}
-              className="border-purple-500/30 hover:bg-purple-500/10"
+              className="border-[rgba(124,58,237,0.3)] hover:bg-[rgba(124,58,237,0.1)]"
               aria-label="Save current item as template for future use"
             >
               <Save className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -83,7 +83,7 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-purple-500/30 hover:bg-purple-500/10"
+                    className="border-[rgba(124,58,237,0.3)] hover:bg-[rgba(124,58,237,0.1)]"
                     aria-label="Load saved template"
                     aria-haspopup="menu"
                   >
@@ -92,15 +92,15 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
                     <ChevronDown className="h-4 w-4 ml-2" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 w-64">
+                <DropdownMenuContent align="end" className="bg-[rgba(26,26,26,0.95)] border-white/[0.07] w-64">
                   {savedTemplates.map((template) => (
                     <DropdownMenuItem
                       key={template.id}
                       onClick={() => onLoadTemplate(template.id)}
-                      className="text-white hover:bg-purple-500/20 cursor-pointer flex items-center justify-between"
+                      className="text-white hover:bg-white/[0.05] cursor-pointer flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
-                        <FileBox className="h-4 w-4 text-purple-400" aria-hidden="true" />
+                        <FileBox className="h-4 w-4 text-[#A78BFA]" aria-hidden="true" />
                         <span>{template.name}</span>
                       </div>
                       <Button
@@ -125,7 +125,7 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-purple-500/30 hover:bg-purple-500/10"
+                  className="border-[rgba(124,58,237,0.3)] hover:bg-[rgba(124,58,237,0.1)]"
                   aria-label="More actions menu"
                   aria-haspopup="menu"
                 >
@@ -133,17 +133,17 @@ export const BulkActionsToolbar = React.memo<BulkActionsToolbarProps>(({
                   <ChevronDown className="h-4 w-4 ml-2" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700">
+              <DropdownMenuContent align="end" className="bg-[rgba(26,26,26,0.95)] border-white/[0.07]">
                 {!hasVariants && (
                   <>
                     <DropdownMenuItem
                       onClick={onCopyPricesToAll}
-                      className="text-white hover:bg-purple-500/20 cursor-pointer"
+                      className="text-white hover:bg-white/[0.05] cursor-pointer"
                     >
-                      <Copy className="h-4 w-4 mr-2 text-purple-400" aria-hidden="true" />
+                      <Copy className="h-4 w-4 mr-2 text-[#A78BFA]" aria-hidden="true" />
                       Copy Prices to All Types
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-gray-700" />
+                    <DropdownMenuSeparator className="bg-white/[0.07]" />
                   </>
                 )}
                 <DropdownMenuItem

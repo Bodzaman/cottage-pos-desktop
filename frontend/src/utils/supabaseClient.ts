@@ -229,3 +229,69 @@ export const getSupabaseConfig = () => {
     connectionFailed: supabaseConnectionFailed
   };
 };
+
+// ============================================================================
+// SLEEP/WAKE RECONNECTION (Electron only)
+// ============================================================================
+
+/**
+ * Reconnect Supabase realtime channels after system resume from sleep.
+ *
+ * When a laptop sleeps, WebSocket connections go stale. On wake, Supabase
+ * Realtime won't automatically reconnect — channels silently stop receiving
+ * updates. This function tears down all channels and lets consumers re-subscribe.
+ *
+ * Called automatically from the Electron preload bridge when the OS resumes.
+ */
+export const reconnectAfterSleep = async () => {
+  console.log('[Supabase] System resumed — reconnecting realtime channels');
+
+  if (!supabaseInstance) {
+    console.warn('[Supabase] No client instance to reconnect');
+    return;
+  }
+
+  try {
+    // 1. Remove all existing realtime channels (they're stale after sleep)
+    const channels = supabaseInstance.getChannels();
+    console.log(`[Supabase] Removing ${channels.length} stale channels`);
+    await supabaseInstance.removeAllChannels();
+
+    // 2. Verify the connection is still alive
+    const connected = await checkSupabaseConnection();
+    if (connected) {
+      console.log('[Supabase] Connection verified after resume');
+    } else {
+      console.warn('[Supabase] Connection check failed after resume — consumers should retry');
+    }
+
+    // 3. Dispatch event so all realtime consumers know to re-subscribe
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('supabase-reconnected'));
+    }
+  } catch (error) {
+    console.error('[Supabase] Error during reconnection:', error);
+  }
+};
+
+// Auto-register sleep/wake handler in Electron
+if (typeof window !== 'undefined' && 'electronAPI' in window) {
+  const electronAPI = (window as any).electronAPI;
+  if (electronAPI?.onSystemResume) {
+    electronAPI.onSystemResume(async () => {
+      // Small delay to let network interfaces come back up
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await reconnectAfterSleep();
+
+      // Re-trigger POS heartbeat so backend knows we're back online
+      try {
+        const { triggerHeartbeat } = await import('./posHeartbeat');
+        await triggerHeartbeat();
+        console.log('[Supabase] Heartbeat re-triggered after resume');
+      } catch {
+        // Heartbeat module may not be loaded in non-POS contexts
+      }
+    });
+    console.log('[Supabase] Registered sleep/wake reconnection handler');
+  }
+}

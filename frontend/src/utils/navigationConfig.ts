@@ -40,9 +40,10 @@ export const navigationConfigs: Record<NavigationContext, NavigationConfig> = {
     navigationItems: [
       { name: "Home", path: "/" },
       { name: "Order Online", path: "/online-orders" },
-      { name: "About", path: "/About" },
-      { name: "Gallery", path: "/Gallery" },
-      { name: "Contact", path: "/Contact" },
+      { name: "About", path: "/about" },
+      { name: "Gallery", path: "/gallery" },
+      { name: "Blog", path: "/blog" },
+      { name: "Contact", path: "/contact" },
     ],
   },
   

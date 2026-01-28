@@ -21,7 +21,7 @@ import { useState, useEffect, useCallback } from 'react';
 export interface RestaurantAvailability {
   /** Whether the POS system is online (received heartbeat recently) */
   isOnline: boolean;
-  /** Whether the restaurant is accepting orders (combined: manual AND online) */
+  /** Whether the restaurant is accepting orders (combined: manual AND online AND hours) */
   isAcceptingOrders: boolean;
   /** Raw manual toggle value (for staff control, independent of heartbeat) */
   manualAcceptingOrders: boolean;
@@ -35,6 +35,10 @@ export interface RestaurantAvailability {
   lastChecked?: Date | null;
   /** Seconds since last heartbeat (for debugging) */
   secondsSinceHeartbeat?: number | null;
+  /** Reason why ordering is unavailable (e.g., "manual_pause", "outside_hours") */
+  unavailableReason?: string | null;
+  /** Professional customer-facing message from backend */
+  displayMessage?: string | null;
 }
 
 // ============================================================================
@@ -73,6 +77,8 @@ export function useRestaurantAvailability(options?: {
     error: null,
     lastChecked: null,
     secondsSinceHeartbeat: null,
+    unavailableReason: null,
+    displayMessage: null,
   });
 
   /**
@@ -97,6 +103,8 @@ export function useRestaurantAvailability(options?: {
         error: null,
         lastChecked: new Date(),
         secondsSinceHeartbeat: data.seconds_since_heartbeat ?? null,
+        unavailableReason: data.unavailable_reason || null,
+        displayMessage: data.display_message || null,
       });
     } catch (err) {
       console.error('[useRestaurantAvailability] Error checking status:', err);

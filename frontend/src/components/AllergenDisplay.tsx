@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { getAllergenLabel, getAllergenEmoji } from './AllergenSelector';
 
 export interface AllergenDisplayProps {
-  allergens: string[] | string | null | undefined;
+  allergens: Record<string, "contains" | "may_contain"> | string[] | string | null | undefined;
   allergenNotes?: string | null;
   size?: 'sm' | 'md' | 'lg';
   showLabels?: boolean;
@@ -28,16 +28,20 @@ export function AllergenDisplay({
   compact = false
 }: AllergenDisplayProps) {
   // Handle empty or null allergens
-  if (!allergens || (Array.isArray(allergens) && allergens.length === 0)) {
+  const isEmpty = !allergens ||
+    (Array.isArray(allergens) && allergens.length === 0) ||
+    (typeof allergens === 'object' && !Array.isArray(allergens) && Object.keys(allergens).length === 0);
+
+  if (isEmpty) {
     // If no structured allergens but we have notes, show a generic allergen warning
     if (allergenNotes && allergenNotes.trim()) {
       return (
         <div className={`flex items-center gap-1 ${className}`}>
-          <Badge 
-            variant="destructive" 
+          <Badge
+            variant="destructive"
             className={`${getSizeClasses(size)} bg-red-100 text-red-800 border border-red-300`}
           >
-            ⚠️ {compact ? '' : 'Contains allergens'}
+            Contains allergens
           </Badge>
         </div>
       );
@@ -49,37 +53,54 @@ export function AllergenDisplay({
   if (typeof allergens === 'string') {
     return (
       <div className={`flex items-center gap-1 ${className}`}>
-        <Badge 
-          variant="destructive" 
+        <Badge
+          variant="destructive"
           className={`${getSizeClasses(size)} bg-red-100 text-red-800 border border-red-300`}
         >
-          ⚠️ {compact ? '' : showLabels ? allergens : 'Contains allergens'}
+          {compact ? '' : showLabels ? allergens : 'Contains allergens'}
         </Badge>
       </div>
     );
   }
 
-  // Handle structured allergen arrays
-  const allergenList = Array.isArray(allergens) ? allergens : [];
-  if (allergenList.length === 0) {
-    return null;
+  // Normalize to a list of { key, status } entries
+  let allergenEntries: Array<{ key: string; status: 'contains' | 'may_contain' }>;
+
+  if (Array.isArray(allergens)) {
+    // Legacy string array format: treat all as "contains"
+    allergenEntries = allergens.map(key => ({ key, status: 'contains' as const }));
+  } else {
+    // New JSONB format: { "gluten": "contains", "nuts": "may_contain" }
+    allergenEntries = Object.entries(allergens).map(([key, status]) => ({ key, status }));
   }
 
+  if (allergenEntries.length === 0) return null;
+
+  // Separate contains vs may_contain
+  const containsItems = allergenEntries.filter(e => e.status === 'contains');
+  const mayContainItems = allergenEntries.filter(e => e.status === 'may_contain');
+  const allItems = [...containsItems, ...mayContainItems];
+
   // Apply max display limit
-  const displayAllergens = maxDisplay ? allergenList.slice(0, maxDisplay) : allergenList;
-  const hiddenCount = maxDisplay && allergenList.length > maxDisplay ? allergenList.length - maxDisplay : 0;
+  const displayAllergens = maxDisplay ? allItems.slice(0, maxDisplay) : allItems;
+  const hiddenCount = maxDisplay && allItems.length > maxDisplay ? allItems.length - maxDisplay : 0;
 
   return (
     <div className={`flex items-center flex-wrap gap-1 ${className}`}>
-      {displayAllergens.map((allergenKey) => {
-        const emoji = getAllergenEmoji(allergenKey);
-        const label = getAllergenLabel(allergenKey);
-        
+      {displayAllergens.map(({ key, status }) => {
+        const emoji = getAllergenEmoji(key);
+        const label = getAllergenLabel(key);
+        const isContains = status === 'contains';
+
         return (
           <Badge
-            key={allergenKey}
+            key={key}
             variant="destructive"
-            className={`${getSizeClasses(size)} bg-red-100 text-red-800 border border-red-300 flex items-center gap-1`}
+            className={`${getSizeClasses(size)} flex items-center gap-1 ${
+              isContains
+                ? 'bg-red-100 text-red-800 border border-red-300'
+                : 'bg-amber-100 text-amber-800 border border-amber-300'
+            }`}
           >
             <span>{emoji}</span>
             {!compact && showLabels && (
@@ -88,7 +109,7 @@ export function AllergenDisplay({
           </Badge>
         );
       })}
-      
+
       {hiddenCount > 0 && (
         <Badge
           variant="outline"
@@ -97,13 +118,13 @@ export function AllergenDisplay({
           +{hiddenCount} more
         </Badge>
       )}
-      
+
       {allergenNotes && allergenNotes.trim() && !compact && (
         <Badge
           variant="outline"
           className={`${getSizeClasses(size)} text-amber-700 border-amber-400 bg-amber-50`}
         >
-          ℹ️ Notes
+          Notes
         </Badge>
       )}
     </div>

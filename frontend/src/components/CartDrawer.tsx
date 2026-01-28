@@ -1,15 +1,41 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from 'utils/cartStore';
 import { CartContent } from './CartContent';
 import { PremiumTheme } from 'utils/premiumTheme';
+import { useSimpleAuth } from 'utils/simple-auth-context';
 
-export function CartDrawer() {
+interface CartDrawerProps {
+  /** Optional menu items for recommendations */
+  menuItems?: any[];
+}
+
+export function CartDrawer({ menuItems }: CartDrawerProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useSimpleAuth();
   const isChatCartOpen = useCartStore((state) => state.isChatCartOpen);
   const closeChatCart = useCartStore((state) => state.closeChatCart);
   const totalItems = useCartStore((state) => state.totalItems);
+
+  // ✅ FIXED: Provide checkout handler
+  const handleCheckout = () => {
+    closeChatCart();
+    navigate('/online-orders?checkout=true');
+  };
+
+  // ✅ FIXED: Provide continue shopping handler
+  const handleContinueShopping = () => {
+    closeChatCart();
+  };
+
+  // ✅ FIXED: Provide sign-in handler
+  const handleSignIn = () => {
+    closeChatCart();
+    navigate('/login');
+  };
 
   return (
     <AnimatePresence>
@@ -27,7 +53,7 @@ export function CartDrawer() {
           data-testid="cart-drawer-instance"
         >
           {/* Header */}
-          <div 
+          <div
             className="flex items-center justify-between p-6 border-b"
             style={{ borderBottom: `1px solid ${PremiumTheme.colors.border.medium}` }}
           >
@@ -45,9 +71,16 @@ export function CartDrawer() {
             </Button>
           </div>
 
-          {/* Cart Content */}
+          {/* Cart Content - ✅ FIXED: Pass required props */}
           <div className="flex-1 overflow-y-auto">
-            <CartContent />
+            <CartContent
+              onCheckout={handleCheckout}
+              onContinueShopping={handleContinueShopping}
+              showContinueShopping={false}
+              menuItems={menuItems}
+              isAuthenticated={isAuthenticated}
+              onSignIn={handleSignIn}
+            />
           </div>
         </motion.div>
       )}

@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import brain from 'brain';
-import { MediaAsset } from './mediaLibraryUtils';
 import { HierarchicalMediaData } from './mediaHierarchyUtils';
 
 // Tab types for media library navigation

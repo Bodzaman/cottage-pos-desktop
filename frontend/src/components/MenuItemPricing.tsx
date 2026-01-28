@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { PoundSterling, Utensils, Truck, Home, Save, Copy, Undo2, Keyboard, AlertTriangle } from 'lucide-react';
-import { colors, cardStyle } from '../utils/designSystem';
 import { toast } from 'sonner';
 import { PriceNumberInput } from './PriceNumberInput';
 import { validatePriceConsistency } from '../utils/menuFormValidation';
@@ -134,33 +133,28 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
   };
 
   return (
-    <Card style={cardStyle}>
+    <Card className="bg-[rgba(26,26,26,0.8)] backdrop-blur-md border border-white/[0.07] rounded-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div 
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: colors.brand.gold }}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500"
               aria-hidden="true"
             >
               <PoundSterling className="w-4 h-4 text-white" />
             </div>
-            <CardTitle 
-              className="text-lg font-medium"
-              style={{ color: colors.text.primary }}
+            <CardTitle
+              className="text-lg font-medium text-white"
               id="pricing-title"
             >
               Pricing Configuration
             </CardTitle>
           </div>
-          
+
           {hasVariants && (
-            <Badge 
-              variant="outline" 
-              style={{ 
-                borderColor: colors.brand.turquoise,
-                color: colors.brand.turquoise 
-              }}
+            <Badge
+              variant="outline"
+              className="border-[#0EBAB1] text-[#0EBAB1]"
               aria-label="Pricing for item with variants"
             >
               Variants Enabled
@@ -178,36 +172,31 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
           id="keyboard-shortcuts"
         >
           <div className="flex items-center space-x-2 mb-2">
-            <Keyboard className="w-4 h-4 text-purple-400" aria-hidden="true" />
-            <Label className="text-sm font-medium text-purple-400">Keyboard Shortcuts</Label>
+            <Keyboard className="w-4 h-4 text-[#A78BFA]" aria-hidden="true" />
+            <Label className="text-sm font-medium text-[#A78BFA]">Keyboard Shortcuts</Label>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-            <div><kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">Tab</kbd> Navigate between price fields</div>
-            <div><kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">↑/↓</kbd> Adjust price by £0.25</div>
-            <div><kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">Scroll</kbd> Quick price adjustment</div>
-            <div><kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">1-9</kbd> Add quantity • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">Ctrl+D</kbd> Duplicate price • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">Ctrl+Z</kbd> Undo • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-300">Escape</kbd> Clear</div>
+            <div><kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">Tab</kbd> Navigate between price fields</div>
+            <div><kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">↑/↓</kbd> Adjust price by £0.25</div>
+            <div><kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">Scroll</kbd> Quick price adjustment</div>
+            <div><kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">1-9</kbd> Add quantity • <kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">Ctrl+D</kbd> Duplicate price • <kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">Ctrl+Z</kbd> Undo • <kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-300">Escape</kbd> Clear</div>
           </div>
         </div>
 
         {hasVariants && (
-          <div 
-            className="p-4 rounded-lg border"
-            style={{ 
-              backgroundColor: `${colors.brand.turquoise}20`,
-              borderColor: colors.brand.turquoise + '40'
-            }}
+          <div
+            className="p-4 rounded-lg border bg-[rgba(14,186,177,0.12)] border-[rgba(14,186,177,0.4)]"
             role="note"
             aria-label="Base pricing information for variants"
           >
-            <p className="font-medium" style={{ color: colors.text.primary }}>Note: This item has variants</p>
-            <p style={{ color: colors.text.primary }}>The prices below serve as base prices. Individual variants can override these prices.</p>
+            <p className="font-medium text-white">Note: This item has variants</p>
+            <p className="text-white">The prices below serve as base prices. Individual variants can override these prices.</p>
           </div>
         )}
 
         <div className="space-y-4">
-          <h4 
-            className="text-sm font-medium"
-            style={{ color: colors.text.secondary }}
+          <h4
+            className="text-sm font-medium text-gray-400"
             id="pricing-instructions"
           >
             Set prices for different order types (VAT inclusive)
@@ -222,15 +211,14 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
             {/* Dine In Price */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <Home className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
+                <Home className="w-4 h-4 text-gray-400" aria-hidden="true" />
                 <Label
                   htmlFor="price-dine-in"
-                  className="text-sm font-medium flex items-center gap-2"
-                  style={{ color: colors.text.secondary }}
+                  className="text-sm font-medium flex items-center gap-2 text-gray-400"
                 >
                   Dine In Price
                   {activeField === 'price_dine_in' && (
-                    <span className="text-xs text-purple-400" aria-label="Currently focused">●</span>
+                    <span className="text-xs text-[#A78BFA]" aria-label="Currently focused">●</span>
                   )}
                 </Label>
               </div>
@@ -251,15 +239,14 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
             {/* Takeaway Price */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <Utensils className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
+                <Utensils className="w-4 h-4 text-gray-400" aria-hidden="true" />
                 <Label
                   htmlFor="price-takeaway"
-                  className="text-sm font-medium flex items-center gap-2"
-                  style={{ color: colors.text.secondary }}
+                  className="text-sm font-medium flex items-center gap-2 text-gray-400"
                 >
                   Takeaway Price
                   {activeField === 'price_takeaway' && (
-                    <span className="text-xs text-purple-400" aria-label="Currently focused">●</span>
+                    <span className="text-xs text-[#A78BFA]" aria-label="Currently focused">●</span>
                   )}
                 </Label>
               </div>
@@ -280,15 +267,14 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
             {/* Delivery Price */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <Truck className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
+                <Truck className="w-4 h-4 text-gray-400" aria-hidden="true" />
                 <Label
                   htmlFor="price-delivery"
-                  className="text-sm font-medium flex items-center gap-2"
-                  style={{ color: colors.text.secondary }}
+                  className="text-sm font-medium flex items-center gap-2 text-gray-400"
                 >
                   Delivery Price
                   {activeField === 'price_delivery' && (
-                    <span className="text-xs text-purple-400" aria-label="Currently focused">●</span>
+                    <span className="text-xs text-[#A78BFA]" aria-label="Currently focused">●</span>
                   )}
                 </Label>
               </div>
@@ -338,25 +324,24 @@ export function MenuItemPricing({ pricing, hasVariants, onChange, errors }: Prop
 
         {/* Price Summary - Only show if any prices are set */}
         {(pricing.price_takeaway || pricing.price_dine_in || pricing.price_delivery) && (
-          <div 
-            className="p-4 rounded-lg" 
-            style={{ backgroundColor: colors.background.tertiary }}
+          <div
+            className="p-4 rounded-lg bg-surface-tertiary"
             role="region"
             aria-label="Price summary for all order types"
           >
-            <h4 className="text-sm font-medium mb-2" style={{ color: colors.text.primary }}>Price Summary</h4>
+            <h4 className="text-sm font-medium mb-2 text-white">Price Summary</h4>
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="text-center">
-                <p style={{ color: colors.text.secondary }}>Dine In</p>
-                <p className="font-semibold" style={{ color: colors.text.primary }} aria-label={`Dine in price: ${formatPrice(pricing.price_dine_in)} pounds`}>£{formatPrice(pricing.price_dine_in)}</p>
+                <p className="text-gray-400">Dine In</p>
+                <p className="font-semibold text-white" aria-label={`Dine in price: ${formatPrice(pricing.price_dine_in)} pounds`}>£{formatPrice(pricing.price_dine_in)}</p>
               </div>
               <div className="text-center">
-                <p style={{ color: colors.text.secondary }}>Takeaway</p>
-                <p className="font-semibold" style={{ color: colors.text.primary }} aria-label={`Takeaway price: ${formatPrice(pricing.price_takeaway)} pounds`}>£{formatPrice(pricing.price_takeaway)}</p>
+                <p className="text-gray-400">Takeaway</p>
+                <p className="font-semibold text-white" aria-label={`Takeaway price: ${formatPrice(pricing.price_takeaway)} pounds`}>£{formatPrice(pricing.price_takeaway)}</p>
               </div>
               <div className="text-center">
-                <p style={{ color: colors.text.secondary }}>Delivery</p>
-                <p className="font-semibold" style={{ color: colors.text.primary }} aria-label={`Delivery price: ${formatPrice(pricing.price_delivery)} pounds`}>£{formatPrice(pricing.price_delivery)}</p>
+                <p className="text-gray-400">Delivery</p>
+                <p className="font-semibold text-white" aria-label={`Delivery price: ${formatPrice(pricing.price_delivery)} pounds`}>£{formatPrice(pricing.price_delivery)}</p>
               </div>
             </div>
           </div>

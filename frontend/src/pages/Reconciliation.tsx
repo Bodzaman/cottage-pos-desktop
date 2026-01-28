@@ -1,18 +1,18 @@
 import React from 'react';
-import { colors, gridBackgroundStyle } from '../utils/designSystem';
-import { ManagementHeader } from '../components/ManagementHeader';
-import { ProtectedRoute } from '../utils/ProtectedRoute';
-import { AllOrdersView } from '../components/AllOrdersView';
+import ZReport from './ZReport';
 
+/**
+ * Reconciliation Page
+ *
+ * This page now renders the new Z-Report component for end-of-day reconciliation.
+ * The Z-Report provides:
+ * - Sales summary by channel (Dine-In, POS Takeaway, Online)
+ * - Payment breakdown (Cash vs Card)
+ * - Cash drawer reconciliation
+ * - Thermal printing support
+ *
+ * For the legacy AllOrdersView (order listing), use /all-orders instead.
+ */
 export default function Reconciliation() {
-  return (
-    <ProtectedRoute requireAuth requireStaff>
-      {/* 
-        This page now renders the comprehensive AllOrdersView component
-        which shows ALL order types and sources in a unified interface,
-        replacing the previous OnlineOrdersView that only showed online orders.
-      */}
-      <AllOrdersView onBack={() => window.history.back()} />
-    </ProtectedRoute>
-  );
+  return <ZReport />;
 }

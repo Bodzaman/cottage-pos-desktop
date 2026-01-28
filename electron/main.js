@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog, powerMonitor, screen, nativeTheme } = require('electron');
+nativeTheme.themeSource = 'dark';
 // Note: electron-updater is lazily loaded after app.whenReady() to avoid initialization errors
 let autoUpdater = null;
 const log = require('electron-log');
@@ -562,10 +563,11 @@ log.transports.file.level = 'info';
 class CottageTandooriPOS {
     constructor() {
         this.mainWindow = null;
+        this.splashWindow = null;
+        this.splashStartTime = null;
         this.tray = null;
         this.defaultPrinter = null;
         this.isProduction = !process.defaultApp;
-        this.isManualUpdateCheck = false;
 
         this.init();
     }
@@ -592,12 +594,39 @@ class CottageTandooriPOS {
 
         app.whenReady().then(() => {
             this.createSplashScreen();
+            this.sendSplashProgress(20, 'Loading application...');
             this.createMainWindow();
+            this.sendSplashProgress(40, 'Setting up printing...');
             this.setupPrinting();
             this.setupStripePayments();
+            this.setupLocalCache();
+            this.sendSplashProgress(60, 'Configuring services...');
+            this.setupCrashRecovery();
+            this.setupReceiptHistory();
+            this.setupPrinterStatusMonitor();
+            this.setupPrinterRoleConfig();
+            this.setupWindowTitle();
+            this.sendSplashProgress(80, 'Preparing workspace...');
+            this.setupNativeNotifications();
+            this.setupWorkspaceManager();
             this.setupSystemTray();
             this.setupGlobalShortcuts();
             this.setupAutoUpdater();
+
+            // Sleep/Wake: notify renderer when system resumes from sleep
+            powerMonitor.on('resume', () => {
+                log.info('[main] System resumed from sleep — notifying renderer');
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('system-resumed');
+                }
+            });
+
+            powerMonitor.on('suspend', () => {
+                log.info('[main] System going to sleep');
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('system-suspended');
+                }
+            });
         });
 
         app.on('window-all-closed', () => {
@@ -616,40 +645,63 @@ class CottageTandooriPOS {
 
     createSplashScreen() {
         this.splashStartTime = Date.now();
+        const { size } = require('electron').screen.getPrimaryDisplay();
         this.splashWindow = new BrowserWindow({
+            width: size.width,
+            height: size.height,
+            x: 0,
+            y: 0,
             frame: false,
             transparent: true,
             alwaysOnTop: true,
             resizable: false,
             skipTaskbar: true,
+            simpleFullscreen: true,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true
             }
         });
-        this.splashWindow.maximize();
+        this.splashWindow.setSimpleFullScreen(true);
         this.splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+
+        // Inject version number once splash content loads
+        this.splashWindow.webContents.once('did-finish-load', () => {
+            const version = require('./package.json').version;
+            this.sendSplashProgress(0, 'Initialising...');
+            this.splashWindow?.webContents.executeJavaScript(
+                `setVersion(${JSON.stringify(version)})`
+            ).catch(() => {});
+        });
         log.info('Splash screen displayed');
     }
 
-    createMainWindow() {
-        nativeTheme.themeSource = 'dark';
+    /** Send progress update to splash screen */
+    sendSplashProgress(percent, label) {
+        if (this.splashWindow && !this.splashWindow.isDestroyed()) {
+            this.splashWindow.webContents.executeJavaScript(
+                `updateProgress(${percent}, ${JSON.stringify(label)})`
+            ).catch(() => {});
+        }
+    }
 
+    createMainWindow() {
         const windowConfig = {
             width: 1200,
             height: 800,
             minWidth: 1000,
             minHeight: 600,
+            backgroundColor: '#000000',
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
                 webSecurity: true
             },
-            title: 'Cottage Tandoori POS',
+            title: 'Cottage Tandoori',
             show: false,
             icon: path.join(__dirname, 'assets', 'icon.png'),
-            autoHideMenuBar: true,
+            autoHideMenuBar: false,
             titleBarStyle: 'default'
         };
 
@@ -669,9 +721,9 @@ class CottageTandooriPOS {
             this.mainWindow.webContents.openDevTools();
         } else {
             // Production: Load local bundled frontend
-            const indexPath = path.join(__dirname, 'dist', 'index.html');
+            const indexPath = path.join(__dirname, 'dist', 'renderer', 'index.html');
             log.info(`Loading POS from: ${indexPath} (production mode)`);
-            this.mainWindow.loadFile(indexPath);
+            this.mainWindow.loadURL(`file://${indexPath}`);
         }
 
         this.mainWindow.once('ready-to-show', () => {
@@ -681,23 +733,31 @@ class CottageTandooriPOS {
             const remainingDelay = Math.max(0, splashMinTime - elapsed);
 
             setTimeout(() => {
-                // Dismiss splash screen
+                // Dismiss splash with choreographed exit sequence
                 if (this.splashWindow && !this.splashWindow.isDestroyed()) {
                     this.splashWindow.webContents.executeJavaScript(
-                        "document.body.classList.add('fade-out')"
+                        "startExit()"
                     ).catch(() => {});
+                    // Allow exit animations to play (200ms beat + 500ms animations + 400ms fade = ~1100ms)
+                    // Show main window partway through so it's ready behind the fading splash
+                    setTimeout(() => {
+                        this.mainWindow.maximize();
+                        this.mainWindow.show();
+                        this.mainWindow.focus();
+                        log.info('POS window loaded successfully');
+                    }, 600);
                     setTimeout(() => {
                         if (this.splashWindow && !this.splashWindow.isDestroyed()) {
                             this.splashWindow.destroy();
                             this.splashWindow = null;
                         }
-                    }, 350);
+                    }, 1200);
+                } else {
+                    this.mainWindow.maximize();
+                    this.mainWindow.show();
+                    this.mainWindow.focus();
+                    log.info('POS window loaded successfully');
                 }
-
-                this.mainWindow.maximize();
-                this.mainWindow.show();
-                this.mainWindow.focus();
-                log.info('POS window loaded successfully');
             }, remainingDelay);
         });
 
@@ -705,10 +765,93 @@ class CottageTandooriPOS {
             this.mainWindow = null;
         });
 
-        // Handle external links
+        // Handle window.open calls - KDS opens in new Electron window, external links in system browser
         this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-            require('electron').shell.openExternal(url);
+            if (!url || url === '' || url === 'about:blank') {
+                console.log('[main] Skipping empty/blank window.open URL');
+                return { action: 'deny' };
+            }
+            // Open KDS in a dedicated Electron window
+            if (url.includes('/kds-v2')) {
+                this.openKDSWindow(url);
+                return { action: 'deny' };
+            }
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                require('electron').shell.openExternal(url);
+            } else {
+                console.log('[main] Skipping non-http window.open URL:', url);
+            }
             return { action: 'deny' };
+        });
+    }
+
+    openKDSWindow(url) {
+        // Reuse existing KDS window if already open
+        if (this.kdsWindow && !this.kdsWindow.isDestroyed()) {
+            this.kdsWindow.focus();
+            return;
+        }
+
+        const boundsPath = path.join(app.getPath('userData'), 'kds-window-bounds.json');
+        let savedBounds = null;
+
+        try {
+            const data = require('fs').readFileSync(boundsPath, 'utf-8');
+            savedBounds = JSON.parse(data);
+        } catch (e) {
+            // No saved bounds yet
+        }
+
+        // Check if saved bounds are on a currently available display
+        let useSavedBounds = false;
+        if (savedBounds && savedBounds.x !== undefined && savedBounds.y !== undefined) {
+            const matchingDisplay = screen.getDisplayMatching(savedBounds);
+            if (matchingDisplay) {
+                useSavedBounds = true;
+            }
+        }
+
+        const windowOptions = {
+            width: useSavedBounds ? savedBounds.width : 1920,
+            height: useSavedBounds ? savedBounds.height : 1080,
+            ...(useSavedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
+            backgroundColor: '#000000',
+            title: 'Kitchen Display',
+            icon: path.join(__dirname, 'assets', 'icon.png'),
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js'),
+                webSecurity: true
+            }
+        };
+
+        this.kdsWindow = new BrowserWindow(windowOptions);
+        this.kdsWindow.loadURL(url);
+
+        if (!useSavedBounds) {
+            this.kdsWindow.maximize();
+        }
+
+        log.info('KDS window opened' + (useSavedBounds ? ' (restored position)' : ''));
+
+        // Save bounds on move/resize (debounced)
+        let saveBoundsTimeout = null;
+        const saveBounds = () => {
+            if (saveBoundsTimeout) clearTimeout(saveBoundsTimeout);
+            saveBoundsTimeout = setTimeout(() => {
+                if (this.kdsWindow && !this.kdsWindow.isDestroyed() && !this.kdsWindow.isMinimized()) {
+                    const bounds = this.kdsWindow.getBounds();
+                    fs.writeFile(boundsPath, JSON.stringify(bounds)).catch(() => {});
+                }
+            }, 500);
+        };
+
+        this.kdsWindow.on('move', saveBounds);
+        this.kdsWindow.on('resize', saveBounds);
+
+        this.kdsWindow.on('closed', () => {
+            this.kdsWindow = null;
         });
     }
 
@@ -755,15 +898,9 @@ class CottageTandooriPOS {
                         label: 'Check for Updates',
                         click: () => {
                             if (autoUpdater) {
-                                this.isManualUpdateCheck = true;
-                                autoUpdater.checkForUpdates();
+                                autoUpdater.checkForUpdatesAndNotify();
                             } else {
-                                dialog.showMessageBox(this.mainWindow, {
-                                    type: 'info',
-                                    title: 'Updates',
-                                    message: 'Auto-updater is not available in development mode.',
-                                    buttons: ['OK']
-                                });
+                                log.info('Auto-updater not available in development mode');
                             }
                         }
                     },
@@ -772,9 +909,12 @@ class CottageTandooriPOS {
                         click: () => {
                             dialog.showMessageBox(this.mainWindow, {
                                 type: 'info',
-                                title: 'About Cottage Tandoori POS',
-                                message: `Cottage Tandoori POS v${app.getVersion()}`,
-                                detail: `Professional Restaurant Point of Sale System\n\nBuilt with Electron ${process.versions.electron}\nCopyright \u00A9 ${new Date().getFullYear()} Cottage Tandoori Restaurant`
+                                title: 'About QuickServe AI',
+                                message: 'QuickServe AI POS v1.0.0',
+                                detail: `Professional Restaurant Point of Sale System
+
+Built with Electron
+Powered by QuickServe AI`
                             });
                         }
                     }
@@ -795,7 +935,8 @@ class CottageTandooriPOS {
         // Lazily load electron-updater after app is ready
         autoUpdater = require('electron-updater').autoUpdater;
         autoUpdater.logger = log;
-        autoUpdater.autoDownload = false;
+
+        autoUpdater.checkForUpdatesAndNotify();
 
         autoUpdater.on('checking-for-update', () => {
             log.info('Checking for updates...');
@@ -803,82 +944,27 @@ class CottageTandooriPOS {
 
         autoUpdater.on('update-available', (info) => {
             log.info('Update available:', info.version);
-            if (this.mainWindow) {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'Update Available',
-                    message: `A new version (v${info.version}) is available.`,
-                    detail: `Current version: v${app.getVersion()}\nNew version: v${info.version}\n\nWould you like to download it now?`,
-                    buttons: ['Download', 'Later'],
-                    defaultId: 0,
-                    cancelId: 1
-                }).then(({ response }) => {
-                    if (response === 0) {
-                        autoUpdater.downloadUpdate();
-                    }
-                });
-            }
         });
 
         autoUpdater.on('update-not-available', (info) => {
-            log.info('No update available. Current version:', app.getVersion());
-            if (this.isManualUpdateCheck && this.mainWindow) {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'No Updates Available',
-                    message: 'You are running the latest version.',
-                    detail: `Current version: v${app.getVersion()}`,
-                    buttons: ['OK']
-                });
-            }
-            this.isManualUpdateCheck = false;
+            log.info('Update not available:', info.version);
         });
 
         autoUpdater.on('error', (err) => {
             log.error('Error in auto-updater:', err);
-            if (this.isManualUpdateCheck && this.mainWindow) {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'error',
-                    title: 'Update Error',
-                    message: 'Failed to check for updates.',
-                    detail: `Error: ${err.message}\n\nPlease check your internet connection and try again.`,
-                    buttons: ['OK']
-                });
-            }
-            this.isManualUpdateCheck = false;
         });
 
         autoUpdater.on('download-progress', (progressObj) => {
-            log.info(`Download: ${Math.round(progressObj.percent)}% (${progressObj.transferred}/${progressObj.total})`);
-            if (this.mainWindow) {
-                this.mainWindow.setProgressBar(progressObj.percent / 100);
-            }
+            let log_message = "Download speed: " + progressObj.bytesPerSecond;
+            log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+            log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+            log.info(log_message);
         });
 
         autoUpdater.on('update-downloaded', (info) => {
             log.info('Update downloaded:', info.version);
-            if (this.mainWindow) {
-                this.mainWindow.setProgressBar(-1);
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'Update Ready',
-                    message: `Version ${info.version} has been downloaded.`,
-                    detail: 'The update will be installed when you restart the application. Would you like to restart now?',
-                    buttons: ['Restart Now', 'Later'],
-                    defaultId: 0,
-                    cancelId: 1
-                }).then(({ response }) => {
-                    if (response === 0) {
-                        autoUpdater.quitAndInstall(false, true);
-                    }
-                });
-            }
-            this.isManualUpdateCheck = false;
+            autoUpdater.quitAndInstall();
         });
-
-        // Auto-check on startup (silent unless update found)
-        this.isManualUpdateCheck = false;
-        autoUpdater.checkForUpdates();
     }
 
     setupPrinting() {
@@ -957,10 +1043,12 @@ class CottageTandooriPOS {
                 log.info('Creating Stripe payment intent:', {
                     amount: data.amount,
                     currency: data.currency,
-                    order_id: data.order_id
+                    order_id: data.order_id,
+                    pos_mode: data.pos_mode
                 });
 
-                const paymentIntent = await stripe.paymentIntents.create({
+                // Build payment intent params
+                const paymentIntentParams = {
                     amount: data.amount, // Amount in pence/cents
                     currency: data.currency || 'gbp',
                     metadata: {
@@ -969,10 +1057,18 @@ class CottageTandooriPOS {
                         customer_name: data.customer_name || 'POS Customer'
                     },
                     description: data.description || `POS Order - ${data.order_type}`,
-                    automatic_payment_methods: {
-                        enabled: true,
-                    },
-                });
+                };
+
+                // POS mode: Restrict to card-only payments (no Klarna, Revolut, Link, etc.)
+                // This is critical for in-person POS payments where staff need simple card entry
+                if (data.pos_mode) {
+                    paymentIntentParams.payment_method_types = ['card'];
+                    log.info('POS mode: Restricting to card-only payments');
+                } else {
+                    paymentIntentParams.automatic_payment_methods = { enabled: true };
+                }
+
+                const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
                 log.info('Payment intent created:', paymentIntent.id);
 
@@ -1018,36 +1114,13 @@ class CottageTandooriPOS {
     async initializePrinter() {
         try {
             const printers = await this.discoverPrinters();
-
-            // Priority 1: Look for Epson thermal printer by name
-            const epsonPrinter = printers.find(p =>
-                p.name.toLowerCase().includes('epson') &&
+            
+            const epsonPrinter = printers.find(p => 
+                p.name.toLowerCase().includes('epson') && 
                 (p.name.toLowerCase().includes('tm-t20') || p.name.toLowerCase().includes('tm-t88'))
             );
-
-            if (epsonPrinter) {
-                this.defaultPrinter = epsonPrinter.name;
-            } else if (process.platform === 'win32') {
-                // Priority 2: Use Windows system default printer
-                try {
-                    const { stdout } = await execAsync(
-                        'powershell -NoProfile -Command "(Get-CimInstance Win32_Printer -Filter \\"Default=TRUE\\").Name"'
-                    );
-                    const defaultName = stdout.trim();
-                    if (defaultName) {
-                        this.defaultPrinter = defaultName;
-                    } else {
-                        this.defaultPrinter = printers[0]?.name;
-                    }
-                } catch (e) {
-                    this.defaultPrinter = printers[0]?.name;
-                }
-            } else {
-                // macOS: discoverPrinters already marks isDefault
-                const defaultPrinter = printers.find(p => p.isDefault);
-                this.defaultPrinter = defaultPrinter?.name || printers[0]?.name;
-            }
-
+            
+            this.defaultPrinter = epsonPrinter ? epsonPrinter.name : printers[0]?.name;
             log.info('Default printer set to:', this.defaultPrinter);
         } catch (error) {
             log.error('Printer initialization error:', error);
@@ -1142,6 +1215,573 @@ class CottageTandooriPOS {
         return await this.printReceipt({ receipt: testReceipt });
     }
 
+    // =========================================================================
+    // LOCAL DATA CACHE — File-system cache for instant cold starts
+    // =========================================================================
+
+    setupLocalCache() {
+        this.cacheDirPath = path.join(app.getPath('userData'), 'pos-cache');
+
+        // Ensure cache directory exists
+        require('fs').mkdirSync(this.cacheDirPath, { recursive: true });
+
+        // IPC: Write cache entry
+        ipcMain.handle('cache-set', async (event, key, data) => {
+            try {
+                const filePath = path.join(this.cacheDirPath, `${key}.json`);
+                await fs.writeFile(filePath, JSON.stringify(data), 'utf-8');
+                return { success: true };
+            } catch (error) {
+                log.error(`[Cache] Failed to write ${key}:`, error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // IPC: Read cache entry
+        ipcMain.handle('cache-get', async (event, key) => {
+            try {
+                const filePath = path.join(this.cacheDirPath, `${key}.json`);
+                const raw = await fs.readFile(filePath, 'utf-8');
+                return { success: true, data: JSON.parse(raw) };
+            } catch (error) {
+                // File not found is expected on first run
+                if (error.code !== 'ENOENT') {
+                    log.warn(`[Cache] Failed to read ${key}:`, error.message);
+                }
+                return { success: false, data: null };
+            }
+        });
+
+        // IPC: Clear a specific cache entry
+        ipcMain.handle('cache-clear', async (event, key) => {
+            try {
+                if (key) {
+                    const filePath = path.join(this.cacheDirPath, `${key}.json`);
+                    await fs.unlink(filePath).catch(() => {});
+                } else {
+                    // Clear all cache files
+                    const files = await fs.readdir(this.cacheDirPath);
+                    await Promise.all(
+                        files.filter(f => f.endsWith('.json')).map(f =>
+                            fs.unlink(path.join(this.cacheDirPath, f)).catch(() => {})
+                        )
+                    );
+                }
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        });
+
+        log.info('[Cache] Local file cache initialized at:', this.cacheDirPath);
+    }
+
+    // =========================================================================
+    // CRASH RECOVERY — Persist POS state so we can recover after crash/force-quit
+    // =========================================================================
+
+    setupCrashRecovery() {
+        // State file path: <userData>/pos-crash-state.json
+        this.crashStatePath = path.join(app.getPath('userData'), 'pos-crash-state.json');
+        this.didCrashLastRun = false;
+
+        // Check if we crashed last time (presence of non-empty state file = unclean exit)
+        try {
+            const raw = require('fs').readFileSync(this.crashStatePath, 'utf-8');
+            const state = JSON.parse(raw);
+            if (state && state.timestamp) {
+                // State file exists and has data → previous run didn't exit cleanly
+                this.didCrashLastRun = true;
+                log.warn('[CrashRecovery] Detected unclean shutdown — state file found');
+            }
+        } catch {
+            // No file or invalid JSON → clean previous exit
+            this.didCrashLastRun = false;
+        }
+
+        // IPC: Save crash state (called periodically by renderer)
+        ipcMain.handle('save-crash-state', async (event, state) => {
+            try {
+                const stateWithMeta = {
+                    ...state,
+                    timestamp: Date.now(),
+                    version: app.getVersion()
+                };
+                await fs.writeFile(this.crashStatePath, JSON.stringify(stateWithMeta), 'utf-8');
+                return { success: true };
+            } catch (error) {
+                log.error('[CrashRecovery] Failed to save state:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // IPC: Get crash state (called on startup by renderer)
+        ipcMain.handle('get-crash-state', async () => {
+            try {
+                if (!this.didCrashLastRun) {
+                    return { hasCrashState: false };
+                }
+                const raw = await fs.readFile(this.crashStatePath, 'utf-8');
+                const state = JSON.parse(raw);
+                return { hasCrashState: true, state };
+            } catch {
+                return { hasCrashState: false };
+            }
+        });
+
+        // IPC: Clear crash state (called after recovery or dismissal)
+        ipcMain.handle('clear-crash-state', async () => {
+            try {
+                await fs.unlink(this.crashStatePath).catch(() => {});
+                this.didCrashLastRun = false;
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Clear state on clean exit
+        app.on('before-quit', () => {
+            log.info('[CrashRecovery] Clean quit — removing crash state');
+            try {
+                require('fs').unlinkSync(this.crashStatePath);
+            } catch {
+                // File may not exist
+            }
+        });
+
+        // Catch uncaught exceptions in main process
+        process.on('uncaughtException', (error) => {
+            log.error('[CrashRecovery] Uncaught exception:', error);
+            // Don't delete crash state — renderer already saved it
+        });
+
+        log.info(`[CrashRecovery] Initialized. Previous crash detected: ${this.didCrashLastRun}`);
+    }
+
+    // =========================================================================
+    // RECEIPT HISTORY — Store last 50 receipts for reprint functionality
+    // =========================================================================
+
+    setupReceiptHistory() {
+        this.receiptHistoryPath = path.join(app.getPath('userData'), 'pos-cache', 'receipt-history.json');
+
+        // IPC: Save a receipt to history
+        ipcMain.handle('save-receipt-history', async (event, receipt) => {
+            try {
+                let history = [];
+                try {
+                    const raw = await fs.readFile(this.receiptHistoryPath, 'utf-8');
+                    history = JSON.parse(raw);
+                } catch {
+                    // No existing history file
+                }
+
+                // Add new receipt at the front
+                history.unshift({
+                    ...receipt,
+                    savedAt: Date.now()
+                });
+
+                // Keep only last 50
+                if (history.length > 50) {
+                    history = history.slice(0, 50);
+                }
+
+                await fs.writeFile(this.receiptHistoryPath, JSON.stringify(history), 'utf-8');
+                return { success: true };
+            } catch (error) {
+                log.error('[ReceiptHistory] Failed to save:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // IPC: Get receipt history
+        ipcMain.handle('get-receipt-history', async () => {
+            try {
+                const raw = await fs.readFile(this.receiptHistoryPath, 'utf-8');
+                return { success: true, history: JSON.parse(raw) };
+            } catch (error) {
+                if (error.code === 'ENOENT') {
+                    return { success: true, history: [] };
+                }
+                log.error('[ReceiptHistory] Failed to load:', error.message);
+                return { success: false, history: [] };
+            }
+        });
+
+        log.info('[ReceiptHistory] Initialized at:', this.receiptHistoryPath);
+    }
+
+    // =========================================================================
+    // PRINTER STATUS MONITOR — Poll printer availability every 30s
+    // =========================================================================
+
+    setupPrinterStatusMonitor() {
+        this.printerStatusInterval = null;
+        this.lastPrinterStatus = {};
+
+        const pollPrinterStatus = async () => {
+            try {
+                const printers = await this.discoverPrinters();
+                const status = {
+                    timestamp: Date.now(),
+                    printers: printers.map(p => ({
+                        name: p.name,
+                        displayName: p.displayName || p.name,
+                        available: p.available !== false,
+                        status: p.status || 'unknown',
+                        isDefault: p.isDefault || false
+                    })),
+                    defaultPrinter: this.defaultPrinter || null,
+                    hasThermalPrinter: printers.some(p => {
+                        const n = (p.name || '').toLowerCase();
+                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                    })
+                };
+
+                // Check if status changed (printer connected/disconnected)
+                const prevNames = Object.keys(this.lastPrinterStatus).sort().join(',');
+                const currNames = status.printers.map(p => p.name).sort().join(',');
+                const statusChanged = prevNames !== currNames;
+
+                this.lastPrinterStatus = {};
+                status.printers.forEach(p => { this.lastPrinterStatus[p.name] = p; });
+
+                // Send to renderer
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('printer-status-update', status);
+                }
+
+                // Log if changed
+                if (statusChanged) {
+                    log.info('[PrinterMonitor] Status changed:', status.printers.map(p => `${p.name}(${p.available ? 'ok' : 'offline'})`).join(', '));
+                }
+            } catch (error) {
+                log.error('[PrinterMonitor] Poll error:', error.message);
+            }
+        };
+
+        // Poll every 30 seconds
+        this.printerStatusInterval = setInterval(pollPrinterStatus, 30000);
+        // Initial poll after 3 seconds (let app finish starting)
+        setTimeout(pollPrinterStatus, 3000);
+
+        // IPC: Get printer status on demand
+        ipcMain.handle('get-printer-status', async () => {
+            try {
+                const printers = await this.discoverPrinters();
+                return {
+                    success: true,
+                    printers: printers.map(p => ({
+                        name: p.name,
+                        displayName: p.displayName || p.name,
+                        available: p.available !== false,
+                        status: p.status || 'unknown',
+                        isDefault: p.isDefault || false
+                    })),
+                    defaultPrinter: this.defaultPrinter || null,
+                    hasThermalPrinter: printers.some(p => {
+                        const n = (p.name || '').toLowerCase();
+                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                    })
+                };
+            } catch (error) {
+                return { success: false, printers: [], defaultPrinter: null, hasThermalPrinter: false };
+            }
+        });
+
+        log.info('[PrinterMonitor] Status monitoring started (30s interval)');
+    }
+
+    // =========================================================================
+    // PRINTER ROLE CONFIG — Assign printers to roles (kitchen, customer, bar)
+    // =========================================================================
+
+    setupPrinterRoleConfig() {
+        this.printerConfigPath = path.join(app.getPath('userData'), 'printer-config.json');
+
+        // Load saved config
+        try {
+            const raw = require('fs').readFileSync(this.printerConfigPath, 'utf-8');
+            this.printerRoles = JSON.parse(raw);
+            log.info('[PrinterRoles] Loaded config:', this.printerRoles);
+        } catch {
+            // Default: all roles use the default printer
+            this.printerRoles = {
+                kitchen: null,   // null = use defaultPrinter
+                customer: null,
+                bar: null
+            };
+        }
+
+        // IPC: Get printer role config
+        ipcMain.handle('get-printer-roles', async () => {
+            return {
+                success: true,
+                roles: this.printerRoles,
+                defaultPrinter: this.defaultPrinter || null
+            };
+        });
+
+        // IPC: Save printer role config
+        ipcMain.handle('save-printer-roles', async (event, roles) => {
+            try {
+                this.printerRoles = { ...this.printerRoles, ...roles };
+                await fs.writeFile(this.printerConfigPath, JSON.stringify(this.printerRoles, null, 2), 'utf-8');
+                log.info('[PrinterRoles] Saved config:', this.printerRoles);
+                return { success: true };
+            } catch (error) {
+                log.error('[PrinterRoles] Failed to save:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // IPC: Test print on a specific printer
+        ipcMain.handle('test-print-role', async (event, role) => {
+            try {
+                const printerName = this.printerRoles[role] || this.defaultPrinter;
+                if (!printerName) {
+                    return { success: false, error: 'No printer assigned to this role' };
+                }
+
+                // Build a simple test receipt
+                const builder = new ESCPOSBuilder(80);
+                builder.initialize()
+                    .centerAlign()
+                    .bold(true)
+                    .text('=== TEST PRINT ===')
+                    .bold(false)
+                    .newline()
+                    .text(`Role: ${role.toUpperCase()}`)
+                    .text(`Printer: ${printerName}`)
+                    .text(`Time: ${new Date().toLocaleString()}`)
+                    .newline()
+                    .text('If you see this, the printer')
+                    .text('is working correctly.')
+                    .newline()
+                    .centerAlign()
+                    .text('--- END TEST ---')
+                    .feedAndCut();
+
+                const buffer = builder.getBuffer();
+
+                if (process.platform === 'darwin') {
+                    const tempFile = path.join(os.tmpdir(), `test-print-${Date.now()}.bin`);
+                    await fs.writeFile(tempFile, Buffer.from(buffer));
+                    await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
+                    await fs.unlink(tempFile).catch(() => {});
+                } else if (process.platform === 'win32') {
+                    const tempFile = path.join(os.tmpdir(), `test-print-${Date.now()}.bin`);
+                    await fs.writeFile(tempFile, Buffer.from(buffer));
+                    await execAsync(`powershell -Command "Get-Printer -Name '${printerName}' | Out-Null; Copy-Item '${tempFile}' -Destination '\\\\localhost\\${printerName}'" 2>$null`).catch(async () => {
+                        // Fallback: try using lpr
+                        await execAsync(`lpr -P "${printerName}" "${tempFile}"`);
+                    });
+                    await fs.unlink(tempFile).catch(() => {});
+                }
+
+                return { success: true, printer: printerName };
+            } catch (error) {
+                log.error(`[PrinterRoles] Test print failed for ${role}:`, error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        log.info('[PrinterRoles] Config initialized');
+    }
+
+    setupWindowTitle() {
+        // IPC: Set window title dynamically from renderer (restaurant settings)
+        ipcMain.handle('set-window-title', async (event, title) => {
+            try {
+                if (this.mainWindow && typeof title === 'string' && title.trim()) {
+                    this.mainWindow.setTitle(title.trim());
+                    log.info(`[WindowTitle] Updated to: "${title.trim()}"`);
+                    return { success: true };
+                }
+                return { success: false, error: 'Invalid title or no window' };
+            } catch (error) {
+                log.error('[WindowTitle] Failed to set:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+    }
+
+    // =========================================================================
+    // NATIVE NOTIFICATIONS
+    // =========================================================================
+
+    setupNativeNotifications() {
+        const { Notification } = require('electron');
+
+        ipcMain.handle('show-native-notification', async (event, data) => {
+            try {
+                const { title, body, urgency, actionId } = data;
+
+                if (!Notification.isSupported()) {
+                    log.warn('[Notification] Notifications not supported on this platform');
+                    return { success: false, error: 'Notifications not supported' };
+                }
+
+                const notification = new Notification({
+                    title: title || 'Quick Serve AI',
+                    body: body || '',
+                    urgency: urgency || 'normal', // 'low' | 'normal' | 'critical'
+                    silent: false,
+                    icon: path.join(__dirname, 'assets', 'icon.png'),
+                });
+
+                notification.on('click', () => {
+                    // Focus the main window when notification is clicked
+                    if (this.mainWindow) {
+                        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+                        this.mainWindow.show();
+                        this.mainWindow.focus();
+                    }
+                    // Send action back to renderer so it can navigate/respond
+                    if (this.mainWindow && actionId) {
+                        this.mainWindow.webContents.send('notification-clicked', { actionId });
+                    }
+                });
+
+                notification.show();
+                log.info(`[Notification] Shown: "${title}" (urgency: ${urgency || 'normal'})`);
+                return { success: true };
+            } catch (error) {
+                log.error('[Notification] Failed:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        log.info('[Notifications] Native notification handler registered');
+    }
+
+    // =========================================================================
+    // WORKSPACE MANAGER (Multi-Monitor)
+    // =========================================================================
+
+    setupWorkspaceManager() {
+        const workspaceFile = path.join(app.getPath('userData'), 'workspace-layout.json');
+
+        // Get all connected displays
+        ipcMain.handle('get-displays', async () => {
+            try {
+                const displays = screen.getAllDisplays();
+                const primaryDisplay = screen.getPrimaryDisplay();
+                return {
+                    success: true,
+                    displays: displays.map(d => ({
+                        id: d.id,
+                        label: d.label || `Display ${d.id}`,
+                        bounds: d.bounds,
+                        workArea: d.workArea,
+                        isPrimary: d.id === primaryDisplay.id,
+                        scaleFactor: d.scaleFactor,
+                    })),
+                };
+            } catch (error) {
+                log.error('[Workspace] Failed to get displays:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Save workspace layout
+        ipcMain.handle('save-workspace-layout', async (event, layout) => {
+            try {
+                await fs.writeFile(workspaceFile, JSON.stringify(layout, null, 2), 'utf8');
+                log.info('[Workspace] Layout saved:', JSON.stringify(layout));
+                return { success: true };
+            } catch (error) {
+                log.error('[Workspace] Failed to save layout:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Load saved workspace layout
+        ipcMain.handle('get-workspace-layout', async () => {
+            try {
+                const data = await fs.readFile(workspaceFile, 'utf8');
+                return { success: true, layout: JSON.parse(data) };
+            } catch {
+                return { success: true, layout: null }; // No saved layout is fine
+            }
+        });
+
+        // Apply a workspace layout — position windows on the specified monitors
+        ipcMain.handle('apply-workspace-layout', async (event, layout) => {
+            try {
+                const displays = screen.getAllDisplays();
+
+                // Position main POS window
+                if (layout.pos && this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    const display = displays.find(d => d.id === layout.pos.displayId);
+                    if (display) {
+                        const { x, y, width, height } = display.workArea;
+                        this.mainWindow.setBounds({ x, y, width, height });
+                        log.info(`[Workspace] POS → Display ${display.id}`);
+                    }
+                }
+
+                // Open/position KDS window
+                if (layout.kds) {
+                    const display = displays.find(d => d.id === layout.kds.displayId);
+                    if (display) {
+                        const { x, y, width, height } = display.workArea;
+                        // KDS will be positioned when opened
+                        // Store the target bounds for the KDS window
+                        this.kdsTargetBounds = { x, y, width, height };
+                        log.info(`[Workspace] KDS target → Display ${display.id}`);
+                    }
+                }
+
+                // Open/position customer display
+                if (layout.customerDisplay) {
+                    const display = displays.find(d => d.id === layout.customerDisplay.displayId);
+                    if (display) {
+                        this.customerDisplayTargetBounds = display.workArea;
+                        log.info(`[Workspace] Customer Display target → Display ${display.id}`);
+                    }
+                }
+
+                // Save the layout for next startup
+                await fs.writeFile(workspaceFile, JSON.stringify(layout, null, 2), 'utf8');
+
+                return { success: true };
+            } catch (error) {
+                log.error('[Workspace] Failed to apply layout:', error.message);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Listen for display changes
+        screen.on('display-added', () => {
+            log.info('[Workspace] Display added');
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('displays-changed');
+            }
+        });
+
+        screen.on('display-removed', () => {
+            log.info('[Workspace] Display removed');
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('displays-changed');
+            }
+        });
+
+        log.info('[Workspace] Manager initialized');
+    }
+
+    /**
+     * Get the printer name for a given role, falling back to defaultPrinter.
+     */
+    getPrinterForRole(role) {
+        if (this.printerRoles && this.printerRoles[role]) {
+            return this.printerRoles[role];
+        }
+        return this.defaultPrinter;
+    }
+
     setupSystemTray() {
         const iconPath = path.join(__dirname, 'assets', 'icon.png');
         let trayIcon;
@@ -1182,15 +1822,9 @@ class CottageTandooriPOS {
                 label: 'Check for Updates',
                 click: () => {
                     if (autoUpdater) {
-                        this.isManualUpdateCheck = true;
-                        autoUpdater.checkForUpdates();
+                        autoUpdater.checkForUpdatesAndNotify();
                     } else {
-                        dialog.showMessageBox(null, {
-                            type: 'info',
-                            title: 'Updates',
-                            message: 'Auto-updater is not available in development mode.',
-                            buttons: ['OK']
-                        });
+                        log.info('Auto-updater not available in development mode');
                     }
                 }
             },
@@ -1942,109 +2576,6 @@ class CottageTandooriPOS {
     }
 
     /**
-     * Send raw binary data to a Windows printer via the Print Spooler API.
-     * Uses P/Invoke to call winspool.drv (OpenPrinter, WritePrinter, etc.)
-     * This is the Windows equivalent of macOS `lp -d "printer" -o raw "file"`
-     *
-     * Works with ANY printer type: USB, network, parallel, virtual.
-     * Does not need to know the port name - uses printer name directly.
-     */
-    async sendRawToWindowsPrinter(printerName, filePath) {
-        const safePrinterName = printerName.replace(/'/g, "''");
-        const safeFilePath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "''");
-
-        const psScript = `
-$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @'
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-public class RawPrinterHelper
-{
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    public struct DOCINFO
-    {
-        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
-        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
-        [MarshalAs(UnmanagedType.LPWStr)] public string pDatatype;
-    }
-    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
-    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFO pDocInfo);
-    [DllImport("winspool.drv", SetLastError = true)]
-    public static extern bool StartPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.drv", SetLastError = true)]
-    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
-    [DllImport("winspool.drv", SetLastError = true)]
-    public static extern bool EndPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.drv", SetLastError = true)]
-    public static extern bool EndDocPrinter(IntPtr hPrinter);
-    [DllImport("winspool.drv", SetLastError = true)]
-    public static extern bool ClosePrinter(IntPtr hPrinter);
-    public static void SendFileToPrinter(string printerName, string filePath)
-    {
-        IntPtr hPrinter = IntPtr.Zero;
-        if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero))
-            throw new Exception("OpenPrinter failed for: " + printerName + " (Error: " + Marshal.GetLastWin32Error() + ")");
-        try
-        {
-            DOCINFO docInfo = new DOCINFO();
-            docInfo.pDocName = "RAW ESC/POS Document";
-            docInfo.pOutputFile = null;
-            docInfo.pDatatype = "RAW";
-            if (!StartDocPrinter(hPrinter, 1, ref docInfo))
-                throw new Exception("StartDocPrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
-            try
-            {
-                if (!StartPagePrinter(hPrinter))
-                    throw new Exception("StartPagePrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
-                byte[] fileData = File.ReadAllBytes(filePath);
-                IntPtr unmanagedBytes = Marshal.AllocHGlobal(fileData.Length);
-                try
-                {
-                    Marshal.Copy(fileData, 0, unmanagedBytes, fileData.Length);
-                    int bytesWritten = 0;
-                    if (!WritePrinter(hPrinter, unmanagedBytes, fileData.Length, out bytesWritten))
-                        throw new Exception("WritePrinter failed (Error: " + Marshal.GetLastWin32Error() + ")");
-                }
-                finally { Marshal.FreeHGlobal(unmanagedBytes); }
-                EndPagePrinter(hPrinter);
-            }
-            finally { EndDocPrinter(hPrinter); }
-        }
-        finally { ClosePrinter(hPrinter); }
-    }
-}
-'@ -ReferencedAssemblies System.IO
-[RawPrinterHelper]::SendFileToPrinter('${safePrinterName}', '${safeFilePath}')
-Write-Output 'SUCCESS'
-`;
-
-        log.info(`[Windows Print] Sending raw data to printer: ${printerName}, file: ${filePath}`);
-
-        // Write script to temp file to avoid Windows 8191-char command line limit
-        const scriptFile = path.join(os.tmpdir(), `raw-print-${Date.now()}.ps1`);
-        await fs.writeFile(scriptFile, psScript, 'utf8');
-
-        try {
-            const { stdout, stderr } = await execAsync(
-                `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptFile}"`,
-                { timeout: 30000 }
-            );
-
-            const output = stdout.trim();
-            if (output !== 'SUCCESS') {
-                throw new Error(`Windows raw print failed: ${output || stderr || 'unknown error'}`);
-            }
-
-            log.info(`[Windows Print] Raw data sent successfully to ${printerName}`);
-        } finally {
-            await fs.unlink(scriptFile).catch(() => {});
-        }
-    }
-
-    /**
      * Print receipt using ESC/POS commands (raw thermal printing)
      * This is the hybrid approach - ESC/POS for text, reliable and fast
      *
@@ -2057,7 +2588,9 @@ Write-Output 'SUCCESS'
     async printReceiptESCPOS(data) {
         const { type, receiptData, printerName } = data;
 
-        const printer = printerName || this.defaultPrinter;
+        // Multi-printer routing: resolve printer by role, then explicit name, then default
+        const role = type === 'kitchen' ? 'kitchen' : 'customer';
+        const printer = printerName || this.getPrinterForRole(role) || this.defaultPrinter;
         if (!printer) {
             throw new Error('No printer available. Please check printer connection.');
         }
@@ -2086,8 +2619,19 @@ Write-Output 'SUCCESS'
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Send raw ESC/POS via Print Spooler API
-                await this.sendRawToWindowsPrinter(printer, tempFile);
+                // Windows: Get printer port and copy raw data
+                const ps = `
+                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
+                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                `;
+                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
+                const port = portName.trim();
+
+                if (port) {
+                    await execAsync(`copy /b "${tempFile}" "${port}"`);
+                } else {
+                    throw new Error('Could not determine printer port');
+                }
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }
@@ -2136,8 +2680,22 @@ Write-Output 'SUCCESS'
                 log.info(`Sending cut command to printer: ${printerName}`);
                 await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Send raw cut command via Print Spooler API
-                await this.sendRawToWindowsPrinter(printerName, tempFile);
+                // Windows: Use copy command to send raw data to printer port
+                // First get the printer port
+                const ps = `
+                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printerName.replace(/'/g, "''")}'";
+                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                `;
+                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
+                const port = portName.trim();
+
+                if (port) {
+                    // Copy raw bytes to printer port
+                    await execAsync(`copy /b "${tempFile}" "${port}"`);
+                } else {
+                    log.warn('Could not determine printer port for cut command');
+                    return false;
+                }
             }
 
             log.info('Paper cut command sent successfully');
@@ -2199,8 +2757,19 @@ Write-Output 'SUCCESS'
                 // macOS: Use lp with raw option
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
-                // Windows: Send raw raster data via Print Spooler API
-                await this.sendRawToWindowsPrinter(printer, tempFile);
+                // Windows: Get printer port and copy raw data
+                const ps = `
+                    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name='${printer.replace(/'/g, "''")}'";
+                    if ($printer) { Write-Output $printer.PortName } else { Write-Output '' }
+                `;
+                const { stdout: portName } = await execAsync(`powershell -Command "${ps.replace(/\n/g, ' ')}"`);
+                const port = portName.trim();
+
+                if (port) {
+                    await execAsync(`copy /b "${tempFile}" "${port}"`);
+                } else {
+                    throw new Error('Could not determine printer port');
+                }
             } else {
                 throw new Error(`Unsupported platform: ${process.platform}`);
             }

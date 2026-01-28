@@ -10,6 +10,7 @@ import { CartItem } from './CartItem';
 import { useCartStore } from '../utils/cartStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PremiumTheme } from '../utils/premiumTheme';
+import { formatPrice } from '../utils/formatUtils';
 
 type CartProps = {
   className?: string;
@@ -75,23 +76,25 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
     setOpen(false);
   }, [location]);
   
-  // NEW: Shake animation when items are added
+  // ✅ FIXED: Shake animation when items are added (including first item)
   useEffect(() => {
-    // Only trigger animation if items increased (not on initial load or decrease)
-    if (totalItems > prevTotalItemsRef.current && prevTotalItemsRef.current > 0) {
+    // Trigger animation if items increased (including from 0 to 1)
+    if (totalItems > prevTotalItemsRef.current) {
       // Shake the icon
       iconControls.start({
         rotate: [0, -10, 10, -10, 10, 0],
         transition: { duration: 0.5, ease: 'easeInOut' }
       });
-      
-      // Scale pulse on badge
-      badgeControls.start({
-        scale: [1, 1.3, 1],
-        transition: { duration: 0.4, ease: 'easeOut' }
-      });
+
+      // Scale pulse on badge (only if we have items)
+      if (totalItems > 0) {
+        badgeControls.start({
+          scale: [1, 1.3, 1],
+          transition: { duration: 0.4, ease: 'easeOut' }
+        });
+      }
     }
-    
+
     prevTotalItemsRef.current = totalItems;
   }, [totalItems, iconControls, badgeControls]);
   
@@ -107,9 +110,10 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
       onCartClick();
       return;
     }
-    
+
     if (insideMobileMenu) {
-      navigate('/cart');
+      // ✅ FIXED: Navigate to online orders page instead of non-existent /cart route
+      navigate('/online-orders');
       return;
     }
 
@@ -120,24 +124,26 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
   // If inside mobile menu, just show the icon with count
   if (insideMobileMenu) {
     return (
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={handleCartClick}
         className="relative text-tandoor-offwhite hover:text-tandoor-platinum hover:bg-transparent"
+        aria-label={totalItems > 0 ? `Shopping cart with ${totalItems} ${totalItems === 1 ? 'item' : 'items'}` : 'Shopping cart is empty'}
       >
         <motion.div animate={iconControls}>
-          <ShoppingBag className="h-6 w-6" />
+          <ShoppingBag className="h-6 w-6" aria-hidden="true" />
         </motion.div>
         {totalItems > 0 && (
           <motion.span
             animate={badgeControls}
             className="absolute -top-2 -right-2 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
-            style={{ 
+            style={{
               backgroundColor: PremiumTheme.colors.burgundy[500],
               color: PremiumTheme.colors.text.primary,
-              boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60` 
+              boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60`
             }}
+            aria-hidden="true"
           >
             {totalItems}
           </motion.span>
@@ -149,25 +155,27 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
   // If onCartClick is provided, just show the button without Sheet wrapper
   if (onCartClick) {
     return (
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className={className}
         onClick={handleCartClick}
+        aria-label={totalItems > 0 ? `Shopping cart with ${totalItems} ${totalItems === 1 ? 'item' : 'items'}` : 'Shopping cart is empty'}
       >
         <div className="relative">
           <motion.div animate={iconControls}>
-            <ShoppingBag className="h-6 w-6" />
+            <ShoppingBag className="h-6 w-6" aria-hidden="true" />
           </motion.div>
           {totalItems > 0 && (
             <motion.span
               animate={badgeControls}
               className="absolute -top-2 -right-2 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
-              style={{ 
+              style={{
                 backgroundColor: PremiumTheme.colors.burgundy[500],
                 color: PremiumTheme.colors.text.primary,
-                boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60` 
+                boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60`
               }}
+              aria-hidden="true"
             >
               {totalItems}
             </motion.span>
@@ -181,20 +189,26 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className={className}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={className}
+          aria-label={totalItems > 0 ? `Shopping cart with ${totalItems} ${totalItems === 1 ? 'item' : 'items'}` : 'Shopping cart is empty'}
+        >
           <div className="relative">
             <motion.div animate={iconControls}>
-              <ShoppingBag className="h-6 w-6" />
+              <ShoppingBag className="h-6 w-6" aria-hidden="true" />
             </motion.div>
             {totalItems > 0 && (
               <motion.span
                 animate={badgeControls}
                 className="absolute -top-2 -right-2 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
-                style={{ 
+                style={{
                   backgroundColor: PremiumTheme.colors.burgundy[500],
                   color: PremiumTheme.colors.text.primary,
-                  boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60` 
+                  boxShadow: `0 2px 8px ${PremiumTheme.colors.burgundy[500]}60`
                 }}
+                aria-hidden="true"
               >
                 {totalItems}
               </motion.span>
@@ -202,20 +216,28 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
           </div>
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md bg-gradient-to-b from-gray-900 to-gray-950 border-tandoor-orange/40 text-tandoor-platinum overflow-y-auto">
+      {/* ✅ FIXED: Updated to use PremiumTheme for consistency */}
+      <SheetContent
+        className="w-full sm:max-w-md overflow-y-auto"
+        style={{
+          backgroundColor: PremiumTheme.colors.background.dark,
+          borderLeft: `1px solid ${PremiumTheme.colors.border.medium}`,
+          color: PremiumTheme.colors.text.primary
+        }}
+      >
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-tandoor-platinum">Your Order</SheetTitle>
-          <SheetDescription className="text-gray-400">
+          <SheetTitle style={{ color: PremiumTheme.colors.text.primary }}>Your Order</SheetTitle>
+          <SheetDescription style={{ color: PremiumTheme.colors.text.muted }}>
             Review your items before checkout
           </SheetDescription>
         </SheetHeader>
-        
+
         <CartErrorBoundary>
           <div className="space-y-6">
             {totalItems === 0 ? (
               <div className="py-10 text-center">
-                <div className="text-gray-400 mb-2">Your cart is empty</div>
-                <p className="text-sm text-gray-500">
+                <div className="mb-2" style={{ color: PremiumTheme.colors.text.muted }}>Your cart is empty</div>
+                <p className="text-sm" style={{ color: PremiumTheme.colors.text.muted }}>
                   Add some delicious items from our menu
                 </p>
               </div>
@@ -226,16 +248,23 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
                     <CartItem key={item.id} item={item} />
                   ))}
                 </div>
-              
-                <div className="border-t border-gray-800 pt-4 space-y-3">
-                  <div className="flex justify-between text-tandoor-platinum">
+
+                <div
+                  className="pt-4 space-y-3"
+                  style={{ borderTop: `1px solid ${PremiumTheme.colors.border.light}` }}
+                >
+                  <div className="flex justify-between" style={{ color: PremiumTheme.colors.text.primary }}>
                     <span>Subtotal</span>
-                    <span>£{totalAmount.toFixed(2)}</span>
+                    <span>{formatPrice(totalAmount)}</span>
                   </div>
-                  
-                  {/* Checkout Button */}
-                  <Button 
-                    className="w-full bg-tandoor-orange hover:bg-tandoor-orange/90 text-white" 
+
+                  {/* Checkout Button - ✅ FIXED: Use burgundy theme */}
+                  <Button
+                    className="w-full text-white font-semibold"
+                    style={{
+                      background: `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[500]}, ${PremiumTheme.colors.burgundy[600]})`,
+                      boxShadow: `0 4px 12px ${PremiumTheme.colors.burgundy[500]}40`
+                    }}
                     onClick={handleCheckout}
                   >
                     Checkout

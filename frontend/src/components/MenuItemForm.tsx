@@ -8,23 +8,17 @@
 
 
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm, UseFormRegister, UseFormSetValue, UseFormWatch, FieldErrors, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Sparkles, Save, X, Loader2 } from 'lucide-react';
-import { globalColors } from '../utils/QSAIDesign';
+// Button, Save, X, Loader2 moved to MenuItemFormProgressFooter
 import { BulkActionsToolbar } from 'components/MenuItemFormBulkActionsToolbar';
 import { MenuItemFormHeader } from 'components/MenuItemFormHeader';
-import { MenuItemFormActions } from 'components/MenuItemFormActions';
-import { MenuItemConfigurationBanner } from 'components/MenuItemConfigurationBanner';
-import { 
+import {
   MenuItemFormErrorDisplay,
   MenuItemFormBasicInfoSectionWrapper,
   MenuItemFormTypeSpecificSectionWrapper,
-  MenuItemFormMediaSectionWrapper,
   MenuItemFormVariantsSectionWrapper,
   MenuItemFormPricingSectionWrapper
 } from 'components/MenuItemFormSectionWrappers';
@@ -40,13 +34,12 @@ import type { MenuItemFormInput } from '../utils/menuFormValidation';
 import { MenuItemConfiguration, detectConfigurationFromItem } from '../utils/menuItemConfiguration';
 import brain from 'brain';
 import { menuItemFormSchema } from '../utils/menuFormValidation';
-import { validateItemPricing, getVariantSummary } from '../utils/variantPricing';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MenuItemFormStepper } from './MenuItemFormStepper';
-import { getStepsWithStatus, getNextIncompleteStep, type FormStep } from '../utils/menuFormSteps';
+import { validateItemPricing } from '../utils/variantPricing';
+import { getStepsWithStatus, type FormStep } from '../utils/menuFormSteps';
 import { MenuItemTypeConfigurationStep } from './MenuItemTypeConfigurationStep';
+import { MenuItemFormNavRail, MenuItemFormTabBar } from './MenuItemFormNavRail';
+import { MenuItemFormSectionHeader } from './MenuItemFormSectionHeader';
+import { MenuItemFormProgressFooter } from './MenuItemFormProgressFooter';
 
 /**
  * Map form field names to user-friendly labels for error messages
@@ -163,18 +156,6 @@ function MenuItemForm({
   itemType = null,
   initialItemType = null
 }: Props) {
-  console.log('🎨 [MenuItemForm] Component rendering with props:', {
-    hasMenuItem: !!menuItem,
-    hasInitialData: !!initialData,
-    categoriesProp: categories,
-    categoriesLength: categories?.length,
-    categoriesType: typeof categories,
-    itemType,
-    initialItemType,
-    configuration: propConfiguration,
-    isEditing,
-    categoriesPreview: categories?.slice(0, 2).map(c => ({ id: c.id, name: c.name }))
-  });
 
   // ✅ CRITICAL: Initialize itemData FIRST (before any hooks that reference it)
   const itemData = menuItem || initialData;
@@ -227,7 +208,7 @@ function MenuItemForm({
       image_state: v.image_state || 'inherited',
       display_order: index,
       spice_level: v.spice_level || 0,
-      allergens: v.allergens || [],
+      allergens: v.allergens || {},
       allergen_notes: v.allergen_notes || '',
       is_vegetarian: v.is_vegetarian || false,
       is_vegan: v.is_vegan || false,
@@ -272,7 +253,7 @@ function MenuItemForm({
   // 🆕 Phase 2.1: Unsaved Changes Dialog State
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   
-  // ✅ MOVED UP: itemData now initialized at the top (line after console.log)
+  // ✅ MOVED UP: itemData now initialized at the top
   const [selectedCategory, setSelectedCategory] = useState<string>(itemData?.category_id || '');
   
   const getInitialHasVariants = (): boolean => {
@@ -308,7 +289,7 @@ function MenuItemForm({
         setSavedTemplates(JSON.parse(templatesJson));
       }
     } catch (e) {
-      console.warn('Failed to load templates:', e);
+      // Failed to load templates
     }
   }, []);
 
@@ -355,7 +336,7 @@ function MenuItemForm({
         image_state: v.image_state || 'inherited',
         display_order: v.display_order ?? index, // REQUIRED FIELD - use index as fallback
         spice_level: v.spice_level || 0,
-        allergens: v.allergens || [],
+        allergens: v.allergens || {},
         allergen_notes: v.allergen_notes || '',
         // Dietary fields
         is_vegetarian: v.is_vegetarian || false,
@@ -398,63 +379,6 @@ function MenuItemForm({
   // ✅ FIX: Use useWatch instead of watch() to avoid render loop
   const formData = useWatch({ control });
   
-  const completionPercentage = useMemo(() => {
-    if (!formData) return 0;
-    
-    let completedFields = 0;
-    let totalFields = 0;
-    
-    // Required fields
-    const requiredFields = ['name', 'category_id'];
-    totalFields += requiredFields.length;
-    completedFields += requiredFields.filter(field => {
-      const value = formData[field];
-      return value && String(value).trim() !== '';
-    }).length;
-    
-    // Pricing (at least one price type)
-    totalFields += 1;
-    if ((formData.price && formData.price > 0) ||
-        (formData.price_dine_in && formData.price_dine_in > 0) ||
-        (formData.price_takeaway && formData.price_takeaway > 0) ||
-        (formData.price_delivery && formData.price_delivery > 0)) {
-      completedFields += 1;
-    }
-    
-    // Variants (if applicable)
-    if (formData.has_variants) {
-      totalFields += 1;
-      if (variants && variants.length > 0) {
-        completedFields += 1;
-      }
-    }
-    
-    // Optional but valuable fields
-    const optionalFields = ['description', 'image_url'];
-    totalFields += optionalFields.length;
-    completedFields += optionalFields.filter(field => {
-      const value = formData[field];
-      return value && String(value).trim() !== '';
-    }).length;
-    
-    return Math.round((completedFields / totalFields) * 100);
-  }, [formData]);
-  
-  // 🆕 Phase 2.4: Estimated time to complete (in minutes)
-  /**
-   * Estimate time remaining to complete form
-   * 
-   * Based on completion percentage.
-   * Assumes 30 seconds per 10% of form = 3 minutes for full form.
-   * 
-   * @returns {number} Estimated minutes remaining (minimum 1)
-   */
-  const estimatedTimeMinutes = useMemo(() => {
-    const remaining = 100 - completionPercentage;
-    // Rough estimate: 30 seconds per 10% of form = 3 minutes for full form
-    return Math.max(1, Math.round((remaining / 100) * 3));
-  }, [completionPercentage]);
-
   // Autosave Draft System - Check for existing draft on mount
   /**
    * Check for existing draft on component mount
@@ -482,27 +406,13 @@ function MenuItemForm({
         }
       }
     } catch (e) {
-      console.warn('Failed to load draft:', e);
+      // Failed to load draft
     }
   }, [draftKey, isEditing]);
 
   // ✅ CRITICAL FIX: Load existing variants when editing
   useEffect(() => {
     if (isEditing && itemData?.variants && Array.isArray(itemData.variants)) {
-      // 🔴 DEBUG: Log variant IDs when loading from itemData
-      console.log('🔴 [MenuItemForm] Loading variants from itemData:', {
-        timestamp: new Date().toISOString(),
-        variantIds: itemData.variants.map((v: MenuItemVariant) => v.id),
-        variantNames: itemData.variants.map((v: MenuItemVariant) => v.name),
-        variantPrices: itemData.variants.map((v: MenuItemVariant) => ({
-          id: v.id,
-          name: v.name,
-          price: v.price,
-          price_dine_in: v.price_dine_in,
-          price_delivery: v.price_delivery
-        })),
-        sourceNote: 'This data came from React Query cache or fresh fetch'
-      });
       // Transform MenuItemVariant[] to MenuVariant[] for local state
       const transformedVariants: MenuVariant[] = itemData.variants.map((v: MenuItemVariant, index: number) => ({
         id: v.id,
@@ -519,7 +429,7 @@ function MenuItemForm({
         image_state: v.image_state || 'inherited',
         display_order: index,
         spice_level: v.spice_level || 0,
-        allergens: v.allergens || [],
+        allergens: v.allergens || {},
         allergen_notes: v.allergen_notes || '',
         is_vegetarian: v.is_vegetarian || false,
         is_vegan: v.is_vegan || false,
@@ -551,36 +461,9 @@ function MenuItemForm({
     
     // Only update if there's a mismatch
     if (hasVariantsComputed !== currentHasVariants) {
-      console.log('🔄 Auto-syncing has_variants:', {
-        variantsCount: variants.length,
-        currentHasVariants,
-        newHasVariants: hasVariantsComputed
-      });
       setValue('has_variants', hasVariantsComputed, { shouldDirty: false });
     }
   }, [variants, watch, setValue]);
-
-  // 🐛 DEBUG: Log form validation errors
-  useEffect(() => {
-    if (Object.keys(errors).length > 0) {
-      console.error('🚨 [MenuItemForm] Validation Errors:', {
-        errorCount: Object.keys(errors).length,
-        errors: errors,
-        errorFields: Object.keys(errors),
-        errorMessages: Object.entries(errors).map(([field, error]) => ({
-          field,
-          message: error?.message,
-          type: error?.type
-        })),
-        formData: {
-          has_variants: watch('has_variants'),
-          variantsCount: variants?.length,
-          name: watch('name'),
-          category_id: watch('category_id')
-        }
-      });
-    }
-  }, [errors, watch, variants]);
 
   // Autosave Draft System - Auto-save every 30 seconds
   /**
@@ -611,9 +494,8 @@ function MenuItemForm({
         
         localStorage.setItem(draftKey, JSON.stringify(draftPayload));
         setLastAutosaveTime(new Date());
-        console.log('📝 Draft auto-saved:', new Date().toLocaleTimeString());
       } catch (e) {
-        console.warn('Failed to auto-save draft:', e);
+        // Failed to auto-save draft
       }
     }, 30000); // 30 seconds
 
@@ -649,7 +531,7 @@ function MenuItemForm({
       setShowDraftRestoreDialog(false);
       toast.success('Draft restored successfully!');
     } catch (e) {
-      console.error('Failed to restore draft:', e);
+      // Failed to restore draft
       toast.error('Failed to restore draft');
     }
   }, [draftData, setValue]);
@@ -670,7 +552,7 @@ function MenuItemForm({
       setLastAutosaveTime(null);
       toast.info('Draft discarded');
     } catch (e) {
-      console.warn('Failed to discard draft:', e);
+      // Failed to discard draft
     }
   }, [draftKey]);
 
@@ -734,7 +616,7 @@ function MenuItemForm({
         timestamp: new Date().toISOString()
       }));
     } catch (e) {
-      console.warn('Failed to backup form data:', e);
+      // Failed to backup form data
     }
 
     try {
@@ -886,7 +768,7 @@ function MenuItemForm({
           }
         } catch (error) {
           // Validation endpoint failed - log but don't block submission
-          console.warn('⚠️ [Media Validation] Failed to validate assets (non-blocking):', error);
+          // Media validation failed (non-blocking)
           // Continue with submission - backend Layer 3 will catch any issues
         }
       }
@@ -937,7 +819,7 @@ function MenuItemForm({
         is_dairy_free: v.is_dairy_free || false,
         is_nut_free: v.is_nut_free || false,
         spice_level: v.spice_level || null,
-        allergens: v.allergens || [],
+        allergens: v.allergens || {},
         allergen_notes: v.allergen_notes || null,
         featured: v.featured || false,
       })) : [];
@@ -952,53 +834,12 @@ function MenuItemForm({
       
       delete submissionData.menu_order;
       
-      // 🔍 DEBUG: Log complete submission payload
-      console.log('\n' + '='.repeat(80));
-      console.log('🔍 [FORM SUBMISSION DEBUG] Menu Item Save Payload');
-      console.log('='.repeat(80));
-      console.log('Operation:', itemData?.id ? 'UPDATE' : 'CREATE');
-      console.log('Item ID:', itemData?.id || 'NEW');
-      console.log('Item Name:', submissionData.name);
-      console.log('Has Variants:', submissionData.has_variants);
-      console.log('\n📸 IMAGE ASSET DATA:');
-      console.log('  image_asset_id:', submissionData.image_asset_id || '(not set)');
-      console.log('  image_widescreen_asset_id:', submissionData.image_widescreen_asset_id || '(not set)');
-      console.log('\n💰 PRICING DATA:');
-      console.log('  price:', submissionData.price);
-      console.log('  price_takeaway:', submissionData.price_takeaway);
-      console.log('  price_dine_in:', submissionData.price_dine_in);
-      console.log('  price_delivery:', submissionData.price_delivery);
-      if (submissionData.has_variants && submissionData.variants?.length > 0) {
-        console.log('\n🔄 VARIANTS DATA:');
-        submissionData.variants.forEach((v: any, idx: number) => {
-          console.log(`  Variant ${idx + 1}: ${v.name}`);
-          console.log(`    - id: ${v.id || '(NO ID - will CREATE instead of UPDATE!)'}`);
-          console.log(`    - image_asset_id: ${v.image_asset_id || '(not set)'}`);
-          console.log(`    - price: £${v.price}`);
-          console.log(`    - price_dine_in: £${v.price_dine_in || 0}`);
-          console.log(`    - price_delivery: £${v.price_delivery || 0}`);
-        });
-      }
-      console.log('\n📦 Full Payload:', JSON.stringify(submissionData, null, 2));
-      console.log('='.repeat(80) + '\n');
-      
       let response;
 
-      // 🔍 DEBUG: Trace onSave callback flow
-      console.log('\n' + '🟡'.repeat(40));
-      console.log('🟡 [MenuItemForm] onSave exists:', !!onSave);
-      console.log('🟡 [MenuItemForm] onSave type:', typeof onSave);
-      console.log('🟡 [MenuItemForm] isEditing:', isEditing);
-      console.log('🟡 [MenuItemForm] itemData?.id:', itemData?.id);
-      console.log('🟡'.repeat(40) + '\n');
-
       if (onSave) {
-        console.log('🟡 [MenuItemForm] CALLING onSave(submissionData)...');
         try {
           await onSave(submissionData);
-          console.log('🟡 [MenuItemForm] onSave COMPLETED without error');
         } catch (onSaveError) {
-          console.error('🟡 [MenuItemForm] onSave THREW ERROR:', onSaveError);
           throw onSaveError; // Re-throw to outer catch
         }
 
@@ -1120,7 +961,7 @@ function MenuItemForm({
       }
       
     } catch (error: any) {
-      console.error('Error saving menu item:', error);
+      // Error saving menu item
       const errorMsg = error.message || `Failed to ${itemData?.id ? 'update' : 'create'} menu item`;
       setSubmitError(errorMsg);
       setErrorMessage(errorMsg); // Announce error to screen readers
@@ -1139,7 +980,7 @@ function MenuItemForm({
             }
           }, 100);
         } catch (e) {
-          console.warn('Could not focus error field:', e);
+          // Could not focus error field
         }
       }
       
@@ -1165,8 +1006,6 @@ function MenuItemForm({
    * Focuses the field for immediate correction
    */
   const onInvalid = useCallback((errors: FieldErrors<MenuItemFormData>) => {
-    console.log('❌ [FORM VALIDATION] Validation failed:', errors);
-    
     // Get first error field
     const firstErrorField = Object.keys(errors)[0];
     if (!firstErrorField) return;
@@ -1199,7 +1038,7 @@ function MenuItemForm({
     try {
       setFocus(firstErrorField as keyof MenuItemFormData);
     } catch (e) {
-      console.warn('Could not focus field via setFocus:', e);
+      // Could not focus field via setFocus
     }
   }, [setFocus]);
 
@@ -1278,16 +1117,10 @@ function MenuItemForm({
     image_widescreen_asset_id: string;
     preferred_aspect_ratio: string;
   }) => {
-    console.log('🔵 [MenuItemForm handleMediaChange] RECEIVED mediaData:', mediaData);
-    console.log('🔵 [MenuItemForm handleMediaChange] image_asset_id value:', mediaData.image_asset_id);
-    console.log('🔵 [MenuItemForm handleMediaChange] image_widescreen_asset_id value:', mediaData.image_widescreen_asset_id);
-
     setValue('image_url', mediaData.image_url, { shouldDirty: true });
     setValue('image_url_widescreen', mediaData.image_url_widescreen, { shouldDirty: true });
     setValue('image_asset_id', mediaData.image_asset_id, { shouldDirty: true });
-    console.log('✅ [MenuItemForm handleMediaChange] Called setValue for image_asset_id:', mediaData.image_asset_id);
     setValue('image_widescreen_asset_id', mediaData.image_widescreen_asset_id, { shouldDirty: true });
-    console.log('✅ [MenuItemForm handleMediaChange] Called setValue for image_widescreen_asset_id:', mediaData.image_widescreen_asset_id);
     setValue('preferred_aspect_ratio', mediaData.preferred_aspect_ratio as 'square' | 'widescreen', { shouldDirty: true });
   }, [setValue]);
 
@@ -1320,7 +1153,7 @@ function MenuItemForm({
         is_dairy_free: v.is_dairy_free || false,
         is_nut_free: v.is_nut_free || false,
         spice_level: v.spice_level || null,
-        allergens: v.allergens || [],
+        allergens: v.allergens || {},
         allergen_notes: v.allergen_notes || null,
         featured: v.featured || false,
       }));
@@ -1345,14 +1178,6 @@ function MenuItemForm({
 
   // Filter categories based on item type
   const filteredCategories = useMemo(() => {
-    console.log('🔍 [MenuItemForm] filteredCategories memo:', {
-      categoriesProp: categories,
-      categoriesLength: categories?.length,
-      categoriesType: typeof categories,
-      itemType,
-      categoriesPreview: categories?.slice(0, 2).map(c => ({ id: c.id, name: c.name }))
-    });
-    
     if (!categories) return [];
     
     if (itemType === 'drinks_wine') {
@@ -1378,11 +1203,6 @@ function MenuItemForm({
     }
     
     const result = categories.filter(cat => cat.active && !cat.is_protein_type);
-    console.log('🎯 [MenuItemForm] FINAL FILTER RESULT for itemType=' + itemType + ':', {
-      inputCount: categories?.length,
-      outputCount: result.length,
-      sampleOutput: result.slice(0, 3).map(c => ({ name: c.name, active: c.active, is_protein_type: c.is_protein_type }))
-    });
     return result;
   }, [categories, itemType]);
 
@@ -1412,7 +1232,7 @@ function MenuItemForm({
       setTemplateName('');
       toast.success(`Template "${newTemplate.name}" saved!`);
     } catch (e) {
-      console.error('Failed to save template:', e);
+      // Failed to save template
       toast.error('Failed to save template');
     }
   }, [templateName, getValues, variants, savedTemplates]);
@@ -1443,7 +1263,7 @@ function MenuItemForm({
       setLoadTemplateDialogOpen(false);
       toast.success(`Template "${template.name}" loaded!`);
     } catch (e) {
-      console.error('Failed to load template:', e);
+      // Failed to load template
       toast.error('Failed to load template');
     }
   }, [savedTemplates, reset, setValue]);
@@ -1459,7 +1279,7 @@ function MenuItemForm({
       setSavedTemplates(updatedTemplates);
       toast.success('Template deleted');
     } catch (e) {
-      console.error('Failed to delete template:', e);
+      // Failed to delete template
       toast.error('Failed to delete template');
     }
   }, [savedTemplates]);
@@ -1495,7 +1315,7 @@ function MenuItemForm({
       
       toast.success('Item duplicated! Ready to save.');
     } catch (e) {
-      console.error('Failed to duplicate item:', e);
+      // Failed to duplicate item
       toast.error('Failed to duplicate item');
     }
   }, [getValues, reset, setValue, variants]);
@@ -1546,21 +1366,11 @@ function MenuItemForm({
     }
   }, [configuration, setValue]);
 
-  // 🎯 NEW: Stepper state management
-  // Start with configuration step expanded for new items, basic for existing
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(
-    new Set([initialConfiguration ? 'basic' : 'configuration'])
+  // Active section tracking for nav rail highlight
+  const [activeStepId, setActiveStepId] = useState<string>(
+    initialConfiguration ? 'basic' : 'configuration'
   );
-
-  // Remove old section expansion state (replaced by stepper)
-  // const [sectionsExpanded, setSectionsExpanded] = useState({
-  //   basic: true,
-  //   typeSpecific: true,
-  //   media: false,
-  //   variants: true,
-  //   pricing: true
-  // });
-  // const toggleSection = ...
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // 🎯 NEW: Calculate steps with current status
   const formSteps = useMemo<FormStep[]>(() => {
@@ -1593,53 +1403,39 @@ function MenuItemForm({
     );
   }, [configuration, watch, variants, errors, itemData?.id]);
 
-  // 🎯 NEW: Auto-expand logic for progressive disclosure
+  // IntersectionObserver for active section tracking
   useEffect(() => {
-    // Find the first incomplete required step
-    const nextIncomplete = getNextIncompleteStep(formSteps);
-    
-    if (nextIncomplete && !expandedSteps.has(nextIncomplete.id)) {
-      setExpandedSteps(prev => {
-        const next = new Set(prev);
-        
-        // Collapse all previous steps to reduce cognitive load
-        const nextIndex = formSteps.findIndex(s => s.id === nextIncomplete.id);
-        formSteps.slice(0, nextIndex).forEach(step => {
-          next.delete(step.id);
-        });
-        
-        // Expand the next incomplete required step
-        next.add(nextIncomplete.id);
-        return next;
-      });
-    }
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const stepId = entry.target.getAttribute('data-step');
+            if (stepId) setActiveStepId(stepId);
+          }
+        }
+      },
+      {
+        root: container,
+        rootMargin: '-20% 0px -70% 0px',
+        threshold: 0,
+      }
+    );
+
+    const sections = container.querySelectorAll('[data-step]');
+    sections.forEach((section) => observer.observe(section));
+
+    return () => observer.disconnect();
   }, [formSteps]);
 
-  // 🎯 NEW: Manual step toggle handler
-  const handleToggleStep = useCallback((stepId: string) => {
-    setExpandedSteps(prev => {
-      const next = new Set(prev);
-      if (next.has(stepId)) {
-        next.delete(stepId);
-      } else {
-        next.add(stepId);
-      }
-      return next;
-    });
-  }, []);
-
-  // 🎯 NEW: Scroll to step and expand
+  // Scroll to a specific section
   const handleScrollToStep = useCallback((stepId: string) => {
-    // Expand the step
-    setExpandedSteps(prev => new Set(prev).add(stepId));
-    
-    // Scroll to step (with small delay for expand animation)
-    setTimeout(() => {
-      const element = document.getElementById(`step-${stepId}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
+    const element = scrollContainerRef.current?.querySelector(`[data-step="${stepId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, []);
 
   // 🎯 NEW: Render step content based on step ID
@@ -1672,8 +1468,8 @@ function MenuItemForm({
               // Update has_variants in form based on pricing mode
               setValue('has_variants', newConfig.pricingMode === 'variants');
             }}
-            isExpanded={expandedSteps.has('configuration')}
-            onToggleExpanded={() => handleToggleStep('configuration')}
+            isExpanded={true}
+            onToggleExpanded={() => {}}
             isComplete={!!(configuration?.itemType && configuration?.pricingMode)}
           />
         );
@@ -1739,35 +1535,16 @@ function MenuItemForm({
       default:
         return null;
     }
-  }, [configuration, variants, register, control, setValue, errors, filteredCategories, watch, proteinTypes, handleMediaChange, handleFocusPricing, handleAddVariant, hasPricingError, isEditing, initialConfiguration, expandedSteps, handleToggleStep]);
+  }, [configuration, variants, register, control, setValue, errors, filteredCategories, watch, proteinTypes, handleMediaChange, handleFocusPricing, handleAddVariant, hasPricingError, isEditing, initialConfiguration]);
+
+  // Compute config subtitle for header
+  const configSubtitle = configuration
+    ? `${configuration.itemType === 'food' ? 'Food' : configuration.itemType === 'drinks_wine' ? 'Drinks & Wine' : configuration.itemType === 'coffee_desserts' ? 'Coffee & Desserts' : 'Menu'} — ${configuration.pricingMode === 'variants' ? 'Variant Pricing' : 'Single Price'}`
+    : undefined;
 
   return (
     <>
-      {/* 🆕 PHASE 3.3: Enhanced Focus Indicators - Global CSS */}
-      <style>{`
-        /* Enhanced focus indicators for accessibility */
-        .menu-item-form input:focus,
-        .menu-item-form textarea:focus,
-        .menu-item-form select:focus,
-        .menu-item-form button:focus-visible,
-        .menu-item-form [role="button"]:focus-visible {
-          outline: 2px solid ${globalColors.purple.primary};
-          outline-offset: 2px;
-          border-radius: 4px;
-        }
-        
-        /* Focus for card headers (collapsible sections) */
-        .menu-item-form [role="button"]:focus-visible {
-          box-shadow: 0 0 0 3px ${globalColors.purple.glow};
-        }
-        
-        /* Ensure focus is always visible */
-        .menu-item-form *:focus:not(:focus-visible) {
-          outline: none;
-        }
-      `}</style>
-
-      {/* 🆕 PHASE 3.4: Screen Reader Live Regions */}
+      {/* Screen Reader Live Regions */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {statusMessage}
       </div>
@@ -1775,327 +1552,89 @@ function MenuItemForm({
         {errorMessage}
       </div>
 
-      {/* Outer container with flex column layout */}
+      {/* Outer container */}
       <div className="flex flex-col h-full min-h-0">
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
-          {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="w-full max-w-6xl mx-auto px-6 pt-6 pb-6">
-              {/* 🆕 PHASE 2.5: Bulk Operations Toolbar */}
-              <BulkActionsToolbar
-                isEditing={isEditing}
-                hasVariants={hasVariants}
-                savedTemplates={savedTemplates}
-                onDuplicateItem={handleDuplicateItem}
-                onSaveAsTemplate={handleSaveAsTemplate}
-                onLoadTemplate={handleLoadTemplate}
-                onDeleteTemplate={handleDeleteTemplate}
-                onCopyPricesToAll={handleCopyPricesToAll}
-                onResetForm={handleResetForm}
+        {/* Compact Header */}
+        <MenuItemFormHeader
+          isEditing={isEditing}
+          formTitle={isEditing ? 'Edit Menu Item' : 'Add Menu Item'}
+          isDirty={isDirty}
+          lastAutosaveTime={lastAutosaveTime}
+          configSubtitle={configSubtitle}
+          isConfigLocked={isEditing || !!initialConfiguration}
+        />
+
+        {/* Bulk Actions Toolbar */}
+        <BulkActionsToolbar
+          isEditing={isEditing}
+          hasVariants={hasVariants}
+          savedTemplates={savedTemplates}
+          onDuplicateItem={handleDuplicateItem}
+          onSaveAsTemplate={handleSaveAsTemplate}
+          onLoadTemplate={handleLoadTemplate}
+          onDeleteTemplate={handleDeleteTemplate}
+          onCopyPricesToAll={handleCopyPricesToAll}
+          onResetForm={handleResetForm}
+        />
+
+        {/* Mobile Tab Bar (visible < lg) */}
+        <MenuItemFormTabBar
+          steps={formSteps}
+          activeStepId={activeStepId}
+          onStepClick={handleScrollToStep}
+        />
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 min-h-0">
+          {/* Desktop Nav Rail (visible lg+) */}
+          <MenuItemFormNavRail
+            steps={formSteps}
+            activeStepId={activeStepId}
+            onStepClick={handleScrollToStep}
+          />
+
+          {/* Scrollable Content Area */}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto"
+          >
+            <div className="max-w-4xl mx-auto px-6 py-6 space-y-2 menu-item-form">
+              {/* Error Display */}
+              <MenuItemFormErrorDisplay
+                submitError={submitError}
+                errors={errors as unknown as import('react-hook-form').FieldErrors<MenuItemFormInput>}
+                shouldShowValidationErrors={
+                  !!submitError || !!itemData?.id || Object.keys(touchedFields || {}).length > 0
+                }
               />
 
-              {/* Main Form Container */}
-              <div 
-                className="p-8 rounded-xl transition-all duration-300 menu-item-form"
-                style={{
-                  backgroundColor: '#1E1E1E',
-                  border: '1px solid rgba(255, 255, 255, 0.03)',
-                  borderBottom: '1px solid rgba(91, 33, 182, 0.15)',
-                  borderRadius: '0.75rem',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                }}
-              >
-                {/* Form Header */}
-                <MenuItemFormHeader
-                  isEditing={isEditing}
-                  formTitle={isEditing ? 'Edit Menu Item' : 
-                    `Add New ${itemType === 'food' ? 'Food' : 
-                      itemType === 'drinks_wine' ? 'Drinks & Wine' : 
-                      itemType === 'coffee_desserts' ? 'Coffee & Desserts' : 'Menu'} Item`}
-                  isDirty={isDirty}
-                  lastAutosaveTime={lastAutosaveTime}
-                  completionPercentage={completionPercentage}
-                  estimatedTimeMinutes={estimatedTimeMinutes}
-                  statusMessage={statusMessage}
-                  errorMessage={errorMessage}
-                  onDiscardDraft={handleDiscardDraft}
-                />
-
-                {/* Error Display */}
-                <MenuItemFormErrorDisplay
-                  submitError={submitError}
-                  errors={errors as unknown as import('react-hook-form').FieldErrors<MenuItemFormInput>}
-                  shouldShowValidationErrors={
-                    // Show validation errors only when:
-                    !!submitError ||          // User attempted submit and it failed
-                    !!itemData?.id ||         // Editing existing item (validation always on)
-                    Object.keys(touchedFields || {}).length > 0  // User has interacted with fields
-                  }
-                />
-
-                {/* 🆕 Configuration Banner */}
-                {configuration && (
-                  <MenuItemConfigurationBanner
-                    configuration={configuration}
-                    variantCount={variants.length}
+              {/* All sections rendered continuously with section dividers */}
+              {formSteps.map((step) => (
+                <section key={step.id} data-step={step.id}>
+                  <MenuItemFormSectionHeader
+                    title={step.title}
+                    icon={step.icon}
+                    status={step.status}
+                    required={step.required}
                   />
-                )}
-
-                {/* 🆕 PHASE 2: Pricing Status Panel - Only show for existing items or after submit error */}
-                {(() => {
-                  // Only show validation for: existing items OR after submit error
-                  // Do NOT show during form filling - let users complete the form first
-                  const shouldShowPricingValidation = 
-                    !!itemData?.id ||       // Editing existing item - show validation
-                    hasPricingError;         // Submit failed - show errors
-                  
-                  if (!shouldShowPricingValidation) {
-                    return null; // Don't show validation for brand new forms being filled out
-                  }
-                  
-                  const basePriceIsZero = 
-                    (!watch('price') || watch('price') === 0) &&
-                    (!watch('price_dine_in') || watch('price_dine_in') === 0) &&
-                    (!watch('price_takeaway') || watch('price_takeaway') === 0) &&
-                    (!watch('price_delivery') || watch('price_delivery') === 0);
-                  
-                  // Transform MenuVariant[] to MenuItemVariant[] for getVariantSummary
-                  const transformedVariants: MenuItemVariant[] = variants.map(v => ({
-                    ...v,
-                    id: v.id || '',
-                    menu_item_id: itemData?.id || '',
-                    protein_type_id: v.protein_type_id || null,
-                    name: v.name || null,
-                    is_default: v.is_default || false,
-                  }));
-
-                  const variantSummary = hasVariants && variants.length > 0
-                    ? getVariantSummary(transformedVariants, 'COLLECTION')
-                    : null;
-
-                  const pricingValidation = validateItemPricing(
-                    {
-                      base_price: watch('price') || 0,
-                      price_dine_in: watch('price_dine_in') || 0,
-                      price_takeaway: watch('price_takeaway') || 0,
-                      price_delivery: watch('price_delivery') || 0,
-                      has_variants: hasVariants,
-                      variants: []
-                    } as Partial<import('../utils/masterTypes').MenuItem>,
-                    transformedVariants
-                  );
-
-                  return (
-                    <Alert 
-                      className="mb-6 border-purple-500/20" 
-                      style={{ 
-                        backgroundColor: 'rgba(91, 33, 182, 0.1)',
-                        borderColor: pricingValidation.isValid ? 'rgba(91, 33, 182, 0.3)' : 'rgba(239, 68, 68, 0.5)'
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        {pricingValidation.isValid ? (
-                          <CheckCircle2 className="h-5 w-5 text-purple-400 mt-0.5" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
-                        )}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-semibold text-white">Pricing Configuration</h4>
-                            <Badge variant={pricingValidation.isValid ? 'default' : 'destructive'} className="text-xs">
-                              {pricingValidation.isValid ? 'Valid' : 'Invalid'}
-                            </Badge>
-                          </div>
-
-                          {hasVariants ? (
-                            <div className="space-y-2 text-sm">
-                              <div className="flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-400" />
-                                <span className="text-purple-200">
-                                  Variant pricing active - {variants.length} protein option{variants.length !== 1 ? 's' : ''} configured
-                                </span>
-                              </div>
-                              {variantSummary && (
-                                <div className="flex items-center gap-2 ml-6">
-                                  <Info className="h-4 w-4 text-purple-400" />
-                                  <span className="text-purple-300">
-                                    Price range: {variantSummary.priceRange}
-                                  </span>
-                                </div>
-                              )}
-                              {basePriceIsZero && (
-                                <div className="flex items-center gap-2 ml-6">
-                                  <Info className="h-4 w-4 text-blue-400" />
-                                  <span className="text-blue-300 text-xs">
-                                    ℹ️ Base price is £0.00 - this is normal for variant items
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="space-y-2 text-sm">
-                              <div className="flex items-center gap-2">
-                                <Info className="h-4 w-4 text-purple-400" />
-                                <span className="text-purple-200">
-                                  Single-price item (no variants)
-                                </span>
-                              </div>
-                              {basePriceIsZero && (
-                                <div className="flex items-center gap-2 ml-6">
-                                  <AlertCircle className="h-4 w-4 text-red-400" />
-                                  <span className="text-red-300 text-xs font-medium">
-                                    ⚠️ Warning: Base price is £0.00 - please set a price or add variants
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Show validation errors if any */}
-                          {pricingValidation.errors.length > 0 && (
-                            <div className="mt-3 p-3 rounded-md bg-red-950/50 border border-red-500/30">
-                              <p className="text-red-300 text-sm font-medium mb-1">Pricing errors:</p>
-                              <ul className="list-disc list-inside space-y-1">
-                                {pricingValidation.errors.map((error, idx) => (
-                                  <li key={idx} className="text-red-200 text-xs">{error}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Show warnings if any (non-blocking) */}
-                          {pricingValidation.warnings.length > 0 && pricingValidation.isValid && (
-                            <div className="mt-3 p-3 rounded-md bg-yellow-950/30 border border-yellow-500/20">
-                              <p className="text-yellow-300 text-sm font-medium mb-1">Notices:</p>
-                              <ul className="list-disc list-inside space-y-1">
-                                {pricingValidation.warnings.map((warning, idx) => (
-                                  <li key={idx} className="text-yellow-200 text-xs">{warning}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Alert>
-                  );
-                })()}
-
-                {/* 🆕 PHASE 3: VERTICAL STEPPER LAYOUT */}
-                <MenuItemFormStepper
-                  steps={formSteps}
-                  expandedSteps={expandedSteps}
-                  onToggleStep={handleToggleStep}
-                  renderStepContent={renderStepContent}
-                />
-
-                {/* OLD FLAT LAYOUT - REMOVED */}
-                {/* <MenuItemFormBasicInfoSectionWrapper ... /> */}
-                {/* <MenuItemFormTypeSpecificSectionWrapper ... /> */}
-                {/* <MenuItemFormMediaSectionWrapper ... /> */}
-                {/* {configuration?.pricingMode === 'variants' && <MenuItemFormVariantsSectionWrapper ... />} */}
-                {/* {configuration?.pricingMode === 'single' && <MenuItemFormPricingSectionWrapper ... />} */}
-
-                {/* 🆕 PHASE 3.2: Keyboard Shortcuts Help */}
-                <Card className="mb-6 bg-transparent border-white/10">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5" aria-hidden="true" />
-                      Keyboard Shortcuts
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm" style={{ color: globalColors.text.secondary }}>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: globalColors.text.primary }}>Ctrl+S</kbd>
-                        <span>Save form</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: globalColors.text.primary }}>Ctrl+Enter</kbd>
-                        <span>Submit form</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>Ctrl+D</kbd>
-                        <span>Duplicate item</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>Ctrl+Shift+R</kbd>
-                        <span>Reset form</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>Esc</kbd>
-                        <span>Cancel</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <kbd className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>Enter</kbd>
-                        <span>Submit (from input fields)</span>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs" style={{ color: globalColors.text.muted }}>
-                      💡 Tip: Use <kbd className="px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>Tab</kbd> to navigate between fields
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-
-          {/* 🔧 STICKY FOOTER - Outside scroll container, inside form */}
-          <div className="border-t p-6" style={{ backgroundColor: globalColors.background.primary, borderColor: globalColors.border.medium }}>
-            <div className="flex justify-end gap-4 max-w-5xl mx-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={isSubmitting || isLoading}
-                className="min-w-[120px]"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  console.log('\n' + '🔘'.repeat(50));
-                  console.log('🔘 [SAVE BUTTON] Button Click Registered');
-                  console.log('🔘'.repeat(50));
-                  console.log('📊 Current Form State:');
-                  console.log('  isSubmitting:', isSubmitting);
-                  console.log('  isLoading:', isLoading);
-                  console.log('  isDirty:', isDirty);
-                  console.log('  isValid:', isValid);
-                  console.log('\n🚨 Validation Errors:', Object.keys(errors).length > 0 ? errors : 'NONE');
-                  if (Object.keys(errors).length > 0) {
-                    console.log('\n⚠️ BLOCKING ERRORS FOUND:');
-                    Object.entries(errors).forEach(([field, error]: [string, any]) => {
-                      console.log(`  ❌ ${field}:`, error?.message || error);
-                    });
-                  }
-                  console.log('\n🔧 About to call handleSubmit(onSubmit, onInvalid)...');
-                  console.log('🔘'.repeat(50) + '\n');
-                  
-                  // Call the handler with both success and error callbacks
-                  handleSubmit(onSubmit, onInvalid)();
-                }}
-                disabled={isSubmitting || isLoading}
-                className="min-w-[160px] bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
-              >
-                {isSubmitting || isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {isSubmitting && retryCount > 0 ? `Retrying (${retryCount}/3)...` : 'Saving...'}
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Menu Item
-                  </>
-                )}
-              </Button>
+                  <div className="py-4">
+                    {renderStepContent(step.id)}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
         </form>
 
-        {/* All Dialogs */}
+        {/* Sticky Progress Footer */}
+        <MenuItemFormProgressFooter
+          steps={formSteps}
+          onSave={() => handleSubmit(onSubmit, onInvalid)()}
+          onCancel={handleCancel}
+          isSubmitting={isSubmitting || isLoading}
+          onScrollToStep={handleScrollToStep}
+        />
+
+        {/* Dialogs */}
         <SaveTemplateDialog
           open={templateDialogOpen}
           onOpenChange={setTemplateDialogOpen}

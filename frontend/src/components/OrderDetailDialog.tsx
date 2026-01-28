@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Clock, MapPin, Phone, Receipt, Printer, Edit, RefreshCcw, User, CheckSquare, Trash2, FileAudio, History, ChevronDown, Calendar } from "lucide-react";
+import { Clock, MapPin, Phone, Receipt, Printer, Edit, RefreshCcw, User, CheckSquare, Trash2, History, ChevronDown, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "utils/cn";
 import { getOrderAuditTrail, AuditEntry, createRefundAudit, createCancelAudit, createCompletionAudit } from "../utils/orderAuditTrail";
@@ -34,11 +34,11 @@ export interface OrderAddress {
 export interface OrderData {
   id: string;
   orderNumber: string;
-  sourceOrderId?: string; // Original source order ID
-  source: "ai-voice" | "online" | "pos";
+  sourceOrderId?: string;
+  source: "online" | "pos";
   status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
   type: "delivery" | "pickup" | "dine-in";
-  tableNumber?: number; // For dine-in orders
+  tableNumber?: number;
   items: OrderItem[];
   customer: {
     name: string;
@@ -57,7 +57,7 @@ export interface OrderData {
     updated?: string;
     scheduled?: string;
   };
-  transcript?: string; // For AI voice orders
+  total?: number;
 }
 
 interface OrderDetailDialogProps {
@@ -69,7 +69,7 @@ interface OrderDetailDialogProps {
   onRefund: (order: OrderData) => void;
   onDelete?: (order: OrderData) => void;
   onComplete?: (order: OrderData) => void;
-  orderSource: "ai-voice" | "online" | "pos";
+  orderSource: "online" | "pos";
 }
 
 const statusColors = {
@@ -92,7 +92,6 @@ export function OrderDetailDialog({
   onComplete,
   orderSource
 }: OrderDetailDialogProps) {
-  const [showTranscript, setShowTranscript] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   
@@ -367,31 +366,6 @@ export function OrderDetailDialog({
                 </div>
               </div>
               
-              {/* AI Transcript (for voice orders only) */}
-              {order.source === "ai-voice" && order.transcript && (
-                <div className="bg-[#151515] rounded-lg border border-gray-800 p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-medium text-purple-400 flex items-center gap-2">
-                      <FileAudio className="h-5 w-5" />
-                      Voice Order Transcript
-                    </h3>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setShowTranscript(!showTranscript)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      {showTranscript ? "Hide" : "Show"}
-                    </Button>
-                  </div>
-                  
-                  {showTranscript && (
-                    <div className="bg-[#0a0a0a] p-3 rounded border border-gray-800 text-gray-300 text-sm overflow-x-auto">
-                      <pre className="whitespace-pre-wrap font-mono text-xs">{order.transcript}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
               
               {/* Order Audit Trail */}
               <div className="bg-[#151515] rounded-lg border border-gray-800 p-4">

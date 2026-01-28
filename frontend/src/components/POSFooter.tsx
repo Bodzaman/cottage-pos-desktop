@@ -9,17 +9,24 @@ import { getOfflineStatus, onOfflineStatusChange } from '../utils/serviceWorkerM
 import { outboxSyncManager } from '../utils/outboxSyncManager';
 import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
 import { useOfflineBannerStore } from '../utils/offlineBannerStore';
+import { usePrinterStatus, PrinterStatusBadge } from './pos/PrinterStatusBadge';
+import { Monitor, Lock, Signal, CreditCard } from 'lucide-react';
+import { ActivityTicker } from './pos/ActivityTicker';
 
 interface POSFooterProps {
   className?: string;
   currentOrderType?: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
+  onToggleCustomerDisplay?: () => void;
+  onToggleKioskMode?: () => void;
+  kioskMode?: boolean;
+  onPrinterSettingsClick?: () => void;
 }
 
 /**
  * Professional footer for POSDesktop with complete operational status dashboard
  * Four-section layout: System Status | Operational Status | Branding | Date & Time
  */
-export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSFooterProps) {
+export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onToggleCustomerDisplay, onToggleKioskMode, kioskMode = false, onPrinterSettingsClick }: POSFooterProps) {
   const logger = createLogger('POSFooter');
   
   // Time state
@@ -34,9 +41,15 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
   //   loading: boolean;
   // }>({ connected: true, loading: false });
   
+  // Electron-native printer status (real-time from main process)
+  const electronPrinter = usePrinterStatus();
+
   // Map centralized system status to local printer status format
+  // Prefer Electron's direct printer detection over legacy helper app polling
   const printerStatus = {
-    connected: centralizedSystemStatus.system_status === 'healthy' || centralizedSystemStatus.helper_app_running,
+    connected: electronPrinter.isConnected !== null
+      ? electronPrinter.isConnected
+      : (centralizedSystemStatus.system_status === 'healthy' || centralizedSystemStatus.helper_app_running),
     loading: false
   };
 
@@ -206,26 +219,26 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
   };
   
   // Get status indicator with loading states - CLEANER VERSION
-  const StatusIndicator = ({ 
-    connected, 
-    loading, 
-    icon, 
+  const StatusIndicator = ({
+    connected,
+    loading,
+    icon,
     label,
     extraInfo
-  }: { 
-    connected: boolean; 
-    loading: boolean; 
-    icon: string;
+  }: {
+    connected: boolean;
+    loading: boolean;
+    icon: React.ReactNode;
     label: string;
     extraInfo?: string;
   }) => (
     <div className="flex items-center gap-1 group relative">
-      <span className="text-base">{icon}</span>
-      <div 
+      {icon}
+      <div
         className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${
-          loading ? 'bg-yellow-500 animate-pulse' : 
+          loading ? 'bg-yellow-500 animate-pulse' :
           connected ? 'bg-green-500' : 'bg-red-500'
-        }`} 
+        }`}
       />
       {/* Hover tooltip */}
       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black bg-opacity-90 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
@@ -308,6 +321,11 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
         
         {/* NEW: Offline mode indicator */}
         <OfflineModeIndicator />
+
+        {/* Activity Ticker — orders | items | rate */}
+        <div className="border-l border-white/10 pl-3">
+          <ActivityTicker />
+        </div>
       </div>
       
       {/* Center - Branding */}
@@ -336,24 +354,17 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
         {/* System Status Icons */}
         <div className="flex items-center gap-3">
           <StatusIndicator
-            connected={printerStatus.connected}
-            loading={printerStatus.loading}
-            icon="🖨️"
-            label="Printer"
-          />
-          
-          <StatusIndicator
             connected={internetStatus.online}
             loading={internetStatus.loading}
-            icon="📶"
+            icon={<Signal size={14} className="text-gray-400" />}
             label="Internet"
             extraInfo={isOffline ? 'Offline Mode Active' : undefined}
           />
-          
+
           <StatusIndicator
             connected={stripeStatus.connected && !isOffline}
             loading={stripeStatus.loading}
-            icon="💳"
+            icon={<CreditCard size={14} className="text-gray-400" />}
             label="Payments"
           />
           
@@ -366,6 +377,31 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN' }: POSF
           )}
         </div>
         
+        {/* Electron Controls (Customer Display, Kiosk, Printer Badge) */}
+        {typeof window !== 'undefined' && 'electronAPI' in window && (
+          <div className="flex items-center gap-2 border-l border-white/10 pl-3">
+            {onToggleCustomerDisplay && (
+              <button
+                onClick={onToggleCustomerDisplay}
+                className="flex items-center text-xs opacity-60 hover:opacity-100 transition-opacity"
+                title="Toggle customer display"
+              >
+                <Monitor size={14} className="text-gray-400" />
+              </button>
+            )}
+            {onToggleKioskMode && (
+              <button
+                onClick={onToggleKioskMode}
+                className={`flex items-center text-xs transition-opacity ${kioskMode ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                title={kioskMode ? 'Kiosk mode ON — click to disable' : 'Enable kiosk mode'}
+              >
+                <Lock size={14} className={kioskMode ? 'text-amber-400' : 'text-gray-400'} />
+              </button>
+            )}
+            <PrinterStatusBadge onClick={onPrinterSettingsClick} />
+          </div>
+        )}
+
         {/* Date & Time */}
         <div className="flex items-center">
           <span className="text-xs font-medium text-qsai-text-primary" style={{ letterSpacing: '0.02em' }}>

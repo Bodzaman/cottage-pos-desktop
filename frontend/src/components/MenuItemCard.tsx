@@ -53,7 +53,7 @@ const MenuItemCardComponent: React.FC<Props> = ({ item, orderMode = 'COLLECTION'
     } else if (orderMode === 'DELIVERY' && variant.priceDelivery !== null && variant.priceDelivery !== undefined) {
       return variant.priceDelivery;
     }
-    return variant.price; // Default to base/collection price
+    return variant.price ?? 0; // Default to base/collection price
   };
   
   // Get effective spice level based on variant selection

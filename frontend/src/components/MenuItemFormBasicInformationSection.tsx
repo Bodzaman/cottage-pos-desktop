@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { globalColors } from '../utils/QSAIDesign';
 import { generateKitchenDisplayName } from '../utils/smartAbbreviationSystem';
 import { HierarchicalCategorySelector } from './HierarchicalCategorySelector';
 import { RHFFieldError } from './FieldError';
@@ -129,14 +128,13 @@ export function BasicInformationSection({
   return (
     <div className="mb-8 p-6">
       <div className="flex items-center space-x-3 mb-6">
-        <div 
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: globalColors.purple.primary }}
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#7C3AED]"
           aria-hidden="true"
         >
           <FileText className="w-4 w-4 text-white" />
         </div>
-        <h3 className="text-lg font-semibold" style={{ color: globalColors.text.primary }}>
+        <h3 className="text-lg font-semibold text-white">
           Basic Information
         </h3>
       </div>
@@ -145,24 +143,24 @@ export function BasicInformationSection({
         {/* Name */}
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="name" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+            <Label htmlFor="name" className="text-sm font-medium">
               Item Name *
             </Label>
-            <span className="text-xs" style={{ color: globalColors.text.secondary }} aria-live="polite" aria-atomic="true">
+            <span className="text-xs text-gray-400" aria-live="polite" aria-atomic="true">
               {(formName || '').length} / 100
             </span>
           </div>
           <Input
             id="name"
             placeholder="Enter item name"
-            className={`bg-black/20 border-white/10 ${errors.name ? 'border-red-500' : ''}`}
+            className={`bg-surface-tertiary border-white/10 ${errors.name ? 'border-red-500' : ''}`}
             aria-label="Menu item name"
             aria-invalid={errors.name ? 'true' : 'false'}
             aria-describedby={`name-help ${errors.name ? 'name-error' : ''}`}
             aria-required="true"
             {...register('name')}
           />
-          <p id="name-help" className="text-xs" style={{ color: globalColors.text.secondary }}>
+          <p id="name-help" className="text-xs text-gray-400">
             Customer-facing name shown on menus and receipts
           </p>
           <RHFFieldError error={errors.name} id="name-error" />
@@ -171,15 +169,15 @@ export function BasicInformationSection({
         {/* Kitchen Display Name */}
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="kitchen_display_name" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+            <Label htmlFor="kitchen_display_name" className="text-sm font-medium">
               Kitchen Display Name
-              <span className="text-xs ml-1" style={{ color: globalColors.text.secondary }}>(Optional)</span>
+              <span className="text-xs ml-1 text-gray-400">(Optional)</span>
             </Label>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs text-gray-400"
               onClick={handleKitchenNameSuggest}
               aria-label="Generate smart abbreviation for kitchen display name"
             >
@@ -190,12 +188,12 @@ export function BasicInformationSection({
           <Input
             id="kitchen_display_name"
             placeholder="Abbreviated name for kitchen displays"
-            className="bg-black/20 border-white/10"
+            className="bg-surface-tertiary border-white/10"
             aria-label="Kitchen display name (abbreviated)"
             aria-describedby="kitchen-name-help"
             {...register('kitchen_display_name')}
           />
-          <p id="kitchen-name-help" className="text-xs" style={{ color: globalColors.text.secondary }}>
+          <p id="kitchen-name-help" className="text-xs text-gray-400">
             Shortened version for kitchen tickets and thermal printers
           </p>
         </div>
@@ -203,24 +201,24 @@ export function BasicInformationSection({
         {/* Description */}
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="description" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+            <Label htmlFor="description" className="text-sm font-medium">
               Description
             </Label>
-            <span className="text-xs" style={{ color: globalColors.text.secondary }} aria-live="polite" aria-atomic="true">
+            <span className="text-xs text-gray-400" aria-live="polite" aria-atomic="true">
               {formDescription.length} / 500
             </span>
           </div>
           <Textarea
             id="description"
             placeholder="Describe this menu item"
-            className={`min-h-[100px] resize-none bg-black/20 border-white/10 ${errors.description ? 'border-red-500' : ''}`}
+            className={`min-h-[100px] resize-none bg-surface-tertiary border-white/10 ${errors.description ? 'border-red-500' : ''}`}
             rows={4}
             aria-label="Menu item description"
             aria-invalid={errors.description ? 'true' : 'false'}
             aria-describedby={`description-help ${errors.description ? 'description-error' : ''}`}
             {...register('description')}
           />
-          <p id="description-help" className="text-xs" style={{ color: globalColors.text.secondary }}>
+          <p id="description-help" className="text-xs text-gray-400">
             Customer-facing description shown on menus
           </p>
           <RHFFieldError error={errors.description} id="description-error" />
@@ -228,7 +226,7 @@ export function BasicInformationSection({
 
         {/* Category */}
         <div className="space-y-2">
-          <Label htmlFor="category_id" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+          <Label htmlFor="category_id" className="text-sm font-medium">
             Category *
           </Label>
           <input
@@ -248,20 +246,20 @@ export function BasicInformationSection({
 
         {/* Menu Order */}
         <div className="space-y-2">
-          <Label htmlFor="menu_order" className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+          <Label htmlFor="menu_order" className="text-sm font-medium">
             Display Order
           </Label>
           <Input
             id="menu_order"
             type="number"
             placeholder="1"
-            className={`bg-black/20 border-white/10 ${errors.menu_order ? 'border-red-500' : ''}`}
+            className={`bg-surface-tertiary border-white/10 ${errors.menu_order ? 'border-red-500' : ''}`}
             aria-label="Menu display order (lower numbers appear first)"
             aria-invalid={errors.menu_order ? 'true' : 'false'}
             aria-describedby={`menu-order-help ${errors.menu_order ? 'menu-order-error' : ''}`}
             {...register('menu_order', { valueAsNumber: true })}
           />
-          <p id="menu-order-help" className="text-xs" style={{ color: globalColors.text.secondary }}>
+          <p id="menu-order-help" className="text-xs text-gray-400">
             Lower numbers appear first
           </p>
           <RHFFieldError error={errors.menu_order} id="menu-order-error" />
@@ -271,7 +269,7 @@ export function BasicInformationSection({
       {/* Dietary Tags */}
       {!hasVariants && (
         <div className="mt-6">
-          <Label className="text-sm font-medium mb-4 block" style={{ color: globalColors.text.primary }} id="dietary-tags-label">
+          <Label className="text-sm font-medium mb-4 block" id="dietary-tags-label">
             Dietary & Preference Tags
           </Label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4" role="group" aria-labelledby="dietary-tags-label">
@@ -280,11 +278,11 @@ export function BasicInformationSection({
                 id="vegetarian"
                 checked={vegetarian}
                 onCheckedChange={(checked) => handleDietaryToggle('vegetarian', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as vegetarian"
                 aria-checked={vegetarian}
               />
-              <Label htmlFor="vegetarian" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="vegetarian" className="text-sm cursor-pointer">
                 🥬 Vegetarian
               </Label>
             </div>
@@ -294,11 +292,11 @@ export function BasicInformationSection({
                 id="vegan"
                 checked={vegan}
                 onCheckedChange={(checked) => handleDietaryToggle('vegan', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as vegan"
                 aria-checked={vegan}
               />
-              <Label htmlFor="vegan" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="vegan" className="text-sm cursor-pointer">
                 🌱 Vegan
               </Label>
             </div>
@@ -308,11 +306,11 @@ export function BasicInformationSection({
                 id="gluten_free"
                 checked={glutenFree}
                 onCheckedChange={(checked) => handleDietaryToggle('gluten_free', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as gluten-free"
                 aria-checked={glutenFree}
               />
-              <Label htmlFor="gluten_free" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="gluten_free" className="text-sm cursor-pointer">
                 🌾 Gluten-Free
               </Label>
             </div>
@@ -322,11 +320,11 @@ export function BasicInformationSection({
                 id="halal"
                 checked={halal}
                 onCheckedChange={(checked) => handleDietaryToggle('halal', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as halal"
                 aria-checked={halal}
               />
-              <Label htmlFor="halal" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="halal" className="text-sm cursor-pointer">
                 ☪️ Halal
               </Label>
             </div>
@@ -336,11 +334,11 @@ export function BasicInformationSection({
                 id="dairy_free"
                 checked={dairyFree}
                 onCheckedChange={(checked) => handleDietaryToggle('dairy_free', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as dairy-free"
                 aria-checked={dairyFree}
               />
-              <Label htmlFor="dairy_free" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="dairy_free" className="text-sm cursor-pointer">
                 🥛 Dairy-Free
               </Label>
             </div>
@@ -350,11 +348,11 @@ export function BasicInformationSection({
                 id="nut_free"
                 checked={nutFree}
                 onCheckedChange={(checked) => handleDietaryToggle('nut_free', checked)}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-[#7C3AED]"
                 aria-label="Mark as nut-free"
                 aria-checked={nutFree}
               />
-              <Label htmlFor="nut_free" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+              <Label htmlFor="nut_free" className="text-sm cursor-pointer">
                 🥜 Nut-Free
               </Label>
             </div>
@@ -369,11 +367,11 @@ export function BasicInformationSection({
             id="featured"
             checked={useWatch({ control, name: 'featured' }) || false}
             onCheckedChange={(checked) => setValue('featured', checked, { shouldDirty: true })}
-            className="data-[state=checked]:bg-purple-600"
+            className="data-[state=checked]:bg-[#7C3AED]"
             aria-label="Mark as featured item"
             aria-checked={useWatch({ control, name: 'featured' }) || false}
           />
-          <Label htmlFor="featured" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+          <Label htmlFor="featured" className="text-sm cursor-pointer">
             ⭐ Featured Item
           </Label>
         </div>
@@ -383,11 +381,11 @@ export function BasicInformationSection({
             id="active"
             checked={useWatch({ control, name: 'active' }) || false}
             onCheckedChange={(checked) => setValue('active', checked, { shouldDirty: true })}
-            className="data-[state=checked]:bg-purple-600"
+            className="data-[state=checked]:bg-[#7C3AED]"
             aria-label="Mark as active and available for sale"
             aria-checked={useWatch({ control, name: 'active' }) || false}
           />
-          <Label htmlFor="active" className="text-sm cursor-pointer" style={{ color: globalColors.text.primary }}>
+          <Label htmlFor="active" className="text-sm cursor-pointer">
             ✅ Active (Available for sale)
           </Label>
         </div>

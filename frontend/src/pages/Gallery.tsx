@@ -11,6 +11,8 @@ import { PremiumTheme } from "utils/premiumTheme";
 import { galleryImages, GalleryImage } from "utils/galleryData";
 import brain from "brain";
 import { useNavigate } from "react-router-dom"; // FIXED: Add useNavigate import
+import { SEO } from "components/SEO";
+import { PAGE_SEO } from "utils/seoData";
 
 export default function Gallery() {
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -113,10 +115,11 @@ export default function Gallery() {
   }, []);
 
   return (
-    <div 
+    <div
       className="min-h-screen"
       style={{ background: PremiumTheme.colors.background.primary }}
     >
+      <SEO title={PAGE_SEO.gallery.title} description={PAGE_SEO.gallery.description} path="/gallery" />
       {/* Universal Header */}
       <UniversalHeader context="PUBLIC_NAV" />
       

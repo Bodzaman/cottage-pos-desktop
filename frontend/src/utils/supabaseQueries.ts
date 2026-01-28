@@ -1208,10 +1208,11 @@ export async function getPOSBundle(): Promise<{
   success: boolean;
   categories: any[];
   items: any[];
+  itemVariants: any[];
 }> {
   try {
-    // Fetch essential data for POS startup INCLUDING media_assets for image URL resolution
-    const [categoriesResult, itemsResult, mediaAssetsResult] = await Promise.all([
+    // Fetch essential data for POS startup INCLUDING media_assets and item_variants
+    const [categoriesResult, itemsResult, mediaAssetsResult, variantsResult] = await Promise.all([
       supabase
         .from('menu_categories')
         .select('id, name, parent_category_id, sort_order, is_active')
@@ -1223,16 +1224,19 @@ export async function getPOSBundle(): Promise<{
         .eq('is_active', true)
         .not('published_at', 'is', null)  // 🎯 DRAFT/PUBLISH: Only show published items on POS
         .order('display_order'),
-      // 🔧 FIX: Fetch media_assets to resolve image_asset_id → actual URL
       supabase
         .from('media_assets')
-        .select('id, url')
+        .select('id, url'),
+      supabase
+        .from('item_variants')
+        .select('*, menu_protein_types:protein_type_id(id, name)')
+        .order('menu_item_id')
     ]);
 
     if (categoriesResult.error) throw categoriesResult.error;
     if (itemsResult.error) throw itemsResult.error;
 
-    // 🔧 FIX: Create media asset lookup map for image URL resolution
+    // Create media asset lookup map for image URL resolution
     const mediaLookup: Record<string, string> = {};
     (mediaAssetsResult.data || []).forEach((asset: any) => {
       mediaLookup[asset.id] = asset.url;
@@ -1246,26 +1250,33 @@ export async function getPOSBundle(): Promise<{
       active: cat.is_active
     }));
 
-    // 🔧 FIX: Resolve image_asset_id to actual URL using media_assets lookup
+    // Resolve image_asset_id to actual URL using media_assets lookup
     const items = (itemsResult.data || []).map((item: any) => ({
       ...item,
-      price: item.base_price,  // Map base_price to price for compatibility
-      image_url: item.image_asset_id ? mediaLookup[item.image_asset_id] || null : null,  // ✅ Resolve to actual URL
+      price: item.base_price,
+      image_url: item.image_asset_id ? mediaLookup[item.image_asset_id] || null : null,
       active: item.is_active
     }));
 
+    // Resolve variant image_asset_id to actual URLs
+    const itemVariants = (variantsResult?.data || []).map((variant: any) => ({
+      ...variant,
+      image_url: variant.image_url || (variant.image_asset_id ? mediaLookup[variant.image_asset_id] || null : null)
+    }));
 
     return {
       success: true,
       categories,
-      items
+      items,
+      itemVariants
     };
   } catch (error) {
     console.error(' [supabaseQueries] getPOSBundle failed:', error);
     return {
       success: false,
       categories: [],
-      items: []
+      items: [],
+      itemVariants: []
     };
   }
 }
@@ -2517,19 +2528,9 @@ export async function publishMenu(): Promise<{
   message?: string;
 }> {
   try {
-    // Call backend endpoint which handles full publish workflow
-    const response = await fetch('/routes/publish-menu', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP ${response.status}`);
-    }
-
+    // Use brain module (works on both web via HTTP and Electron via direct Supabase)
+    const brain = await import('brain');
+    const response = await (brain.default as any).publish_menu();
     const result = await response.json();
 
     return {

@@ -20,6 +20,8 @@ import { useChatIsOpen } from "../utils/chat-store";
 import { useWebsiteData } from "../utils/useWebsiteData";
 import { loadFont, getFontFamily, DEFAULT_TITLE_FONT, DEFAULT_BODY_FONT } from "../utils/cmsFonts";
 import brain from "brain";
+import { SEO } from "components/SEO";
+import { RESTAURANT_JSONLD, PAGE_SEO } from "utils/seoData";
 
 // Restaurant images for the hero carousel
 // TODO: Migrate to Supabase storage via Website CMS image upload
@@ -227,6 +229,7 @@ export default function App() {
         fontFamily: getFontFamily(heroData?.body_font, DEFAULT_BODY_FONT),
       }}
     >
+      <SEO title={PAGE_SEO.home.title} description={PAGE_SEO.home.description} path="/" jsonLd={RESTAURANT_JSONLD} />
       {/* Enhanced Universal Header with Glassmorphism */}
       <UniversalHeader 
         context="PUBLIC_NAV"

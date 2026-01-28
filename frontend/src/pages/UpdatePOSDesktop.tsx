@@ -139,6 +139,9 @@ export default function UpdatePOSDesktop() {
         // Default to first non-main, non-protected branch
         const defaultBranch = data.branches.find((b: BranchInfo) => b.name !== 'main' && !b.protected);
         if (defaultBranch) setSelectedBranch(defaultBranch.name);
+      } else {
+        console.error('Branch load failed:', data.error);
+        toast.error(data.error || 'Failed to load branches');
       }
     } catch (error) {
       console.error('Failed to load branches:', error);
@@ -241,11 +244,13 @@ export default function UpdatePOSDesktop() {
       }
 
       // Step 4: Complete
+      // Edge Function returns: { success, tagName, version, releaseUrl, releaseId }
+      const actionsUrl = `https://github.com/Bodzaman/cottage-pos-desktop/actions`;
       setPipeline(prev => ({
         ...prev,
         step: 'complete',
-        releaseUrl: releaseData.release?.url || releaseData.release?.html_url,
-        buildUrl: releaseData.workflowRunUrl
+        releaseUrl: releaseData.releaseUrl || releaseData.release?.html_url,
+        buildUrl: actionsUrl
       }));
 
       toast.success(`Release v${nextVersion} created — build triggered!`);

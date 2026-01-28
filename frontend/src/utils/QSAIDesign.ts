@@ -24,6 +24,7 @@ export {
   colors,
   globalColors,
   QSAITheme,
+  posGlassPanel,
   panelStyle,
   styles,
   effects,

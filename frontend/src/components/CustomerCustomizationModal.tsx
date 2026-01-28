@@ -1,16 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, Check, Search, UtensilsCrossed, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { X, Plus, Minus, Check, Search, UtensilsCrossed } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
@@ -67,12 +61,9 @@ export function CustomerCustomizationModal({
   // State
   const [quantity, setQuantity] = useState(initialQuantity);
   const [selectedCustomizations, setSelectedCustomizations] = useState<SelectedCustomization[]>([]);
-  const [specialInstructions, setSpecialInstructions] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
   const [prevTotal, setPrevTotal] = useState(0);
-  const notesInputRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Update quantity when initialQuantity changes
   useEffect(() => {
@@ -84,7 +75,6 @@ export function CustomerCustomizationModal({
     if (!isOpen) {
       setSearchQuery('');
       setSelectedCustomizations([]);
-      setSpecialInstructions('');
     }
   }, [isOpen]);
 
@@ -94,9 +84,7 @@ export function CustomerCustomizationModal({
       if (initialCustomizations.length > 0) {
         setSelectedCustomizations(initialCustomizations);
       }
-      if (initialInstructions) {
-        setSpecialInstructions(initialInstructions);
-      }
+      // initialInstructions no longer used (notes are staff-only)
     }
   }, [isOpen, editMode, initialCustomizations, initialInstructions]);
 
@@ -114,44 +102,38 @@ export function CustomerCustomizationModal({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Apply search filter  
+  // Apply search filter
   const filteredCustomizations = useMemo(() => {
     return websiteCustomizations.filter(c => {
       if (!debouncedSearchQuery) return true;
       const query = debouncedSearchQuery.toLowerCase();
       return (
         c.name.toLowerCase().includes(query) ||
+        c.customization_group?.toLowerCase().includes(query) ||
         c.description?.toLowerCase().includes(query)
       );
     });
   }, [websiteCustomizations, debouncedSearchQuery]);
 
-  // Group customizations by name (since no customization_group column exists)
+  // Group customizations by customization_group (matching POS behaviour)
   const groupedCustomizations = useMemo(() => {
     const groups: Record<string, CustomizationBase[]> = {};
-    
+
     filteredCustomizations.forEach(customization => {
-      const groupName = customization.name || 'Other';
+      const groupName = customization.customization_group || customization.name || 'Other';
       if (!groups[groupName]) {
         groups[groupName] = [];
       }
       groups[groupName].push(customization);
     });
-    
+
     // Sort each group by display_order
     Object.keys(groups).forEach(groupName => {
       groups[groupName].sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
     });
-    
+
     return groups;
   }, [filteredCustomizations]);
-
-  // Open all accordion groups when modal opens and groups are computed
-  useEffect(() => {
-    if (isOpen && Object.keys(groupedCustomizations).length > 0) {
-      setOpenAccordionItems(Object.keys(groupedCustomizations));
-    }
-  }, [isOpen, groupedCustomizations]);
 
   // Calculate base price
   const basePrice = useMemo(() => {
@@ -215,44 +197,37 @@ export function CustomerCustomizationModal({
   // Handle add to cart
   const handleAddToCart = () => {
     if (variant) {
-      addToCart(item, quantity, variant, selectedCustomizations, specialInstructions);
+      addToCart(item, quantity, variant, selectedCustomizations, '');
     } else {
       // For items without variants, create a minimal variant object
-      const price = mode === 'delivery' 
+      const price = mode === 'delivery'
         ? (item.price_delivery || item.price_takeaway || item.price || 0)
         : (item.price_takeaway || item.price || 0);
-      
+
       const defaultVariant: ItemVariant = {
         id: item.id || '',
         name: 'Standard',
         price_adjustment: 0
       };
 
-      onAddToCart(defaultVariant, [], quantity, specialInstructions);
+      onAddToCart(defaultVariant, [], quantity, '');
     }
 
     // Reset state (parent will handle closing via onClose)
     setQuantity(1);
     setSelectedCustomizations([]);
-    setSpecialInstructions('');
     // Note: Removed onClose() call - parent component handles modal lifecycle
   };
 
-  // Handle chip removal and jump to group
-  const handleRemoveChip = (customizationId: string, groupName?: string) => {
+  // Handle chip removal
+  const handleRemoveChip = (customizationId: string) => {
     setSelectedCustomizations(prev => prev.filter(c => c.id !== customizationId));
-    
-    // Optionally expand the group if it's collapsed
-    if (groupName && !openAccordionItems.includes(groupName)) {
-      setOpenAccordionItems(prev => [...prev, groupName]);
-    }
   };
 
   // Handle close
   const handleClose = () => {
     setQuantity(1);
     setSelectedCustomizations([]);
-    setSpecialInstructions('');
     onClose();
     onModalClose?.();
   };
@@ -290,11 +265,6 @@ export function CustomerCustomizationModal({
       case '_':
         e.preventDefault();
         if (quantity > 1) handleQuantityDecrease();
-        break;
-      case 'm':
-      case 'M':
-        e.preventDefault();
-        notesInputRef.current?.focus();
         break;
     }
   }, [quantity]);
@@ -367,7 +337,7 @@ export function CustomerCustomizationModal({
             />
             <Input
               type="text"
-              placeholder="Search add-ons..."
+              placeholder="Search options..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -381,239 +351,93 @@ export function CustomerCustomizationModal({
           </div>
           {debouncedSearchQuery && (
             <p className="text-xs mt-2" style={{ color: PremiumTheme.colors.text.muted }}>
-              {Object.keys(groupedCustomizations).length} group(s) • {filteredCustomizations.length} option(s) found
+              {filteredCustomizations.length} result{filteredCustomizations.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-          {/* Customization Groups as Accordion */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-5">
           {Object.keys(groupedCustomizations).length > 0 ? (
-            <Accordion 
-              type="multiple" 
-              value={openAccordionItems}
-              onValueChange={setOpenAccordionItems}
-              className="space-y-3"
-            >
+            <div className="space-y-5">
               {Object.entries(groupedCustomizations).map(([groupName, items]) => {
                 const groupSelectionCount = selectedCustomizations.filter(c => c.group === groupName).length;
                 const hasExclusiveItems = items.some(item => item.is_exclusive);
-                
+
                 return (
-                  <AccordionItem 
-                    key={groupName} 
-                    value={groupName}
-                    className="border rounded-lg"
-                    style={{
-                      borderColor: PremiumTheme.colors.dark[700],
-                      background: PremiumTheme.colors.dark[850]
-                    }}
-                  >
-                    <AccordionTrigger 
-                      className="px-4 hover:no-underline"
-                      style={{ color: PremiumTheme.colors.text.primary }}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <h3 
-                          className="text-lg font-semibold"
-                          style={{ color: PremiumTheme.colors.burgundy[400] }}
-                        >
-                          {groupName}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs"
+                  <div key={groupName} className="space-y-3">
+                    {/* Section Header */}
+                    <div className="flex items-baseline gap-2">
+                      <h3
+                        className="text-base font-semibold"
+                        style={{ color: PremiumTheme.colors.burgundy[400] }}
+                      >
+                        {groupName}
+                      </h3>
+                      <span className="text-xs" style={{ color: PremiumTheme.colors.text.muted }}>
+                        {hasExclusiveItems ? 'Choose one' : 'Choose any'}
+                        {groupSelectionCount > 0 && ` (${groupSelectionCount} selected)`}
+                      </span>
+                    </div>
+
+                    {/* Pill / Chip Options */}
+                    <div className="flex flex-wrap gap-2">
+                      {items.map(customization => {
+                        const isSelected = selectedCustomizations.some(c => c.id === customization.id);
+                        const hasPrice = (customization.price ?? 0) > 0;
+
+                        return (
+                          <motion.button
+                            key={customization.id}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-medium transition-all min-h-[44px] cursor-pointer"
+                            )}
                             style={{
-                              borderColor: PremiumTheme.colors.burgundy[500],
-                              color: PremiumTheme.colors.burgundy[400]
+                              background: isSelected
+                                ? PremiumTheme.colors.burgundy[600]
+                                : PremiumTheme.colors.dark[850],
+                              borderColor: isSelected
+                                ? PremiumTheme.colors.burgundy[500]
+                                : PremiumTheme.colors.dark[700],
+                              color: isSelected
+                                ? PremiumTheme.colors.text.primary
+                                : PremiumTheme.colors.text.muted
                             }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => {
+                              if (hasExclusiveItems) {
+                                // Single choice: deselect others in group first
+                                setSelectedCustomizations(prev => prev.filter(c => c.group !== groupName));
+                                if (!isSelected) {
+                                  handleCustomizationToggle(customization, true);
+                                }
+                              } else {
+                                handleCustomizationToggle(customization, !isSelected);
+                              }
+                            }}
+                            role="option"
+                            aria-selected={isSelected}
                           >
-                            {items.length} {items.length === 1 ? 'option' : 'options'}
-                          </Badge>
-                          {groupSelectionCount > 0 && (
-                            <Badge 
-                              className="text-xs"
-                              style={{
-                                background: PremiumTheme.colors.burgundy[600],
-                                color: PremiumTheme.colors.text.primary
-                              }}
-                            >
-                              {groupSelectionCount} selected
-                            </Badge>
-                          )}
-                          {hasExclusiveItems && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge 
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{
-                                      borderColor: PremiumTheme.colors.gold[500],
-                                      color: PremiumTheme.colors.gold[400]
-                                    }}
-                                  >
-                                    Choice
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent 
-                                  className="bg-gray-900 text-white border-gray-700"
-                                >
-                                  Select one option from this group
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      {hasExclusiveItems ? (
-                        <RadioGroup
-                          value={selectedCustomizations.find(c => c.group === groupName)?.id}
-                          onValueChange={(value) => {
-                            const customization = items.find(item => item.id === value);
-                            if (customization) {
-                              // Deselect all in this group first
-                              setSelectedCustomizations(prev => prev.filter(c => c.group !== groupName));
-                              // Select the new one
-                              handleCustomizationToggle(customization, true);
-                            }
-                          }}
-                          className="space-y-2 pt-2"
-                        >
-                          {items.map(customization => {
-                            const isSelected = selectedCustomizations.some(c => c.id === customization.id);
-                            const hasPrice = (customization.price ?? 0) > 0;
-                            
-                            return (
-                              <motion.div
-                                key={customization.id}
-                                className={cn(
-                                  "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
-                                  isSelected 
-                                    ? "border-opacity-100" 
-                                    : "border-opacity-30 hover:border-opacity-60"
-                                )}
-                                style={{
-                                  background: isSelected 
-                                    ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[500]}40 0%, ${PremiumTheme.colors.dark[900]} 100%)`
-                                    : PremiumTheme.colors.dark[850],
-                                  borderColor: isSelected 
-                                    ? PremiumTheme.colors.burgundy[500]
-                                    : PremiumTheme.colors.dark[700]
-                                }}
-                                whileHover={{ scale: 1.01 }}
-                                role="option"
-                                aria-selected={isSelected}
-                              >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <RadioGroupItem
-                                    value={customization.id}
-                                    className="data-[state=checked]:bg-[#8B1538] data-[state=checked]:border-[#8B1538]"
-                                  />
-                                  <Label
-                                    htmlFor={customization.id}
-                                    className="cursor-pointer font-medium flex-1"
-                                    style={{ color: PremiumTheme.colors.text.primary }}
-                                  >
-                                    {customization.name}
-                                    {customization.description && (
-                                      <p className="text-sm mt-1" style={{ color: PremiumTheme.colors.text.muted }}>
-                                        {customization.description}
-                                      </p>
-                                    )}
-                                  </Label>
-                                </div>
-                                {hasPrice && (
-                                  <span 
-                                    className="text-sm font-semibold"
-                                    style={{ color: PremiumTheme.colors.burgundy[400] }}
-                                  >
-                                    +£{customization.price?.toFixed(2)}
-                                  </span>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </RadioGroup>
-                      ) : (
-                        <div className="space-y-2 pt-2">
-                          {items.map(customization => {
-                            const isSelected = selectedCustomizations.some(c => c.id === customization.id);
-                            const hasPrice = (customization.price ?? 0) > 0;
-                            
-                            return (
-                              <motion.div
-                                key={customization.id}
-                                className={cn(
-                                  "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
-                                  isSelected 
-                                    ? "border-opacity-100" 
-                                    : "border-opacity-30 hover:border-opacity-60"
-                                )}
-                                style={{
-                                  background: isSelected 
-                                    ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[500]}40 0%, ${PremiumTheme.colors.dark[900]} 100%)`
-                                    : PremiumTheme.colors.dark[850],
-                                  borderColor: isSelected 
-                                    ? PremiumTheme.colors.burgundy[500]
-                                    : PremiumTheme.colors.dark[700]
-                                }}
-                                whileHover={{ scale: 1.01 }}
-                                onClick={() => handleCustomizationToggle(customization, !isSelected)}
-                                role="option"
-                                aria-selected={isSelected}
-                              >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <Checkbox
-                                    id={customization.id}
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => 
-                                      handleCustomizationToggle(customization, checked as boolean)
-                                    }
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="data-[state=checked]:bg-[#8B1538] data-[state=checked]:border-[#8B1538]"
-                                  />
-                                  <Label
-                                    htmlFor={customization.id}
-                                    className="cursor-pointer font-medium flex-1"
-                                    style={{ color: PremiumTheme.colors.text.primary }}
-                                  >
-                                    {customization.name}
-                                    {customization.description && (
-                                      <p className="text-sm mt-1" style={{ color: PremiumTheme.colors.text.muted }}>
-                                        {customization.description}
-                                      </p>
-                                    )}
-                                  </Label>
-                                </div>
-                                {hasPrice && (
-                                  <span 
-                                    className="text-sm font-semibold"
-                                    style={{ color: PremiumTheme.colors.burgundy[400] }}
-                                  >
-                                    +£{customization.price?.toFixed(2)}
-                                  </span>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
+                            {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                            <span>{customization.name}</span>
+                            {hasPrice && (
+                              <span className="opacity-75">+£{customization.price?.toFixed(2)}</span>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
-            </Accordion>
+            </div>
           ) : (
-            <div 
+            <div
               className="text-center py-8"
               style={{ color: PremiumTheme.colors.text.muted }}
             >
-              {searchQuery ? 'No add-ons found matching your search.' : 'No add-ons available for this item.'}
+              {searchQuery ? 'No options found matching your search.' : 'No options available for this item.'}
             </div>
           )}
         </div>
@@ -635,7 +459,7 @@ export function CustomerCustomizationModal({
                       background: PremiumTheme.colors.burgundy[600],
                       color: PremiumTheme.colors.text.primary
                     }}
-                    onClick={() => handleRemoveChip(custom.id, custom.group)}
+                    onClick={() => handleRemoveChip(custom.id)}
                   >
                     <span>{custom.name}</span>
                     {custom.price_adjustment > 0 && (
@@ -761,7 +585,7 @@ export function CustomerCustomizationModal({
               <TooltipContent className="bg-gray-900 text-white border-gray-700">
                 <div className="space-y-1">
                   <p>Press Enter to add • Esc to cancel</p>
-                  <p className="text-xs opacity-75">+/− for quantity • M for notes</p>
+                  <p className="text-xs opacity-75">+/− for quantity</p>
                 </div>
               </TooltipContent>
             </Tooltip>

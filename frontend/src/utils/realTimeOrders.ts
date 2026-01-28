@@ -3,6 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import React from 'react';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
+import brain from 'brain';
 
 // Types for real-time orders
 export interface OrderItem {
@@ -375,20 +376,16 @@ const useRealTimeOrders = create<RealTimeOrderStore>()(subscribeWithSelector((se
   // Update order status (triggers real-time update)
   updateOrderStatus: async (orderId: string, status: OrderStatus) => {
     try {
-      // Call API to update order status
-      const response = await fetch(`/api/realtime-orders/update-order-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ order_id: orderId, status }),
+      const response = await (brain as any).update_order_status({
+        order_id: orderId,
+        status,
       });
+      const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error('Failed to update order status');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update order status');
       }
 
-      const result = await response.json();
       console.log('Order status updated:', result);
 
     } catch (error) {

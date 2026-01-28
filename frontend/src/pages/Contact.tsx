@@ -18,6 +18,8 @@ import { PremiumTheme } from "utils/premiumTheme";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { useWebsiteData } from "utils/useWebsiteData";
+import { SEO } from "components/SEO";
+import { PAGE_SEO } from "utils/seoData";
 
 export default function Contact() {
   const contactData = useWebsiteData<{ opening_hours?: any[]; phones?: string[]; emails?: string[]; address?: string }>('contact');
@@ -49,13 +51,14 @@ export default function Contact() {
   }, []);
 
   return (
-    <div 
+    <div
       className="min-h-screen"
-      style={{ 
+      style={{
         background: PremiumTheme.colors.background.primary,
-        color: PremiumTheme.colors.text.primary 
+        color: PremiumTheme.colors.text.primary
       }}
     >
+      <SEO title={PAGE_SEO.contact.title} description={PAGE_SEO.contact.description} path="/contact" />
       {/* Universal Header */}
       <UniversalHeader 
         context="PUBLIC_NAV"

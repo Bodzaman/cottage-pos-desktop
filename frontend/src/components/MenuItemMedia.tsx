@@ -8,7 +8,6 @@ import { MenuItemMediaSelectorDialog } from 'components/MenuItemMediaSelectorDia
 import { ImageUploader, type ImageUploadResult } from 'components/ImageUploader';
 import type { MediaItem } from 'utils/mediaLibraryUtils';
 import { toast } from 'sonner';
-import { colors, cardStyle } from 'utils/designSystem';
 import { OptimizedImage } from 'components/OptimizedImage';
 
 export interface MediaData {
@@ -146,19 +145,17 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
 
   return (
     <>
-      <Card style={cardStyle}>
+      <Card className="bg-[rgba(26,26,26,0.8)] backdrop-blur-md border border-white/[0.07] rounded-lg">
         <CardHeader>
           <div className="flex items-center space-x-3">
-            <div 
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: colors.brand.turquoise }}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#0EBAB1]"
               aria-hidden="true"
             >
               <Camera className="w-4 h-4 text-white" aria-hidden="true" />
             </div>
-            <CardTitle 
-              className="text-lg font-medium flex items-center gap-2"
-              style={{ color: colors.text.primary }}
+            <CardTitle
+              className="text-lg font-medium flex items-center gap-2 text-white"
               id="menu-item-media-heading"
             >
               Images & Media
@@ -170,9 +167,8 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
           {/* Aspect Ratio Preference - Moved to top for better UX */}
           <fieldset className="space-y-3">
             <legend className="sr-only">Image aspect ratio preference for menu item display</legend>
-            <Label 
-              style={{ color: colors.text.secondary }}
-              className="text-sm font-medium"
+            <Label
+              className="text-sm font-medium text-gray-400"
               id="aspect-ratio-label"
             >
               Aspect Ratio Preference
@@ -187,29 +183,29 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="square" id="square" />
                 <Label htmlFor="square" className="flex items-center space-x-2 cursor-pointer">
-                  <Square className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
-                  <span style={{ color: colors.text.primary }}>Square</span>
-                  <span style={{ color: colors.text.disabled }} className="text-xs" aria-hidden="true">Best for menu cards</span>
+                  <Square className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                  <span className="text-white">Square</span>
+                  <span className="text-xs text-gray-500" aria-hidden="true">Best for menu cards</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="landscape" id="landscape" />
                 <Label htmlFor="landscape" className="flex items-center space-x-2 cursor-pointer">
-                  <Monitor className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
-                  <span style={{ color: colors.text.primary }}>Wide</span>
-                  <span style={{ color: colors.text.disabled }} className="text-xs" aria-hidden="true">Best for hero images</span>
+                  <Monitor className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                  <span className="text-white">Wide</span>
+                  <span className="text-xs text-gray-500" aria-hidden="true">Best for hero images</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="portrait" id="portrait" />
                 <Label htmlFor="portrait" className="flex items-center space-x-2 cursor-pointer">
-                  <Image className="w-4 h-4" style={{ color: colors.text.secondary }} aria-hidden="true" />
-                  <span style={{ color: colors.text.primary }}>Auto</span>
-                  <span style={{ color: colors.text.disabled }} className="text-xs" aria-hidden="true">Adapts to content</span>
+                  <Image className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                  <span className="text-white">Auto</span>
+                  <span className="text-xs text-gray-500" aria-hidden="true">Adapts to content</span>
                 </Label>
               </div>
             </RadioGroup>
-            <p className="text-xs" style={{ color: colors.text.disabled }} id="aspect-ratio-help">
+            <p className="text-xs text-gray-500" id="aspect-ratio-help">
               This determines which format is preferred when displaying the image.
             </p>
           </fieldset>
@@ -218,12 +214,8 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
           <div className="space-y-4" role="group" aria-labelledby="menu-item-media-heading">
             {/* Image Preview Area */}
             {primaryImage.url ? (
-              <div 
-                className="relative border rounded-lg p-4"
-                style={{ 
-                  backgroundColor: colors.background.tertiary,
-                  borderColor: colors.text.disabled + '40'
-                }}
+              <div
+                className="relative border border-white/[0.07] rounded-lg p-4 bg-surface-tertiary"
                 role="region"
                 aria-labelledby="image-preview-label"
               >
@@ -236,15 +228,14 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
                     className="w-24 h-24 object-cover rounded border"
                   />
                   <div className="flex-1 min-w-0">
-                    <p 
+                    <p
                       id="image-preview-label"
-                      className="text-sm font-medium truncate" 
-                      style={{ color: colors.text.primary }}
+                      className="text-sm font-medium truncate text-white"
                     >
                       Current Image
                     </p>
                     {primaryImage.asset_id && (
-                      <p className="text-xs" style={{ color: colors.text.disabled }}>
+                      <p className="text-xs text-gray-500">
                         <span className="sr-only">Asset ID: </span>
                         <span aria-hidden="true">ID: {primaryImage.asset_id.substring(0, 8)}...</span>
                       </p>
@@ -279,12 +270,7 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
-                style={{
-                  backgroundColor: '#1E1E1E',
-                  borderColor: 'rgba(91, 33, 182, 0.3)',
-                  color: '#F0F0F5'
-                }}
+                className="w-full bg-surface-tertiary border-[rgba(124,58,237,0.3)] text-white hover:bg-white/[0.05]"
                 onClick={openMediaSelector}
                 aria-label="Browse media library to select existing image"
                 aria-describedby="browse-button-hint"

@@ -137,7 +137,7 @@ export interface ItemVariant {
   // Food-specific
   spiceLevel?: number;
   spice_level?: number; // Snake_case alias
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergenNotes?: string;
   allergen_notes?: string; // Snake_case alias
 
@@ -266,7 +266,7 @@ export interface MenuItem {
   isNutFree?: boolean; // CamelCase alias
 
   // Food-specific fields
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergenWarnings?: string;
   specialtyNotes?: string;
   chefsSpecial?: boolean;
@@ -407,7 +407,7 @@ export interface MenuItemFormData {
 
   // Food-specific fields
   spiceLevel?: number;
-  allergens?: string[];
+  allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergenWarnings?: string;
   specialtyNotes?: string;
   chefsSpecial?: boolean;

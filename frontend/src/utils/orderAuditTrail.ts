@@ -13,7 +13,7 @@ export interface AuditEntry {
   userName: string;
   action: "created" | "edited" | "status_changed" | "cancelled" | "refunded" | "completed";
   orderId: string;
-  orderSource: "ai-voice" | "online" | "pos";
+  orderSource: "online" | "pos";
   changes?: {
     field: string;
     oldValue: any;
@@ -71,7 +71,7 @@ export const createOrderAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos"
+  orderSource: "online" | "pos"
 ): void => {
   saveAuditEntry({
     timestamp: new Date().toISOString(),
@@ -91,7 +91,7 @@ export const createEditAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos",
+  orderSource: "online" | "pos",
   oldOrder: OrderData,
   newOrder: OrderData
 ): void => {
@@ -165,7 +165,7 @@ export const createStatusChangeAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos",
+  orderSource: "online" | "pos",
   oldStatus: string,
   newStatus: string
 ): void => {
@@ -194,7 +194,7 @@ export const createCancelAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos",
+  orderSource: "online" | "pos",
   reason?: string
 ): void => {
   saveAuditEntry({
@@ -215,7 +215,7 @@ export const createRefundAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos",
+  orderSource: "online" | "pos",
   amount: number,
   reason?: string
 ): void => {
@@ -249,7 +249,7 @@ export const createCompletionAudit = (
   orderId: string,
   userId: string,
   userName: string,
-  orderSource: "ai-voice" | "online" | "pos"
+  orderSource: "online" | "pos"
 ): void => {
   saveAuditEntry({
     timestamp: new Date().toISOString(),

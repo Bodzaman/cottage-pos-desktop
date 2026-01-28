@@ -9,6 +9,7 @@ import { AuthInput } from "components/AuthInput";
 import { AuthButton } from "components/AuthButton";
 import { AuthTheme } from "utils/authTheme";
 import { useSimpleAuth } from "utils/simple-auth-context";
+import { SEO } from "components/SEO";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -54,6 +55,7 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
+      <SEO title="Reset Password" description="Reset your Cottage Tandoori account password." path="/forgot-password" noindex={true} />
       <motion.div
         variants={AuthTheme.animations.containerFade}
         initial="hidden"

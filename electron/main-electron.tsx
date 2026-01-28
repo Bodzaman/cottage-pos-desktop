@@ -2,8 +2,13 @@
  * Electron Entry Point for Cottage Tandoori POS
  *
  * This is the entry point specifically for the Electron desktop app.
- * It uses MemoryRouter instead of BrowserRouter and only includes
- * the POS Login and POS Desktop routes (staff/admin access only).
+ * It uses MemoryRouter instead of BrowserRouter and includes:
+ * - POS Login (authentication for both staff and admin users)
+ * - POS Desktop (for staff users)
+ * - Admin Portal (for admin/tenant users)
+ *
+ * Role-based routing is handled by the login page - staff users
+ * are directed to POS Desktop, admin users to Admin Portal.
  */
 import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -14,9 +19,11 @@ import { DEFAULT_THEME } from '../frontend/src/constants/default-theme';
 import '../frontend/src/index.css';
 import '../frontend/src/polyfills/react-polyfill';
 
-// Lazy load POS pages only - staff/admin access in Electron
+// Lazy load POS pages - staff/admin access in Electron
 const POSDesktop = lazy(() => import('../frontend/src/pages/POSDesktop'));
 const POSLogin = lazy(() => import('../frontend/src/pages/POSLogin'));
+// Admin portal for admin/tenant users
+const Admin = lazy(() => import('../frontend/src/pages/Admin'));
 
 // Loading fallback for lazy components — uses inline styles to guarantee centering
 // even before Tailwind CSS loads
@@ -58,6 +65,8 @@ function ElectronApp() {
                 <Route path="/poslogin" element={<POSLogin />} />
                 <Route path="/pos-desktop" element={<POSDesktop />} />
                 <Route path="/posdesktop" element={<POSDesktop />} />
+                {/* Admin portal for admin/tenant users */}
+                <Route path="/admin" element={<Admin />} />
                 {/* Redirect any other routes to POS Login */}
                 <Route path="*" element={<Navigate to="/pos-login" replace />} />
               </Routes>
@@ -67,6 +76,23 @@ function ElectronApp() {
       </ThemeProvider>
     </StrictMode>
   );
+}
+
+// Force re-authentication on every Electron cold start (POS security)
+// Preserve PIN data (pinEnabled, lastUserId, etc.) so PIN pad appears
+const storageKey = 'pos-auth-storage';
+try {
+  const raw = localStorage.getItem(storageKey);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (parsed.state) {
+      parsed.state.isAuthenticated = false;
+      parsed.state.user = null;
+      localStorage.setItem(storageKey, JSON.stringify(parsed));
+    }
+  }
+} catch {
+  // Ignore parse errors — store will initialize fresh
 }
 
 // Mount the app

@@ -19,6 +19,7 @@ import { useGlobalKeyboardShortcuts } from "utils/useKeyboardShortcuts";
 import { KeyboardShortcutsHelp } from "components/KeyboardShortcutsHelp";
 import { VisuallyHidden } from "components/VisuallyHidden";
 import { useChatStore } from "utils/chat-store";
+import { SEO } from "components/SEO";
 
 // Password strength calculator
 const getPasswordStrength = (password: string) => {
@@ -153,7 +154,8 @@ export default function SignUp() {
 
   return (
     <AuthLayout>
-      <motion.div 
+      <SEO title="Create Account" description="Create your Cottage Tandoori account to order online, save your favourites, and track deliveries." path="/sign-up" noindex={true} />
+      <motion.div
         variants={AuthTheme.animations.containerFade}
         initial="hidden"
         animate="visible"

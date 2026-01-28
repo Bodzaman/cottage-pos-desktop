@@ -25,11 +25,11 @@ import { Breadcrumbs } from "./Breadcrumbs";
 import { QuickNavigation } from "./QuickNavigation";
 import MenuManagementDialog from "./MenuManagementDialog";
 import AllOrdersModal from "./AllOrdersModal";
-import SearchResultsDropdown from "./SearchResultsDropdown";
+import ContextSearchResultsDropdown from "./ContextSearchResultsDropdown";
 import { OrderDetailDialog } from "./OrderDetailDialog";
-import brain from "brain";
 import { OrderModel } from "types";
 import { usePOSAuth } from "../utils/usePOSAuth";
+import { usePOSContextSearch, POSSearchResult } from "../utils/usePOSContextSearch";
 import { AvatarDropdown } from "./AvatarDropdown";
 import { APP_BASE_PATH } from '../utils/environment';
 import { POSOnlineStatusControl } from "./POSOnlineStatusControl";
@@ -42,18 +42,25 @@ export interface Props {
   currentSection?: string;
   className?: string;
   showGradient?: boolean;
-  onAdminSuccess?: () => void; // New callback for POS admin overlay
-  onLogout?: () => void; // Logout callback from parent component
+  onAdminSuccess?: () => void;
+  onLogout?: () => void;
+  // Context-aware search callbacks
+  onCustomerSelect?: (profile: any) => void;
+  onSelectOnlineOrder?: (orderId: string) => void;
+  onReorder?: (order: any) => void;
 }
 
 export const ManagementHeader: React.FC<Props> = ({ 
-  title, 
-  selectedStore, 
-  currentSection, 
-  className, 
-  showGradient, 
+  title,
+  selectedStore,
+  currentSection,
+  className,
+  showGradient,
   onAdminSuccess,
-  onLogout
+  onLogout,
+  onCustomerSelect,
+  onSelectOnlineOrder,
+  onReorder
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -66,113 +73,62 @@ export const ManagementHeader: React.FC<Props> = ({
   // Get auth info for dropdown
   const { user, isAuthenticated } = usePOSAuth();
   
-  // Order search state (replacing menu search)
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<OrderModel[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  // Context-aware search hook
+  const contextSearch = usePOSContextSearch({
+    onCustomerSelect,
+    onSelectOnlineOrder,
+    onReorder,
+  });
+
+  // Order detail dialog state (kept local — opened from search results)
   const [selectedOrder, setSelectedOrder] = useState<OrderModel | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
-  
-  // Always show search for POS environments (desktop and web)
-  const isPOSEnvironment = path.includes('pos') || path === '/' || 
-    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || 
+
+  // Always show search bar
+  const isPOSEnvironment = path.includes('pos') || path === '/' ||
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' ||
      window.navigator.userAgent.includes('Electron')));
-  
-  // DESKTOP FIX: Always show search bar for maximum compatibility
-  // Desktop app routing may vary, so ensure search is always available
-  const showSearch = true; // Previously: isPOSEnvironment
-  
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (query: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(async () => {
-          if (query.length >= 2) {
-            setIsSearching(true);
-            try {
-              const response = await brain.get_orders({
-                page: 1,
-                search: query
-              });
-              const data = await response.json();
-              setSearchResults(data.orders || []);
-              setShowSearchDropdown(true);
-            } catch (error) {
-              console.error('Search error:', error);
-              setSearchResults([]);
-            } finally {
-              setIsSearching(false);
-            }
-          } else {
-            setSearchResults([]);
-            setShowSearchDropdown(false);
-          }
-        }, 300);
-      };
-    })()
-  , []);
-  
-  // Handle search query change
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    if (value.trim()) {
-      debouncedSearch(value.trim());
+  const showSearch = !contextSearch.isDisabled;
+
+  // Handle result selection — customer/active online handled by hook, past orders open detail dialog
+  const handleResultSelect = useCallback((result: POSSearchResult) => {
+    if (result.type === 'customer' || (result.type === 'online_order' && result.source === 'active')) {
+      contextSearch.handleSelect(result);
     } else {
-      setSearchResults([]);
-      setShowSearchDropdown(false);
+      // Past order — open detail dialog
+      setSelectedOrder(result.rawData);
+      setShowOrderDialog(true);
+      contextSearch.setShowDropdown(false);
     }
-  };
-  
-  // Handle order selection
-  const handleSelectOrder = (order: OrderModel) => {
-    setSelectedOrder(order);
-    setShowOrderDialog(true);
-    setShowSearchDropdown(false);
-  };
-  
-  // Handle show all results
-  const handleShowAllResults = () => {
+  }, [contextSearch]);
+
+  const handleShowAllResults = useCallback(() => {
     setShowAllOrdersModal(true);
-    setShowSearchDropdown(false);
-    // Pre-fill search in AllOrdersModal if needed
-  };
-  
-  // Handle clearing search
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setShowSearchDropdown(false);
-  };
-  
+    contextSearch.setShowDropdown(false);
+  }, [contextSearch]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target.closest('.search-container')) {
-        setShowSearchDropdown(false);
+        contextSearch.setShowDropdown(false);
       }
     };
-    
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-  
+  }, [contextSearch]);
+
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showSearchDropdown) {
-          setShowSearchDropdown(false);
-        }
+      if (event.key === 'Escape' && contextSearch.showDropdown) {
+        contextSearch.setShowDropdown(false);
       }
     };
-    
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showSearchDropdown]);
+  }, [contextSearch.showDropdown]);
 
   // Add event listeners for QuickToolsModal integration
   useEffect(() => {
@@ -261,9 +217,9 @@ export const ManagementHeader: React.FC<Props> = ({
               />
               <Input
                 type="text"
-                placeholder="Search orders by customer, phone, or order number..."
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder={contextSearch.placeholder}
+                value={contextSearch.query}
+                onChange={(e) => contextSearch.setQuery(e.target.value)}
                 className="pl-12 pr-12 py-3 text-base font-medium"
                 style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -283,26 +239,31 @@ export const ManagementHeader: React.FC<Props> = ({
                   e.target.style.boxShadow = '0 4px 20px rgba(124, 93, 250, 0.1)';
                 }}
               />
-              {searchQuery && (
+              {contextSearch.query && (
                 <button
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 transition-all duration-200 hover:scale-110"
                   style={{ color: globalColors.text.tertiary }}
-                  onClick={handleClearSearch}
+                  onClick={contextSearch.clearSearch}
                   onMouseEnter={(e) => e.currentTarget.style.color = globalColors.text.primary}
                   onMouseLeave={(e) => e.currentTarget.style.color = globalColors.text.tertiary}
                 >
                   <X className="h-5 w-5" />
                 </button>
               )}
-              
-              {/* Search Results Dropdown */}
-              <SearchResultsDropdown
-                results={searchResults}
-                isVisible={showSearchDropdown}
-                isLoading={isSearching}
-                onSelectOrder={handleSelectOrder}
+
+              {/* Context-Aware Search Results Dropdown */}
+              <ContextSearchResultsDropdown
+                customerResults={contextSearch.customerResults}
+                activeResults={contextSearch.activeResults}
+                pastResults={contextSearch.pastResults}
+                isVisible={contextSearch.showDropdown}
+                isLoading={contextSearch.isSearching}
+                searchQuery={contextSearch.query}
+                posViewMode={contextSearch.posViewMode}
+                onSelect={handleResultSelect}
+                onReprint={undefined}
+                onReorder={contextSearch.handleReorder}
                 onShowAllResults={handleShowAllResults}
-                searchQuery={searchQuery}
               />
             </div>
           </div>

@@ -414,7 +414,7 @@ export interface CardStyles {
  * (3) faint internal radial gradient for surface richness.
  */
 export function getCardStyles(status: TableCardStatus, isSelected: boolean = false): CardStyles {
-  const BASE_BG = 'rgba(24, 24, 27, 0.95)';
+  const BASE_BG = 'linear-gradient(135deg, rgba(18,18,22,0.98) 0%, rgba(28,28,32,0.95) 100%)';
 
   if (isSelected) {
     switch (status) {

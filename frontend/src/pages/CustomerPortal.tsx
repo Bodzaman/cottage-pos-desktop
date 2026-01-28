@@ -32,6 +32,7 @@ import { InlineEditField } from "components/InlineEditField";
 import { calculateProfileCompletion, getCompletionColor, getCompletionMessage } from "utils/profileCompletion";
 import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from 'date-fns';
+import { subscribeToCustomerOrders, unsubscribeFromOrderTracking } from "utils/orderTrackingRealtime";
 import { WelcomeTour } from "components/WelcomeTour";
 import { OnboardingWizard } from "components/OnboardingWizard";
 import { useOnboardingStore } from "utils/onboardingStore";
@@ -499,6 +500,64 @@ export default function CustomerPortal() {
       clearCache();
     }
   }, [user]);
+
+  // ✅ NEW: Real-time order status subscription for live updates
+  useEffect(() => {
+    if (!profile?.id || !isOnline) return;
+
+    console.log('🔔 Setting up real-time order subscription for customer:', profile.id);
+
+    const subscription = subscribeToCustomerOrders(
+      profile.id,
+      (updatedOrder) => {
+        setOrderHistory((prevOrders) => {
+          // Check if this is an existing order being updated
+          const existingIndex = prevOrders.findIndex((o) => o.id === updatedOrder.id);
+
+          if (existingIndex !== -1) {
+            // Update existing order
+            const newOrders = [...prevOrders];
+            newOrders[existingIndex] = {
+              ...newOrders[existingIndex],
+              ...updatedOrder,
+            };
+
+            // Show toast notification for status changes
+            const oldStatus = prevOrders[existingIndex].status;
+            const newStatus = updatedOrder.status;
+            if (oldStatus !== newStatus) {
+              const orderNumber = updatedOrder.id?.slice(-8).toUpperCase() || 'Order';
+              const statusMessages: Record<string, string> = {
+                'CONFIRMED': `Order #${orderNumber} has been confirmed!`,
+                'PREPARING': `Order #${orderNumber} is being prepared`,
+                'READY': `Order #${orderNumber} is ready for pickup!`,
+                'OUT_FOR_DELIVERY': `Order #${orderNumber} is out for delivery!`,
+                'DELIVERED': `Order #${orderNumber} has been delivered`,
+                'COLLECTED': `Order #${orderNumber} has been collected`,
+                'CANCELLED': `Order #${orderNumber} has been cancelled`,
+              };
+              const message = statusMessages[newStatus] || `Order #${orderNumber} status updated to ${newStatus}`;
+              toast.info(message, { duration: 5000 });
+            }
+
+            return newOrders;
+          } else {
+            // New order - add to the beginning of the list
+            toast.success('New order placed!', { duration: 3000 });
+            return [updatedOrder, ...prevOrders];
+          }
+        });
+      },
+      (error) => {
+        console.error('❌ Real-time subscription error:', error);
+      }
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up real-time order subscription');
+      unsubscribeFromOrderTracking(subscription);
+    };
+  }, [profile?.id, isOnline]);
 
   // Calculate profile completion
   const profileCompletion = calculateProfileCompletion(profile, addresses);

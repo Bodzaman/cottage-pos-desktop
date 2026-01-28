@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import brain from 'brain';
 import { API_URL } from '../utils/environment';
+import { isElectronMode } from 'utils/electronDetection';
 import { colors } from 'utils/designSystem';
 
 export interface ImageUploadResult {
@@ -121,19 +122,28 @@ export function ImageUploader({
       if (menuCategoryId) formData.append('menu_category_id', menuCategoryId);
       if (menuItemName) formData.append('menu_item_name', menuItemName);
 
-      // Upload via fetch (FormData handles content-type automatically)
-      const response = await fetch(`${API_URL}/menu-image-upload/upload`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include', // Important for dev environment
-      });
+      let data: any;
+      let response: any;
 
-      const data = await response.json();
+      if (isElectronMode()) {
+        // Electron: upload via brain (direct Supabase Storage)
+        response = await brain.upload_menu_image(formData);
+        data = await response.json();
+      } else {
+        // Web: upload via backend API
+        const fetchResponse = await fetch(`${API_URL}/menu-image-upload/upload`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+        data = await fetchResponse.json();
+        response = fetchResponse;
+      }
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (!response.ok || !data.success) {
+      if (!data.success && (response.ok === false || !data.file_url)) {
         throw new Error(data.error || 'Upload failed');
       }
 
@@ -223,8 +233,8 @@ export function ImageUploader({
           borderColor: isDragging
             ? colors.brand.turquoise
             : preview
-            ? colors.border.subtle
-            : colors.border.default,
+            ? colors.border.light
+            : colors.border.medium,
           backgroundColor: isDragging
             ? 'rgba(14, 186, 177, 0.1)'
             : 'rgba(255, 255, 255, 0.03)',
