@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, di
 nativeTheme.themeSource = 'dark';
 // Note: electron-updater is lazily loaded after app.whenReady() to avoid initialization errors
 let autoUpdater = null;
+// Flag to track if update check was triggered manually (show dialogs) vs automatic startup (silent)
+let manualCheckTriggered = false;
 const log = require('electron-log');
 const path = require('path');
 const fs = require('fs').promises;
@@ -913,9 +915,15 @@ class CottageTandooriPOS {
                         label: 'Check for Updates',
                         click: () => {
                             if (autoUpdater) {
-                                autoUpdater.checkForUpdatesAndNotify();
+                                manualCheckTriggered = true;
+                                autoUpdater.checkForUpdates();
                             } else {
-                                log.info('Auto-updater not available in development mode');
+                                dialog.showMessageBox(this.mainWindow, {
+                                    type: 'info',
+                                    title: 'Updates',
+                                    message: 'Auto-updater not available in development mode.',
+                                    buttons: ['OK']
+                                });
                             }
                         }
                     },
@@ -951,7 +959,11 @@ Powered by QuickServe AI`
         autoUpdater = require('electron-updater').autoUpdater;
         autoUpdater.logger = log;
 
-        autoUpdater.checkForUpdatesAndNotify();
+        // Disable auto-download so we can show dialogs first
+        autoUpdater.autoDownload = false;
+
+        // Silent startup check (will trigger update-available if found)
+        autoUpdater.checkForUpdates();
 
         autoUpdater.on('checking-for-update', () => {
             log.info('Checking for updates...');
@@ -959,14 +971,60 @@ Powered by QuickServe AI`
 
         autoUpdater.on('update-available', (info) => {
             log.info('Update available:', info.version);
+            const wasManual = manualCheckTriggered;
+            manualCheckTriggered = false;
+
+            if (wasManual) {
+                // Manual check - show dialog asking if user wants to download
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'Update Available',
+                    message: `A new version (${info.version}) is available.`,
+                    detail: 'Would you like to download it now?',
+                    buttons: ['Download', 'Later'],
+                    defaultId: 0,
+                    cancelId: 1
+                }).then(result => {
+                    if (result.response === 0) {
+                        autoUpdater.downloadUpdate();
+                    }
+                });
+            } else {
+                // Automatic startup check - download silently in background
+                autoUpdater.downloadUpdate();
+            }
         });
 
         autoUpdater.on('update-not-available', (info) => {
             log.info('Update not available:', info.version);
+            const wasManual = manualCheckTriggered;
+            manualCheckTriggered = false;
+
+            if (wasManual) {
+                // Only show dialog if user manually checked
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'No Updates',
+                    message: 'You are running the latest version.',
+                    buttons: ['OK']
+                });
+            }
         });
 
         autoUpdater.on('error', (err) => {
             log.error('Error in auto-updater:', err);
+            manualCheckTriggered = false;
+
+            // Show error dialog if it was a manual check
+            if (this.mainWindow) {
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'error',
+                    title: 'Update Error',
+                    message: 'Failed to check for updates.',
+                    detail: err.message || 'Please try again later.',
+                    buttons: ['OK']
+                });
+            }
         });
 
         autoUpdater.on('download-progress', (progressObj) => {
@@ -978,7 +1036,20 @@ Powered by QuickServe AI`
 
         autoUpdater.on('update-downloaded', (info) => {
             log.info('Update downloaded:', info.version);
-            autoUpdater.quitAndInstall();
+            // Always show dialog to confirm restart
+            dialog.showMessageBox(this.mainWindow, {
+                type: 'info',
+                title: 'Update Ready',
+                message: `Version ${info.version} has been downloaded.`,
+                detail: 'The update will be installed when you restart the app. Would you like to restart now?',
+                buttons: ['Restart Now', 'Later'],
+                defaultId: 0,
+                cancelId: 1
+            }).then(result => {
+                if (result.response === 0) {
+                    autoUpdater.quitAndInstall();
+                }
+            });
         });
     }
 
@@ -1877,7 +1948,8 @@ Powered by QuickServe AI`
                 label: 'Check for Updates',
                 click: () => {
                     if (autoUpdater) {
-                        autoUpdater.checkForUpdatesAndNotify();
+                        manualCheckTriggered = true;
+                        autoUpdater.checkForUpdates();
                     } else {
                         log.info('Auto-updater not available in development mode');
                     }
