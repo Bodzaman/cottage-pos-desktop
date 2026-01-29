@@ -219,7 +219,7 @@ function KDS_V2_Content() {
   // Loading state
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: QSAITheme.background.primary }}>
+      <div className="min-h-screen flex items-center justify-center theme-internal" style={{ background: QSAITheme.background.primary }}>
         <div className="text-center">
           <div className="text-lg" style={{ color: QSAITheme.text.primary }}>Please log in to access Kitchen Display</div>
         </div>
@@ -229,7 +229,7 @@ function KDS_V2_Content() {
 
   if (isLoading && orders.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: QSAITheme.background.primary }}>
+      <div className="min-h-screen flex items-center justify-center theme-internal" style={{ background: QSAITheme.background.primary }}>
         <div className="text-center">
           <div className="text-lg" style={{ color: QSAITheme.text.primary }}>Loading kitchen display...</div>
         </div>
@@ -244,8 +244,8 @@ function KDS_V2_Content() {
   const delayedOrders = orders.filter(o => o.status === "DELAYED");
 
   return (
-    <div 
-      className={`min-h-screen overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+    <div
+      className={`min-h-screen overflow-hidden theme-internal ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
       style={{
         ...styles.gridBackground,
         backgroundImage: indianPatterns.rangoli,

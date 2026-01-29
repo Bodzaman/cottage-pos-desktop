@@ -302,6 +302,9 @@ export function StaffUnifiedCustomizationModal({
     const customizationsTotal = selectedCustomizations.reduce((sum, c) => sum + c.price_adjustment, 0);
     const total = (price + customizationsTotal) * quantity;
 
+    // Resolve image from variant/item hierarchy (variant.display_image_url → variant.image_url → item.image_url)
+    const resolvedImageUrl = variant?.display_image_url || variant?.image_url || item.image_url || undefined;
+
     const orderItem: OrderItem = {
       menu_item_id: item.id,
       category_id: item.category_id,
@@ -312,7 +315,7 @@ export function StaffUnifiedCustomizationModal({
       variant_id: variant?.id || null,
       variantName: variant ? getVariantDisplayName(variant) : null,
       notes: specialInstructions || '',
-      image_url: item.image_url || undefined,
+      image_url: resolvedImageUrl,
       customizations: selectedCustomizations.map(c => ({
         id: c.id,
         name: c.name,

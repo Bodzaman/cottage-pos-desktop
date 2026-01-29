@@ -183,29 +183,32 @@ export function calculateStepStatus(
     }
 
     case 'basic': {
-      const requiredFields = ['name', 'category_id', 'menu_item_description'];
-      
+      // Only name and category_id are truly required (description is optional)
+      const requiredFields = ['name', 'category_id'];
+
       // Check for errors
       if (hasErrorsInFields(requiredFields)) {
         return 'error';
       }
-      
+
       // Check if all required fields have values
-      const hasName = formData.name?.trim().length > 0;
-      const hasDescription = 
-        (formData.description?.trim().length > 0) || 
-        (formData.menu_item_description?.trim().length > 0);
+      const hasName = formData.name && formData.name.trim().length > 0;
       const hasCategory = !!formData.category_id;
-      
-      if (hasName && hasCategory && hasDescription) {
+      // Description is optional - not required for completion
+      const hasDescription =
+        (formData.description && formData.description.trim().length > 0) ||
+        (formData.menu_item_description && formData.menu_item_description.trim().length > 0);
+
+      // Complete when required fields (name + category) are filled
+      if (hasName && hasCategory) {
         return 'complete';
       }
-      
+
       // Started but not complete
       if (hasName || hasCategory || hasDescription) {
         return 'incomplete';
       }
-      
+
       return 'not-started';
     }
 
@@ -270,20 +273,20 @@ export function calculateStepStatus(
     case 'coffee-details': {
       // Optional sections - check if any fields have errors
       const typeSpecificFields = [
-        'default_spice_level',
+        'spice_level',
         'dietary_tags',
         'allergen_info',
         'serving_sizes',
         'abv_percentage',
         'temperature'
       ];
-      
+
       if (hasErrorsInFields(typeSpecificFields)) {
         return 'error';
       }
-      
+
       // Check if any optional fields are filled
-      const hasSpiceLevel = formData.default_spice_level !== undefined && formData.default_spice_level > 0;
+      const hasSpiceLevel = formData.spice_level !== undefined && formData.spice_level > 0;
       const hasDietaryTags = formData.dietary_tags && formData.dietary_tags.length > 0;
       const hasAllergenInfo = formData.allergen_info && formData.allergen_info.trim().length > 0;
       const hasServingSizes = formData.serving_sizes && formData.serving_sizes.length > 0;
@@ -412,9 +415,9 @@ export function getStepSummary(
 
     case 'food-details': {
       const parts: string[] = [];
-      
-      if (formData.default_spice_level && formData.default_spice_level > 0) {
-        parts.push(`Spice Level: ${formData.default_spice_level}`);
+
+      if (formData.spice_level && formData.spice_level > 0) {
+        parts.push(`Spice Level: ${formData.spice_level}`);
       }
       
       if (formData.dietary_tags && formData.dietary_tags.length > 0) {

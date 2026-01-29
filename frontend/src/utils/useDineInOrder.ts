@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import brain from 'brain';
 import { toast } from 'sonner';
 import { EnrichedDineInOrderItem } from '../brain/data-contracts';
+import { getOfflineStatus } from './serviceWorkerManager';
 
 interface OrderItem {
   id: string;
@@ -256,6 +257,13 @@ export const useDineInOrder = (tableId: string | null) => {
       return null;
     }
 
+    // Check online status - dine-in orders require network for real-time coordination
+    if (getOfflineStatus()) {
+      toast.error('Dine-in orders require network connection. Please check WiFi.', { duration: 5000 });
+      console.warn('[useDineInOrder] Blocked offline dine-in order creation');
+      return null;
+    }
+
     // Handle backwards compatibility: can be (number) or (CreateOrderParams)
     let params: CreateOrderParams = {};
     if (typeof paramsOrGuestCount === 'number') {
@@ -307,6 +315,12 @@ export const useDineInOrder = (tableId: string | null) => {
   const addItem = async (item: OrderItem) => {
     if (!order) {
       toast.error('No active order');
+      return;
+    }
+
+    // Check online status - adding items requires network for dine-in orders
+    if (getOfflineStatus()) {
+      toast.error('Cannot add items while offline. Please check WiFi.', { duration: 4000 });
       return;
     }
 
@@ -442,6 +456,12 @@ export const useDineInOrder = (tableId: string | null) => {
     const hasItems = (order.items && order.items.length > 0) || enrichedItems.length > 0;
     if (!hasItems) {
       toast.error('Cannot send empty order to kitchen');
+      return;
+    }
+
+    // Check online status - sending to kitchen requires network
+    if (getOfflineStatus()) {
+      toast.error('Cannot send to kitchen while offline. Please check WiFi.', { duration: 5000 });
       return;
     }
 

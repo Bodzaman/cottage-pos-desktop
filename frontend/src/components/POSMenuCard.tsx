@@ -251,6 +251,9 @@ export function POSMenuCard({
     const finalName = selectedVariant ? variantName : item.name;
     
 
+    // Resolve image from variant/item hierarchy (matches POSMenuItemCard pattern)
+    const resolvedImageUrl = selectedVariant?.display_image_url || selectedVariant?.image_url || item.image_url || '';
+
     const orderItem: OrderItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       menu_item_id: item.id,
@@ -259,6 +262,7 @@ export function POSMenuCard({
       name: finalName,
       quantity: 1,
       price: basePrice,
+      image_url: resolvedImageUrl,
       modifiers: [],
       customizations: [],
       notes: ''

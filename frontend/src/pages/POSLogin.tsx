@@ -242,11 +242,6 @@ export default function POSLogin() {
       if (!currentPinEnabled) {
         // PIN not configured - show setup UI (ref already blocks redirect)
         setLoginSuccess(true);
-        if (userRole === 'admin') {
-          toast.success('Login successful — PIN setup required for offline access');
-        } else {
-          toast.success('Login successful — set a quick PIN');
-        }
         setView('pin-setup');
         return;
       }
@@ -254,7 +249,6 @@ export default function POSLogin() {
       // PIN already configured — allow redirect
       pinSetupActiveRef.current = false;
       setLoginSuccess(true);
-      toast.success('Welcome back!');
       navigateWithExit(redirectPath);
     } catch (err) {
       // Reset ref on error so user can retry
@@ -346,7 +340,6 @@ export default function POSLogin() {
                 onSubmit={async (pin) => {
                   const success = await loginWithPin(pin);
                   if (success) {
-                    toast.success('Welcome back!');
                     const currentUser = usePOSAuth.getState().user;
                     const redirectPath = getRedirectPath(currentUser?.role || lastUserRole);
                     setTimeout(() => navigateWithExit(redirectPath), 200);
@@ -398,7 +391,6 @@ export default function POSLogin() {
                 onSubmit={async (pin) => {
                   const success = await setPin(pin);
                   if (success) {
-                    toast.success('PIN set successfully!');
                     pinSetupActiveRef.current = false;
                     const currentUser = usePOSAuth.getState().user;
                     const redirectPath = getRedirectPath(currentUser?.role);

@@ -57,7 +57,30 @@ import { useVoiceAgentStore } from 'utils/voiceAgentStore';
 
 import { MultiNationalityPassportCard, AgentStatus } from './MultiNationalityPassportCard';
 import { HorizontalAgentCarousel } from './HorizontalAgentCarousel';
-import { createWebRTCVoiceClient, VoiceCallStatus, isWebRTCSupported } from 'utils/webrtcVoiceClient';
+import { VoiceCallStatus } from 'utils/chat-store';
+
+// Legacy WebRTC stubs (deprecated - voice flow moved to ChatLargeModal)
+interface VoiceSessionConfig {
+  agentId: string;
+  agentName: string;
+  onStatusChange?: (status: VoiceCallStatus) => void;
+  onTranscriptUpdate?: (transcript: string) => void;
+  onError?: (error: string) => void;
+}
+
+function createWebRTCVoiceClient(config: VoiceSessionConfig) {
+  return {
+    startCall: async () => {
+      throw new Error('Legacy WebRTC client is deprecated.');
+    },
+    endCall: () => {},
+    getStatus: () => VoiceCallStatus.IDLE
+  };
+}
+
+function isWebRTCSupported(): boolean {
+  return false; // Deprecated - always return false
+}
 
 // TypeScript declarations for Twilio Voice SDK
 declare global {

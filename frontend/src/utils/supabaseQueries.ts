@@ -2284,6 +2284,64 @@ export async function assignItemToTab(
 }
 
 /**
+ * Update customizations, quantity, and notes for a dine_in_order_item
+ *
+ * @param itemId - The dine_in_order_items.id to update
+ * @param quantity - New quantity
+ * @param customizations - Array of customization objects
+ * @param notes - Special instructions/notes
+ * @returns Promise<{ success: boolean; message: string }>
+ */
+export async function updateOrderItemCustomizations(
+  itemId: string,
+  quantity: number,
+  customizations: Array<{
+    customization_id: string;
+    name: string;
+    price_adjustment: number;
+    group?: string;
+  }>,
+  notes: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Calculate new line total based on quantity and customizations
+    const { data: item, error: fetchError } = await supabase
+      .from('dine_in_order_items')
+      .select('unit_price')
+      .eq('id', itemId)
+      .single();
+
+    if (fetchError || !item) {
+      return { success: false, message: `Item not found: ${itemId}` };
+    }
+
+    const customizationTotal = customizations.reduce((sum, c) => sum + (c.price_adjustment || 0), 0);
+    const lineTotal = (item.unit_price + customizationTotal) * quantity;
+
+    // Update the item
+    const { error: updateError } = await supabase
+      .from('dine_in_order_items')
+      .update({
+        quantity,
+        customizations,
+        notes: notes || null,
+        line_total: lineTotal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId);
+
+    if (updateError) {
+      return { success: false, message: `Failed to update item: ${updateError.message}` };
+    }
+
+    return { success: true, message: 'Item updated successfully' };
+  } catch (error) {
+    console.error('[supabaseQueries] updateOrderItemCustomizations failed:', error);
+    return { success: false, message: `Error updating item: ${error}` };
+  }
+}
+
+/**
  * Bulk assign multiple dine_in_order_items to a customer tab
  *
  * @param itemIds - Array of dine_in_order_items.id to assign
@@ -2348,19 +2406,6 @@ export async function assignItemsToTabBulk(
  * @param variants - Array of variant objects from the form
  */
 async function syncMenuItemVariants(menuItemId: string, variants: any[]): Promise<void> {
-  // 🔴 DEBUG: Log incoming variant data to trace price update issues
-  console.log('🔴 [syncMenuItemVariants] CALLED with:', {
-    menuItemId,
-    variantsCount: variants?.length,
-    variants: variants?.map(v => ({
-      id: v.id,
-      name: v.name,
-      price: v.price,
-      price_dine_in: v.price_dine_in,
-      price_delivery: v.price_delivery
-    }))
-  });
-
   try {
 
     // Get existing variants from database
@@ -2428,15 +2473,6 @@ async function syncMenuItemVariants(menuItemId: string, variants: any[]): Promis
       const cleanedVariant = cleanVariantData(variant);
       const { id, menu_item_id, created_at, ...updates } = cleanedVariant;
 
-      // 🟡 DEBUG: Log variant update payload to verify price is included
-      console.log('🟡 [syncMenuItemVariants] UPDATING variant:', {
-        id,
-        updates_price: updates.price,
-        updates_price_dine_in: updates.price_dine_in,
-        updates_price_delivery: updates.price_delivery,
-        fullUpdates: updates
-      });
-
       // FIX: Removed .single() - it causes 406 error when update returns 0 rows
       // Instead, we check if update affected any rows by examining the returned array
       const { data: updatedData, error: updateError } = await supabase
@@ -2448,20 +2484,6 @@ async function syncMenuItemVariants(menuItemId: string, variants: any[]): Promis
         .eq('id', id)
         .select('id, name, price, price_dine_in, price_delivery');
 
-      // 🟣 DEBUG: Log Supabase response to verify what was actually updated
-      console.log('🟣 [syncMenuItemVariants] Supabase UPDATE response:', {
-        variantId: id,
-        success: !updateError,
-        error: updateError,
-        updatedData: updatedData,
-        rowsAffected: updatedData?.length || 0,
-        sentPrices: {
-          price: updates.price,
-          price_dine_in: updates.price_dine_in,
-          price_delivery: updates.price_delivery
-        }
-      });
-
       if (updateError) {
         console.error(` Failed to update variant ${id}:`, updateError);
         throw updateError;
@@ -2469,27 +2491,8 @@ async function syncMenuItemVariants(menuItemId: string, variants: any[]): Promis
 
       // Check if the update actually affected any rows
       if (!updatedData || updatedData.length === 0) {
-        console.error(`⚠️ [syncMenuItemVariants] UPDATE returned 0 rows for variant ${id} - possible RLS policy issue or ID mismatch`);
-        // Don't throw - log the warning and continue to see verification read result
+        console.warn(`[syncMenuItemVariants] UPDATE returned 0 rows for variant ${id} - possible RLS policy issue`);
       }
-
-      // 🔍 VERIFICATION: Re-read the variant to confirm database state
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('menu_item_variants')
-        .select('id, name, price, price_dine_in, price_delivery')
-        .eq('id', id)
-        .single();
-
-      console.log('🔍 [syncMenuItemVariants] VERIFICATION READ after update:', {
-        variantId: id,
-        verifySuccess: !verifyError,
-        verifyData: verifyData,
-        matchesSent: verifyData ? {
-          price_matches: verifyData.price === updates.price,
-          price_dine_in_matches: verifyData.price_dine_in === updates.price_dine_in,
-          price_delivery_matches: verifyData.price_delivery === updates.price_delivery
-        } : null
-      });
     }
 
     // Delete removed variants

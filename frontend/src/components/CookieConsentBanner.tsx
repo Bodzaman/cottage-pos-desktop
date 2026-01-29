@@ -1,10 +1,13 @@
 import { useEffect } from "react";
 import CookieConsent from "react-cookie-consent";
 import { initAnalytics } from "utils/analytics";
+import { useCookieBannerStore } from "utils/cookieBannerStore";
 
 const COOKIE_NAME = "cottage_tandoori_consent";
 
 export function CookieConsentBanner() {
+  const setVisible = useCookieBannerStore((s) => s.setVisible);
+
   // Auto-init analytics if consent was previously granted
   useEffect(() => {
     if (document.cookie.includes(`${COOKIE_NAME}=true`)) {
@@ -20,6 +23,10 @@ export function CookieConsentBanner() {
       enableDeclineButton
       onAccept={() => {
         initAnalytics();
+        setVisible(false);
+      }}
+      onDecline={() => {
+        setVisible(false);
       }}
       cookieName={COOKIE_NAME}
       expires={365}

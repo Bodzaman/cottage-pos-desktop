@@ -22,7 +22,7 @@ import { AuthModal } from 'components/AuthModal';
 // TODO: VariantSelectorModal not used - removed import
 import { Badge } from '@/components/ui/badge';
 import { UniversalHeader } from 'components/UniversalHeader';
-import { CartSidebar } from 'components/CartSidebar';
+import { UnifiedCart } from 'components/cart/UnifiedCart';
 // TODO: TermsAndConditionsModal not used - removed import
 // TODO: BackToTopButton not used (custom button used instead) - removed import
 // TODO: CustomerProfileBottomSheet not used - removed import
@@ -229,9 +229,6 @@ export default function OnlineOrders() {
   const handleRetry = useCallback(() => {
     setError(null);
     initialize()
-      .then(() => {
-        toast.success('Menu loaded successfully', { duration: 2000 });
-      })
       .catch((err) => {
         console.error(' Retry failed:', err);
         setError(err.message || 'Failed to load menu');
@@ -355,22 +352,19 @@ export default function OnlineOrders() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         searchInputRef.current?.focus();
-        toast.info('Search focused - Type to find dishes', { duration: 1500 });
         return;
       }
-      
+
       // Quick search with / (when not typing)
       if (e.key === '/' && !isTyping) {
         e.preventDefault();
         searchInputRef.current?.focus();
-        toast.info('Search focused - Type to find dishes', { duration: 1500 });
         return;
       }
-      
+
       // Escape to clear search when focused on search input
       if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
         handleClearSearch();
-        toast.info('Search cleared', { duration: 1500 });
         return;
       }
       
@@ -402,8 +396,6 @@ export default function OnlineOrders() {
               isScrolling.current = false;
             }, 1000);
           }
-          
-          toast.info(`Jumped to ${section.displayName}`, { duration: 1500 });
         }
         return;
       }
@@ -431,25 +423,24 @@ export default function OnlineOrders() {
     onToggleCart: () => {
       if (isCartOpen) {
         closeCart();
-        toast.info('Cart closed', { duration: 1500 });
       } else {
         openCart();
-        toast.info('Cart opened - Cmd+Enter to checkout', { duration: 2000 });
       }
     },
     onCheckout: () => {
       if (cartItems.length > 0) {
         // Check if user is authenticated
         if (!isAuthenticated) {
-          // Show auth modal for guest checkout
-          toast.info('Please sign in to checkout', { duration: 2000 });
+          // Show auth modal for guest checkout - modal is self-explanatory
+          setShowAuthModal(true);
+          setAuthModalMode('login');
+          setAuthContext('checkout');
         } else {
           // Close cart and open checkout view
           closeCart();
           const newParams = new URLSearchParams(searchParams);
           newParams.set('checkout', 'true');
           setSearchParams(newParams);
-          toast.success('Opening checkout...', { duration: 1500 });
         }
       } else {
         toast.error('Your cart is empty', { duration: 2000 });
@@ -469,12 +460,15 @@ export default function OnlineOrders() {
   // ✅ REMOVED: Local orderMode state - now using cartStore.currentOrderMode globally
   // const [orderMode, setOrderMode] = useState<'delivery' | 'collection'>('collection');
 
-  // **Sync checkout overlay with URL param `checkout`**
+  // **Redirect to new checkout page if URL param present**
   useEffect(() => {
     const checkoutParam = searchParams.get('checkout');
     const shouldCheckout = checkoutParam === '1' || checkoutParam === 'true';
-    setCheckoutView(shouldCheckout ? 'checkout' : 'menu');
-  }, [searchParams]);
+    if (shouldCheckout && cartItems.length > 0) {
+      // Redirect to new checkout page
+      navigate('/checkout');
+    }
+  }, [searchParams, cartItems.length, navigate]);
   
   // ✅ NEW: Focus management for checkout overlay
   useEffect(() => {
@@ -754,13 +748,10 @@ export default function OnlineOrders() {
     clearCart();
   }, [clearCart]);
   
-  // Checkout handler - UPDATED: No auth gate, support guest checkout
+  // Checkout handler - UPDATED: Navigate to new single-page checkout
   const handleCheckout = () => {
-    // ✅ Open checkout directly - no auth required (guest checkout enabled)
-    setCheckoutView('checkout');
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('checkout', '1');
-    setSearchParams(newParams);
+    // Navigate to new modern checkout page
+    navigate('/checkout');
   };
   
   // NEW: Handle sign-in from cart
@@ -825,10 +816,10 @@ export default function OnlineOrders() {
 
       // Close voice modal
       setShowVoiceModal(false);
-      
-      // Open checkout overlay directly
-      setCheckoutView('checkout');
-      
+
+      // Navigate to new checkout page
+      navigate('/checkout');
+
       toast.success('Voice order transferred to checkout', {
         description: `${voiceCartItems.length} items ready for payment`
       });
@@ -1105,7 +1096,7 @@ export default function OnlineOrders() {
       }}
     >
       <div
-        className="min-h-screen flex flex-col"
+        className="min-h-screen flex flex-col theme-customer"
         style={{
           background: `linear-gradient(135deg, ${PremiumTheme.colors.dark[950]} 0%, ${PremiumTheme.colors.charcoal[900]} 50%, ${PremiumTheme.colors.dark[900]} 100%)`,
           color: PremiumTheme.colors.text.primary
@@ -1712,17 +1703,13 @@ export default function OnlineOrders() {
           redirectTo="/online-orders"
         />
         
-        {/* ✅ NEW: Customer Cart Sidebar - Scoped to OnlineOrders page only */}
+        {/* ✅ NEW: Unified Cart (handles mobile bottom sheet and desktop side panel) */}
         {/* ✅ MYA-1564: Only render when chat cart is NOT open (DOM-level mutual exclusivity) */}
         {!isChatCartOpen && (
-          <CartSidebar
-            isOpen={isCartOpen}
-            onClose={closeCart}
-            isAuthenticated={isAuthenticated}
-            menuItems={menuItems as any} // Type coercion: utils/menuTypes.MenuItem[] -> masterTypes.MenuItem[]
+          <UnifiedCart
             onCheckout={() => {
               closeCart();
-              setCheckoutView('checkout');
+              navigate('/checkout');
             }}
             onSignIn={() => {
               closeCart();

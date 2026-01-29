@@ -56,8 +56,6 @@ function useChatVisibilityInternal(): boolean {
       // Staff Tools (internal)
       '/ai-staff-management-hub',
       '/aistaffmanagementhub',
-      '/printer-management',
-      '/printermanagement',
       '/thermal-receipt-designer-v2',
       '/thermalreceiptdesignerv2',
       '/media-library',

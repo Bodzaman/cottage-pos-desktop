@@ -503,7 +503,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         }
       }));
 
-      toast.success(`Customer tab "${tabName}" created successfully`);
+      // Success - no toast needed, UI updates visually
       return realTab.id;
     } catch (error) {
       console.error('Error creating customer tab:', error);
@@ -677,7 +677,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         }
       }));
 
-      toast.success(`Added ${items.length} items to customer tab`);
+      // Success - no toast needed, UI updates visually
       return true;
     } catch (error) {
       console.error('Error adding items to customer tab:', error);
@@ -771,7 +771,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         };
       });
 
-      toast.success('Customer tab closed successfully');
+      // Success - no toast needed, UI updates visually
       return true;
     } catch (error) {
       console.error('Error closing customer tab:', error);
@@ -884,7 +884,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       // Refresh tabs from database
       await get().loadCustomerTabsForTable(tableNumber);
 
-      toast.success(`Split ${itemsToMove.length} items to "${newTabName}"`);
+      // Success - no toast needed, UI updates visually
       return {
         success: true,
         originalTab: sourceTab,
@@ -952,7 +952,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       // Refresh tabs from database
       await get().loadCustomerTabsForTable(tableNumber);
 
-      toast.success(`Merged "${sourceTab.tab_name}" into "${targetTab.tab_name}"`);
+      // Success - no toast needed, UI updates visually
       return {
         success: true,
         targetTab,
@@ -1027,7 +1027,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
       // Refresh tabs from database
       await get().loadCustomerTabsForTable(tableNumber);
 
-      toast.success(`Moved ${itemsToMove.length} items to "${targetTab.tab_name}"`);
+      // Success - no toast needed, UI updates visually
       return {
         success: true,
         sourceTab,
@@ -1106,7 +1106,7 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
         };
       });
 
-      toast.success('Customer tab deleted successfully');
+      // Success - no toast needed, UI updates visually
       return true;
     } catch (error) {
       console.error('Error deleting customer tab:', error);

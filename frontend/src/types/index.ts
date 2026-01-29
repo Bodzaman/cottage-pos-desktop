@@ -205,6 +205,12 @@ export {
   // Cart state
   type CartState,
 
+  // Undo system
+  type UndoStackEntry,
+
+  // Animation
+  type LastAddedItem,
+
   // Selectors
   type CartItemsSelector,
   type CartTotalSelector,

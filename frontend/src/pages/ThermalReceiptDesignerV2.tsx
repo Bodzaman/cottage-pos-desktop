@@ -32,6 +32,16 @@ import { injectGoogleFonts } from 'utils/thermalFonts';
 import TemplateManagementModal from 'components/TemplateManagementModal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Loader2, FileText, FolderOpen } from 'lucide-react';
 import { useRestaurantSettings } from 'utils/useRestaurantSettings';
 
@@ -77,6 +87,10 @@ export default function ThermalReceiptDesignerV2() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showDineInModal, setShowDineInModal] = useState(false);
   const [showTakeawayModal, setShowTakeawayModal] = useState(false);
+
+  // Confirmation dialog state (replaces window.confirm)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUnsavedChangesConfirm, setShowUnsavedChangesConfirm] = useState(false);
 
   // ==================== Lifecycle ====================
 
@@ -152,7 +166,7 @@ export default function ThermalReceiptDesignerV2() {
     
     if (response.success && response.data) {
       store.loadTemplate(response.data);
-      toast.success(`Template "${response.data.metadata.name}" loaded`);
+      // Success - UI updates show template is loaded
       setViewMode('editing'); // Transition to editing mode
     } else {
       toast.error(response.error || 'Failed to load template');
@@ -165,7 +179,7 @@ export default function ThermalReceiptDesignerV2() {
 
   const handleCreateBlank = useCallback(() => {
     store.resetForm();
-    toast.success('Blank template created');
+    // Success - UI shows blank template in editor
     setViewMode('editing'); // Transition to editing mode
   }, [store]);
 
@@ -196,7 +210,7 @@ export default function ThermalReceiptDesignerV2() {
 
         if (response.success) {
           store.markAsSaved();
-          toast.success('Template updated successfully');
+          // Success - UI shows saved state
           // Show warning if kitchen variant sync failed
           if (response.warning) {
             toast.warning(response.warning);
@@ -221,7 +235,7 @@ export default function ThermalReceiptDesignerV2() {
         if (response.success && response.data) {
           store.setCurrentTemplate(response.data);
           store.markAsSaved();
-          toast.success('Template saved successfully');
+          // Success - UI shows saved state
           // Show warning if kitchen variant failed
           if (response.warning) {
             toast.warning(response.warning);
@@ -286,7 +300,7 @@ export default function ThermalReceiptDesignerV2() {
       if (response.success && response.data) {
         store.setCurrentTemplate(response.data);
         store.markAsSaved();
-        toast.success(`Template duplicated as "${newName}"`);
+        // Success - UI shows duplicated template
         // Show warning if kitchen variant failed
         if (response.warning) {
           toast.warning(response.warning);
@@ -303,21 +317,20 @@ export default function ThermalReceiptDesignerV2() {
     }
   }, [currentTemplate, formData, store, loadTemplates, templatesList]);
 
-  const handleDelete = useCallback(async () => {
+  // Opens the delete confirmation dialog
+  const handleDelete = useCallback(() => {
     if (!currentTemplate) {
       toast.info('No template to delete');
       return;
     }
+    setShowDeleteConfirm(true);
+  }, [currentTemplate]);
 
-    // Confirmation dialog
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${currentTemplate.metadata.name}"?\n\nThis action cannot be undone.`
-    );
+  // Executes the actual delete after user confirms
+  const handleDeleteConfirmed = useCallback(async () => {
+    if (!currentTemplate) return;
 
-    if (!confirmed) {
-      return;
-    }
-
+    setShowDeleteConfirm(false);
     store.setIsSaving(true);
 
     try {
@@ -326,15 +339,15 @@ export default function ThermalReceiptDesignerV2() {
       );
 
       if (response.success) {
-        toast.success('Template deleted successfully');
-        
+        // Success - UI shows template removed
+
         // Clear current template and reset form
         store.setCurrentTemplate(null);
         store.resetForm();
-        
+
         // Reload templates list
         await loadTemplates();
-        
+
         // Transition back to browsing or empty state
         const updatedList = templatesList.filter(t => t.id !== currentTemplate.id);
         if (updatedList.length === 0) {
@@ -379,7 +392,7 @@ export default function ThermalReceiptDesignerV2() {
     });
 
     setShowDineInModal(false);
-    toast.success(`Sample order created with ${output.orderItems.length} items for Table ${output.tableNumber}`);
+    // Success - preview updates with sample order
   }, [store]);
 
   const handleTakeawayOrderBuilt = useCallback((output: { orderItems: OrderItem[]; customerName?: string; customerPhone?: string }) => {
@@ -391,7 +404,7 @@ export default function ThermalReceiptDesignerV2() {
     });
 
     setShowTakeawayModal(false);
-    toast.success(`Sample order created with ${output.orderItems.length} items`);
+    // Success - preview updates with sample order
   }, [store]);
 
   // Handler to open appropriate modal based on order mode
@@ -408,24 +421,30 @@ export default function ThermalReceiptDesignerV2() {
     // Load template data into store
     if (templateData?.design_data) {
       store.updateFormData(templateData.design_data);
-      toast.success('Template loaded successfully');
+      // Success - UI updates with template
     } else {
       // Legacy format support
       store.updateFormData(templateData);
-      toast.success('Template loaded successfully');
+      // Success - UI updates with template
     }
     setShowTemplateModal(false);
     setViewMode('editing'); // Transition to editing mode
   }, [store]);
 
+  // Opens the unsaved changes dialog or navigates directly if no changes
   const handleBackToBrowsing = useCallback(() => {
     if (hasUnsavedChanges) {
-      if (!window.confirm('You have unsaved changes. Are you sure you want to go back?')) {
-        return;
-      }
+      setShowUnsavedChangesConfirm(true);
+      return;
     }
     setViewMode('browsing');
   }, [hasUnsavedChanges]);
+
+  // Executes the navigation after user confirms discarding changes
+  const handleDiscardChangesConfirmed = useCallback(() => {
+    setShowUnsavedChangesConfirm(false);
+    setViewMode('browsing');
+  }, []);
 
   // ==================== Keyboard Shortcuts ====================
 
@@ -636,7 +655,7 @@ export default function ThermalReceiptDesignerV2() {
             onFormatChange={(format) => {
               store.setFormatToggle(format);
               store.updateFormField('receiptFormat', format);
-              toast.success(`Switched to ${format === 'front_of_house' ? 'Front of House' : 'Kitchen Copy'} format`);
+              // Format switch - preview updates visually
             }}
           />
         </div>
@@ -647,7 +666,7 @@ export default function ThermalReceiptDesignerV2() {
   // ==================== Main Render (State Machine) ====================
 
   return (
-    <>
+    <div className="theme-internal min-h-screen" style={{ background: QSAITheme.background.primary }}>
       {/* Main View (State Machine) */}
       {(() => {
         switch (viewMode) {
@@ -695,6 +714,54 @@ export default function ThermalReceiptDesignerV2() {
         onOrderBuilt={handleTakeawayOrderBuilt}
         initialOrderItems={formData.orderItems}
       />
-    </>
+
+      {/* Delete Template Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-[#1A1A1A] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Template?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Are you sure you want to delete "{currentTemplate?.metadata?.name}"?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirmed}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      <AlertDialog open={showUnsavedChangesConfirm} onOpenChange={setShowUnsavedChangesConfirm}>
+        <AlertDialogContent className="bg-[#1A1A1A] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Discard Changes?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              You have unsaved changes. Are you sure you want to go back?
+              Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/20 text-white hover:bg-white/10">
+              Keep Editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDiscardChangesConfirmed}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

@@ -39,23 +39,12 @@ export function initCartRealtimeSubscription(
         filter: `session_id=eq.${sessionId}`
       },
       async (payload) => {
-        
+
         // Refresh cart from Supabase to get latest state
         // This ensures we have the complete, authoritative cart data
         try {
           await get().fetchCartFromSupabase();
-          
-          // Show toast notification based on event type
-          if (payload.eventType === 'INSERT') {
-            const itemName = (payload.new as any)?.name || 'Item';
-            toast.success(`${itemName} added to cart`, { duration: 2000 });
-          } else if (payload.eventType === 'DELETE') {
-            const itemName = (payload.old as any)?.name || 'Item';
-            toast.info(`${itemName} removed from cart`, { duration: 2000 });
-          } else if (payload.eventType === 'UPDATE') {
-            const itemName = (payload.new as any)?.name || 'Item';
-            toast.info(`Cart updated`, { duration: 2000 });
-          }
+          // Cart UI updates visually - no toast needed
         } catch (error) {
           console.error(' Failed to refresh cart after real-time event:', error);
         }

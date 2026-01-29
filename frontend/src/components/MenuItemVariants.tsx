@@ -82,19 +82,6 @@ export interface Props {
 }
 
 export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemName = '', baseItemDescription = '', baseItemImage = '', baseItemImageAssetId = '', errors }: Props) {
-  // 🐛 Debug logging to diagnose rendering
-  console.log('🔍 [MenuItemVariants] Component Render:', {
-    variantsLength: variants?.length,
-    variantsIsArray: Array.isArray(variants),
-    variantsValue: variants,
-    proteinTypesLength: proteinTypes?.length,
-    baseItemName,
-    hasErrors: !!errors,
-    errorsObject: errors,
-    errorsKeys: errors ? Object.keys(errors) : [],
-    variantsError: errors?.variants
-  });
-  
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [mediaSelectorOpen, setMediaSelectorOpen] = useState(false);
@@ -291,10 +278,6 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
    * Now uses the same ImageUploader flow as Basic Information
    */
   const handleVariantImageUpload = async (index: number, result: ImageUploadResult) => {
-    console.log('✅ [MenuItemVariants] Variant image upload successful:', result);
-    console.log('📸 [MenuItemVariants] Asset ID:', result.asset_id);
-    console.log('📁 [MenuItemVariants] File URL:', result.file_url);
-
     // Update variant with optimized image data
     const newVariants = [...variants];
     newVariants[index] = {
@@ -609,13 +592,6 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
                 onOpenMediaSelector={() => openMediaSelector(index)}
                 onRemove={() => removeVariant(index)}
                 onPricingChange={(pricingData) => {
-                  // 🟢 DEBUG: Log pricing change to trace variant price updates
-                  console.log('🟢 [MenuItemVariants] onPricingChange:', {
-                    index,
-                    pricingData,
-                    currentVariantPrice: variants[index]?.price,
-                    currentVariantId: variants[index]?.id
-                  });
                   const newVariants = [...variants];
                   newVariants[index] = {
                     ...newVariants[index],
@@ -623,10 +599,6 @@ export function MenuItemVariants({ variants, proteinTypes, onChange, baseItemNam
                     price_dine_in: pricingData.price_dine_in || 0,
                     price_delivery: pricingData.price_delivery || 0
                   };
-                  console.log('🟢 [MenuItemVariants] After update:', {
-                    newPrice: newVariants[index].price,
-                    newVariantId: newVariants[index].id
-                  });
                   onChange(newVariants);
                 }}
                 onUploadSuccess={(result) => handleVariantImageUpload(index, result)}

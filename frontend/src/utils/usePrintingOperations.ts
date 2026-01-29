@@ -39,7 +39,7 @@ import { saveReceiptToHistory } from 'components/pos/ReprintDialog';
  * TEMPLATE ASSIGNMENT INTEGRATION:
  * - Each order type can have assigned receipt templates
  * - Templates defined in ThermalReceiptDesignerV2 page
- * - Template selection managed via POSSettings → PrinterManagement
+ * - Template selection managed via POSSettings
  * - Supports different layouts for kitchen vs customer receipts
  *
  * PRINTING MODES:
@@ -239,9 +239,7 @@ export function usePrintingOperations(
 
         if (result.success) {
           setLastPrintedAt(new Date());
-          toast.success('Kitchen ticket printed', {
-            description: `Sent to ${result.printer || 'thermal printer'}`
-          });
+          // Success - no toast, printer provides physical feedback
           console.log('✅ [HYBRID] Direct print successful:', result);
           return true;
         } else {
@@ -281,7 +279,7 @@ export function usePrintingOperations(
 
       if (queued) {
         setLastPrintedAt(new Date());
-        toast.success('Kitchen ticket queued for printing');
+        // Success - no toast, print queue handles printing
         return true;
       } else {
         throw new Error('Failed to queue print job');
@@ -364,9 +362,7 @@ export function usePrintingOperations(
 
         if (result.success) {
           setLastPrintedAt(new Date());
-          toast.success('Receipt printed', {
-            description: `Sent to ${result.printer || 'thermal printer'}`
-          });
+          // Success - no toast, printer provides physical feedback
           console.log('✅ [HYBRID] Direct receipt print successful:', result);
           // Save to receipt history for reprint functionality
           saveReceiptToHistory(customerData_, {
@@ -427,7 +423,7 @@ export function usePrintingOperations(
 
       if (queued) {
         setLastPrintedAt(new Date());
-        toast.success('Receipt queued for printing');
+        // Success - no toast, print queue handles printing
         return true;
       } else {
         throw new Error('Failed to queue print job');
@@ -526,9 +522,7 @@ export function usePrintingOperations(
 
         if (result.success) {
           setLastPrintedAt(new Date());
-          toast.success(`Bill printed for Table ${selectedTableNumber}`, {
-            description: `Sent to ${result.printer || 'thermal printer'}`
-          });
+          // Success - no toast, printer provides physical feedback
           console.log('✅ [HYBRID] Direct bill print successful:', result);
           // Save to receipt history for reprint functionality
           saveReceiptToHistory(billData, {
@@ -577,7 +571,7 @@ export function usePrintingOperations(
 
       if (queued) {
         setLastPrintedAt(new Date());
-        toast.success(`Bill queued for Table ${selectedTableNumber}`);
+        // Success - no toast, print queue handles printing
         return true;
       } else {
         throw new Error('Failed to queue bill print job');
@@ -639,9 +633,7 @@ export function usePrintingOperations(
 
         if (result.success) {
           setLastPrintedAt(new Date());
-          toast.success('Order sent to kitchen', {
-            description: `Printed on ${result.printer || 'thermal printer'}`
-          });
+          // Success - no toast, kitchen display and printer provide feedback
           console.log('✅ [HYBRID] Direct kitchen send successful:', result);
           return true;
         } else {
@@ -680,7 +672,7 @@ export function usePrintingOperations(
 
       if (queued) {
         setLastPrintedAt(new Date());
-        toast.success('Order sent to kitchen');
+        // Success - no toast, kitchen display provides feedback
         return true;
       } else {
         throw new Error('Failed to queue kitchen ticket');

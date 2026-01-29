@@ -295,3 +295,51 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
     console.log('[Supabase] Registered sleep/wake reconnection handler');
   }
 }
+
+// ============================================================================
+// NETWORK STATUS RECONNECTION (WiFi drops)
+// ============================================================================
+
+/**
+ * Handle network reconnection when WiFi comes back online.
+ * This handles the common case where WiFi drops during service and reconnects.
+ */
+let isReconnecting = false;
+
+const handleNetworkOnline = async () => {
+  if (isReconnecting) return;
+  isReconnecting = true;
+
+  console.log('[Supabase] Network back online — reconnecting realtime channels');
+
+  try {
+    // Wait for network to stabilize (WiFi can flap during reconnection)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Verify we're still online after the delay
+    if (!navigator.onLine) {
+      console.log('[Supabase] Network went offline again, skipping reconnection');
+      return;
+    }
+
+    // Use the same reconnection logic as sleep/wake
+    await reconnectAfterSleep();
+
+    console.log('[Supabase] Network reconnection complete');
+  } catch (error) {
+    console.error('[Supabase] Network reconnection error:', error);
+  } finally {
+    isReconnecting = false;
+  }
+};
+
+// Register network status listeners
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', handleNetworkOnline);
+
+  window.addEventListener('offline', () => {
+    console.log('[Supabase] Network offline — realtime channels may become stale');
+  });
+
+  console.log('[Supabase] Registered network status reconnection handler');
+}

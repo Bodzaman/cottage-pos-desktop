@@ -72,8 +72,6 @@ export default function SharedFavoritesList() {
         price: item.price || 0,
         price_adjustment: 0
       }, [], 1, '');
-
-      toast.success(`${item.menu_item_name} added to cart!`);
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add item to cart');

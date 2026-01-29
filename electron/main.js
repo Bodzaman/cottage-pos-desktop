@@ -224,6 +224,61 @@ class ESCPOSBuilder {
         return this;
     }
 
+    // =========================================================================
+    // CONVENIENCE METHODS - Aliases for common operations
+    // =========================================================================
+
+    /**
+     * Print a newline (alias for feed(1))
+     */
+    newline() {
+        return this.feed(1);
+    }
+
+    /**
+     * Center align text (alias for align('center'))
+     */
+    centerAlign() {
+        return this.align('center');
+    }
+
+    /**
+     * Left align text (alias for align('left'))
+     */
+    leftAlign() {
+        return this.align('left');
+    }
+
+    /**
+     * Right align text (alias for align('right'))
+     */
+    rightAlign() {
+        return this.align('right');
+    }
+
+    /**
+     * Feed paper and cut (combines feed + cut)
+     * @param {string} mode - 'full' or 'partial' (default)
+     */
+    feedAndCut(mode = 'partial') {
+        return this.cut(mode); // cut() already includes feed(5)
+    }
+
+    /**
+     * Get the buffer (alias for build())
+     * @returns {Buffer} - Complete ESC/POS command buffer
+     */
+    getBuffer() {
+        return this.build();
+    }
+
+    /**
+     * Initialize printer (alias for init())
+     */
+    initialize() {
+        return this.init();
+    }
+
     /**
      * Print QR code (GS ( k)
      * @param {string} data - Data to encode
@@ -1466,9 +1521,38 @@ Powered by QuickServe AI`
             }
         });
 
-        // Clear state on clean exit
+        // Clear state on clean exit and cleanup all event listeners
         app.on('before-quit', () => {
-            log.info('[CrashRecovery] Clean quit — removing crash state');
+            log.info('[CrashRecovery] Clean quit — removing crash state and cleaning up listeners');
+
+            // Cleanup autoUpdater listeners to prevent memory leaks
+            if (autoUpdater) {
+                autoUpdater.removeAllListeners();
+                log.info('[Cleanup] Removed autoUpdater listeners');
+            }
+
+            // Cleanup powerMonitor listeners
+            powerMonitor.removeAllListeners('resume');
+            powerMonitor.removeAllListeners('suspend');
+            log.info('[Cleanup] Removed powerMonitor listeners');
+
+            // Cleanup screen listeners
+            screen.removeAllListeners('display-added');
+            screen.removeAllListeners('display-removed');
+            log.info('[Cleanup] Removed screen listeners');
+
+            // Cleanup global shortcuts
+            globalShortcut.unregisterAll();
+            log.info('[Cleanup] Unregistered global shortcuts');
+
+            // Clear printer status polling interval
+            if (this.printerStatusInterval) {
+                clearInterval(this.printerStatusInterval);
+                this.printerStatusInterval = null;
+                log.info('[Cleanup] Cleared printer status interval');
+            }
+
+            // Remove crash state file
             try {
                 require('fs').unlinkSync(this.crashStatePath);
             } catch {
@@ -2809,8 +2893,8 @@ if (-not $success) { exit 1 }
             await fs.writeFile(tempFile, buffer);
 
             // Send raw data to printer
-            if (process.platform === 'darwin') {
-                // macOS: Use lp with raw option
+            if (process.platform === 'darwin' || process.platform === 'linux') {
+                // macOS/Linux: Use lp with raw option (CUPS)
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
                 // Windows: Use Win32 Spooler API to send raw ESC/POS data
@@ -2858,8 +2942,8 @@ if (-not $success) { exit 1 }
         try {
             await fs.writeFile(tempFile, cutCommand);
 
-            if (process.platform === 'darwin') {
-                // macOS: Use lp command with raw option to send ESC/POS directly
+            if (process.platform === 'darwin' || process.platform === 'linux') {
+                // macOS/Linux: Use lp command with raw option (CUPS)
                 log.info(`Sending cut command to printer: ${printerName}`);
                 await execAsync(`lp -d "${printerName}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
@@ -2923,8 +3007,8 @@ if (-not $success) { exit 1 }
             await fs.writeFile(tempFile, escposBuffer);
 
             // Send raw data to printer
-            if (process.platform === 'darwin') {
-                // macOS: Use lp with raw option
+            if (process.platform === 'darwin' || process.platform === 'linux') {
+                // macOS/Linux: Use lp with raw option (CUPS)
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
                 // Windows: Use Win32 Spooler API to send raw ESC/POS data
@@ -2990,8 +3074,8 @@ if (-not $success) { exit 1 }
             await fs.writeFile(tempFile, buffer);
 
             // Send raw data to printer
-            if (process.platform === 'darwin') {
-                // macOS: Use lp with raw option
+            if (process.platform === 'darwin' || process.platform === 'linux') {
+                // macOS/Linux: Use lp with raw option (CUPS)
                 await execAsync(`lp -d "${printer}" -o raw "${tempFile}"`);
             } else if (process.platform === 'win32') {
                 // Windows: Use Win32 Spooler API to send raw ESC/POS data

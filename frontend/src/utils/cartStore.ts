@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
-import type { OrderMode, CartState, CartCustomization, CartItem, MenuItemInput } from 'types';
+import type { OrderMode, CartState, CartCustomization, CartItem, MenuItemInput, UndoStackEntry, LastAddedItem } from 'types';
 import { getPriceForMode, calculateTotalItems, calculateTotalAmount } from 'types';
 import { trackItemAdded, trackItemRemoved, trackModeSwitch, trackCartCleared, trackCartEvent } from './cartAnalytics';
 import { getOrCreateSessionId } from './session-manager';
@@ -199,6 +199,14 @@ export const useCartStore = create<CartState>()(persist(
     
     // NEW: Editing state
     editingItemId: null,
+
+    // NEW: Undo system state
+    undoStack: [] as UndoStackEntry[],
+    pendingUndo: null as string | null,
+
+    // NEW: Animation state
+    lastAddedItem: null as LastAddedItem | null,
+    animationTrigger: null as string | null,
     
     // NEW: Get cart age in days
     getCartAge: () => {
@@ -242,7 +250,106 @@ export const useCartStore = create<CartState>()(persist(
     // NEW: Editing actions
     setEditingItem: (itemId: string | null) => set({ editingItemId: itemId }),
     clearEditingItem: () => set({ editingItemId: null }),
-    
+
+    // ================================
+    // UNDO SYSTEM ACTIONS
+    // ================================
+
+    // Push removed item to undo stack
+    pushToUndoStack: (item: CartItem, action: 'remove' | 'clear') => {
+      set((state) => ({
+        undoStack: [
+          ...state.undoStack,
+          {
+            item,
+            action,
+            timestamp: Date.now(),
+          },
+        ],
+      }));
+    },
+
+    // Undo the last remove action (handles both single remove and batch clear)
+    undoLastAction: () => {
+      const state = get();
+      const lastEntry = state.undoStack[state.undoStack.length - 1];
+
+      if (!lastEntry) return;
+
+      // For 'clear' action, restore all items with the same timestamp
+      if (lastEntry.action === 'clear') {
+        const clearTimestamp = lastEntry.timestamp;
+        const itemsToRestore = state.undoStack.filter(
+          (entry) => entry.action === 'clear' && entry.timestamp === clearTimestamp
+        );
+        const remainingUndoStack = state.undoStack.filter(
+          (entry) => !(entry.action === 'clear' && entry.timestamp === clearTimestamp)
+        );
+
+        set((state) => ({
+          items: [...state.items, ...itemsToRestore.map((e) => e.item)],
+          totalItems: calculateTotalItems([...state.items, ...itemsToRestore.map((e) => e.item)]),
+          totalAmount: calculateTotalAmount([...state.items, ...itemsToRestore.map((e) => e.item)]),
+          undoStack: remainingUndoStack,
+          lastSavedAt: Date.now(),
+        }));
+
+        toast.success(`${itemsToRestore.length} items restored to cart`);
+        return;
+      }
+
+      // For single 'remove' action
+      set({ pendingUndo: lastEntry.item.id });
+
+      // Restore the item to cart
+      set((state) => {
+        const newItems = [...state.items, lastEntry.item];
+        const newUndoStack = state.undoStack.slice(0, -1);
+
+        return {
+          items: newItems,
+          totalItems: calculateTotalItems(newItems),
+          totalAmount: calculateTotalAmount(newItems),
+          undoStack: newUndoStack,
+          pendingUndo: null,
+          lastSavedAt: Date.now(),
+        };
+      });
+
+      toast.success(`${lastEntry.item.name} restored to cart`);
+    },
+
+    // Clear a specific item from undo stack (after timeout or dismiss)
+    clearFromUndoStack: (itemId: string) => {
+      set((state) => ({
+        undoStack: state.undoStack.filter((entry) => entry.item.id !== itemId),
+      }));
+    },
+
+    // Clear all items from undo stack
+    clearUndoStack: () => {
+      set({ undoStack: [], pendingUndo: null });
+    },
+
+    // ================================
+    // ANIMATION ACTIONS
+    // ================================
+
+    // Set last added item for fly animation
+    setLastAddedItem: (item: LastAddedItem | null) => {
+      set({ lastAddedItem: item });
+    },
+
+    // Trigger animation (generates unique key)
+    triggerAnimation: () => {
+      set({ animationTrigger: `anim_${Date.now()}` });
+    },
+
+    // Clear animation state
+    clearAnimationState: () => {
+      set({ lastAddedItem: null, animationTrigger: null });
+    },
+
     toggleCart: () => {
       const isOpen = get().isCartOpen;
       set({ isCartOpen: !isOpen });
@@ -363,7 +470,7 @@ export const useCartStore = create<CartState>()(persist(
       }
     },
     
-    // ✅ LOCAL-ONLY: Remove item from cart (no backend sync)
+    // ✅ LOCAL-ONLY: Remove item from cart with undo support
     removeItem: async (itemId: string) => {
       const item = get().items.find(i => i.id === itemId);
 
@@ -372,6 +479,8 @@ export const useCartStore = create<CartState>()(persist(
         return;
       }
 
+      // Push to undo stack before removing
+      get().pushToUndoStack(item, 'remove');
 
       // Update local state
       set((state) => {
@@ -384,11 +493,11 @@ export const useCartStore = create<CartState>()(persist(
         };
       });
 
-      // Show toast notification
-      toast.success(`${item.name} removed from cart`);
-
       // Track analytics
       trackItemRemoved(item.menuItemId, item.name, 'user_action');
+
+      // NOTE: Toast with undo is handled by the component using UndoToast
+      // The component should call clearFromUndoStack after timeout/dismiss
     },
 
     // ✅ NEW: Update an existing cart item (variant, customizations, notes, quantity)
@@ -467,25 +576,35 @@ export const useCartStore = create<CartState>()(persist(
       }, QUANTITY_UPDATE_DEBOUNCE);
     },
 
-    // ✅ LOCAL-ONLY: Clear cart (no backend sync)
+    // ✅ LOCAL-ONLY: Clear cart with undo support
     clearCart: async () => {
       const state = get();
+      const itemCount = state.items.length;
+
+      if (itemCount === 0) return;
 
       // Track analytics before clearing
-      if (state.items.length > 0) {
-        trackCartCleared('user_action', state.totalAmount);
-      }
+      trackCartCleared('user_action', state.totalAmount);
 
+      // Push all items to undo stack as a batch (for undo all)
+      const clearTimestamp = Date.now();
+      const undoEntries: UndoStackEntry[] = state.items.map((item) => ({
+        item,
+        action: 'clear' as const,
+        timestamp: clearTimestamp,
+      }));
 
-      // Clear frontend state
+      // Clear frontend state and add to undo stack
       set({
         items: [],
         totalItems: 0,
         totalAmount: 0,
-        lastSavedAt: undefined
+        lastSavedAt: undefined,
+        undoStack: [...state.undoStack, ...undoEntries],
       });
 
-      toast.success('Cart cleared');
+      // NOTE: Toast with undo is handled by the component using UndoToast
+      // The component should call undoLastAction to restore all items
     },
     
     // ✅ PHASE 4.1b: Cart is managed locally via Zustand persistence
@@ -826,8 +945,25 @@ export const useCartStore = create<CartState>()(persist(
   }
 ));
 
-// ❌ TEMPORARILY DISABLED (Stabilization): Real-time subscription initialization
-// Will re-enable after JSONB parsing issue is resolved
+/**
+ * ❌ REAL-TIME CART SYNC - TEMPORARILY DISABLED
+ *
+ * STATUS: Disabled since v4.0.0 stabilization phase
+ * REASON: JSONB parsing inconsistencies between Supabase real-time events and
+ *         the cart store's expected format were causing cart corruption.
+ *
+ * IMPACT: Users with multiple tabs/sessions may see stale cart data.
+ *         Single-tab usage is unaffected as cart syncs on page load.
+ *
+ * TO RE-ENABLE:
+ * 1. Fix JSONB parsing in the onRehydrateStorage middleware (lines 863-943)
+ * 2. Ensure real-time events from Supabase match the CartItem interface
+ * 3. Test with multiple browser tabs to verify sync works correctly
+ * 4. Uncomment the subscription code below
+ *
+ * AUDIT NOTE (2025-01): Documented during codebase audit. Consider prioritizing
+ *                        fix if multi-tab/multi-device usage is required.
+ */
 /*
 // ✅ PHASE 5f: Reactive subscription initialization
 // Watch for sessionId changes and auto-initialize subscription

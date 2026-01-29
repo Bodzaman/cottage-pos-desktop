@@ -33,11 +33,14 @@ import ConfirmationDialog from './ConfirmationDialog';
 import { POSGuestCountModal } from './POSGuestCountModal';
 import { CustomerNotesDialog } from './CustomerNotesDialog';
 import { AddCustomerTabDialog } from './AddCustomerTabDialog';
+import { StaffCustomizationModal, type SelectedCustomization } from './StaffCustomizationModal';
 
 // Utils & Types
 import { QSAITheme } from 'utils/QSAIDesign';
-import type { OrderItem } from 'utils/menuTypes';
-import { assignItemToTab } from 'utils/supabaseQueries';
+import type { OrderItem, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/menuTypes';
+import { assignItemToTab, updateOrderItemCustomizations } from 'utils/supabaseQueries';
+import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { supabase } from 'utils/supabaseClient';
 
 /**
  * EnrichedDineInOrderItem - Local interface matching backend response
@@ -214,6 +217,12 @@ export function DineInOrderWorkspace({
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [showCreateTabDialog, setShowCreateTabDialog] = useState(false);
 
+  // Customization modal state
+  const [customizingItem, setCustomizingItem] = useState<EnrichedDineInOrderItem | null>(null);
+  const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  const [customizingItemIndex, setCustomizingItemIndex] = useState<number>(-1);
+  const [isEditingStagingItem, setIsEditingStagingItem] = useState(false);
+
   // Reset view when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -310,10 +319,109 @@ export function DineInOrderWorkspace({
     onRemoveItem(itemId);
   }, [onRemoveItem]);
 
+  // Handle customizing persisted items (from Review view)
   const handleCustomizeItem = useCallback((item: EnrichedDineInOrderItem) => {
-    // TODO: Open customization modal
-    console.log('Customize item:', item);
+    setCustomizingItem(item);
+    setIsEditingStagingItem(false);
+    setCustomizingItemIndex(-1);
+    setIsCustomizationModalOpen(true);
   }, []);
+
+  // Handle customizing staging items (from Add Items view)
+  const handleCustomizeStagingItem = useCallback((index: number, item: OrderItem) => {
+    // Convert OrderItem to EnrichedDineInOrderItem format for the modal
+    const enrichedItem: EnrichedDineInOrderItem = {
+      id: item.id,
+      order_id: order?.id || '',
+      customer_tab_id: null,
+      table_number: tableNumber || 0,
+      menu_item_id: item.menu_item_id,
+      variant_id: item.variant_id || null,
+      category_id: null,
+      item_name: item.name,
+      variant_name: item.variantName || null,
+      protein_type: item.protein_type || null,
+      quantity: item.quantity,
+      unit_price: item.price,
+      line_total: item.price * item.quantity,
+      customizations: item.customizations?.map(c => ({
+        customization_id: c.id || c.customization_id,
+        name: c.name,
+        price_adjustment: c.price_adjustment || 0,
+        group: c.group || ''
+      })) || [],
+      notes: item.notes || null,
+      status: 'PENDING',
+      sent_to_kitchen_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      image_url: item.image_url || null,
+    };
+    setCustomizingItem(enrichedItem);
+    setIsEditingStagingItem(true);
+    setCustomizingItemIndex(index);
+    setIsCustomizationModalOpen(true);
+  }, [order?.id, tableNumber]);
+
+  // Handle confirmation from customization modal
+  const handleCustomizationConfirm = useCallback(async (
+    menuItem: MenuTypesMenuItem,
+    quantity: number,
+    variant?: MenuTypesItemVariant | null,
+    customizations?: SelectedCustomization[],
+    notes?: string
+  ) => {
+    if (!customizingItem) return;
+
+    if (isEditingStagingItem && customizingItemIndex >= 0) {
+      // Update staging item
+      const originalItem = stagingItems[customizingItemIndex];
+      if (!originalItem) return;
+
+      const updatedItem: OrderItem = {
+        ...originalItem,
+        quantity,
+        customizations: customizations?.map(c => ({
+          id: c.id,
+          customization_id: c.id,
+          name: c.name,
+          price_adjustment: c.price_adjustment || 0,
+          group: c.group || ''
+        })) || [],
+        notes: notes || '',
+      };
+
+      // Remove old and add updated (staging cart doesn't support in-place update)
+      onRemoveFromStaging(originalItem.id);
+      onAddToStaging(updatedItem);
+      toast.success(`Updated ${menuItem.name}`);
+    } else {
+      // Update persisted item in database
+      const result = await updateOrderItemCustomizations(
+        customizingItem.id,
+        quantity,
+        customizations?.map(c => ({
+          customization_id: c.id,
+          name: c.name,
+          price_adjustment: c.price_adjustment || 0,
+          group: c.group || ''
+        })) || [],
+        notes || ''
+      );
+
+      if (result.success) {
+        toast.success(`Updated ${customizingItem.item_name}`);
+        // Enriched items will auto-refresh via real-time subscription
+      } else {
+        toast.error(result.message || 'Failed to update item');
+      }
+    }
+
+    setIsCustomizationModalOpen(false);
+    setCustomizingItem(null);
+    setCustomizingItemIndex(-1);
+    setIsEditingStagingItem(false);
+  }, [customizingItem, isEditingStagingItem, customizingItemIndex, stagingItems, onRemoveFromStaging, onAddToStaging]);
 
   // Handle item assignment to customer tab
   const handleAssignItemToTab = useCallback(async (itemId: string, tabId: string | null) => {
@@ -403,6 +511,7 @@ export function DineInOrderWorkspace({
                   tableNumber={tableNumber}
                   guestCount={order?.guest_count || customerTabs.length || 1}
                   linkedTables={linkedTables}
+                  onCustomizeItem={handleCustomizeStagingItem}
                 />
               </motion.div>
             )}
@@ -493,8 +602,23 @@ export function DineInOrderWorkspace({
         onClose={() => setShowNotesDialog(false)}
         initialNotes={order?.notes || ''}
         onSave={async (notes) => {
-          // TODO: Implement notes save via order update
-          console.log('Save notes:', notes);
+          if (!order?.id) {
+            toast.error('No active order');
+            setShowNotesDialog(false);
+            return;
+          }
+
+          const { error } = await supabase
+            .from('orders')
+            .update({ notes })
+            .eq('id', order.id);
+
+          if (error) {
+            console.error('[DineInOrderWorkspace] Notes save error:', error);
+            toast.error('Failed to save notes');
+          } else {
+            toast.success('Notes saved');
+          }
           setShowNotesDialog(false);
         }}
         tableNumber={tableNumber || undefined}
@@ -509,6 +633,48 @@ export function DineInOrderWorkspace({
           .filter(tab => tab.status === 'active')
           .map(tab => tab.tab_name || '')}
       />
+
+      {/* Customization Modal for editing item customizations */}
+      {isCustomizationModalOpen && customizingItem && (() => {
+        const { menuItems: allMenuItems, itemVariants } = useRealtimeMenuStore.getState();
+        const fullMenuItem = allMenuItems.find(mi => mi.id === customizingItem.menu_item_id);
+
+        if (!fullMenuItem) {
+          console.error('Menu item not found for customization modal:', customizingItem.menu_item_id);
+          return null;
+        }
+
+        const selectedVariant = customizingItem.variant_id
+          ? itemVariants.find(v => v.id === customizingItem.variant_id)
+          : null;
+
+        // Convert customizations to SelectedCustomization format
+        const initialCustomizations: SelectedCustomization[] = customizingItem.customizations?.map((c: any) => ({
+          id: c.customization_id || c.id,
+          name: c.name,
+          price_adjustment: c.price_adjustment || 0,
+          group: c.group || ''
+        })) || [];
+
+        return (
+          <StaffCustomizationModal
+            item={fullMenuItem}
+            variant={selectedVariant || null}
+            isOpen={isCustomizationModalOpen}
+            onClose={() => {
+              setIsCustomizationModalOpen(false);
+              setCustomizingItem(null);
+              setCustomizingItemIndex(-1);
+              setIsEditingStagingItem(false);
+            }}
+            onConfirm={handleCustomizationConfirm}
+            orderType="DINE-IN"
+            initialQuantity={customizingItem.quantity}
+            initialCustomizations={initialCustomizations}
+            initialNotes={customizingItem.notes || ''}
+          />
+        );
+      })()}
     </>
   );
 }

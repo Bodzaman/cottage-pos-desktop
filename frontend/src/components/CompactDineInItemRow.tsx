@@ -12,8 +12,9 @@
  * Size: ~80px height per row (vs 200px+ for EnrichedOrderItemCard)
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Minus, Trash2, Cog, Utensils, User, Users } from 'lucide-react';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,33 @@ export function CompactDineInItemRow({
   onAssignItemToTab,
 }: CompactDineInItemRowProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Get menu store data for dynamic image resolution (matches OrderSummaryPanel pattern)
+  const { itemVariants, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
+
+  // Resolve image URL with fallback to menu store (fixes existing items with NULL image_url)
+  // Priority: variant.display_image_url > variant.image_url > item.image_url > menuItem.image_url
+  const resolvedImageUrl = useMemo(() => {
+    let imageUrl = item.image_url; // Start with snapshot
+
+    // Try to resolve from menu store for latest image (variant first)
+    if (item.variant_id && itemVariants) {
+      const variantObj = itemVariants.find(v => v.id === item.variant_id);
+      if (variantObj) {
+        imageUrl = (variantObj as any).display_image_url || variantObj.image_url || item.image_url;
+      }
+    }
+
+    // Fallback: If still no image, try menu item from store
+    if (!imageUrl && item.menu_item_id && menuItems) {
+      const menuItem = menuItems.find(m => m.id === item.menu_item_id);
+      if (menuItem) {
+        imageUrl = menuItem.image_url || null;
+      }
+    }
+
+    return imageUrl || null;
+  }, [item.image_url, item.variant_id, item.menu_item_id, itemVariants, menuItems]);
 
   // Get active customer tabs for dropdown
   const activeTabs = customerTabs?.filter(tab => tab.status === 'active') || [];
@@ -146,7 +174,7 @@ export function CompactDineInItemRow({
           e.currentTarget.style.borderColor = 'transparent';
         }}
       >
-        {/* Thumbnail Image (60x60) */}
+        {/* Thumbnail Image (60x60) - Uses dynamic resolution from menu store */}
         <div
           className="w-[60px] h-[60px] rounded-md overflow-hidden flex-shrink-0"
           style={{
@@ -154,9 +182,9 @@ export function CompactDineInItemRow({
             backgroundColor: QSAITheme.background.secondary,
           }}
         >
-          {item.image_url ? (
+          {resolvedImageUrl ? (
             <img
-              src={item.image_url}
+              src={resolvedImageUrl}
               alt={item.item_name}
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -323,6 +351,27 @@ export function CompactDineInItemRow({
           </button>
         </div>
 
+        {/* Customize Button - Always Visible */}
+        <button
+          onClick={() => onCustomizeItem(item)}
+          className="h-6 px-2 rounded flex items-center justify-center gap-1 transition-all flex-shrink-0 text-xs font-medium"
+          style={{
+            border: `1px solid ${QSAITheme.purple.primary}`,
+            color: QSAITheme.purple.light,
+            background: 'transparent',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = QSAITheme.purple.primaryTransparent;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+          aria-label="Customize item"
+        >
+          <Cog className="h-3 w-3" />
+          <span>Custom</span>
+        </button>
+
         {/* Line Total */}
         <div className="text-right flex-shrink-0 min-w-[70px]">
           <p
@@ -333,35 +382,14 @@ export function CompactDineInItemRow({
           </p>
         </div>
 
-        {/* Quick Actions (Hover Reveal - Absolutely Positioned Overlay) */}
+        {/* Delete Button (Hover Reveal) */}
         <div
-          className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{
             background: `linear-gradient(90deg, transparent 0%, ${QSAITheme.background.secondary} 20%)`,
             paddingLeft: '16px',
           }}
         >
-          {/* Customize Button */}
-          <button
-            onClick={() => onCustomizeItem(item)}
-            className="h-7 w-7 rounded flex items-center justify-center transition-all"
-            style={{
-              border: `1px solid ${QSAITheme.purple.primary}`,
-              color: QSAITheme.purple.primary,
-              background: QSAITheme.background.secondary,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = QSAITheme.purple.primaryTransparent;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = QSAITheme.background.secondary;
-            }}
-            aria-label="Customize item"
-          >
-            <Cog className="h-3.5 w-3.5" />
-          </button>
-
-          {/* Delete Button */}
           <button
             onClick={() => setShowDeleteDialog(true)}
             className="h-7 w-7 rounded flex items-center justify-center transition-all"

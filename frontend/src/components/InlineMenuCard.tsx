@@ -201,11 +201,6 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
           ''
         );
         
-        const displayName = selectedVariant.variant_name || selectedVariant.name || 'Option';
-        toast.success(`${menuItem.name} added to cart`, {
-          description: `${displayName} • Qty: ${quantity} • £${totalPrice.toFixed(2)}`,
-          duration: 2000
-        });
       } else {
         // Single item without variants
         const syntheticVariant: ItemVariant = {
@@ -231,11 +226,6 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
           mode,
           ''
         );
-        
-        toast.success(`${menuItem.name} added to cart`, {
-          description: `Qty: ${quantity} • £${totalPrice.toFixed(2)}`,
-          duration: 2000
-        });
       }
       
       // Reset quantity after add
@@ -273,10 +263,6 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
     }));
     addItem(item as any, variant, qty, cartCustomizations, mode, notes || '');
     setIsCustomizationModalOpen(false);
-    toast.success(`Added ${item.name} to cart`, {
-      description: variant?.name ? `Variant: ${variant.name} • Qty: ${qty}` : `Qty: ${qty}`,
-      duration: 2000
-    });
   };
 
   // ✅ Phase 4A: ChatGPT-style staggered reveal animation

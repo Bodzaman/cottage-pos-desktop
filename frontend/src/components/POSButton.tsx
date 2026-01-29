@@ -270,14 +270,14 @@ export function POSButton(props: POSButtonProps) {
       style={{
         background: 'transparent',
         border: 'none',
-        padding: iconOnly ? '6px' : '6px 12px',
+        padding: iconOnly ? '10px' : '6px 12px',
         color: destructive ? 'rgba(248, 113, 113, 0.8)' : 'rgba(255, 255, 255, 0.6)',
         fontSize: '13px',
         fontWeight: 400,
         opacity: disabled ? 0.3 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        minWidth: iconOnly ? '28px' : undefined,
-        minHeight: iconOnly ? '28px' : undefined,
+        minWidth: iconOnly ? '44px' : undefined,
+        minHeight: iconOnly ? '44px' : undefined,
       }}
       onMouseEnter={(e) => {
         if (disabled) return;

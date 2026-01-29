@@ -139,7 +139,6 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       const data = await response.json();
       
       if (data.authenticated) {
-        console.log('🎉 Password authentication successful!');
         setIsEditMode(true);
         setIsAuthenticated(true);
         setShowPasswordDialog(false);
@@ -186,7 +185,9 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
       allergens: item.allergens,
       ingredients: item.ingredients,
       active: item.active,
-      featured: item.featured
+      featured: item.featured,
+      chefs_special: item.chefs_special,
+      specialty_notes: item.specialty_notes
     });
   };
   
@@ -216,6 +217,8 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
         featured: editFormData.featured ?? item.featured,
         display_order: item.display_order,
         active: editFormData.active ?? item.active,
+        chefs_special: editFormData.chefs_special ?? item.chefs_special,
+        specialty_notes: editFormData.specialty_notes ?? item.specialty_notes,
         variants: item.variants?.map(variant => ({
           id: variant.id,
           protein_type_id: variant.protein_type_id,
@@ -916,14 +919,7 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    console.log('🔘 Edit Menu button clicked!');
-                    console.log('🔍 Current state:', { isEditMode, showPasswordDialog, isAuthenticated });
-                    console.log('🌟 About to set showPasswordDialog to true...');
-                    setShowPasswordDialog(true);
-                    console.log('✅ Password dialog state set to true');
-                    console.log('🎯 showPasswordDialog should now be:', true);
-                  }}
+                  onClick={() => setShowPasswordDialog(true)}
                   className="text-sm"
                   style={{
                     borderColor: colors.brand.purple,
@@ -1036,7 +1032,6 @@ const MenuManagementDialog: React.FC<MenuManagementDialogProps> = ({ isOpen, onC
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              console.log('🛑 Backdrop clicked - closing password dialog');
               setShowPasswordDialog(false);
               setPasswordInput('');
               setPasswordError(null);

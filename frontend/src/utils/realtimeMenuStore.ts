@@ -208,12 +208,10 @@ let currentStoreContext: MenuStoreContext = 'admin'; // Default to admin (shows 
 export function setMenuStoreContext(context: MenuStoreContext) {
   const previousContext = currentStoreContext;
   currentStoreContext = context;
-  console.log(`🎯 [RealtimeMenuStore] Context set to: ${context}`);
 
   // 🎯 DRAFT/PUBLISH FIX: Clear cache when switching contexts to prevent draft items leaking
   // This is critical when switching from admin (sees all items) to pos/online (published only)
   if (previousContext !== null && previousContext !== context) {
-    console.log(`🔄 [RealtimeMenuStore] Context changed from ${previousContext} to ${context}, clearing cache to force fresh data load`);
 
     // Clear the persisted localStorage cache
     try {
@@ -656,7 +654,6 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
                   if (!newRecord?.published_at) {
                     // Item is a draft - for POS/Online, we need to REMOVE it from state
                     // (it was either a new draft we shouldn't show, or a published item that became a draft)
-                    console.log(`🚫 [Realtime] Removing unpublished item from POS/Online: ${newRecord?.name || newRecord?.id}`);
 
                     // Remove the item from state instead of just skipping
                     const store = useRealtimeMenuStore.getState();
@@ -667,7 +664,6 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
                     if (filteredItems.length !== currentItems.length) {
                       store.setMenuItems(filteredItems);
                       store.updateFilteredItems();
-                      console.log(`✅ [Realtime] Removed draft item "${newRecord?.name}" from POS/Online menu`);
                     }
                     return;
                   }

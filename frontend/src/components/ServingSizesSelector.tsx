@@ -6,14 +6,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
-import { UseFormRegister, UseFormWatch, FieldErrors } from 'react-hook-form';
+import { UseFormRegister, FieldErrors, Control, useWatch } from 'react-hook-form';
 import { useCustomServingSizes } from 'utils/useCustomServingSizes';
 import { toast } from 'sonner';
 
 interface ServingSizesSelectorProps {
   register: UseFormRegister<any>;
-  watch: UseFormWatch<any>;
+  control: Control<any>;
   errors: FieldErrors<any>;
+  /** @deprecated - watch prop no longer needed, using useWatch hook */
+  watch?: any;
 }
 
 // Helper function to get category icon (moved to top to avoid hoisting issues)
@@ -26,8 +28,84 @@ const getCategoryIcon = (category: string): string => {
   }
 };
 
-export function ServingSizesSelector({ register, watch, errors }: ServingSizesSelectorProps) {
-  const { allEnhancedSizes, loading, addCustomServingSize, refresh } = useCustomServingSizes();
+/**
+ * Individual serving size item that uses useWatch for proper subscription
+ */
+interface ServingSizeItemProps {
+  size: any;
+  fieldName: string;
+  priceFieldName: string;
+  categoryTag: { label: string; color: string };
+  register: UseFormRegister<any>;
+  control: Control<any>;
+}
+
+function ServingSizeItem({ size, fieldName, priceFieldName, categoryTag, register, control }: ServingSizeItemProps) {
+  // Use useWatch for proper form state subscription
+  const isSelected = useWatch({ control, name: fieldName });
+
+  return (
+    <div
+      className={`p-4 border rounded-lg space-y-3 ${size.color_class}`}
+    >
+      <div className="flex items-center space-x-3">
+        <input
+          type="checkbox"
+          id={fieldName}
+          className="rounded"
+          {...register(fieldName)}
+        />
+        <Label htmlFor={fieldName} className="text-sm font-medium flex items-center space-x-2">
+          <span>{size.icon}</span>
+          <span>{size.display_label}</span>
+          <Badge
+            variant="secondary"
+            className={`text-xs ${
+              categoryTag.color === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/50' :
+              categoryTag.color === 'blue' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50' :
+              categoryTag.color === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/50' :
+              categoryTag.color === 'green' ? 'bg-green-100 text-green-600 dark:bg-green-900/50' :
+              'bg-gray-100 text-gray-600 dark:bg-gray-900/50'
+            }`}
+          >
+            {categoryTag.label}
+          </Badge>
+        </Label>
+      </div>
+      {isSelected && (
+        <div className="pl-8">
+          <Label htmlFor={priceFieldName} className="text-xs text-gray-600">Price (£)</Label>
+          <Input
+            id={priceFieldName}
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder={size.is_default ? getDefaultPlaceholder(size) : "0.00"}
+            className="mt-1 text-sm"
+            {...register(priceFieldName, { valueAsNumber: true })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Helper function to get default placeholder prices (moved up for ServingSizeItem access)
+function getDefaultPlaceholder(size: any): string {
+  switch (size.field_name) {
+    case 'serving_size_125ml_glass': return '4.50';
+    case 'serving_size_175ml_glass': return '6.50';
+    case 'serving_size_250ml_glass': return '2.95';
+    case 'serving_size_330ml_bottle': return '3.50';
+    case 'serving_size_half_pint': return '2.75';
+    case 'serving_size_pint': return '5.50';
+    case 'serving_size_bottle': return '24.95';
+    default: return '0.00';
+  }
+}
+
+export function ServingSizesSelector({ register, control, errors }: ServingSizesSelectorProps) {
+  const { allEnhancedSizes, loading, addCustomServingSize, reload } = useCustomServingSizes();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSizeForm, setNewSizeForm] = useState({ name: '', volume: '', category: 'Glass' });
   const [isAdding, setIsAdding] = useState(false);
@@ -52,7 +130,7 @@ export function ServingSizesSelector({ register, watch, errors }: ServingSizesSe
       await addCustomServingSize(newSizeForm.name, newSizeForm.volume, newSizeForm.category);
       setNewSizeForm({ name: '', volume: '', category: 'Glass' });
       setIsAddDialogOpen(false);
-      refresh(); // Refresh the serving sizes list
+      reload(); // Refresh the serving sizes list
     } catch (error) {
       console.error('Failed to add custom serving size:', error);
     } finally {
@@ -193,52 +271,17 @@ export function ServingSizesSelector({ register, watch, errors }: ServingSizesSe
           const fieldName = getFieldName(size);
           const priceFieldName = getPriceFieldName(size);
           const categoryTag = getCategoryTag(size);
-          const isSelected = watch(fieldName);
-          
+
           return (
-            <div 
-              key={size.id} 
-              className={`p-4 border rounded-lg space-y-3 ${size.color_class}`}
-            >
-              <div className="flex items-center space-x-3">
-                <input 
-                  type="checkbox" 
-                  id={fieldName}
-                  className="rounded" 
-                  {...register(fieldName)}
-                />
-                <Label htmlFor={fieldName} className="text-sm font-medium flex items-center space-x-2">
-                  <span>{size.icon}</span>
-                  <span>{size.display_label}</span>
-                  <Badge 
-                    variant="secondary" 
-                    className={`text-xs ${
-                      categoryTag.color === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/50' :
-                      categoryTag.color === 'blue' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50' :
-                      categoryTag.color === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/50' :
-                      categoryTag.color === 'green' ? 'bg-green-100 text-green-600 dark:bg-green-900/50' :
-                      'bg-gray-100 text-gray-600 dark:bg-gray-900/50'
-                    }`}
-                  >
-                    {categoryTag.label}
-                  </Badge>
-                </Label>
-              </div>
-              {isSelected && (
-                <div className="pl-8">
-                  <Label htmlFor={priceFieldName} className="text-xs text-gray-600">Price (£)</Label>
-                  <Input
-                    id={priceFieldName}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder={size.is_default ? getDefaultPlaceholder(size) : "0.00"}
-                    className="mt-1 text-sm"
-                    {...register(priceFieldName, { valueAsNumber: true })}
-                  />
-                </div>
-              )}
-            </div>
+            <ServingSizeItem
+              key={size.id}
+              size={size}
+              fieldName={fieldName}
+              priceFieldName={priceFieldName}
+              categoryTag={categoryTag}
+              register={register}
+              control={control}
+            />
           );
         })}
       </div>
@@ -252,18 +295,4 @@ export function ServingSizesSelector({ register, watch, errors }: ServingSizesSe
       </div>
     </div>
   );
-}
-
-// Helper function to get default placeholder prices
-function getDefaultPlaceholder(size: any): string {
-  switch (size.field_name) {
-    case 'serving_size_125ml_glass': return '4.50';
-    case 'serving_size_175ml_glass': return '6.50';
-    case 'serving_size_250ml_glass': return '2.95';
-    case 'serving_size_330ml_bottle': return '3.50';
-    case 'serving_size_half_pint': return '2.75';
-    case 'serving_size_pint': return '5.50';
-    case 'serving_size_bottle': return '24.95';
-    default: return '0.00';
-  }
 }

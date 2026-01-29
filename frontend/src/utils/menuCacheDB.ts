@@ -61,7 +61,6 @@ class MenuCacheDB {
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('✅ [MenuCacheDB] IndexedDB initialized successfully');
         resolve();
       };
 
@@ -71,13 +70,11 @@ class MenuCacheDB {
         // Create menu cache store
         if (!db.objectStoreNames.contains(MENU_STORE)) {
           db.createObjectStore(MENU_STORE, { keyPath: 'cacheKey' });
-          console.log('📦 [MenuCacheDB] Created menu_cache object store');
         }
 
         // Create metadata store
         if (!db.objectStoreNames.contains(METADATA_STORE)) {
           db.createObjectStore(METADATA_STORE, { keyPath: 'key' });
-          console.log('📦 [MenuCacheDB] Created cache_metadata object store');
         }
       };
     });
@@ -128,7 +125,6 @@ class MenuCacheDB {
         metadataStore.put({ key: 'menu_metadata', ...metadata })
       );
 
-      console.log(`✅ [MenuCacheDB] Saved ${recordCount} records to cache`);
       return true;
     } catch (error) {
       console.error('❌ [MenuCacheDB] Failed to save menu data:', error);
@@ -152,22 +148,11 @@ class MenuCacheDB {
       const result = await this.promisifyRequest(request);
 
       if (!result) {
-        console.log('ℹ️ [MenuCacheDB] No cached menu data found');
         return null;
       }
 
       // Extract menu data (remove IndexedDB metadata)
       const { cacheKey, cachedAt, ...menuData } = result;
-      
-      const recordCount = 
-        menuData.categories.length +
-        menuData.menuItems.length +
-        menuData.proteinTypes.length +
-        menuData.customizations.length +
-        menuData.itemVariants.length +
-        menuData.setMeals.length;
-
-      console.log(`✅ [MenuCacheDB] Loaded ${recordCount} records from cache (cached ${Math.round((Date.now() - cachedAt) / 1000)}s ago)`);
       
       return menuData as MenuCacheData;
     } catch (error) {
@@ -209,10 +194,7 @@ class MenuCacheDB {
 
     const ageMs = Date.now() - metadata.lastSync;
     const ageMinutes = ageMs / 1000 / 60;
-    const isFresh = ageMinutes < 60; // Cache valid for 1 hour
-
-    console.log(`📊 [MenuCacheDB] Cache age: ${Math.round(ageMinutes)} minutes (${isFresh ? 'fresh' : 'stale'})`);
-    return isFresh;
+    return ageMinutes < 60; // Cache valid for 1 hour
   }
 
   /**
@@ -228,7 +210,6 @@ class MenuCacheDB {
       await this.promisifyRequest(transaction.objectStore(MENU_STORE).clear());
       await this.promisifyRequest(transaction.objectStore(METADATA_STORE).clear());
 
-      console.log('✅ [MenuCacheDB] Cache cleared successfully');
       return true;
     } catch (error) {
       console.error('❌ [MenuCacheDB] Failed to clear cache:', error);
@@ -254,7 +235,6 @@ class MenuCacheDB {
       this.db.close();
       this.db = null;
       this.initPromise = null;
-      console.log('🔒 [MenuCacheDB] Database closed');
     }
   }
 }
@@ -276,9 +256,6 @@ const electronFileCache = {
         ...menuData,
         cachedAt: Date.now()
       });
-      if (result?.success) {
-        console.log('[MenuCache] Saved to Electron file cache');
-      }
       return result?.success || false;
     } catch {
       return false;
@@ -292,8 +269,6 @@ const electronFileCache = {
       const result = await api.cacheGet('menu-data');
       if (result?.success && result.data) {
         const { cachedAt, ...menuData } = result.data;
-        const ageMin = Math.round((Date.now() - (cachedAt || 0)) / 60000);
-        console.log(`[MenuCache] Loaded from Electron file cache (${ageMin}m old)`);
         return menuData as MenuCacheData;
       }
       return null;

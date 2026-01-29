@@ -102,6 +102,7 @@ export function QSAIMenuItemForm(props: QSAIMenuItemFormProps) {
     handleSubmit,
     watch,
     setValue,
+    control,
     errors,
     isSubmitting,
     submitError,
@@ -269,7 +270,7 @@ export function QSAIMenuItemForm(props: QSAIMenuItemFormProps) {
                 </CollapsibleTrigger>
 
                 <CollapsibleContent className="space-y-6 pt-4">
-                  <SpecializedFieldsRenderer itemType={props.itemType} register={register} watch={watch} setValue={setValue} />
+                  <SpecializedFieldsRenderer itemType={props.itemType} register={register} watch={watch} setValue={setValue} control={control} />
                 </CollapsibleContent>
               </Collapsible>
             </CardHeader>
@@ -490,9 +491,10 @@ interface SpecializedFieldsRendererProps {
   register: any;
   watch: any;
   setValue: any;
+  control: any;
 }
 
-function SpecializedFieldsRenderer({ itemType, register, watch, setValue }: SpecializedFieldsRendererProps) {
+function SpecializedFieldsRenderer({ itemType, register, watch, setValue, control }: SpecializedFieldsRendererProps) {
   switch (itemType) {
     case 'food':
       return (
@@ -548,7 +550,7 @@ function SpecializedFieldsRenderer({ itemType, register, watch, setValue }: Spec
           </div>
           
           {/* Serving sizes would go here */}
-          <ServingSizesSelector register={register} watch={watch} errors={{}} />
+          <ServingSizesSelector register={register} control={control} errors={{}} />
         </div>
       );
       

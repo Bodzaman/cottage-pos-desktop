@@ -56,6 +56,7 @@ import { detectDishMentionsFast } from '../utils/dishMentionDetector';
 import type { ChatMessage } from '../utils/chat-store';
 import type { CartItem } from '../utils/cartStore';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
+import { RestaurantStatusBadge } from 'components/status';
 import { useVoiceAgentStore } from '../utils/voiceAgentStore';
 import { useAgentVoiceConfigQuery } from '../utils/agentQueries';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -349,7 +350,6 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
       '/kds-v2',
       // Staff management
       '/ai-staff-management-hub',
-      '/printer-management',
       // Internal tools
       '/reconciliation',
       '/all-orders',
@@ -1096,22 +1096,26 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                 </div>
                 {/* Agent name and role */}
                 <div className="flex flex-col">
-                  <span 
-                    className="font-semibold text-sm"
-                    style={{ color: PremiumTheme.colors.text.primary }}
-                  >
-                    {isLoadingAgentConfig ? (
-                      <span className="inline-block w-24 h-4 rounded animate-pulse" 
-                        style={{ backgroundColor: PremiumTheme.colors.background.tertiary }}
-                      />
-                    ) : agentName}
-                  </span>
-                  <span 
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="font-semibold text-sm"
+                      style={{ color: PremiumTheme.colors.text.primary }}
+                    >
+                      {isLoadingAgentConfig ? (
+                        <span className="inline-block w-24 h-4 rounded animate-pulse"
+                          style={{ backgroundColor: PremiumTheme.colors.background.tertiary }}
+                        />
+                      ) : agentName}
+                    </span>
+                    {/* Restaurant status indicator */}
+                    <RestaurantStatusBadge compact />
+                  </div>
+                  <span
                     className="text-xs"
                     style={{ color: PremiumTheme.colors.text.muted }}
                   >
                     {isLoadingAgentConfig ? (
-                      <span className="inline-block w-16 h-3 rounded animate-pulse" 
+                      <span className="inline-block w-16 h-3 rounded animate-pulse"
                         style={{ backgroundColor: PremiumTheme.colors.background.tertiary }}
                       />
                     ) : agentRole}

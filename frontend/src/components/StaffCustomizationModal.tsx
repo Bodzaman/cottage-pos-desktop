@@ -23,6 +23,12 @@ interface StaffCustomizationModalProps {
   onConfirm: (item: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string, serveWithSectionId?: string | null) => void;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   initialQuantity?: number;
+  /** Pre-selected customizations when editing an existing item */
+  initialCustomizations?: SelectedCustomization[];
+  /** Pre-filled notes when editing an existing item */
+  initialNotes?: string;
+  /** Pre-selected serve-with section when editing an existing item */
+  initialServeWithSectionId?: string | null;
 }
 
 export interface SelectedCustomization {
@@ -52,7 +58,10 @@ export function StaffCustomizationModal({
   onClose,
   onConfirm,
   orderType,
-  initialQuantity = 1
+  initialQuantity = 1,
+  initialCustomizations = [],
+  initialNotes = '',
+  initialServeWithSectionId = null
 }: StaffCustomizationModalProps) {
   const { customizations, categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
@@ -85,16 +94,22 @@ export function StaffCustomizationModal({
     setQuantity(initialQuantity);
   }, [initialQuantity]);
 
-  // Reset state when modal closes (transitions from open to closed)
+  // Initialize or reset state based on modal open state
   useEffect(() => {
-    if (!isOpen) {
-      // Only reset when modal is closed
+    if (isOpen) {
+      // When modal opens, initialize with provided values
+      setSelectedCustomizations(initialCustomizations);
+      setSpecialInstructions(initialNotes);
+      setServeWithSectionId(initialServeWithSectionId);
+      setSearchQuery('');
+    } else {
+      // When modal closes, reset everything
       setSearchQuery('');
       setSelectedCustomizations([]);
       setSpecialInstructions('');
       setServeWithSectionId(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialCustomizations, initialNotes, initialServeWithSectionId]);
 
   // Filter customizations for POS display (show_on_pos = true)
   const posCustomizations = useMemo(() => {

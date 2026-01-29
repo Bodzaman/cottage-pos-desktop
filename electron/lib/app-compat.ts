@@ -2141,6 +2141,7 @@ export const apiClient = {
           table_number: tableNumber || 0,  // Required NOT NULL field
           menu_item_id: cleanUUID(item.menu_item_id || item.id),
           variant_id: cleanUUID(item.variant_id),
+          category_id: item.category_id || null,  // FIXED: Store category_id for section grouping
           item_name: item.name,
           variant_name: item.variant_name || item.variantName || null,
           quantity: quantity,
@@ -2149,6 +2150,7 @@ export const apiClient = {
           status: 'NEW',  // ADDED: Required NOT NULL - default status
           customizations: item.modifiers || item.customizations || [],
           notes: item.special_instructions || item.notes || '',
+          image_url: item.image_url || null,  // FIXED: Store image_url for display
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),  // ADDED: Required NOT NULL
         })
@@ -2408,72 +2410,30 @@ export const apiClient = {
   },
 
   // Complete order and close table session (for dine-in bill completion)
+  // Uses atomic database function to ensure order + table updates happen together
   complete_order: async (params: { order_id: string }) => {
     console.log('✅ [app-compat] complete_order called:', params);
     try {
       const { order_id } = params;
 
-      // 1. Get order to find table number and linked table group
-      const { data: order, error: fetchError } = await supabase
-        .from('orders')
-        .select('id, table_number, linked_table_group_id')
-        .eq('id', order_id)
-        .single();
+      // Use atomic RPC to complete order and reset tables in single transaction
+      // This prevents partial completion if network drops mid-operation
+      const { data, error } = await supabase.rpc('complete_order_atomic', {
+        p_order_id: order_id
+      });
 
-      if (fetchError) {
-        console.error('❌ [app-compat] Failed to fetch order:', fetchError);
-        return mockResponse({ success: false, error: fetchError.message }, false);
+      if (error) {
+        console.error('❌ [app-compat] complete_order_atomic RPC failed:', error);
+        return mockResponse({ success: false, error: error.message }, false);
       }
 
-      // 2. Update order status to COMPLETED
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          status: 'COMPLETED',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order_id);
-
-      if (orderError) {
-        console.error('❌ [app-compat] Failed to complete order:', orderError);
-        return mockResponse({ success: false, error: orderError.message }, false);
+      // Check the result from the function
+      if (data && !data.success) {
+        console.error('❌ [app-compat] complete_order_atomic returned error:', data.error);
+        return mockResponse({ success: false, error: data.error }, false);
       }
 
-      // 3. Mark table as AVAILABLE
-      if (order?.table_number) {
-        const { error: tableError } = await supabase
-          .from('pos_tables')
-          .update({
-            status: 'AVAILABLE',
-            current_order_id: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('table_number', order.table_number);
-
-        if (tableError) {
-          console.warn('⚠️ [app-compat] Failed to reset table status:', tableError);
-        }
-      }
-
-      // 4. Handle linked tables - unlink and reset all tables in the group
-      if (order?.linked_table_group_id) {
-        const { error: linkedError } = await supabase
-          .from('pos_tables')
-          .update({
-            status: 'AVAILABLE',
-            current_order_id: null,
-            linked_table_group_id: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('linked_table_group_id', order.linked_table_group_id);
-
-        if (linkedError) {
-          console.warn('⚠️ [app-compat] Failed to reset linked tables:', linkedError);
-        }
-      }
-
-      console.log('✅ [app-compat] Order completed and table(s) reset:', order_id);
+      console.log('✅ [app-compat] Order completed atomically:', order_id, data);
       return mockResponse({ success: true });
     } catch (error) {
       console.error('❌ [app-compat] Exception in complete_order:', error);

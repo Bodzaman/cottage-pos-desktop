@@ -341,18 +341,10 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
               onCallCustomer={handleCallCustomer}
               onTextCustomer={handleTextCustomer}
               onEditInPos={(order) => {
-                // TODO: Complete POS integration - Currently causes routing error
-                // Extract order details and move to POS
-                // const orderType = order.order_type.toUpperCase() === 'DELIVERY' ? 'DELIVERY' : 'COLLECTION';
-                
-                // DISABLED: This navigate call with state parameter causes "Cannot convert object to primitive value" error
-                // navigate('/pos', {
-                //   state: {
-                //     loadOrder: order
-                //   }
-                // });
-                
-                toast.info(`Order editing in POS - feature under development`);
+                // Store order ID in sessionStorage to avoid navigate state serialization issues
+                sessionStorage.setItem('posLoadOrderId', order.id);
+                toast.info(`Loading order #${order.order_number || order.id.slice(0, 8)} in POS...`);
+                navigate('/pos');
               }}
               className="h-full"
             />

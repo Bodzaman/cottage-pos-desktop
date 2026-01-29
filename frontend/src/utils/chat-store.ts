@@ -766,30 +766,24 @@ export const useChatStore = create<ChatState>()(
                               result.item.orderMode || cartStore.currentOrderMode,        // orderMode from backend or store
                               result.item.notes || undefined   // notes (optional)
                             );
-                            
-                            toast.success(result.message || 'Added to cart');
-                            // ❌ REMOVED: cartStore.openCart() - Use industry-standard non-intrusive UX
-                            // Cart badge updates automatically, user clicks trolley icon when ready
+                            // Cart UI updates visually - no toast needed
                           }
                           break;
-                          
+
                         case 'remove_from_cart':
                           if (result.cart_item_id) {
                             cartStore.removeItem(result.cart_item_id);
-                            toast.success(result.message || 'Removed from cart');
                           }
                           break;
-                          
+
                         case 'update_quantity':
                           if (result.cart_item_id && result.new_quantity !== undefined) {
                             cartStore.updateQuantity?.(result.cart_item_id, result.new_quantity);
-                            toast.success(result.message || 'Quantity updated');
                           }
                           break;
-                          
+
                         case 'clear_cart':
                           cartStore.clearCart();
-                          toast.success(result.message || 'Cart cleared');
                           break;
                           
                         case 'get_cart_summary':
@@ -988,8 +982,7 @@ export const useChatStore = create<ChatState>()(
 
           // Sync cart after adding items
           await cartStore.fetchCartFromSupabase();
-
-          toast.success('Items added to cart');
+          // Cart UI updates visually - no toast needed
         } catch (error) {
           console.error('[chat-store] Failed to confirm cart proposal:', error);
           toast.error('Failed to add items to cart');

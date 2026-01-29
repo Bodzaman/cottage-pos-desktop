@@ -22,6 +22,7 @@ import { loadFont, getFontFamily, DEFAULT_TITLE_FONT, DEFAULT_BODY_FONT } from "
 import brain from "brain";
 import { SEO } from "components/SEO";
 import { RESTAURANT_JSONLD, PAGE_SEO } from "utils/seoData";
+import { RestaurantStatusBadge } from "components/status";
 
 // Restaurant images for the hero carousel
 // TODO: Migrate to Supabase storage via Website CMS image upload
@@ -222,7 +223,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen theme-customer"
       style={{
         background: PremiumTheme.colors.background.primary,
         color: PremiumTheme.colors.text.primary,
@@ -299,14 +300,19 @@ export default function App() {
             </h1>
             
             {/* Descriptive Text */}
-            <p 
-              className="text-lg md:text-xl mb-8 leading-relaxed font-light tracking-wide drop-shadow-lg"
+            <p
+              className="text-lg md:text-xl mb-6 leading-relaxed font-light tracking-wide drop-shadow-lg"
               style={{ color: PremiumTheme.colors.text.secondary }}
             >
-              Experience authentic Indian cuisine crafted with passion and tradition. 
+              Experience authentic Indian cuisine crafted with passion and tradition.
               From our tandoor-fired specialties to our signature curries, every dish tells a story of heritage and flavor.
             </p>
-            
+
+            {/* Restaurant Status Badge - Shows open/closed status */}
+            <div className="flex justify-center mb-6">
+              <RestaurantStatusBadge showHours />
+            </div>
+
             {/* Conditional Content Based on Auth State */}
             {user ? (
               /* Authenticated User Experience */

@@ -358,9 +358,7 @@ export function POSOrderSummary({
       if (onSendToKitchen) {
         onSendToKitchen();
       }
-      toast.success(`Table ${tableNumber} order sent to kitchen`, {
-        description: 'Kitchen tickets printed'
-      });
+      // Success - no toast needed, kitchen display and ticket printing provide feedback
     } else {
       // For other order types, use the enhanced flow
       handleEnhancedSendToKitchen();
@@ -424,10 +422,7 @@ export function POSOrderSummary({
       
       // Check if customer details are provided
       if (!customerFirstName) {
-        toast.info('Customer details required', {
-          description: 'Please add customer information to continue'
-        });
-        // Open Customer Details Modal
+        // Open Customer Details Modal - validation shown inline
         if (onOpenCustomerModal) {
           onOpenCustomerModal();
         }
@@ -437,10 +432,7 @@ export function POSOrderSummary({
 
     // WAITING/COLLECTION Orders: Check if first name is provided
     if ((orderType === "WAITING" || orderType === "COLLECTION") && !customerFirstName) {
-      toast.info('Customer name required', {
-        description: 'Please add customer name to continue'
-      });
-      // Open Customer Details Modal
+      // Open Customer Details Modal - validation shown inline
       if (onOpenCustomerModal) {
         onOpenCustomerModal();
       }
@@ -449,10 +441,7 @@ export function POSOrderSummary({
 
     // DINE-IN Orders: Check if table is assigned
     if (orderType === "DINE-IN" && !tableNumber) {
-      toast.info('Table selection required', {
-        description: 'Please select a table to continue'
-      });
-      // Open Table Selection Modal - this should be handled by the parent component
+      // Open Table Selection Modal - validation shown inline
       if (onOpenTableModal) {
         onOpenTableModal();
       }
@@ -522,10 +511,7 @@ export function POSOrderSummary({
         onSendToKitchen();
       }
 
-      // Show success message
-      toast.success('Order processed successfully', {
-        description: `Kitchen tickets printed • Order ID: ${pendingOrderId.split('_')[1]} • Payment pending`
-      });
+      // Success - no toast needed, kitchen display provides feedback
 
       // Clear the current order from POS
       if (onClearOrder) {
@@ -563,9 +549,7 @@ export function POSOrderSummary({
     if (onSendToKitchen) {
       onSendToKitchen();
     }
-    toast.success('Order sent to kitchen', {
-      description: 'Receipts printed - payment to be collected manually'
-    });
+    // Success - no toast needed, receipts and kitchen display provide feedback
   };
   
   // Handle take payment with tip
@@ -587,10 +571,7 @@ export function POSOrderSummary({
     
     // Open payment modal with updated total
     setShowPaymentModal(true);
-    
-    toast.success(`Tip added: ${formatCurrency(tipAmount)}`, {
-      description: `Total with tip: ${formatCurrency(totalWithTip)}`
-    });
+    // Tip added - no toast needed, total updates visually in payment modal
   };
   
   // Handle take payment with tip (alias for dialog integration)
@@ -742,16 +723,13 @@ export function POSOrderSummary({
         onProcessPayment();
       }
 
-      toast.success('Payment successful - tickets printed!', {
-        description: `${orderType.toLowerCase()} order ready for processing`
-      });
+      // Success - no toast needed, tickets printing provides feedback
     } else {
       // For DINE-IN orders (shouldn't reach here with new flow, but keeping for safety)
       if (onProcessPayment) {
         onProcessPayment();
       }
-
-      toast.success('Payment processed successfully');
+      // Payment complete - no toast needed, UI updates
     }
 
     // Reset payment processing state
@@ -791,38 +769,36 @@ export function POSOrderSummary({
           case 'SMS_PAYMENT_LINK':
             // Send SMS payment link and mark as payment processing
             setIsPaymentComplete(true);
-            toast.success('SMS payment link sent to customer', {
-              description: 'Order will be dispatched when payment confirmed'
-            });
+            // Success - no toast, UI shows payment status
             break;
-            
+
           case 'QR_AT_DOOR':
             // Generate QR code for driver to show at delivery
             setIsPaymentComplete(true);
-            toast.success('Order ready for delivery with QR payment');
+            // Success - no toast, UI shows ready status
             break;
-            
+
           case 'CASH':
             // Cash on delivery - mark as ready for dispatch
             setIsPaymentComplete(true);
-            toast.success('Cash on delivery confirmed - ready to dispatch');
+            // Success - no toast, UI shows ready status
             break;
-            
+
           case 'CARD':
             // Manual card entry at door
             setIsPaymentComplete(true);
-            toast.success('Card payment at door confirmed - ready to dispatch');
+            // Success - no toast, UI shows ready status
             break;
-            
+
           case 'ALREADY_PAID':
             // Pre-paid online order
             setIsPaymentComplete(true);
-            toast.success('Pre-paid order confirmed - ready to dispatch');
+            // Success - no toast, UI shows ready status
             break;
-            
+
           default:
             setIsPaymentComplete(true);
-            toast.success('Payment method confirmed for delivery');
+            // Success - no toast, UI shows status
         }
       } else {
         // Handle non-delivery orders (existing logic)
@@ -873,21 +849,13 @@ export function POSOrderSummary({
           const storeResult = await storeResponse.json();
 
           if (storeResult.success) {
-            // Calculate change for cash payment
-            const changeDue = (result.cashReceived || total) - total;
-            toast.success(`Cash payment recorded successfully`, {
-              description: `Change due: £${changeDue.toFixed(2)}`
-            });
+            // Success - no toast, change shown in receipt/UI
 
             // For COLLECTION and WAITING orders, mark payment complete but don't finish order yet
             if (orderType === 'COLLECTION' || orderType === 'WAITING') {
               // Set payment completed state instead of calling onProcessPayment
               setIsPaymentComplete(true);
-              toast.success(`Payment complete - ready for collection`, {
-                description: orderType === 'WAITING'
-                  ? 'Customer is waiting - confirm collection when ready'
-                  : 'Customer can collect when ready'
-              });
+              // Success - UI shows ready for collection status
             } else if (onProcessPayment) {
               onProcessPayment();
             }
@@ -941,24 +909,15 @@ export function POSOrderSummary({
 
           if (storeResult.success) {
             const processingTime = result.method === 'CARD' ? 2000 : 500;
-            
+
             setTimeout(() => {
-              let successMessage = `Payment processed via ${result.method.toLowerCase()}`;
-              if (result.method === 'CASH' && result.change) {
-                successMessage += ` - Change: £${result.change.toFixed(2)}`;
-              }
-              
-              toast.success(successMessage);
-              
+              // Success - no toast, UI updates show payment complete
+
               // For COLLECTION and WAITING orders, mark payment complete but don't finish order yet
               if (orderType === 'COLLECTION' || orderType === 'WAITING') {
                 // Set payment completed state instead of calling onProcessPayment
                 setIsPaymentComplete(true);
-                toast.success(`Payment complete - ready for collection`, {
-                  description: orderType === 'WAITING' 
-                    ? 'Customer is waiting - confirm collection when ready' 
-                    : 'Customer can collect when ready'
-                });
+                // UI shows ready for collection status
               } else {
                 onProcessPayment();
               }
@@ -990,33 +949,19 @@ export function POSOrderSummary({
       if (onProcessPayment) {
         onProcessPayment(); // This will complete the order
       }
-      
-      toast.success(`Order collected successfully`, {
-        description: orderType === 'WAITING' 
-          ? 'Thank you for your patience!' 
-          : 'Order completed and collected'
-      });
-      
-      // Generate collection receipt
+      // Success - UI shows order completed, receipt prints
     } else if (orderType === 'DELIVERY') {
       // Handle delivery dispatch/completion workflow
       if (!isDeliveryDispatched) {
         // First click: Dispatch for delivery (driver collection)
         setIsDeliveryDispatched(true);
-        toast.success('Order dispatched for delivery', {
-          description: 'Driver has collected the order and is en route'
-        });
+        // Success - UI shows dispatched status
       } else {
         // Second click: Mark as delivered (delivery completion)
         if (onProcessPayment) {
           onProcessPayment(); // This will complete the order
         }
-        
-        toast.success('Delivery completed successfully', {
-          description: 'Order has been delivered to customer'
-        });
-        
-        // Generate delivery receipt
+        // Success - UI shows delivered, receipt prints
       }
     }
   };
@@ -1048,12 +993,8 @@ export function POSOrderSummary({
     // Call the onSaveUpdate callback if provided
     if (onSaveUpdate) {
       await onSaveUpdate(tableNumber, orderItems);
-    } else {
-      // Fallback: Save order without sending to kitchen (no printing)
-      toast.success("Order saved/updated", {
-        description: `Table ${tableNumber} order updated without kitchen notification`
-      });
     }
+    // Success - no toast needed, UI updates reflect saved state
   };
   
   return (
@@ -1526,17 +1467,20 @@ export function POSOrderSummary({
                         }}>
                         <motion.button
                           whileTap={{ scale: 0.9 }}
-                          style={{ 
-                            height: '1.75rem',
-                            width: '1.75rem',
+                          style={{
+                            height: '2.5rem',
+                            width: '2.5rem',
+                            minHeight: '40px',
+                            minWidth: '40px',
                             color: colors.text.primary,
                             borderRadius: '0.375rem 0 0 0.375rem',
                             borderRight: `1px solid rgba(255, 255, 255, 0.05)`
                           }}
                           className="flex items-center justify-center hover:bg-[rgba(0,0,0,0.2)] transition-colors duration-200"
                           onClick={() => onQuantityChange(index, Math.max(1, item.quantity - 1))}
+                          aria-label="Decrease quantity"
                         >
-                          <Minus className="h-3.5 w-3.5" />
+                          <Minus className="h-4 w-4" />
                         </motion.button>
                         <span className="w-7 text-center font-medium" style={{ 
                           backgroundImage: `linear-gradient(to right, ${colors.text.primary}, ${colors.text.secondary})`,
@@ -1545,17 +1489,20 @@ export function POSOrderSummary({
                         }}>{item.quantity}</span>
                         <motion.button
                           whileTap={{ scale: 0.8 }}
-                          style={{ 
-                            height: '1.65rem',
-                            width: '1.75rem',
+                          style={{
+                            height: '2.5rem',
+                            width: '2.5rem',
+                            minHeight: '40px',
+                            minWidth: '40px',
                             color: colors.text.primary,
                             borderRadius: '0 0.375rem 0.375rem 0',
                             borderLeft: `1px solid rgba(255, 255, 255, 0.05)`
                           }}
                           className="flex items-center justify-center hover:bg-[rgba(0,0,0,0.2)] transition-colors duration-200"
                           onClick={() => onQuantityChange(index, item.quantity + 1)}
+                          aria-label="Increase quantity"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-4 w-4" />
                         </motion.button>
                       </div>
                       
@@ -1565,9 +1512,11 @@ export function POSOrderSummary({
                           <motion.button
                             whileTap={{ scale: 0.9 }}
                             onClick={() => onCustomizeItem(index, item)}
-                            style={{ 
-                              height: '1.65rem',
-                              width: '1.75rem',
+                            style={{
+                              height: '2.5rem',
+                              width: '2.5rem',
+                              minHeight: '40px',
+                              minWidth: '40px',
                               background: `linear-gradient(145deg, ${globalColors.purple.primaryTransparent}30 0%, ${globalColors.purple.primaryTransparent}80 100%)`,
                               color: globalColors.purple.primary,
                               borderRadius: '0.375rem',
@@ -1576,6 +1525,7 @@ export function POSOrderSummary({
                               backdropFilter: 'blur(4px)'
                             }}
                             className="flex items-center justify-center transition-colors duration-200 hover:shadow-lg"
+                            aria-label="Customize item"
                             title="Customize item"
                           >
                             <Wrench className="h-3.5 w-3.5" />
@@ -1586,9 +1536,11 @@ export function POSOrderSummary({
                         <motion.button
                           whileTap={{ scale: 0.9 }}
                           onClick={() => onRemoveItem(item.id)}
-                          style={{ 
-                            height: '1.65rem',
-                            width: '1.75rem',
+                          style={{
+                            height: '2.5rem',
+                            width: '2.5rem',
+                            minHeight: '40px',
+                            minWidth: '40px',
                             background: `linear-gradient(145deg, ${colors.status.error}30 0%, ${colors.status.error}80 100%)`,
                             color: colors.status.error,
                             borderRadius: '0.375rem',
@@ -1597,9 +1549,9 @@ export function POSOrderSummary({
                             backdropFilter: 'blur(4px)'
                           }}
                           className="flex items-center justify-center transition-colors duration-200"
-                          title="Remove item"
+                          aria-label="Remove item"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-4 w-4" />
                         </motion.button>
                       </div>
                     </div>

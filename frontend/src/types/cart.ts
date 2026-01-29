@@ -159,6 +159,25 @@ export interface CartItem {
 // ================================
 
 /**
+ * Undo stack entry for restoring removed items
+ */
+export interface UndoStackEntry {
+  item: CartItem;
+  action: 'remove' | 'clear';
+  timestamp: number;
+}
+
+/**
+ * Last added item info for fly-to-cart animation
+ */
+export interface LastAddedItem {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  position: { x: number; y: number };
+}
+
+/**
  * Complete cart state interface
  * Defines all properties and methods available in the cart store
  */
@@ -202,6 +221,26 @@ export interface CartState {
 
   /** Currently editing item ID */
   editingItemId: string | null;
+
+  // ================================
+  // UNDO SYSTEM STATE
+  // ================================
+
+  /** Stack of removed items for undo functionality */
+  undoStack: UndoStackEntry[];
+
+  /** ID of item currently being undone (for animation) */
+  pendingUndo: string | null;
+
+  // ================================
+  // ANIMATION STATE
+  // ================================
+
+  /** Last added item info for fly-to-cart animation */
+  lastAddedItem: LastAddedItem | null;
+
+  /** Animation trigger key (changes trigger re-render) */
+  animationTrigger: string | null;
 
   // ================================
   // COMPUTED METHODS
@@ -328,6 +367,35 @@ export interface CartState {
 
   /** Cleanup real-time subscription */
   cleanupRealtimeSubscription: () => void;
+
+  // ================================
+  // UNDO SYSTEM ACTIONS
+  // ================================
+
+  /** Push removed item to undo stack */
+  pushToUndoStack: (item: CartItem, action: 'remove' | 'clear') => void;
+
+  /** Undo the last remove action */
+  undoLastAction: () => void;
+
+  /** Clear a specific item from undo stack */
+  clearFromUndoStack: (itemId: string) => void;
+
+  /** Clear all items from undo stack */
+  clearUndoStack: () => void;
+
+  // ================================
+  // ANIMATION ACTIONS
+  // ================================
+
+  /** Set last added item for fly animation */
+  setLastAddedItem: (item: LastAddedItem | null) => void;
+
+  /** Trigger animation (increments key) */
+  triggerAnimation: () => void;
+
+  /** Clear animation state */
+  clearAnimationState: () => void;
 }
 
 // ================================

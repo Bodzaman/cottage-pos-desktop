@@ -220,6 +220,11 @@ export interface MenuItem {
   isDairyFree?: boolean;
   nut_free?: boolean;
   isNutFree?: boolean;
+  // Chef's special fields
+  chefs_special?: boolean;
+  chefsSpecial?: boolean; // CamelCase alias
+  specialty_notes?: string | null;
+  specialtyNotes?: string | null; // CamelCase alias
   // Menu variants (different protein types, sizes, or preparations)
   variants: ItemVariant[];
 }

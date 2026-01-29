@@ -5,43 +5,50 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ServingSizesSelector } from './ServingSizesSelector';
 import { FieldError as RHFFieldError } from './FieldError';
-import type { UseFormRegister, UseFormSetValue, UseFormWatch, FieldErrors } from 'react-hook-form';
+import type { UseFormRegister, UseFormSetValue, FieldErrors, Control } from 'react-hook-form';
+import { useWatch } from 'react-hook-form';
 import type { MenuItemFormInput } from '../utils/menuFormValidation';
 
 /**
  * Props for CoffeeDessertsFieldsSection component
+ *
+ * Note: `watch` prop removed - using useWatch hook instead for proper
+ * form state subscription that works with React.memo
  */
 interface CoffeeDessertsFieldsSectionProps {
   /** Form registration function */
   register: UseFormRegister<MenuItemFormInput>;
   /** Function to set form values */
   setValue: UseFormSetValue<MenuItemFormInput>;
-  /** Function to watch form values */
-  watch: UseFormWatch<MenuItemFormInput>;
+  /** Form control instance for useWatch */
+  control: Control<MenuItemFormInput>;
   /** Validation errors */
   errors: FieldErrors<MenuItemFormInput>;
+  /** @deprecated - watch prop no longer needed, using useWatch hook */
+  watch?: any;
 }
 
 /**
  * CoffeeDessertsFieldsSection Component
- * 
+ *
  * Handles coffee and desserts-specific fields:
  * - Serving Sizes selector (with custom size creation)
  * - ABV percentage (for desserts with alcohol)
  * - Temperature (hot/cold/room)
- * 
- * Only renders when itemType === 'coffee_desserts'
- * 
+ *
+ * Uses useWatch hook for proper form state subscription that works
+ * correctly with React.memo optimization.
+ *
  * @component
  */
-export const CoffeeDessertsFields = React.memo<CoffeeDessertsFieldsSectionProps>(({ 
+export const CoffeeDessertsFields = React.memo<CoffeeDessertsFieldsSectionProps>(({
   register,
   setValue,
-  watch,
+  control,
   errors,
 }) => {
-  // Watch form values internally
-  const formTemperature = watch('temperature') || '';
+  // Use useWatch hook for proper form state subscription
+  const formTemperature = useWatch({ control, name: 'temperature' }) ?? '';
 
   return (
     <div className="mb-8 p-6">
@@ -61,7 +68,7 @@ export const CoffeeDessertsFields = React.memo<CoffeeDessertsFieldsSectionProps>
         {/* Serving Sizes Selector */}
         <ServingSizesSelector
           register={register}
-          watch={watch}
+          control={control}
           errors={errors}
         />
         

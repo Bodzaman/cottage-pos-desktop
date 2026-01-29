@@ -138,7 +138,6 @@ export const MenuItemFormTypeSpecificSectionWrapper = React.memo<TypeSpecificSec
       {itemType === 'food' && (
         <FoodSpecificFields
           register={register as any}
-          watch={watch as any}
           setValue={setValue as any}
           control={control as any}
           errors={errors}
@@ -148,14 +147,14 @@ export const MenuItemFormTypeSpecificSectionWrapper = React.memo<TypeSpecificSec
       {itemType === 'drinks_wine' && (
         <DrinksWineFields
           register={register as any}
-          watch={watch as any}
+          control={control as any}
           errors={errors}
         />
       )}
       {itemType === 'coffee_desserts' && (
         <CoffeeDessertsFields
           register={register as any}
-          watch={watch as any}
+          control={control as any}
           setValue={setValue as any}
           errors={errors}
         />

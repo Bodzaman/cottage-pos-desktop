@@ -46,33 +46,24 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
 
   // Handle successful image upload from ImageUploader
   const handleUploadSuccess = (result: ImageUploadResult) => {
-    console.log('✅ [MenuItemMedia] Image upload successful - FULL RESULT:', result);
-    console.log('📸 [MenuItemMedia] Extracted asset_id:', result.asset_id);
-    console.log('📁 [MenuItemMedia] Extracted file_url:', result.file_url);
-    
     const ratio = media.preferred_aspect_ratio || 'square';
-    console.log('🔍 [MenuItemMedia] Current aspect ratio preference:', ratio);
-    
+
     if (ratio === 'landscape') {
       // Set as widescreen image
-      const updatedMedia = {
+      onChange({
         ...media,
         image_url_widescreen: result.file_url,
         image_widescreen_asset_id: result.asset_id
-      };
-      console.log('🎯 [MenuItemMedia] Calling onChange for WIDESCREEN with:', updatedMedia);
-      onChange(updatedMedia);
+      });
     } else {
       // Set as square image (default)
-      const updatedMedia = {
+      onChange({
         ...media,
         image_url: result.file_url,
         image_asset_id: result.asset_id
-      };
-      console.log('🎯 [MenuItemMedia] Calling onChange for SQUARE with:', updatedMedia);
-      onChange(updatedMedia);
+      });
     }
-    
+
     toast.success('Image uploaded and optimized successfully!');
   };
 
@@ -80,13 +71,10 @@ export function MenuItemMedia({ media, onChange, menuItemName }: Props) {
   const handleMediaSelect = (selectedAssets: MediaItem[]) => {
     // Dialog is in single-select mode, so we expect one asset
     if (selectedAssets.length === 0) {
-      console.log('No media selected');
       return;
     }
 
     const selectedMedia = selectedAssets[0];
-    console.log('Selected media from new dialog:', selectedMedia);
-    
     const ratio = media.preferred_aspect_ratio || 'square';
     
     if (ratio === 'landscape') {

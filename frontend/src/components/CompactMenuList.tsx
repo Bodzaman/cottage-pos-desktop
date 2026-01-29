@@ -9,7 +9,6 @@ import { useCartStore } from 'utils/cartStore';
 import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { CustomerVariantSelector } from './CustomerVariantSelector';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { toast } from 'sonner';
 import { cn } from 'utils/cn';
 import { computeUnitPrice, formatCurrency } from 'utils/priceUtils';
 import { FavoriteHeartButton } from './FavoriteHeartButton';
@@ -188,10 +187,6 @@ export function CompactMenuList({
       addItem(item, state.selectedVariant, state.quantity, [], undefined, '');
 
       const displayName = state.selectedVariant.variant_name || state.selectedVariant.name || 'Option';
-      toast.success(`${item.name} added to cart`, {
-        description: `${displayName} • Qty: ${state.quantity} • £${(price * state.quantity).toFixed(2)}`
-      });
-
       setAriaLiveMessage(`${item.name}, ${displayName}, quantity ${state.quantity} added to cart.`);
     } else {
       const singleVariant = {
@@ -201,11 +196,6 @@ export function CompactMenuList({
       };
 
       addItem(item, singleVariant, state.quantity, [], undefined, '');
-      
-      toast.success(`${item.name} added to cart`, {
-        description: `Quantity: ${state.quantity} • £${(price * state.quantity).toFixed(2)}`
-      });
-
       setAriaLiveMessage(`${item.name}, quantity ${state.quantity} added to cart.`);
     }
     

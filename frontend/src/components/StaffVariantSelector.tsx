@@ -143,6 +143,9 @@ export function StaffVariantSelector({
     }
 
     // Field names must match what BuildSampleTakeawayModal.handleCustomizedItem() expects
+    // Use getDisplayImage to resolve the correct image from variant/item hierarchy
+    const resolvedImageUrl = getDisplayImage(variant || undefined);
+
     const orderItem: OrderItem = {
       menu_item_id: item.id,
       category_id: item.category_id,  // Include category_id for backend storage
@@ -153,7 +156,7 @@ export function StaffVariantSelector({
       variant_id: variant?.id || null,
       variantName: variant?.name || null,  // ✅ Fixed: was "variant_name"
       notes: notes || '',
-      image_url: item.image_url || undefined,
+      image_url: resolvedImageUrl,
       customizations: customizations?.map(c => ({
         id: c.id,
         name: c.name,

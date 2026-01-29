@@ -9,7 +9,7 @@ import { ConnectionStatusIndicator } from "components/ConnectionStatusIndicator"
 import { POSGuestCountModalWrapper } from "components/POSGuestCountModalWrapper";
 import { ChatTriggerButton } from "components/ChatTriggerButton";
 import { ChatLargeModal } from "components/ChatLargeModal";
-import { CartSidebar } from "components/CartSidebar";
+import { UnifiedCart } from "components/cart/UnifiedCart";
 import { CustomerUnifiedCustomizationModal } from "./CustomerUnifiedCustomizationModal"; // ✅ Updated: Using unified modal
 import { GoogleMapsProvider } from "utils/googleMapsProvider";
 import { setupGlobalErrorHandlers, checkBrowserCompatibility } from "utils/errorHandling";
@@ -25,9 +25,9 @@ import { getOrCreateSessionId } from "utils/session-manager";
 const isDev = import.meta.env.DEV;
 
 /**
- * ✅ REMOVED: CartSidebarWrapper
- * Cart should only appear on OnlineOrders page (customer-facing),
- * not globally on all pages. Moved to OnlineOrders.tsx.
+ * ✅ UPDATED: UnifiedCart now renders globally
+ * Cart is available on all customer-facing pages (same visibility as chat)
+ * Uses isChatAllowed hook to determine if cart should be visible
  */
 
 /**
@@ -235,13 +235,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         <SimpleAuthProvider>
           <NavigationProvider>
             <TooltipProvider>
-              <Toaster position="top-right" richColors />
+              <Toaster
+                position="bottom-center"
+                closeButton
+                toastOptions={{
+                  className: 'max-w-[90vw]',
+                  duration: 4000,
+                }}
+              />
               {children}
               <ConnectionStatusIndicator />
               <POSGuestCountModalWrapper />
               {isChatAllowed && <ChatTriggerButton />}
               {isChatAllowed && <ChatLargeModal />}
               <CustomerCustomizationModalWrapper />
+              {/* Global cart - visible on customer-facing pages */}
+              {isChatAllowed && <UnifiedCart />}
             </TooltipProvider>
           </NavigationProvider>
         </SimpleAuthProvider>

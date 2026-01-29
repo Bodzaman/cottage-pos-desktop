@@ -307,6 +307,71 @@ export default function POSDesktop() {
     };
   }, []);
 
+  // Load order from sessionStorage (set when clicking "Edit in POS" from Online Orders)
+  useEffect(() => {
+    const loadOrderId = sessionStorage.getItem('posLoadOrderId');
+    if (!loadOrderId) return;
+
+    // Clear immediately to prevent re-loading on subsequent renders
+    sessionStorage.removeItem('posLoadOrderId');
+
+    const loadOrder = async () => {
+      try {
+        // Fetch order details
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', loadOrderId)
+          .single();
+
+        if (orderError || !order) {
+          toast.error('Failed to load order');
+          return;
+        }
+
+        // Fetch order items
+        const { items: orderItemsData, error: itemsError } = await getOrderItems(loadOrderId);
+
+        if (itemsError || !orderItemsData) {
+          toast.error('Failed to load order items');
+          return;
+        }
+
+        // Set order type
+        const orderTypeMap: Record<string, string> = {
+          'DELIVERY': 'DELIVERY',
+          'COLLECTION': 'COLLECTION',
+          'DINE_IN': 'DINE-IN',
+          'DINE-IN': 'DINE-IN',
+        };
+        setOrderType((orderTypeMap[order.order_type?.toUpperCase()] || 'COLLECTION') as any);
+
+        // Convert and load items
+        const convertedItems: OrderItem[] = orderItemsData.map((i: any) => ({
+          id: i.id || crypto.randomUUID(),
+          menu_item_id: i.menu_item_id,
+          variant_id: i.variant_id || null,
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          variantName: i.variant_name || null,
+          protein_type: i.protein_type || null,
+          modifiers: i.modifiers || [],
+          notes: i.notes || '',
+          image_url: i.image_url || '',
+        }));
+
+        setOrderItems(convertedItems);
+        // Order loaded - UI shows items in cart
+      } catch (err) {
+        console.error('[POSDesktop] Load order error:', err);
+        toast.error('Failed to load order');
+      }
+    };
+
+    loadOrder();
+  }, [setOrderType, setOrderItems]);
+
   const toggleKioskMode = useCallback(async () => {
     const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
     if (!electronAPI?.setKioskMode) return;
@@ -592,8 +657,7 @@ export default function POSDesktop() {
       setGuestCount(pendingSession.guestCount);
       setModal('showSessionRestoreDialog', false);
       setPendingSession(null);
-
-      toast.success(`Restored order with ${pendingSession.orderItems.length} items`);
+      // Order restored - UI shows items in cart
     } catch (error) {
       console.error('❌ [POSDesktop] Failed to restore session:', error);
       toast.error('Failed to restore saved order');
@@ -714,7 +778,7 @@ export default function POSDesktop() {
       if (action === 'link' && linkedTables && linkedTables.length > 0) {
         // Note: Linking data is now stored in the orders table (source of truth)
         // The dashboard will derive linking state from orders via useTableState hook
-        toast.success(`Linked tables ${allTableNumbers.map(t => `T${t}`).join(' + ')}`);
+        // Tables linked - UI shows connected tables
         await refetchTables();
       }
 
@@ -1232,7 +1296,7 @@ export default function POSDesktop() {
       initial={{ opacity: 0, y: 15, scale: 0.99 }}
       animate={pageVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
       transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
-      className="fixed inset-0"
+      className="fixed inset-0 theme-internal"
     >
       <CustomizeOrchestratorProvider>
         {/* Offline/Online Status Banner - Fixed overlay, outside grid to prevent row mismatch */}
@@ -1316,7 +1380,7 @@ export default function POSDesktop() {
             if (dineInOrder?.id) {
               try {
                 await brain.apiClient.complete_order({ order_id: dineInOrder.id });
-                toast.success('Table session completed');
+                // Table session completed - table status updates in UI
               } catch (error) {
                 console.error('Failed to complete order:', error);
                 toast.error('Failed to complete table session');

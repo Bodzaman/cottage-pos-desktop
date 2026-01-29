@@ -13,7 +13,6 @@ import { PremiumMenuCard } from './PremiumMenuCard';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { FavoriteHeartButton } from './FavoriteHeartButton';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
 import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { LazyImage } from './LazyImage';
 import { OptimizedImage } from './OptimizedImage';
@@ -267,11 +266,7 @@ export function CustomerVariantSelector({
 
     // ✅ NEW SIGNATURE: (item, quantity, variant, customizations, notes)
     addToCart(item, quantity, variant, cartCustomizations, notes || '');
-    
-    // Use helper for toast display name
-    const displayName = getVariantDisplayName(variant, item.name);
-    toast.success(`${displayName} added to cart!`);
-    
+
     // Only close the customization modal (parent Dialog already closed)
     setIsCustomizationModalOpen(false);
   };
@@ -286,10 +281,6 @@ export function CustomerVariantSelector({
     if (!item) return;
     // ✅ FIXED: Pass parameters in correct order (item, quantity, variant, customizations, notes)
     addToCart(item, quantity, variant, customizations, notes);
-
-    // Use helper for toast display name
-    const displayName = getVariantDisplayName(variant, item.name);
-    toast.success(`${displayName} added to cart!`);
 
     // Only close the customization modal (parent Dialog already closed)
     setIsCustomizationModalOpen(false);
@@ -321,7 +312,6 @@ export function CustomerVariantSelector({
     }
 
     onClose();
-    toast.success(`Added ${quantity}x ${item.name} to cart`);
   };
 
   // Handle quick add (variant button click in multi-variant view)
@@ -329,11 +319,6 @@ export function CustomerVariantSelector({
     if (!item) return;
     // ✅ FIXED: Pass parameters in correct order (item, quantity, variant, customizations, notes)
     addToCart(item, 1, variant, [], '');
-
-    // Use helper for toast display name
-    const displayName = getVariantDisplayName(variant, item.name);
-    toast.success(`${displayName} added to cart!`);
-
     onClose();
   };
 
@@ -342,11 +327,6 @@ export function CustomerVariantSelector({
     if (!item) return;
     // ✅ FIXED: Pass parameters in correct order (item, quantity, variant, customizations, notes)
     addToCart(item, 1, variant, [], '');
-
-    // Use helper for toast display name
-    const displayName = getVariantDisplayName(variant, item.name);
-    toast.success(`${displayName} added to cart!`);
-
     onClose();
   };
 

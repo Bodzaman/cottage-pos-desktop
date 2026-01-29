@@ -217,6 +217,10 @@ export function DineInOrderModal({
   
   // NEW: State for unsaved changes warning
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
+
+  // NEW: State for table reset confirmation (replaces window.confirm)
+  const [showResetTableConfirm, setShowResetTableConfirm] = useState(false);
+  const [resetTableHasOrders, setResetTableHasOrders] = useState(false);
   
   // UI state for guest count editing
   const [isEditingGuestCount, setIsEditingGuestCount] = useState(false);
@@ -279,22 +283,16 @@ export function DineInOrderModal({
     menuStore.setSelectedMenuCategory(categoryId);
   }, []);
   
-  // ✅ Handle switching between linked tables
+  // Handle switching between linked tables
   const handleTableTabSwitch = (tableNumber: number) => {
-    console.log('🔄 [DineInOrderModal] Switching to table:', tableNumber);
     setSelectedTableTab(tableNumber);
   };
 
-  // ✅ Handle adding menu item to order (staging cart)
+  // Handle adding menu item to order (staging cart)
   const handleAddToOrder = (orderItem: OrderItem) => {
-    console.log('➕ [DineInOrderModal] Adding item to staging:', orderItem.name);
-    
-    // 🚀 PHASE 2 CLEAN ARCHITECTURE: Call parent callback to add to staging
+    // Call parent callback to add to staging
     if (onAddToStaging) {
       onAddToStaging(orderItem);
-      console.log('✅ [DineInOrderModal] Item added to parent staging cart via callback');
-    } else {
-      console.warn('⚠️ [DineInOrderModal] onAddToStaging callback not provided');
     }
     
     // User feedback
@@ -309,10 +307,8 @@ export function DineInOrderModal({
     handleAddToOrder(item);
   }, [handleAddToOrder]);
 
-  // ✅ NEW: Handle customizing staging item (MYA-1728)
+  // Handle customizing staging item (MYA-1728)
   const handleCustomizeStagingItem = useCallback((index: number, item: OrderItem) => {
-    console.log('🔧 [DineInOrderModal] Opening customization modal for staging item:', item.name);
-    
     // Convert OrderItem to EnrichedDineInOrderItem format for modal
     const enrichedItem: EnrichedDineInOrderItem = {
       id: item.id,
@@ -940,23 +936,20 @@ export function DineInOrderModal({
     }
   };
 
-  // ✅ Handler to reset table (force clear occupied status)
-  const handleResetTable = async () => {
+  // ✅ Handler to show reset table confirmation dialog
+  const handleResetTable = () => {
     if (!selectedTableTab) return;
-    
-    // Check if there are saved items - if so, this is a destructive action that requires confirmation
+
+    // Check if there are saved items - this determines the dialog message
     const hasSavedItems = existingItems.length > 0 || (eventDrivenOrder?.items?.length || 0) > 0;
-    
-    if (hasSavedItems) {
-      if (!window.confirm(`Table ${selectedTableTab} has active orders. Are you sure you want to reset it? This will clear all orders.`)) {
-        return;
-      }
-    } else {
-      // Empty table but occupied status - likely ghost order
-      if (!window.confirm(`Reset Table ${selectedTableTab} to available status?`)) {
-        return;
-      }
-    }
+    setResetTableHasOrders(hasSavedItems);
+    setShowResetTableConfirm(true);
+  };
+
+  // ✅ Handler to execute table reset after confirmation
+  const handleResetTableConfirmed = async () => {
+    setShowResetTableConfirm(false);
+    if (!selectedTableTab) return;
 
     try {
       console.log(`🔄 [DineInOrderModal] Resetting table ${selectedTableTab} to available`);
@@ -1170,12 +1163,16 @@ export function DineInOrderModal({
   // ✅ Handle modal close with unsaved items warning
   const handleModalClose = () => {
     if (hasUnsavedItems) {
-      if (window.confirm('You have unsaved items in the cart. Close anyway?')) {
-        onClose();
-      }
+      setShowUnsavedWarning(true);
     } else {
       onClose();
     }
+  };
+
+  // ✅ Handler to close modal after confirming discard of unsaved items
+  const handleDiscardUnsavedConfirmed = () => {
+    setShowUnsavedWarning(false);
+    onClose();
   };
 
   // ✅ NEW: Handle creating customer tab from Full Review Modal
@@ -1977,7 +1974,35 @@ export function DineInOrderModal({
         cancelText="Cancel"
         isDestructive={true}
       />
-      
+
+      {/* ✅ Table Reset Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showResetTableConfirm}
+        onConfirm={handleResetTableConfirmed}
+        onCancel={() => setShowResetTableConfirm(false)}
+        title="Reset Table?"
+        description={
+          resetTableHasOrders
+            ? `Table ${selectedTableTab} has active orders. Are you sure you want to reset it? This will clear all orders.`
+            : `Reset Table ${selectedTableTab} to available status?`
+        }
+        confirmText="Reset Table"
+        cancelText="Cancel"
+        isDestructive={resetTableHasOrders}
+      />
+
+      {/* ✅ Unsaved Items Warning Dialog */}
+      <ConfirmationDialog
+        isOpen={showUnsavedWarning}
+        onConfirm={handleDiscardUnsavedConfirmed}
+        onCancel={() => setShowUnsavedWarning(false)}
+        title="Discard Changes?"
+        description="You have unsaved items in the cart. Are you sure you want to close without saving?"
+        confirmText="Discard"
+        cancelText="Keep Editing"
+        isDestructive={false}
+      />
+
       {/* ✅ Kitchen Preview Modal - For "Preview Order" button */}
       {/* 🚀 PHASE 2: orderItems receives ONLY staging from parent (ephemeral cart) */}
       <DineInKitchenPreviewModal

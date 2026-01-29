@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
+import { FIXED_SECTIONS, findRootSection } from 'utils/sectionMapping';
 import { CompactDineInItemRow } from 'components/CompactDineInItemRow';
 import ThermalReceiptDisplay from 'components/ThermalReceiptDisplay';
 import { useTemplateAssignments } from 'utils/useTemplateAssignments';
@@ -133,10 +134,14 @@ export function DineInReviewView({
   onNavigateToAddItems,
   onSendToKitchen,
 }: DineInReviewViewProps) {
-  // Menu store for category lookups
-  const { categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
+  // Menu store for category lookups (includes menuItems for fallback when category_id is NULL)
+  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
   const categoriesMap = useMemo(() =>
     Object.fromEntries(categories.map(cat => [cat.id, cat])), [categories]);
+
+  // Build menu item → category map for fallback when order item has NULL category_id
+  const menuItemToCategoryMap = useMemo(() =>
+    Object.fromEntries(menuItems.map(mi => [mi.id, mi.category_id])), [menuItems]);
 
   // View state
   const [viewMode, setViewMode] = useState<'category' | 'customer'>('category');
@@ -203,38 +208,47 @@ export function DineInReviewView({
     });
   }, [enrichedItems, categoriesMap]);
 
-  // Group items by category, sorted by category display_order
+  // Group items by SECTION (not category_name) - matches ThermalPreview pattern
+  // Uses findRootSection() to resolve category_id → section, avoiding NULL category_name issues
   const itemsByCategory = useMemo(() => {
-    // First, group items by category_id (using name as key for display)
+    // Group items by section using category_id → section mapping
     const groups: Record<string, {
-      categoryId: string | null;
-      displayOrder: number;
+      sectionOrder: number;
       items: EnrichedDineInOrderItem[];
     }> = {};
 
     enrichedItems.forEach(item => {
-      const categoryName = item.category_name || 'Uncategorized';
-      const categoryId = item.category_id;
+      // Find the root section for this item's category using section mapping
+      let sectionName = 'Uncategorized';
+      let sectionOrder = 999;
 
-      if (!groups[categoryName]) {
-        // Get display_order from the categories store
-        const category = categoryId ? categoriesMap[categoryId] : null;
-        const displayOrder = category?.display_order ?? 999; // Uncategorized goes last
+      // Get category_id (with fallback to menu item's category if NULL)
+      // This handles existing items that were stored without category_id
+      const categoryId = item.category_id || menuItemToCategoryMap[item.menu_item_id] || null;
 
-        groups[categoryName] = {
-          categoryId,
-          displayOrder,
+      if (categoryId) {
+        // Use findRootSection to recursively find the section (handles nested categories)
+        const rootSection = findRootSection(categoryId, categories);
+        if (rootSection) {
+          sectionName = rootSection.displayName || rootSection.name;
+          sectionOrder = rootSection.order;
+        }
+      }
+
+      if (!groups[sectionName]) {
+        groups[sectionName] = {
+          sectionOrder,
           items: []
         };
       }
-      groups[categoryName].items.push(item);
+      groups[sectionName].items.push(item);
     });
 
-    // Sort categories by display_order, then sort items within each category
+    // Sort sections by order, then sort items within each section
     const sortedEntries = Object.entries(groups)
-      .sort((a, b) => a[1].displayOrder - b[1].displayOrder)
+      .sort((a, b) => a[1].sectionOrder - b[1].sectionOrder)
       .map(([name, data]) => {
-        // Sort items within category by their display_order
+        // Sort items within section by their display_order
         const sortedItems = [...data.items].sort((a, b) =>
           (a.display_order ?? 999) - (b.display_order ?? 999)
         );
@@ -242,7 +256,7 @@ export function DineInReviewView({
       });
 
     return Object.fromEntries(sortedEntries);
-  }, [enrichedItems, categoriesMap]);
+  }, [enrichedItems, categories, menuItemToCategoryMap]);
 
   // Group items by customer tab
   const itemsByTab = useMemo(() => {

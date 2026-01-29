@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { useChatStore, useChatConfig } from '../utils/chat-store';
 import { useChatVisibility } from '../utils/useChatVisibility';
+import { useCookieBannerStore } from '../utils/cookieBannerStore';
 
 /**
  * ChatTriggerButton - Floating chat button trigger
@@ -23,6 +24,7 @@ export function ChatTriggerButton() {
   const openChat = useChatStore((state) => state.openChat);
   const loadSystemPrompt = useChatStore((state) => state.loadSystemPrompt);
   const config = useChatConfig();
+  const isCookieBannerVisible = useCookieBannerStore((s) => s.isVisible);
 
   // Phase 6: Load agent config on mount to get avatar for widget button
   useEffect(() => {
@@ -40,7 +42,7 @@ export function ChatTriggerButton() {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-          className="fixed bottom-6 right-6 z-50"
+          className={`fixed right-6 z-50 transition-all duration-300 ${isCookieBannerVisible ? 'bottom-24' : 'bottom-6'}`}
         >
           <Button
             onClick={openChat}

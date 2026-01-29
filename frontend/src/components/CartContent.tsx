@@ -20,6 +20,8 @@ import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat'; // �
 import brain from 'brain';
 import { sortCartItemsByCategory } from 'utils/cartSorting';
 import { formatDistanceToNow } from 'date-fns';
+import { useRestaurantStatusStore, useTimeUntilOpen } from 'utils/restaurantStatusStore';
+import { RestaurantStatusBadge } from 'components/status';
 
 interface CartContentProps {
   onCheckout: () => void;
@@ -91,6 +93,18 @@ export function CartContent({
 }: CartContentProps) {
   // Accessibility: respect user's motion preferences
   const shouldReduceMotion = useReducedMotion();
+
+  // Restaurant availability check
+  const { isAcceptingOrders, displayMessage } = useRestaurantStatusStore();
+  const timeUntilOpen = useTimeUntilOpen();
+
+  // Start polling on mount
+  React.useEffect(() => {
+    const store = useRestaurantStatusStore.getState();
+    if (!store._isPolling) {
+      store.startPolling();
+    }
+  }, []);
   
   const {
     items,
@@ -851,6 +865,13 @@ export function CartContent({
             </div>
           )}
 
+          {/* Restaurant Status - Show when closed */}
+          {!isAcceptingOrders && (
+            <div className="mb-3">
+              <RestaurantStatusBadge showHours className="w-full justify-center" />
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-3">
             {/* Show different buttons based on authentication state */}
@@ -858,29 +879,34 @@ export function CartContent({
               /* AUTHENTICATED: Single Proceed to Checkout button */
               <Button
                 onClick={handleCheckout}
-                disabled={currentOrderMode === 'delivery' && !minimumOrderMet}
+                disabled={!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)}
                 className="w-full h-12 text-base font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  background: (currentOrderMode === 'delivery' && !minimumOrderMet)
+                  background: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet))
                     ? `${PremiumTheme.colors.dark[700]}`
                     : `${PremiumTheme.colors.burgundy[500]}`,
                   color: 'white',
                   border: 'none',
-                  cursor: (currentOrderMode === 'delivery' && !minimumOrderMet) ? 'not-allowed' : 'pointer',
-                  opacity: (currentOrderMode === 'delivery' && !minimumOrderMet) ? 0.5 : 1
+                  cursor: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)) ? 'not-allowed' : 'pointer',
+                  opacity: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)) ? 0.5 : 1
                 }}
                 onMouseEnter={(e) => {
-                  if (currentOrderMode !== 'delivery' || minimumOrderMet) {
+                  if (isAcceptingOrders && (currentOrderMode !== 'delivery' || minimumOrderMet)) {
                     e.currentTarget.style.background = PremiumTheme.colors.burgundy[600];
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (currentOrderMode !== 'delivery' || minimumOrderMet) {
+                  if (isAcceptingOrders && (currentOrderMode !== 'delivery' || minimumOrderMet)) {
                     e.currentTarget.style.background = PremiumTheme.colors.burgundy[500];
                   }
                 }}
               >
-                {(currentOrderMode === 'delivery' && !minimumOrderMet) ? (
+                {!isAcceptingOrders ? (
+                  <>
+                    <Clock className="h-5 w-5 mr-2" />
+                    {timeUntilOpen ? `Opens ${timeUntilOpen}` : 'Currently Closed'}
+                  </>
+                ) : (currentOrderMode === 'delivery' && !minimumOrderMet) ? (
                   <>
                     <CreditCard className="h-5 w-5 mr-2" />
                     Minimum £{deliveryConfig?.min_order.toFixed(2)} Required
@@ -922,29 +948,34 @@ export function CartContent({
                 {/* Primary: Continue as Guest */}
                 <Button
                   onClick={handleCheckout}
-                  disabled={currentOrderMode === 'delivery' && !minimumOrderMet}
+                  disabled={!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)}
                   className="w-full h-12 text-base font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                   style={{
-                    background: (currentOrderMode === 'delivery' && !minimumOrderMet)
+                    background: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet))
                       ? `${PremiumTheme.colors.dark[700]}`
                       : `${PremiumTheme.colors.burgundy[500]}`,
                     color: 'white',
                     border: 'none',
-                    cursor: (currentOrderMode === 'delivery' && !minimumOrderMet) ? 'not-allowed' : 'pointer',
-                    opacity: (currentOrderMode === 'delivery' && !minimumOrderMet) ? 0.5 : 1
+                    cursor: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)) ? 'not-allowed' : 'pointer',
+                    opacity: (!isAcceptingOrders || (currentOrderMode === 'delivery' && !minimumOrderMet)) ? 0.5 : 1
                   }}
                   onMouseEnter={(e) => {
-                    if (currentOrderMode !== 'delivery' || minimumOrderMet) {
+                    if (isAcceptingOrders && (currentOrderMode !== 'delivery' || minimumOrderMet)) {
                       e.currentTarget.style.background = PremiumTheme.colors.burgundy[600];
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (currentOrderMode !== 'delivery' || minimumOrderMet) {
+                    if (isAcceptingOrders && (currentOrderMode !== 'delivery' || minimumOrderMet)) {
                       e.currentTarget.style.background = PremiumTheme.colors.burgundy[500];
                     }
                   }}
                 >
-                  {(currentOrderMode === 'delivery' && !minimumOrderMet) ? (
+                  {!isAcceptingOrders ? (
+                    <>
+                      <Clock className="h-5 w-5 mr-2" />
+                      {timeUntilOpen ? `Opens ${timeUntilOpen}` : 'Currently Closed'}
+                    </>
+                  ) : (currentOrderMode === 'delivery' && !minimumOrderMet) ? (
                     <>
                       <CreditCard className="h-5 w-5 mr-2" />
                       Minimum £{deliveryConfig?.min_order.toFixed(2)} Required

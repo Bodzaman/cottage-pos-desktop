@@ -4,42 +4,49 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RHFFieldError } from './FieldError';
-import type { UseFormRegister, UseFormWatch, FieldErrors } from 'react-hook-form';
+import type { UseFormRegister, FieldErrors, Control } from 'react-hook-form';
+import { useWatch } from 'react-hook-form';
 import type { MenuItemFormInput } from '../utils/menuFormValidation';
 
 /**
  * Props for DrinksWineFieldsSection component
+ *
+ * Note: `watch` prop removed - using useWatch hook instead for proper
+ * form state subscription that works with React.memo
  */
 interface DrinksWineFieldsSectionProps {
   /** Form registration function */
   register: UseFormRegister<MenuItemFormInput>;
-  /** Function to watch form values */
-  watch: UseFormWatch<MenuItemFormInput>;
+  /** Form control instance for useWatch */
+  control: Control<MenuItemFormInput>;
   /** Validation errors */
   errors: FieldErrors<MenuItemFormInput>;
+  /** @deprecated - watch prop no longer needed, using useWatch hook */
+  watch?: any;
 }
 
 /**
  * DrinksWineFieldsSection Component
- * 
+ *
  * Handles drinks and wine-specific fields:
  * - Serving Sizes selector (with custom size creation)
  * - ABV percentage
  * - Temperature (hot/cold/room)
- * 
- * Only renders when itemType === 'drinks_wine'
- * 
+ *
+ * Uses useWatch hook for proper form state subscription that works
+ * correctly with React.memo optimization.
+ *
  * @component
  */
-export const DrinksWineFields = React.memo<DrinksWineFieldsSectionProps>(({ 
+export const DrinksWineFields = React.memo<DrinksWineFieldsSectionProps>(({
   register,
-  watch,
+  control,
   errors
 }) => {
-  // Watch form values
-  const formAbv = watch('abv') ?? '';
-  const formServingSizes = watch('serving_sizes') ?? [];
-  const formDescription = watch('description') ?? '';
+  // Use useWatch hook for proper form state subscription
+  const formAbv = useWatch({ control, name: 'abv' }) ?? '';
+  const formServingSizes = useWatch({ control, name: 'serving_sizes' }) ?? [];
+  const formDescription = useWatch({ control, name: 'description' }) ?? '';
 
   return (
     <div className="mb-8 p-6">
@@ -54,7 +61,7 @@ export const DrinksWineFields = React.memo<DrinksWineFieldsSectionProps>(({
           Wine & Drinks Information
         </h3>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ABV */}
         <div className="space-y-2">
@@ -90,7 +97,7 @@ export const DrinksWineFields = React.memo<DrinksWineFieldsSectionProps>(({
             aria-label="Standard serving sizes"
             aria-invalid={errors.serving_sizes ? 'true' : 'false'}
             aria-describedby={`serving-sizes-help ${errors.serving_sizes ? 'serving-sizes-error' : ''}`}
-            defaultValue={formServingSizes.join(', ')}
+            defaultValue={Array.isArray(formServingSizes) ? formServingSizes.join(', ') : ''}
           />
           <p id="serving-sizes-help" className="text-xs text-gray-400">
             Standard serving sizes (e.g., 175ml, pint, bottle)

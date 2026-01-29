@@ -424,24 +424,26 @@ export default function AllOrders() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={() => setPage(p => Math.max(p - 1, 1))}
                 disabled={page === 1}
-                className="h-8 w-8 p-0 bg-white/5 border-white/10 text-white"
+                className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 bg-white/5 border-white/10 text-white"
+                aria-label="Previous page"
               >
-                <ChevronLeftIcon className="h-4 w-4" />
+                <ChevronLeftIcon className="h-5 w-5" />
               </Button>
               <span className="text-xs text-gray-400">
                 {page} / {totalPages}
               </span>
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={() => setPage(p => Math.min(p + 1, totalPages))}
                 disabled={page === totalPages}
-                className="h-8 w-8 p-0 bg-white/5 border-white/10 text-white"
+                className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 bg-white/5 border-white/10 text-white"
+                aria-label="Next page"
               >
-                <ChevronRightIcon className="h-4 w-4" />
+                <ChevronRightIcon className="h-5 w-5" />
               </Button>
               <Select value={pageSize.toString()} onValueChange={val => { setPageSize(Number(val)); setPage(1); }}>
                 <SelectTrigger className="w-16 h-8 bg-white/5 border-white/10 text-white text-xs">

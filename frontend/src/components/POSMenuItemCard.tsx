@@ -268,14 +268,6 @@ export function POSMenuItemCard({
     };
 
     onAddToOrder(orderItem);
-
-    // Reset quantity and show toast
-    const total = price * quantity;
-    toast.success(`Added ${quantity}× ${toastName}`, {
-      description: `£${total.toFixed(2)}`,
-      duration: 2000,
-      position: 'top-center'
-    });
     setQuantity(1);
   };
 
@@ -335,14 +327,6 @@ export function POSMenuItemCard({
     };
 
     onAddToOrder(orderItem);
-
-    // Reset quantity and show toast
-    const total = price * quantity;
-    toast.success(`Added ${quantity}× ${item.name}`, {
-      description: `£${total.toFixed(2)}`,
-      duration: 2000,
-      position: 'top-center'
-    });
     setQuantity(1);
   };
 

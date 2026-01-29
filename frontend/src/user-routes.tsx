@@ -12,6 +12,7 @@ const About = lazy(() => import("./pages/About.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
 const AllOrders = lazy(() => import("./pages/AllOrders.tsx"));
 const App = lazy(() => import("./pages/App.tsx"));
+const Checkout = lazy(() => import("./pages/Checkout.tsx"));
 const CheckoutPayment = lazy(() => import("./pages/CheckoutPayment.tsx"));
 const Contact = lazy(() => import("./pages/Contact.tsx"));
 const CRM = lazy(() => import("./pages/CRM.tsx"));
@@ -28,7 +29,6 @@ const OnlineOrders = lazy(() => import("./pages/OnlineOrders.tsx"));
 const POSDesktop = lazy(() => import("./pages/POSDesktop.tsx"));
 const POSLogin = lazy(() => import("./pages/POSLogin.tsx"));
 const POSSettings = lazy(() => import("./pages/POSSettings.tsx"));
-const PrinterManagement = lazy(() => import("./pages/PrinterManagement.tsx"));
 const Reconciliation = lazy(() => import("./pages/Reconciliation.tsx"));
 const SharedFavoritesList = lazy(() => import("./pages/SharedFavoritesList.tsx"));
 const SignUp = lazy(() => import("./pages/SignUp.tsx"));
@@ -55,6 +55,7 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/all-orders", element: <AllOrders />},
 	{ path: "/allorders", element: <AllOrders />},
 	{ path: "/", element: <App />},
+	{ path: "/checkout", element: <Checkout />},
 	{ path: "/checkout-payment", element: <CheckoutPayment />},
 	{ path: "/checkoutpayment", element: <CheckoutPayment />},
 	{ path: "/contact", element: <Contact />},
@@ -83,8 +84,6 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/poslogin", element: <POSLogin />},
 	{ path: "/pos-settings", element: <POSSettings />},
 	{ path: "/possettings", element: <POSSettings />},
-	{ path: "/printer-management", element: <PrinterManagement />},
-	{ path: "/printermanagement", element: <PrinterManagement />},
 	{ path: "/reconciliation", element: <Reconciliation />},
 	{ path: "/shared-favorites-list", element: <SharedFavoritesList />},
 	{ path: "/sharedfavoriteslist", element: <SharedFavoritesList />},

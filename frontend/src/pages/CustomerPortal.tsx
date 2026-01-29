@@ -1182,7 +1182,7 @@ export default function CustomerPortal() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen relative">
+      <div className="min-h-screen relative theme-customer">
         <PremiumBackground />
         <UniversalHeader context="AUTH_NAV" />
         <div className="min-h-[60dvh] flex items-center justify-center">
@@ -1196,7 +1196,7 @@ export default function CustomerPortal() {
   }
 
   return (
-    <div className="min-h-screen relative pb-32 md:pb-0 pt-20">
+    <div className="min-h-screen relative pb-32 md:pb-0 pt-20 theme-customer">
       {/* Premium Burgundy Background */}
       <PremiumBackground />
 

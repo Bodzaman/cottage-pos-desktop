@@ -61,6 +61,7 @@ export function useMenuItemForm({
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors, isDirty },
     reset
   } = useForm<MenuItemFormData>({
@@ -224,6 +225,7 @@ export function useMenuItemForm({
     handleSubmit: handleSubmit(onSubmit),
     watch,
     setValue,
+    control,
     errors,
     isDirty,
     reset,

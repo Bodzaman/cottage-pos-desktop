@@ -1,63 +1,67 @@
 import React from 'react';
 import { ChefHat } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { SpiceLevelDropdown } from './SpiceLevelDropdown';
 import { AllergenSelector, normalizeAllergenData } from './AllergenSelector';
-import { FieldError as RHFFieldError } from './FieldError';
-import type { UseFormRegister, UseFormSetValue, UseFormWatch, FieldErrors, Control } from 'react-hook-form';
-import { Controller } from 'react-hook-form';
+import { RHFFieldError } from './FieldError';
+import type { UseFormRegister, UseFormSetValue, FieldErrors, Control } from 'react-hook-form';
+import { Controller, useWatch } from 'react-hook-form';
 import type { MenuItemFormInput } from '../utils/menuFormValidation';
 
 /**
  * Props for FoodSpecificFieldsSection component
+ *
+ * Note: `watch` prop removed - using useWatch hook instead for proper
+ * form state subscription that works with React.memo
  */
 interface FoodSpecificFieldsSectionProps {
   /** Form registration function */
   register: UseFormRegister<MenuItemFormInput>;
-  /** Function to watch form values */
-  watch: UseFormWatch<MenuItemFormInput>;
   /** Function to set form values */
   setValue: UseFormSetValue<MenuItemFormInput>;
-  /** Form control instance for Controller components */
+  /** Form control instance for Controller components and useWatch */
   control: Control<MenuItemFormInput>;
   /** Validation errors */
   errors: FieldErrors<MenuItemFormInput>;
   /** Item type */
   itemType: string | null;
+  /** @deprecated - watch prop no longer needed, using useWatch hook */
+  watch?: any;
 }
 
 /**
  * FoodSpecificFieldsSection Component
- * 
+ *
  * Handles food-specific fields:
  * - Spice Level selector
- * - Preparation Time
  * - Allergen selector with custom notes
  * - Chef's Special designation
  * - Chef's Notes & Special Instructions
- * 
- * Only renders when itemType === 'food'
- * 
+ *
+ * Uses useWatch hook for proper form state subscription that works
+ * correctly with React.memo optimization.
+ *
  * @component
  */
-export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({ 
+export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
   register,
-  watch,
   setValue,
   control,
   errors,
   itemType
 }) => {
-  // Watch form values internally
-  const formDefaultSpiceLevel = watch('default_spice_level') || 0;
-  const rawAllergens = watch('allergens');
+  // Use useWatch hook for proper form state subscription
+  // This creates independent subscriptions that work correctly with React.memo
+  const formSpiceLevel = useWatch({ control, name: 'spice_level' }) ?? 0;
+  const rawAllergens = useWatch({ control, name: 'allergens' });
+  const formAllergenWarnings = useWatch({ control, name: 'allergen_warnings' }) ?? '';
+  const formChefsSpecial = useWatch({ control, name: 'chefs_special' }) ?? false;
+  const formSpecialtyNotes = useWatch({ control, name: 'specialty_notes' }) ?? '';
+
+  // Normalize allergen data for the selector
   const formAllergens = normalizeAllergenData(rawAllergens);
-  const formAllergenWarnings = watch('allergen_warnings') || '';
-  const formChefsSpecial = watch('chefs_special') || false;
-  const formSpecialtyNotes = watch('specialty_notes') || '';
 
   return (
     <div className="mb-8 p-6">
@@ -72,15 +76,15 @@ export const FoodSpecificFields = React.memo<FoodSpecificFieldsSectionProps>(({
           Food-Specific Settings
         </h3>
       </div>
-      
+
       <div className="space-y-8">
         {/* Main Fields Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Spice Level */}
           <div className="space-y-2">
             <SpiceLevelDropdown
-              value={formDefaultSpiceLevel}
-              onChange={(value) => setValue('default_spice_level', value, { shouldDirty: true })}
+              value={formSpiceLevel}
+              onChange={(value) => setValue('spice_level', value, { shouldDirty: true })}
               className="w-full"
               aria-label="Default spice level for this dish"
             />

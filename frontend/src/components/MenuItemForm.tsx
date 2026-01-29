@@ -1373,6 +1373,8 @@ function MenuItemForm({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // 🎯 NEW: Calculate steps with current status
+  // ✅ FIX: Use formData from useWatch (reactive) instead of watch() in useMemo
+  // This ensures steps recalculate when form values change
   const formSteps = useMemo<FormStep[]>(() => {
     // Transform MenuVariant[] to MenuItemVariant[] for getStepsWithStatus
     const transformedVariants: MenuItemVariant[] = variants.map(v => ({
@@ -1397,11 +1399,11 @@ function MenuItemForm({
 
     return getStepsWithStatus(
       configuration,  // ✅ Pass full configuration object
-      watch(),       // ✅ Pass formData from watch()
+      formData as Partial<MenuItemFormData>,  // ✅ Use reactive formData from useWatch
       transformedVariants,      // ✅ Pass transformed variants array
       errors as FieldErrors<MenuItemFormData>   // ✅ Pass validation errors
     );
-  }, [configuration, watch, variants, errors, itemData?.id]);
+  }, [configuration, formData, variants, errors, itemData?.id]);
 
   // IntersectionObserver for active section tracking
   useEffect(() => {

@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { toast } from 'sonner';
 import type { OrderItem } from './menuTypes';
 
 /**
@@ -105,17 +104,15 @@ export function useOrderManagement(
       
       if (duplicateIndex >= 0) {
         // Increment quantity of existing item
-        const updatedItems = currentItems.map((item, index) => 
-          index === duplicateIndex 
+        const updatedItems = currentItems.map((item, index) =>
+          index === duplicateIndex
             ? { ...item, quantity: item.quantity + orderItem.quantity }
             : item
         );
-        toast.success(`Increased quantity of ${orderItem.name} (now ${currentItems[duplicateIndex].quantity + orderItem.quantity})`);
         return updatedItems;
       } else {
         // Add as new item
         const newItems = [...currentItems, orderItem];
-        toast.success(`Added ${orderItem.name} to order`);
         return newItems;
       }
     });
@@ -126,7 +123,6 @@ export function useOrderManagement(
   // ============================================================================
   const handleRemoveItem = useCallback((itemId: string) => {
     setOrderItems(prev => prev.filter(item => item.id !== itemId));
-    toast.info("Item removed from order");
   }, [setOrderItems]);
 
   // ============================================================================
@@ -135,11 +131,10 @@ export function useOrderManagement(
   const handleUpdateQuantity = useCallback((index: number, quantity: number) => {
     if (quantity <= 0) {
       setOrderItems(prev => prev.filter((_, i) => i !== index));
-      toast.info("Item removed from order");
       return;
     }
-    
-    setOrderItems(prev => prev.map((item, i) => 
+
+    setOrderItems(prev => prev.map((item, i) =>
       i === index ? { ...item, quantity } : item
     ));
   }, [setOrderItems]);
@@ -149,7 +144,6 @@ export function useOrderManagement(
   // ============================================================================
   const handleClearOrder = useCallback(() => {
     setOrderItems([]);
-    toast.info('Order cleared');
   }, [setOrderItems]);
 
   // ============================================================================
@@ -204,7 +198,6 @@ export function useOrderManagement(
       }
       return newItems;
     });
-    toast.success('Item updated');
   }, [setOrderItems]);
 
   // ============================================================================

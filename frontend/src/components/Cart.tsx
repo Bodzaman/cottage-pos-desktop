@@ -106,7 +106,7 @@ export function Cart({ className, insideMobileMenu = false, onCartClick }: CartP
   // Handle cart click - use custom handler when provided
   const handleCartClick = () => {
     if (onCartClick) {
-      // Use custom cart handler if provided (opens CartSidebar)
+      // Use custom cart handler if provided (opens UnifiedCart)
       onCartClick();
       return;
     }

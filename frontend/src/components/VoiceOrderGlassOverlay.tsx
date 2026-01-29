@@ -7,7 +7,33 @@ import { X, Phone, Sparkles, Shield, Clock, Mic } from 'lucide-react';
 import { useVoiceAgentStore } from 'utils/voiceAgentStore';
 import { PremiumTheme } from 'utils/premiumTheme';
 import { toast } from 'sonner';
-import { WebRTCVoiceClient, VoiceCallStatus, createWebRTCVoiceClient } from 'utils/webrtcVoiceClient';
+import { VoiceCallStatus } from 'utils/chat-store';
+
+// Legacy WebRTC client interface (deprecated - stub only)
+interface WebRTCVoiceClient {
+  startCall: () => Promise<void>;
+  endCall: () => void;
+  getStatus: () => VoiceCallStatus;
+}
+
+interface VoiceSessionConfig {
+  agentId: string;
+  agentName: string;
+  onStatusChange?: (status: VoiceCallStatus) => void;
+  onTranscriptUpdate?: (transcript: string) => void;
+  onError?: (error: string) => void;
+}
+
+// Deprecated stub - throws error when called
+function createWebRTCVoiceClient(config: VoiceSessionConfig): WebRTCVoiceClient {
+  return {
+    startCall: async () => {
+      throw new Error('Legacy WebRTC client is deprecated. Please use the new ChatLargeModal voice flow.');
+    },
+    endCall: () => {},
+    getStatus: () => VoiceCallStatus.IDLE
+  };
+}
 import brain from 'brain';
 import { OptimizedImage } from 'components/OptimizedImage';
 

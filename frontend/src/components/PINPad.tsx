@@ -39,6 +39,7 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
   const [isConfirming, setIsConfirming] = useState(false);
   const [shake, setShake] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   // Staggered button entrance animation
   // delayAnimation=true for initial splash transition, false for view switches
@@ -80,8 +81,10 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
         // Confirm entry in set mode — check match
         setTimeout(async () => {
           if (newPin === pin) {
-            const success = await onSubmit(newPin);
-            if (!success) {
+            const submitSuccess = await onSubmit(newPin);
+            if (submitSuccess) {
+              setSuccess(true);
+            } else {
               triggerShake();
               setError('Failed to set PIN. Try again.');
               setPin('');
@@ -99,8 +102,10 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
       } else {
         // Login mode — submit
         setTimeout(async () => {
-          const success = await onSubmit(newPin);
-          if (!success) {
+          const submitSuccess = await onSubmit(newPin);
+          if (submitSuccess) {
+            setSuccess(true);
+          } else {
             triggerShake();
             setError('Invalid PIN');
             setPin('');
@@ -182,14 +187,18 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="w-4 h-4 rounded-full transition-all duration-200"
+            className={`w-4 h-4 rounded-full transition-all duration-200 ${success ? 'animate-success-pulse' : ''}`}
             style={{
-              background: i < currentPin.length
+              background: success || i < currentPin.length
                 ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`
                 : 'rgba(255, 255, 255, 0.1)',
-              border: `1px solid ${i < currentPin.length ? QSAITheme.purple.primary : 'rgba(255, 255, 255, 0.2)'}`,
-              boxShadow: i < currentPin.length ? `0 0 8px ${QSAITheme.purple.glow}` : 'none',
-              transform: i < currentPin.length ? 'scale(1.2)' : 'scale(1)',
+              border: `1px solid ${success || i < currentPin.length ? QSAITheme.purple.primary : 'rgba(255, 255, 255, 0.2)'}`,
+              boxShadow: success
+                ? `0 0 20px ${QSAITheme.purple.glow}, 0 0 40px ${QSAITheme.purple.glow}`
+                : i < currentPin.length
+                  ? `0 0 8px ${QSAITheme.purple.glow}`
+                  : 'none',
+              transform: success ? 'scale(1.3)' : i < currentPin.length ? 'scale(1.2)' : 'scale(1)',
             }}
           />
         ))}
@@ -302,7 +311,7 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
         </button>
       )}
 
-      {/* Shake animation keyframes */}
+      {/* Shake and success animation keyframes */}
       <style>{`
         .animate-shake {
           animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
@@ -319,6 +328,14 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-4px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-success-pulse {
+          animation: successPulse 0.6s ease-out;
+        }
+        @keyframes successPulse {
+          0% { transform: scale(1.2); }
+          50% { transform: scale(1.5); }
+          100% { transform: scale(1.3); }
         }
       `}</style>
     </div>

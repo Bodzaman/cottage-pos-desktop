@@ -70,6 +70,12 @@
     --status-error: 239 68 68;                /* #EF4444 */
     --status-info: 59 130 246;                /* #3B82F6 */
 
+    /* Toast Accent Colors (default: customer burgundy) */
+    --toast-accent: 139 21 56;                /* Burgundy */
+    --toast-accent-bg: rgba(139, 21, 56, 0.15);
+    --toast-accent-border: rgba(139, 21, 56, 0.3);
+    --toast-accent-text: #8B1538;
+
     /* Dynamic Viewport Height (dvh with fallback) */
     --app-dvh: 1dvh;
 
@@ -93,6 +99,12 @@
     --theme-primary-light: var(--internal-primary-light);
     --theme-primary-dark: var(--internal-primary-dark);
     --theme-glow: var(--internal-glow);
+
+    /* Toast accent colors for internal theme */
+    --toast-accent: 124 58 237;
+    --toast-accent-bg: rgba(124, 58, 237, 0.15);
+    --toast-accent-border: rgba(124, 58, 237, 0.3);
+    --toast-accent-text: #7C3AED;
   }
 
   /* Theme class - Customer (Public) */
@@ -101,6 +113,12 @@
     --theme-primary-light: var(--customer-primary-light);
     --theme-primary-dark: var(--customer-primary-dark);
     --theme-glow: var(--customer-glow);
+
+    /* Toast accent colors for customer theme */
+    --toast-accent: 139 21 56;
+    --toast-accent-bg: rgba(139, 21, 56, 0.15);
+    --toast-accent-border: rgba(139, 21, 56, 0.3);
+    --toast-accent-text: #8B1538;
   }
 }
 
@@ -259,19 +277,19 @@ select:focus-visible,
 }
 
 .smooth-scroll-dropdown::-webkit-scrollbar-thumb {
-  background: rgba(139, 21, 56, 0.5);
+  background: rgb(var(--toast-accent) / 0.5);
   border-radius: 3px;
   transition: background 0.2s ease;
 }
 
 .smooth-scroll-dropdown::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 93, 250, 0.7);
+  background: rgb(var(--toast-accent) / 0.7);
 }
 
-/* Firefox scrollbar styling */
+/* Firefox scrollbar styling - uses theme accent */
 .smooth-scroll-dropdown {
   scrollbar-width: thin;
-  scrollbar-color: rgba(124, 93, 250, 0.5) transparent;
+  scrollbar-color: rgb(var(--toast-accent) / 0.5) transparent;
 }
 
 /* QSAI Custom Dropdown Overrides - Force Purple Theme */
@@ -414,6 +432,59 @@ select:focus-visible,
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 21, 56, 0.6);
+}
+
+/* ============================================
+   THEME-SCOPED SCROLLBAR STYLES
+   Override scrollbar colors based on page theme
+   ============================================ */
+
+/* Staff/Internal theme - Purple scrollbars */
+.theme-internal ::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.4);
+}
+
+.theme-internal ::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.6);
+}
+
+/* Firefox support for internal theme */
+.theme-internal * {
+  scrollbar-color: rgba(124, 58, 237, 0.4) transparent;
+}
+
+/* Customer/Public theme - Burgundy scrollbars (default, explicit) */
+.theme-customer ::-webkit-scrollbar-thumb {
+  background: rgba(139, 21, 56, 0.4);
+}
+
+.theme-customer ::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 21, 56, 0.6);
+}
+
+/* Firefox support for customer theme */
+.theme-customer * {
+  scrollbar-color: rgba(139, 21, 56, 0.4) transparent;
+}
+
+/* ============================================
+   THEME-AWARE TOAST ICONS (Sonner)
+   Override success/info toast icons to match theme
+   ============================================ */
+
+/* Success toast icon - use theme accent */
+[data-sonner-toast][data-type="success"] [data-icon] svg {
+  color: var(--toast-accent-text) !important;
+}
+
+/* Info toast icon - use theme accent */
+[data-sonner-toast][data-type="info"] [data-icon] svg {
+  color: var(--toast-accent-text) !important;
+}
+
+/* Default toast (no type) - use theme accent for any icons */
+[data-sonner-toast]:not([data-type]) [data-icon] svg {
+  color: var(--toast-accent-text) !important;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

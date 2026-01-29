@@ -21,7 +21,7 @@ export const menuItemSchema = z.object({
   kitchen_display_name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   category_id: z.string().optional().nullable(),
-  default_spice_level: z.coerce.number().int().min(0).max(5).default(0),
+  spice_level: z.coerce.number().int().min(0).max(5).default(0),
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
   display_order: z.coerce.number().int().nonnegative().default(0),
@@ -113,7 +113,7 @@ export interface MenuItemFormValues {
   kitchen_display_name?: string | null;
   description: string | null;
   category_id: string | null;
-  default_spice_level: number;
+  spice_level: number;
   featured: boolean;
   active: boolean;
   display_order: number;

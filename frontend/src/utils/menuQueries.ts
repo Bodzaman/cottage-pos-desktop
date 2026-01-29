@@ -98,7 +98,6 @@ function normalizeMenuItemsResponse(raw: any): MenuItem[] {
 // Helpers to fetch categories/proteins with graceful fallback ordering
 async function fetchCategoriesOrdered(): Promise<Category[]> {
   await ensureSupabaseConfigured();
-  console.log('🔄 [React Query] Fetching categories...');
   // Use display_order as the canonical ordering field (added via migration)
   const res = await supabase
     .from('menu_categories')
@@ -116,7 +115,6 @@ async function fetchCategoriesOrdered(): Promise<Category[]> {
         .select('*')
         .order('sort_order', { ascending: true });
       if (fallback.error) throw new Error(`Failed to fetch categories (fallback): ${fallback.error.message}`);
-      console.log('✅ [React Query] Categories fetched (fallback by sort_order):', fallback.data?.length || 0);
       // Map database columns to TypeScript interface
       return (fallback.data || []).map((cat: any) => ({
         ...cat,
@@ -127,7 +125,6 @@ async function fetchCategoriesOrdered(): Promise<Category[]> {
     throw new Error(`Failed to fetch categories: ${res.error.message}`);
   }
 
-  console.log('✅ [React Query] Categories fetched:', res.data?.length || 0);
   // Map database columns to TypeScript interface
   return (res.data || []).map((cat: any) => ({
     ...cat,
@@ -138,7 +135,6 @@ async function fetchCategoriesOrdered(): Promise<Category[]> {
 
 async function fetchProteinTypesOrdered(): Promise<ProteinType[]> {
   await ensureSupabaseConfigured();
-  console.log('🔄 [React Query] Fetching protein types...');
   const res = await supabase
     .from('menu_protein_types')
     .select('*')
@@ -154,13 +150,11 @@ async function fetchProteinTypesOrdered(): Promise<ProteinType[]> {
         .select('*')
         .order('name', { ascending: true });
       if (fallback.error) throw new Error(`Failed to fetch protein types (fallback): ${fallback.error.message}`);
-      console.log('✅ [React Query] Protein types fetched (fallback by name):', fallback.data?.length || 0);
       return fallback.data || [];
     }
     throw new Error(`Failed to fetch protein types: ${res.error.message}`);
   }
 
-  console.log('✅ [React Query] Protein types fetched:', res.data?.length || 0);
   return res.data || [];
 }
 
@@ -195,13 +189,9 @@ export function useMenuItems(options?: Partial<Omit<UseQueryOptions<MenuItem[]>,
   return useQuery({
     queryKey: menuKeys.menuItems(),
     queryFn: async () => {
-      console.log('🔄 [React Query] Fetching menu items...', { timestamp: new Date().toISOString() });
-
       const response = await (brain as any).get_menu_items();
       const raw = await response.json();
       const items = normalizeMenuItemsResponse(raw);
-
-      console.log('✅ [React Query] Menu items fetched:', items.length);
       return items;
     },
     staleTime: 10 * 60 * 1000,
@@ -223,14 +213,10 @@ export function useMenuItemsByCategory(
   return useQuery({
     queryKey: menuKeys.menuItemsByCategory(categoryId),
     queryFn: async () => {
-      console.log(`🔄 [React Query] Fetching items for category: ${categoryId}`);
-      
       const response = await (brain as any).get_menu_items();
       const raw = await response.json();
       const allItems = normalizeMenuItemsResponse(raw);
       const filtered = allItems.filter((item: MenuItem) => item.category_id === categoryId);
-      
-      console.log(`✅ [React Query] Category items fetched: ${filtered.length}`);
       return filtered;
     },
     staleTime: 10 * 60 * 1000,
@@ -268,28 +254,26 @@ export function useItemVariants(options?: Partial<Omit<UseQueryOptions<ItemVaria
   return useQuery({
     queryKey: menuKeys.itemVariants(),
     queryFn: async () => {
-      console.log('🔄 [React Query] Fetching item variants...');
       await ensureSupabaseConfigured();
-      
+
       const { data, error } = await supabase
         .from('menu_item_variants')
         .select(`
           *,
           protein_type:menu_protein_types(name)
         `);
-      
+
       if (error) {
-        console.error('❌ [React Query] Item variants fetch failed:', error);
+        console.error('Failed to fetch item variants:', error);
         throw new Error(`Failed to fetch item variants: ${error.message}`);
       }
-      
+
       // Map protein_type.name to protein_type_name for backward compatibility
       const mapped = data?.map(variant => ({
         ...variant,
         protein_type_name: variant.protein_type?.name || null,
       })) || [];
-      
-      console.log('✅ [React Query] Item variants fetched:', mapped.length);
+
       return mapped;
     },
     staleTime: 10 * 60 * 1000,
@@ -308,12 +292,8 @@ export function useCustomizations(options?: Partial<Omit<UseQueryOptions<Customi
   return useQuery({
     queryKey: menuKeys.customizations(),
     queryFn: async () => {
-      console.log('🔄 [React Query] Fetching customizations...');
-
       const response = await (brain as any).get_customizations();
       const data = await response.json();
-
-      console.log('✅ [React Query] Customizations fetched:', data?.length || 0);
       return data || [];
     },
     staleTime: 10 * 60 * 1000,
@@ -422,7 +402,6 @@ export function useSetMeals(activeOnly: boolean = false, options?: UseQueryOptio
   return useQuery({
     queryKey: [...menuKeys.setMeals(), { activeOnly }],
     queryFn: async () => {
-      console.log('🔄 [React Query] Fetching set meals...');
       await ensureSupabaseConfigured();
 
       let query = supabase
@@ -437,11 +416,10 @@ export function useSetMeals(activeOnly: boolean = false, options?: UseQueryOptio
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [React Query] Set meals fetch failed:', error);
+        console.error('Failed to fetch set meals:', error);
         throw new Error(`Failed to fetch set meals: ${error.message}`);
       }
 
-      console.log('✅ [React Query] Set meals fetched:', data?.length || 0);
       return (data || []) as SetMeal[];
     },
     staleTime: 10 * 60 * 1000,
@@ -559,7 +537,6 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
   return useQuery({
     queryKey: menuKeys.completeMenu(),
     queryFn: async () => {
-      console.log('🔄 [React Query] Fetching complete menu data...');
       await ensureSupabaseConfigured();
       
       // Fetch all data in parallel, using helpers that handle fallbacks
@@ -595,15 +572,7 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
         itemVariants,
         customizations: customizations || [],
       };
-      
-      console.log('✅ [React Query] Complete menu data fetched:', {
-        categories: result.categories.length,
-        items: result.menuItems.length,
-        proteins: result.proteinTypes.length,
-        variants: result.itemVariants.length,
-        customizations: result.customizations.length,
-      });
-      
+
       return result;
     },
     staleTime: 10 * 60 * 1000,
@@ -635,7 +604,6 @@ export function useCreateMenuItem() {
   
   return useMutation({
     mutationFn: async (newItem: Partial<MenuItem>) => {
-      console.log('➕ [React Query] Creating menu item...');
       const response = await (brain as any).create_menu_item(newItem as any);
       return await response.json();
     },
@@ -643,10 +611,9 @@ export function useCreateMenuItem() {
       // Invalidate affected queries to trigger refetch
       queryClient.invalidateQueries({ queryKey: menuKeys.menuItems() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Menu item created, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Create menu item failed:', error);
+      console.error('Failed to create menu item:', error);
       toast.error('Failed to create menu item');
     },
   });
@@ -660,17 +627,15 @@ export function useUpdateMenuItem() {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<MenuItem> }) => {
-      console.log(`🔄 [React Query] Updating menu item: ${id}`);
       const response = await (brain as any).update_menu_item({ menu_item_id: id, ...data } as any);
       return await response.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: menuKeys.menuItems() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Menu item updated, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Update menu item failed:', error);
+      console.error('Failed to update menu item:', error);
       toast.error('Failed to update menu item');
     },
   });
@@ -684,17 +649,15 @@ export function useDeleteMenuItem() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      console.log(`🗑️ [React Query] Deleting menu item: ${id}`);
       const response = await (brain as any).delete_menu_item({ menu_item_id: id });
       return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: menuKeys.menuItems() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Menu item deleted, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Delete menu item failed:', error);
+      console.error('Failed to delete menu item:', error);
       toast.error('Failed to delete menu item');
     },
   });
@@ -708,22 +671,19 @@ export function useUpsertCategory() {
   
   return useMutation({
     mutationFn: async (category: Partial<Category>) => {
-      console.log('💾 [React Query] Upserting category...');
-      
       const { error } = await supabase
         .from('menu_categories')
         .upsert(category as any);
-      
+
       if (error) throw error;
       return category;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Category upserted, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Upsert category failed:', error);
+      console.error('Failed to save category:', error);
       toast.error('Failed to save category');
     },
   });
@@ -737,22 +697,19 @@ export function useDeleteCategory() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      console.log(`🗑️ [React Query] Deleting category: ${id}`);
-      
       const { error } = await supabase
         .from('menu_categories')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Category deleted, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Delete category failed:', error);
+      console.error('Failed to delete category:', error);
       toast.error('Failed to delete category');
     },
   });
@@ -766,12 +723,10 @@ export function useUpsertProteinType() {
   
   return useMutation({
     mutationFn: async (proteinType: Partial<ProteinType>) => {
-      console.log('💾 [React Query] Upserting protein type...');
-      
       const { error } = await supabase
         .from('menu_protein_types')
         .upsert(proteinType as any);
-      
+
       if (error) throw error;
       return proteinType;
     },
@@ -779,10 +734,9 @@ export function useUpsertProteinType() {
       queryClient.invalidateQueries({ queryKey: menuKeys.proteinTypes() });
       queryClient.invalidateQueries({ queryKey: menuKeys.itemVariants() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Protein type upserted, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Upsert protein type failed:', error);
+      console.error('Failed to save protein type:', error);
       toast.error('Failed to save protein type');
     },
   });
@@ -796,23 +750,20 @@ export function useDeleteProteinType() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      console.log(`🗑️ [React Query] Deleting protein type: ${id}`);
-      
       const { error } = await supabase
         .from('menu_protein_types')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: menuKeys.proteinTypes() });
       queryClient.invalidateQueries({ queryKey: menuKeys.itemVariants() });
       queryClient.invalidateQueries({ queryKey: menuKeys.completeMenu() });
-      console.log('✅ [React Query] Protein type deleted, cache invalidated');
     },
     onError: (error) => {
-      console.error('❌ [React Query] Delete protein type failed:', error);
+      console.error('Failed to delete protein type:', error);
       toast.error('Failed to delete protein type');
     },
   });
@@ -929,7 +880,6 @@ export function useMenuBundle(options?: {
   return useQuery({
     queryKey: menuKeys.posBundle(context),
     queryFn: async (): Promise<MenuBundle> => {
-      console.log(`🔄 [React Query] Fetching menu bundle (context: ${context})...`);
       await ensureSupabaseConfigured();
 
       // Fetch all data in parallel
@@ -971,15 +921,6 @@ export function useMenuBundle(options?: {
         setMeals: setMeals || [],
         ...lookups
       };
-
-      console.log(`✅ [React Query] Menu bundle fetched (context: ${context}):`, {
-        categories: bundle.categories.length,
-        items: bundle.menuItems.length,
-        variants: bundle.itemVariants.length,
-        proteins: bundle.proteinTypes.length,
-        customizations: bundle.customizations.length,
-        setMeals: bundle.setMeals.length
-      });
 
       return bundle;
     },
@@ -1147,7 +1088,6 @@ export function useFilteredMenuItems(options: {
  * ```
  */
 export function invalidateAllMenuData(queryClient: ReturnType<typeof useQueryClient>) {
-  console.log('🔄 [React Query] Invalidating ALL menu data...');
   queryClient.invalidateQueries({ queryKey: menuKeys.all });
 }
 
@@ -1170,15 +1110,10 @@ export async function checkForMenuPublishEvents(queryClient: ReturnType<typeof u
       
       // Only refresh if this is a new event
       if (!lastCheck || eventTimestamp > lastCheck) {
-        console.log('🔄 [React Query] Detected menu publish event, refreshing...', {
-          eventId: eventData.data.trigger_id,
-          timestamp: eventTimestamp
-        });
-        
         invalidateAllMenuData(queryClient);
         localStorage.setItem(lastCheckKey, eventTimestamp);
         toast.success('Menu updated! Refreshing data...');
-        
+
         return true;
       }
     }
