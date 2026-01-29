@@ -143,10 +143,10 @@ export default function PublishReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80dvh] overflow-hidden flex flex-col bg-gray-900 border-[#7C5DFA]/30">
+      <DialogContent className="max-w-2xl max-h-[80dvh] overflow-hidden flex flex-col bg-[rgba(26,26,26,0.95)] text-white border-[rgba(124,93,250,0.3)] backdrop-blur-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
-            <FileEdit className="h-5 w-5 text-[#7C5DFA]" />
+            <FileEdit className="h-5 w-5 text-[#7C3AED]" />
             Review Changes Before Publishing
           </DialogTitle>
           <DialogDescription className="text-gray-400">
@@ -155,20 +155,20 @@ export default function PublishReviewModal({
         </DialogHeader>
 
         {/* Summary Stats */}
-        <div className="flex gap-3 py-4 border-b border-gray-700">
-          <div className="flex-1 text-center p-3 rounded-lg bg-[#7C5DFA]/10 border border-[#7C5DFA]/30">
-            <div className="text-2xl font-bold text-[#7C5DFA]">{totalDraftCount}</div>
+        <div className="flex gap-3 py-4 border-b border-white/10">
+          <div className="flex-1 text-center p-3 rounded-lg bg-[rgba(124,58,237,0.1)] border border-[rgba(124,93,250,0.3)]">
+            <div className="text-2xl font-bold text-[#7C3AED]">{totalDraftCount}</div>
             <div className="text-sm text-gray-400">Total Drafts</div>
           </div>
-          <div className="flex-1 text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+          <div className="flex-1 text-center p-3 rounded-lg bg-[rgba(59,130,246,0.1)] border border-blue-500/30">
             <div className="text-2xl font-bold text-blue-400">{draftItems.length}</div>
             <div className="text-sm text-gray-400">Menu Items</div>
           </div>
-          <div className="flex-1 text-center p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="flex-1 text-center p-3 rounded-lg bg-[rgba(245,158,11,0.1)] border border-amber-500/30">
             <div className="text-2xl font-bold text-amber-400">{draftCustomizations.length}</div>
             <div className="text-sm text-gray-400">Add-ons</div>
           </div>
-          <div className="flex-1 text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+          <div className="flex-1 text-center p-3 rounded-lg bg-[rgba(16,185,129,0.1)] border border-emerald-500/30">
             <div className="text-2xl font-bold text-emerald-400">{draftSetMeals.length}</div>
             <div className="text-sm text-gray-400">Set Meals</div>
           </div>
@@ -178,14 +178,14 @@ export default function PublishReviewModal({
         <div className="flex-1 overflow-hidden flex flex-col">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#7C5DFA] mb-4" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#7C3AED] mb-4" />
               <p className="text-gray-400">Loading draft changes...</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <AlertCircle className="h-8 w-8 text-red-400 mb-4" />
               <p className="text-red-400 mb-4">{error}</p>
-              <Button variant="outline" onClick={fetchAllDraftChanges} className="gap-2">
+              <Button variant="outline" onClick={fetchAllDraftChanges} className="gap-2 border-[rgba(124,93,250,0.4)] text-white hover:bg-[rgba(124,93,250,0.1)]">
                 <RefreshCw className="h-4 w-4" />
                 Retry
               </Button>
@@ -197,16 +197,16 @@ export default function PublishReviewModal({
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-800/50">
-                <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-[#7C5DFA]/20">
+              <TabsList className="grid w-full grid-cols-3 bg-[#111] rounded-lg p-1">
+                <TabsTrigger value="items" className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white data-[state=inactive]:hover:bg-white/5 transition-colors">
                   <Utensils className="h-4 w-4" />
                   Items ({draftItems.length})
                 </TabsTrigger>
-                <TabsTrigger value="customizations" className="flex items-center gap-2 data-[state=active]:bg-[#7C5DFA]/20">
+                <TabsTrigger value="customizations" className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white data-[state=inactive]:hover:bg-white/5 transition-colors">
                   <Settings className="h-4 w-4" />
                   Add-ons ({draftCustomizations.length})
                 </TabsTrigger>
-                <TabsTrigger value="setmeals" className="flex items-center gap-2 data-[state=active]:bg-[#7C5DFA]/20">
+                <TabsTrigger value="setmeals" className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white data-[state=inactive]:hover:bg-white/5 transition-colors">
                   <Package className="h-4 w-4" />
                   Set Meals ({draftSetMeals.length})
                 </TabsTrigger>
@@ -229,7 +229,7 @@ export default function PublishReviewModal({
                           {newItems.map((item) => (
                             <div
                               key={item.item_id}
-                              className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20"
+                              className="p-3 rounded-lg bg-[rgba(16,185,129,0.05)] border border-emerald-500/20"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -257,7 +257,7 @@ export default function PublishReviewModal({
                           {modifiedItems.map((item) => (
                             <div
                               key={item.item_id}
-                              className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20"
+                              className="p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-amber-500/20"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
@@ -295,7 +295,7 @@ export default function PublishReviewModal({
                     {draftCustomizations.map((customization) => (
                       <div
                         key={customization.id}
-                        className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20"
+                        className="p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-amber-500/20"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -321,7 +321,7 @@ export default function PublishReviewModal({
                     {draftSetMeals.map((setMeal) => (
                       <div
                         key={setMeal.id}
-                        className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20"
+                        className="p-3 rounded-lg bg-[rgba(16,185,129,0.05)] border border-emerald-500/20"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -341,14 +341,14 @@ export default function PublishReviewModal({
           )}
         </div>
 
-        <DialogFooter className="border-t border-gray-700 pt-4">
-          <Button variant="outline" onClick={onClose} disabled={publishing}>
+        <DialogFooter className="border-t border-white/10 pt-4">
+          <Button variant="outline" onClick={onClose} disabled={publishing} className="border-[rgba(124,93,250,0.4)] text-white hover:bg-[rgba(124,93,250,0.1)]">
             Cancel
           </Button>
           <Button
             onClick={handlePublish}
             disabled={loading || publishing || totalDraftCount === 0}
-            className="bg-[#7C5DFA] hover:bg-[#6B4CE6] text-white gap-2"
+            className="bg-[#7C3AED] hover:bg-[#6D28D9] active:bg-[#5B21B6] text-white gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(26,26,26,0.95)]"
           >
             {publishing ? (
               <>

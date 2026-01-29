@@ -2679,14 +2679,28 @@ export async function publishMenu(): Promise<{
   try {
     // Use brain module (works on both web via HTTP and Electron via direct Supabase)
     const brain = await import('brain');
-    const response = await (brain.default as any).publish_menu();
-    const result = await response.json();
 
+    // Call brain.publish_menu()
+    // - Web: Pass format: "json" to parse response, returns HttpResponse with .data property
+    // - Electron: Ignores format param, returns data directly (no wrapper)
+    const response = await (brain.default as any).publish_menu({ format: "json" });
+
+    // Extract result from response
+    // - Web: response.data contains parsed JSON
+    // - Electron: response IS the data (not wrapped)
+    const result = response?.data || response;
+
+    if (!result || typeof result !== 'object') {
+      console.error('[supabaseQueries] publishMenu: Invalid response structure', { response, result });
+      return { success: false, message: 'Invalid response from server' };
+    }
+
+    // Electron brain returns 'error' field on failure, backend returns 'message'
     return {
-      success: result.success,
+      success: result.success ?? false,
       menu_items: result.menu_items,
       corpus_updated: result.corpus_updated,
-      message: result.message
+      message: result.message || result.error  // Handle both 'message' and 'error'
     };
   } catch (error) {
     console.error('[supabaseQueries] publishMenu failed:', error);

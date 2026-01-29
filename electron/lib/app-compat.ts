@@ -1653,21 +1653,29 @@ export const apiClient = {
   },
 
   publish_menu: async () => {
+    console.log('[app-compat] publish_menu called');
+    console.log('[app-compat] isHybridMode:', isHybridMode);
+    console.log('[app-compat] RIFF_BACKEND_URL:', RIFF_BACKEND_URL);
+
     if (isHybridMode) {
       try {
+        console.log('[app-compat] Calling backend API: /routes/publish-menu');
         const result = await callBackendAPI('/routes/publish-menu', { method: 'POST' });
         console.log('✅ [app-compat] publish_menu succeeded:', result);
         toast.success('Menu published successfully to all systems!');
         return result;
       } catch (error) {
         console.error('❌ [app-compat] publish_menu failed:', error);
+        console.error('[app-compat] Error name:', (error as Error).name);
+        console.error('[app-compat] Error message:', (error as Error).message);
+        console.error('[app-compat] Error stack:', (error as Error).stack);
         toast.error(`Failed to sync menu: ${(error as Error).message}`);
         return { success: false, error: (error as Error).message };
       }
     } else {
       toast.warning('Backend not configured - menu changes are local only');
       console.log('⚠️ [app-compat] publish_menu - no backend configured');
-      return mockResponse({ success: true, warning: 'Backend not configured - local only' });
+      return { success: true, warning: 'Backend not configured - local only' };
     }
   },
 

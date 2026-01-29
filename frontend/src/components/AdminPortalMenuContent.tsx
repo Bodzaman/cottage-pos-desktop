@@ -488,10 +488,17 @@ export default function AdminPortalMenuContent() {
               <Button
                 onClick={() => setIsPublishReviewOpen(true)}
                 disabled={isMutating || loading || draftItemCount === 0}
-                className="text-white border-0 transition-all duration-200"
-                style={{
-                  backgroundColor: draftItemCount > 0 ? colors.status.warning : colors.purple.primary,
-                }}
+                className={`
+                  text-white border-0
+                  transition-all duration-200
+                  shadow-lg
+                  disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0F0F]
+                  ${draftItemCount > 0
+                    ? 'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309]'
+                    : 'bg-[#7C3AED] hover:bg-[#6D28D9] active:bg-[#5B21B6]'
+                  }
+                `}
                 aria-label={draftItemCount > 0 ? `Review and publish ${draftItemCount} drafts` : 'Publish menu'}
               >
                 <Upload className={`h-4 w-4 ${isPublishing ? 'animate-pulse' : ''} sm:mr-2`} />
