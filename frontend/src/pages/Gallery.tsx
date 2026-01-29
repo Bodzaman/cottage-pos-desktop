@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FaChevronLeft, FaChevronRight, FaTimes, FaExpand, FaCompress, FaCamera, FaUtensils, FaBuilding } from "react-icons/fa";
 import { AnimatePresence } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,62 +8,57 @@ import { GalleryItem } from "components/GalleryItem";
 import { Lightbox } from "components/Lightbox";
 import { AnimatedSection } from "components/AnimatedSection";
 import { PremiumTheme } from "utils/premiumTheme";
-import { galleryImages, GalleryImage } from "utils/galleryData";
-import brain from "brain";
-import { useNavigate } from "react-router-dom"; // FIXED: Add useNavigate import
+import type { GalleryImage } from "utils/galleryData";
+import { useGalleryMenuImages } from "utils/galleryQueries";
+import { useWebsiteData } from "utils/useWebsiteData";
+import type { GalleryImagesContent } from "utils/websiteCmsTypes";
 import { SEO } from "components/SEO";
 import { PAGE_SEO } from "utils/seoData";
+
+// Default fallback values
+const DEFAULT_HERO_IMAGE = "https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/BAR%202.jpg";
+const DEFAULT_TITLE = "Gallery";
+const DEFAULT_SUBTITLE = "Experience the ambiance, flavors, and memorable moments at Cottage Tandoori through our visual journey.";
 
 export default function Gallery() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
-  const [allGalleryImages, setAllGalleryImages] = useState<GalleryImage[]>(galleryImages);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch real menu data and combine with venue images
-  useEffect(() => {
-    const fetchMenuData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await brain.get_real_menu_data();
-        const menuData = await response.json();
-        
-        if (menuData && menuData.items) {
-          // Convert menu items to gallery images - ONLY items with real image URLs
-          const menuGalleryItems: GalleryImage[] = [];
-          
-          menuData.items.forEach((item: any, index: number) => {
-            // Only include items that have a real image_url from database
-            if (item.image_url && item.image_url.trim() !== '') {
-              menuGalleryItems.push({
-                id: 1000 + index, // Start from 1000 to avoid conflicts with venue images
-                url: item.image_url,
-                alt: item.name || 'Menu item',
-                category: 'food',
-                title: item.name
-              });
-            }
-          });
-          
-          // Filter out mock food items (IDs 1-6) and keep venue images (IDs 7+)
-          const venueImages = galleryImages.filter(img => img.category === 'venue');
-          
-          // Combine ONLY real menu items with venue images
-          setAllGalleryImages([...menuGalleryItems, ...venueImages]);
-          
-        } else {
-        }
-      } catch (error) {
-        console.error('Error fetching menu data:', error);
-        // Keep default gallery on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch CMS gallery configuration
+  const galleryConfig = useWebsiteData<GalleryImagesContent>('gallery_images');
 
-    fetchMenuData();
-  }, []);
+  // Fetch menu images using React Query (cached, deduplicated)
+  const { data: menuImages = [], isLoading: isLoadingMenu } = useGalleryMenuImages();
+
+  // Determine if we should include menu images (default to true)
+  const includeMenuImages = galleryConfig?.include_menu_images ?? true;
+
+  // Combine CMS venue images with menu images (if enabled)
+  const allGalleryImages = useMemo(() => {
+    // Get CMS venue images, converting to GalleryImage format
+    const cmsImages: GalleryImage[] = (galleryConfig?.images || []).map(img => ({
+      id: img.id,
+      src: img.src,
+      alt: img.alt,
+      category: img.category,
+      title: img.title,
+      description: img.description,
+    }));
+
+    // Include menu images only if enabled in CMS
+    const foodImages = includeMenuImages ? menuImages : [];
+
+    return [...foodImages, ...cmsImages];
+  }, [galleryConfig?.images, menuImages, includeMenuImages]);
+
+  // Loading state
+  const isLoading = isLoadingMenu;
+
+  // Get CMS content with fallbacks
+  const heroImage = galleryConfig?.hero_image || DEFAULT_HERO_IMAGE;
+  const pageTitle = galleryConfig?.title || DEFAULT_TITLE;
+  const pageSubtitle = galleryConfig?.subtitle || DEFAULT_SUBTITLE;
 
   // Filter images by selected category
   const filteredImages = selectedCategory === "all" 
@@ -124,11 +119,10 @@ export default function Gallery() {
       <UniversalHeader context="PUBLIC_NAV" />
       
       {/* Hero header with parallax effect */}
-      {/* TODO: Static background image should be migrated to Supabase storage via Website CMS */}
       <div
         className="h-[50dvh] md:h-[60dvh] min-h-[200px] max-h-[500px] relative flex items-center justify-center overflow-hidden pt-20"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("https://static.databutton.com/public/6d13cbb4-0d00-46ec-8ef0-98e0a8405532/BAR%202.jpg")`,
+          backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("${heroImage}")`,
           backgroundPosition: `center ${50 + offset * 0.1}%`,
           backgroundSize: "cover",
         }}
@@ -136,20 +130,20 @@ export default function Gallery() {
         <div className="absolute inset-0 bg-black/40"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
           <AnimatedSection threshold={0.2}>
-            <h1 
+            <h1
               className="text-5xl md:text-6xl mb-4"
-              style={{ 
+              style={{
                 fontFamily: PremiumTheme.typography.fontFamily.serif,
-                color: PremiumTheme.colors.text.primary 
+                color: PremiumTheme.colors.text.primary
               }}
             >
-              Gallery
+              {pageTitle}
             </h1>
-            <p 
+            <p
               className="text-xl max-w-2xl mx-auto"
               style={{ color: PremiumTheme.colors.text.secondary }}
             >
-              Experience the ambiance, flavors, and memorable moments at Cottage Tandoori through our visual journey.
+              {pageSubtitle}
             </p>
           </AnimatedSection>
         </div>

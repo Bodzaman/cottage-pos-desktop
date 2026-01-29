@@ -1,3 +1,15 @@
+/**
+ * POS Settings Store
+ *
+ * @deprecated Phase 7: Use React Query hooks from posSettingsQueries.ts instead.
+ * This store is kept for backward compatibility and type exports.
+ *
+ * New code should use:
+ * - usePOSSettingsQuery() for reading settings
+ * - useUpdatePOSSettings() for mutations
+ * - useUrgencySettingsQuery(), useServiceChargeSettingsQuery() for specific slices
+ */
+
 import { create } from 'zustand';
 import brain from 'brain';
 import { toast } from 'sonner';

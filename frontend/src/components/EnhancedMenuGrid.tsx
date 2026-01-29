@@ -23,7 +23,7 @@ import { POSMenuCard } from './POSMenuCard';
 import { POSSetMealCard } from './POSSetMealCard';
 import { SetMealListResponse } from '../brain/data-contracts';
 import { CompactProteinChips } from './CompactProteinChips';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 interface EnhancedMenuGridProps {
   menuItems: MenuItem[];
@@ -48,9 +48,9 @@ export function EnhancedMenuGrid({
 }: EnhancedMenuGridProps) {
   const [favoriteItems, setFavoriteItems] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  
+
   // Get protein types and variants from store
-  const { proteinTypes, itemVariants: allItemVariants } = useRealtimeMenuStore();
+  const { proteinTypes, itemVariants: allItemVariants } = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // If showing set meals only, filter and display set meals
   if (showSetMealsOnly) {

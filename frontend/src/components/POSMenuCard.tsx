@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { OrderItem, MenuItem, ItemVariant, ModifierSelection } from 'utils/menuTypes';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { FloatingDropdown } from 'components/FloatingDropdown';
 import { MultiCustomModal } from 'components/MultiCustomModal';
 import { useCustomizeOrchestrator } from 'components/CustomizeOrchestrator';
@@ -53,7 +53,7 @@ export function POSMenuCard({
 }: POSMenuCardProps) {
   const isDev = import.meta.env.DEV;
   // Get variants from realtimeMenuStore with null safety
-  const { itemVariants: storeVariants, proteinTypes, isLoading } = useRealtimeMenuStore();
+  const { itemVariants: storeVariants, proteinTypes, isLoading } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // 🔍 DEBUG: Log proteinTypes availability
   

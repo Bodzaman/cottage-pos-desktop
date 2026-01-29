@@ -6,7 +6,7 @@ import { X, LogOut, Utensils, Image, Bot, Cog } from 'lucide-react';
 import { colors, gridBackgroundStyle } from '../utils/designSystem';
 import { globalColors, styles } from '../utils/QSAIDesign';
 import { useSimpleAuth } from '../utils/simple-auth-context';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { Category, MenuItem } from '../utils/menuTypes';
 
 // Import admin components directly

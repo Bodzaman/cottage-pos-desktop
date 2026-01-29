@@ -14,7 +14,8 @@ import {
   listParentTemplates,
   getTemplateAssignments,
   setTemplateAssignment,
-  getKitchenVariant
+  getKitchenVariant,
+  getReceiptTemplate
 } from 'utils/receiptTemplateSupabase';
 
 // Order mode definitions
@@ -175,6 +176,16 @@ export function OrderModeAssignmentModal({
       const kitchenResult = await getKitchenVariant(templateId);
       if (kitchenResult.success && kitchenResult.data) {
         kitchenVariantId = kitchenResult.data.id;
+      } else if (kitchenResult.success && !kitchenResult.data) {
+        // Kitchen variant doesn't exist - warn user
+        toast.warning('Kitchen variant not found', {
+          description: 'This template has no kitchen variant. Kitchen receipts may not work correctly.'
+        });
+      } else if (!kitchenResult.success) {
+        // Failed to fetch kitchen variant
+        toast.error('Could not verify kitchen variant', {
+          description: kitchenResult.error || 'Please try again'
+        });
       }
     }
 
@@ -196,7 +207,27 @@ export function OrderModeAssignmentModal({
     try {
       setIsSaving(true);
 
-      // Save ALL assignments - uses template_id for customer, kitchen_variant_id for kitchen
+      // Step 1: Validate all assigned templates still exist
+      const assignedTemplateIds = assignments
+        .filter(a => a.template_id)
+        .map(a => a.template_id!);
+
+      if (assignedTemplateIds.length > 0) {
+        const validationPromises = assignedTemplateIds.map(id => getReceiptTemplate(id));
+        const validationResults = await Promise.all(validationPromises);
+
+        const missingTemplates = validationResults.filter(r => !r.success || !r.data);
+        if (missingTemplates.length > 0) {
+          toast.error('Some templates no longer exist', {
+            description: 'Please refresh and select valid templates'
+          });
+          // Reload templates to get fresh list
+          loadTemplates();
+          return;
+        }
+      }
+
+      // Step 2: Save ALL assignments - uses template_id for customer, kitchen_variant_id for kitchen
       const savePromises = assignments.map(assignment => {
         const orderModeUpper = assignment.order_mode.toUpperCase();
 

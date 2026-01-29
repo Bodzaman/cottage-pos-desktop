@@ -6,10 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Star, Leaf, Sliders, Check, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { PremiumTheme } from 'utils/premiumTheme';
 import { useCartStore } from 'utils/cartStore';
-import { shallow } from 'zustand/shallow';
-import { CustomerCustomizationModal, SelectedCustomization } from './CustomerCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { CustomerVariantSelector } from './CustomerVariantSelector';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { toast } from 'sonner';
 import { cn } from 'utils/cn';
 import { computeUnitPrice, formatCurrency } from 'utils/priceUtils';
@@ -35,10 +34,7 @@ export function CompactMenuList({
   className = '' 
 }: CompactMenuListProps) {
   const { addItem } = useCartStore();
-  const { customizations, variantsByMenuItem } = useRealtimeMenuStore(
-    (state) => ({ customizations: state.customizations, variantsByMenuItem: state.variantsByMenuItem }),
-    shallow
-  );
+  const { customizations, variantsByMenuItem } = useRealtimeMenuStoreCompat({ context: 'online' });
 
   // A11y: screen reader announcements
   const [ariaLiveMessage, setAriaLiveMessage] = useState('');
@@ -220,19 +216,11 @@ export function CompactMenuList({
     setTimeout(() => updateItemState(item.id, { addedPulse: false }), 600);
   };
 
-  // Handle customization
+  // Handle customization - always open unified modal (has built-in variant selection)
   const handleCustomiseClick = (item: MenuItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const variants = getItemVariants(item.id);
-    const isMultiVariant = variants.length > 0;
-    
-    if (isMultiVariant) {
-      // For variant items, open the protein selection modal
-      updateItemState(item.id, { isVariantSelectorOpen: true });
-    } else {
-      // For single items, open customization modal directly
-      updateItemState(item.id, { isCustomizationModalOpen: true });
-    }
+    // Open the unified customization modal directly - it handles both single and multi-variant items
+    updateItemState(item.id, { isCustomizationModalOpen: true });
   };
 
   // Handle add to cart with customizations
@@ -488,7 +476,8 @@ export function CompactMenuList({
                               className="underline underline-offset-2 hover:text-gray-300"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                updateItemState(item.id, { isVariantSelectorOpen: true });
+                                // Open unified customization modal which has built-in variant selection
+                                updateItemState(item.id, { isCustomizationModalOpen: true });
                               }}
                             >
                               Choose an option
@@ -685,17 +674,17 @@ export function CompactMenuList({
               </div>
             </div>
             
-            {/* Customization Modal */}
-            <CustomerCustomizationModal
+            {/* Customization Modal - Updated to use Unified Modal */}
+            <CustomerUnifiedCustomizationModal
               item={item}
-              variant={state.selectedVariant}
+              itemVariants={activeVariants}
               isOpen={state.isCustomizationModalOpen}
               onClose={() => updateItemState(item.id, { isCustomizationModalOpen: false })}
               addToCart={(item, quantity, variant, customizations, notes) => {
-                // ✅ NEW SIGNATURE: Direct pass-through, no swapping needed
                 handleAddToCartWithCustomizations(item, quantity, variant, customizations, notes);
               }}
               mode={mode}
+              initialVariant={state.selectedVariant}
               initialQuantity={state.quantity}
             />
             

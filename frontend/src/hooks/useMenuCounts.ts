@@ -10,7 +10,7 @@
 
 import { useMemo } from 'react';
 import { useMenuItems } from '../utils/menuQueries';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 export interface MenuCounts {
   items: number;
@@ -25,9 +25,8 @@ export interface MenuCounts {
 export function useMenuCounts(): MenuCounts {
   const { data: menuItems = [] } = useMenuItems();
 
-  // Get set meals and customizations from the realtime store
-  const setMeals = useRealtimeMenuStore((state) => state.setMeals);
-  const customizations = useRealtimeMenuStore((state) => state.customizations);
+  // Get set meals and customizations from the realtime store compat layer
+  const { setMeals, customizations } = useRealtimeMenuStoreCompat({ context: 'online' });
 
   return useMemo(() => {
     // Count all menu items

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, ShoppingCart, Utensils, Minus, Plus, Check, MousePointer, Info, ChevronRight, Sparkles, Star, X, ChevronLeft, SlidersHorizontal } from 'lucide-react';
 import type { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
 import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
-import { CustomerCustomizationModal, SelectedCustomization } from './CustomerCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { SimpleVariantPicker } from './SimpleVariantPicker';
 import { cn } from 'utils/cn';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useCartStore } from 'utils/cartStore';
 import { toast } from 'sonner';
 import { ItemInfoModal } from './ItemInfoModal';
-import { CustomerVariantSelector } from './CustomerVariantSelector';
 import { getOptimizedImagePreset } from 'utils/imageOptimization';
 import { FavoriteHeartButton } from './FavoriteHeartButton';
 import { OptimizedImage } from './OptimizedImage';
@@ -82,8 +81,7 @@ export function OnlineMenuCard({
   // isDescriptionExpanded removed — descriptions now always 2-line clamped
   const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
-  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false); // NEW
-  const [isCustomerVariantSelectorOpen, setIsCustomerVariantSelectorOpen] = useState(false); // NEW: For Customise button
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   // Phase 2 micro-interactions state
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
@@ -964,11 +962,7 @@ export function OnlineMenuCard({
             }}
             onClick={(e) => {
               e.stopPropagation();
-              if (galleryCompact && isMultiVariant) {
-                setIsCustomerVariantSelectorOpen(true);
-              } else {
-                setIsCustomizationModalOpen(true);
-              }
+              setIsCustomizationModalOpen(true);
             }}
           >
             <SlidersHorizontal className="h-3 w-3" />
@@ -1002,44 +996,23 @@ export function OnlineMenuCard({
         mode={mode}
       />
       
-      {/* CustomerVariantSelector - for Customise button (shows variants + Customise & Add) */}
-      {galleryCompact && isMultiVariant && (
-        <CustomerVariantSelector
-          item={item}
-          itemVariants={itemVariants}
-          isOpen={isCustomerVariantSelectorOpen}
-          onClose={() => setIsCustomerVariantSelectorOpen(false)}
-          addToCart={(item, quantity, variant, customizations, notes) => {
-            // Pass to addItem: (item, variant, qty, customizations, mode, notes)
-            addItem(item, variant, quantity, customizations || [], mode, notes || '');
-            toast.success(`Added ${quantity}x ${variant?.name || item.name} to cart`);
-            setIsCustomerVariantSelectorOpen(false);
-            setQuantity(1);
-          }}
-          mode={mode}
-          initialVariant={selectedVariantId ? itemVariants.find(v => v.id === selectedVariantId) : null}
-        />
-      )}
-      
-      {/* Customization Modal - for extras/notes (non-variant items or list mode) */}
-      {!(galleryCompact && isMultiVariant) && (
-        <CustomerCustomizationModal
-          item={item}
-          isOpen={isCustomizationModalOpen}
-          onClose={() => setIsCustomizationModalOpen(false)}
-          addToCart={(item, quantity, variant, customizations, notes) => {
-            // ✅ NEW SIGNATURE: (item, quantity, variant, customizations, notes)
-            const finalVariant = variant || (selectedVariantId ? itemVariants.find(v => v.id === selectedVariantId) : undefined);
-            // Pass to addItem: (item, variant, qty, customizations, mode, notes)
-            addItem(item, finalVariant, quantity, customizations || [], mode, notes || '');
-            toast.success(`Added ${quantity}x ${item.name} to cart`);
-            setIsCustomizationModalOpen(false);
-          }}
-          selectedVariant={selectedVariantId ? itemVariants.find(v => v.id === selectedVariantId) : undefined}
-          mode={mode}
-          initialQuantity={quantity}
-        />
-      )}
+      {/* Unified Customization Modal - handles both variants and customizations */}
+      <CustomerUnifiedCustomizationModal
+        item={item as any}
+        itemVariants={itemVariants as any[]}
+        isOpen={isCustomizationModalOpen}
+        onClose={() => setIsCustomizationModalOpen(false)}
+        addToCart={(menuItem, qty, variant, customizations) => {
+          // Pass to addItem: (item, variant, qty, customizations, mode, notes)
+          addItem(menuItem as any, variant as any, qty, customizations || [], mode, '');
+          toast.success(`Added ${qty}x ${variant?.name || menuItem.name} to cart`);
+          setIsCustomizationModalOpen(false);
+          setQuantity(1);
+        }}
+        mode={mode}
+        initialVariant={selectedVariantId ? itemVariants.find(v => v.id === selectedVariantId) as any : undefined}
+        initialQuantity={quantity}
+      />
     </motion.div>
   );
 }

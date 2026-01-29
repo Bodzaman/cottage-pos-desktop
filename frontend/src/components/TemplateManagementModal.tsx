@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Save, Edit3, Trash2, Plus, Eye, Download, Upload, Search, FileText, Clock, User, Copy, Settings, Monitor, ChefHat, Maximize2 } from 'lucide-react';
+import { Save, Edit3, Trash2, Plus, Eye, Download, Upload, Search, FileText, Clock, User, Copy, Settings, Monitor, ChefHat, Maximize2, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { QSAITheme, styles } from 'utils/QSAIDesign';
@@ -541,11 +541,13 @@ export function TemplateManagementModal({
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Template Preview</h3>
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
+                    className="h-7 w-7 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
                     onClick={() => setSelectedTemplate(null)}
+                    title="Close preview panel"
                   >
-                    ×
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
                 

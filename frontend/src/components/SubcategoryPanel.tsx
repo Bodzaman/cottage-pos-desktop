@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { globalColors } from 'utils/QSAIDesign';
 
 interface SubcategoryPanelProps {
@@ -15,7 +15,7 @@ interface SubcategoryPanelProps {
  * navigation experience.
  */
 export function SubcategoryPanel({ className = '' }: SubcategoryPanelProps) {
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // Early return for loading state or missing data
   if (realtimeMenuStore.isLoading || !realtimeMenuStore.categories) {

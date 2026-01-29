@@ -1,14 +1,34 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import brain from 'brain';
 import { supabase, ensureSupabaseConfigured } from './supabaseClient';
 import { toast } from 'sonner';
-import type { 
-  Category, 
-  MenuItem, 
-  ProteinType, 
-  ItemVariant, 
-  CustomizationBase 
+import type {
+  Category,
+  MenuItem,
+  ProteinType,
+  ItemVariant,
+  CustomizationBase,
+  SetMeal
 } from './menuTypes';
+import {
+  getMenuWithOrdering,
+  getProteinTypes as fetchProteinTypesFromDB,
+  getCustomizations as fetchCustomizationsFromDB,
+  getSetMeals as fetchSetMealsFromDB
+} from './supabaseQueries';
+
+// ============================================================================
+// MENU CONTEXT TYPE
+// ============================================================================
+
+/**
+ * Menu context determines data filtering:
+ * - 'admin': Shows ALL items (draft + published) for editing
+ * - 'pos': Shows only PUBLISHED items for ordering
+ * - 'online': Shows only PUBLISHED items for customer-facing menu
+ */
+export type MenuContext = 'admin' | 'pos' | 'online';
 
 /**
  * Centralized React Query hooks for all menu data fetching.
@@ -41,14 +61,16 @@ import type {
  */
 export const menuKeys = {
   all: ['menu'] as const,
-  categories: () => [...menuKeys.all, 'categories'] as const,
-  menuItems: () => [...menuKeys.all, 'items'] as const,
-  menuItemsByCategory: (categoryId: string) => [...menuKeys.menuItems(), 'by-category', categoryId] as const,
+  categories: (context?: MenuContext) => [...menuKeys.all, 'categories', { context }] as const,
+  menuItems: (context?: MenuContext) => [...menuKeys.all, 'items', { context }] as const,
+  menuItemsByCategory: (categoryId: string, context?: MenuContext) => [...menuKeys.menuItems(context), 'by-category', categoryId] as const,
   proteinTypes: () => [...menuKeys.all, 'proteins'] as const,
   itemVariants: () => [...menuKeys.all, 'variants'] as const,
-  customizations: () => [...menuKeys.all, 'customizations'] as const,
-  setMeals: () => [...menuKeys.all, 'set-meals'] as const,
-  completeMenu: () => [...menuKeys.all, 'complete'] as const,
+  customizations: (context?: MenuContext) => [...menuKeys.all, 'customizations', { context }] as const,
+  setMeals: (context?: MenuContext) => [...menuKeys.all, 'set-meals', { context }] as const,
+  completeMenu: (context?: MenuContext) => [...menuKeys.all, 'complete', { context }] as const,
+  // NEW: POS bundle key for unified data fetching
+  posBundle: (context?: MenuContext) => [...menuKeys.all, 'pos-bundle', { context }] as const,
 } as const;
 
 // ============================================================================
@@ -794,6 +816,320 @@ export function useDeleteProteinType() {
       toast.error('Failed to delete protein type');
     },
   });
+}
+
+// ============================================================================
+// MENU BUNDLE HOOK (Unified Data Fetching)
+// ============================================================================
+
+/**
+ * Menu bundle data structure - all menu data in one place
+ */
+export interface MenuBundle {
+  categories: Category[];
+  menuItems: MenuItem[];
+  itemVariants: ItemVariant[];
+  proteinTypes: ProteinType[];
+  customizations: CustomizationBase[];
+  setMeals: SetMeal[];
+  // Computed lookups for O(1) access
+  variantsByMenuItem: Record<string, ItemVariant[]>;
+  proteinTypesById: Record<string, ProteinType>;
+  menuItemsByCategory: Record<string, MenuItem[]>;
+  parentCategories: Category[];
+  childCategories: Category[];
+  subcategories: Record<string, Category[]>;
+}
+
+/**
+ * Build computed lookups from raw menu data
+ */
+function buildMenuLookups(data: {
+  categories: Category[];
+  menuItems: MenuItem[];
+  itemVariants: ItemVariant[];
+  proteinTypes: ProteinType[];
+}): Pick<MenuBundle, 'variantsByMenuItem' | 'proteinTypesById' | 'menuItemsByCategory' | 'parentCategories' | 'childCategories' | 'subcategories'> {
+  // Build variantsByMenuItem lookup
+  const variantsByMenuItem: Record<string, ItemVariant[]> = {};
+  data.itemVariants.forEach(variant => {
+    const menuItemId = variant.menu_item_id;
+    if (!variantsByMenuItem[menuItemId]) {
+      variantsByMenuItem[menuItemId] = [];
+    }
+    variantsByMenuItem[menuItemId].push(variant);
+  });
+  // Sort variants by display_order within each menu item
+  Object.keys(variantsByMenuItem).forEach(menuItemId => {
+    variantsByMenuItem[menuItemId].sort((a, b) =>
+      (a.display_order || 0) - (b.display_order || 0)
+    );
+  });
+
+  // Build proteinTypesById lookup
+  const proteinTypesById: Record<string, ProteinType> = {};
+  data.proteinTypes.forEach(proteinType => {
+    proteinTypesById[proteinType.id] = proteinType;
+  });
+
+  // Build menuItemsByCategory
+  const menuItemsByCategory: Record<string, MenuItem[]> = {};
+  data.menuItems.forEach(item => {
+    if (!menuItemsByCategory[item.category_id]) {
+      menuItemsByCategory[item.category_id] = [];
+    }
+    menuItemsByCategory[item.category_id].push(item);
+  });
+
+  // Build category hierarchy
+  const activeCategories = data.categories.filter(cat => cat.active);
+  const parentCategories = activeCategories.filter(cat => !cat.parent_category_id);
+  const childCategories = activeCategories.filter(cat => cat.parent_category_id);
+
+  const subcategories: Record<string, Category[]> = {};
+  parentCategories.forEach(parent => {
+    subcategories[parent.id] = activeCategories
+      .filter(cat => cat.parent_category_id === parent.id)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  });
+
+  return {
+    variantsByMenuItem,
+    proteinTypesById,
+    menuItemsByCategory,
+    parentCategories,
+    childCategories,
+    subcategories
+  };
+}
+
+/**
+ * Fetch complete menu bundle with auto-refresh.
+ * This is the main hook for POS/Online menu data.
+ *
+ * Benefits over realtimeMenuStore:
+ * - Single network request for all menu data
+ * - React Query handles caching, deduplication, background refetch
+ * - Context-aware filtering (admin sees all, pos/online see published only)
+ * - No module-level flags or race conditions
+ *
+ * Usage:
+ * ```ts
+ * const { data: bundle, isLoading, refetch } = useMenuBundle({ context: 'pos' });
+ * const { menuItems, categories, itemVariants } = bundle || {};
+ * ```
+ */
+export function useMenuBundle(options?: {
+  context?: MenuContext;
+  enabled?: boolean;
+}) {
+  const { context = 'pos', enabled = true } = options || {};
+  const publishedOnly = context !== 'admin';
+
+  return useQuery({
+    queryKey: menuKeys.posBundle(context),
+    queryFn: async (): Promise<MenuBundle> => {
+      console.log(`🔄 [React Query] Fetching menu bundle (context: ${context})...`);
+      await ensureSupabaseConfigured();
+
+      // Fetch all data in parallel
+      const [menuResult, proteinTypes, customizations, setMeals] = await Promise.all([
+        getMenuWithOrdering({ publishedOnly }),
+        fetchProteinTypesFromDB(),
+        fetchCustomizationsFromDB(publishedOnly),
+        fetchSetMealsFromDB(true, publishedOnly)
+      ]);
+
+      if (!menuResult.success || !menuResult.data) {
+        throw new Error('Failed to fetch menu data');
+      }
+
+      const { categories, items: menuItems } = menuResult.data;
+
+      // Extract variants from items (they come embedded in the query)
+      const itemVariants: ItemVariant[] = [];
+      menuItems.forEach((item: any) => {
+        if (item.variants && Array.isArray(item.variants)) {
+          itemVariants.push(...item.variants);
+        }
+      });
+
+      // Build computed lookups
+      const lookups = buildMenuLookups({
+        categories: categories || [],
+        menuItems: menuItems || [],
+        itemVariants,
+        proteinTypes: proteinTypes || []
+      });
+
+      const bundle: MenuBundle = {
+        categories: categories || [],
+        menuItems: menuItems || [],
+        itemVariants,
+        proteinTypes: proteinTypes || [],
+        customizations: customizations || [],
+        setMeals: setMeals || [],
+        ...lookups
+      };
+
+      console.log(`✅ [React Query] Menu bundle fetched (context: ${context}):`, {
+        categories: bundle.categories.length,
+        items: bundle.menuItems.length,
+        variants: bundle.itemVariants.length,
+        proteins: bundle.proteinTypes.length,
+        customizations: bundle.customizations.length,
+        setMeals: bundle.setMeals.length
+      });
+
+      return bundle;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - menu data is relatively static
+    gcTime: 60 * 60 * 1000, // 1 hour cache retention
+    refetchOnWindowFocus: true,
+    retry: 2,
+    enabled
+  });
+}
+
+/**
+ * Hook to get filtered menu items based on search query and category selection.
+ * This is a computed value derived from React Query data.
+ *
+ * Usage:
+ * ```ts
+ * const { filteredItems, isLoading } = useFilteredMenuItems({
+ *   context: 'pos',
+ *   searchQuery: 'chicken',
+ *   selectedCategory: 'cat-123'
+ * });
+ * ```
+ */
+export function useFilteredMenuItems(options: {
+  context?: MenuContext;
+  searchQuery?: string;
+  selectedParentCategory?: string | null;
+  selectedMenuCategory?: string | null;
+}) {
+  const {
+    context = 'pos',
+    searchQuery = '',
+    selectedParentCategory = null,
+    selectedMenuCategory = null
+  } = options;
+
+  const { data: bundle, isLoading, error } = useMenuBundle({ context });
+
+  const filteredItems = useMemo(() => {
+    if (!bundle) return [];
+
+    const { menuItems, categories, setMeals } = bundle;
+    let filtered = [...menuItems];
+
+    // Filter by category
+    if (selectedParentCategory) {
+      const childCategoryIds = categories
+        .filter(cat => cat.parent_category_id === selectedParentCategory && cat.active)
+        .map(cat => cat.id);
+
+      if (childCategoryIds.length > 0) {
+        filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
+      }
+    } else if (selectedMenuCategory) {
+      const selectedCategory = categories.find(cat => cat.id === selectedMenuCategory);
+
+      if (selectedCategory) {
+        if (selectedCategory.id.startsWith('section-') || !selectedCategory.parent_category_id) {
+          // Parent or section category - get all child items
+          const childCategoryIds = categories
+            .filter(cat => cat.parent_category_id === selectedMenuCategory && cat.active)
+            .map(cat => cat.id);
+
+          if (childCategoryIds.length > 0) {
+            filtered = filtered.filter(item => childCategoryIds.includes(item.category_id));
+          } else {
+            filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
+          }
+        } else {
+          // Regular category
+          filtered = filtered.filter(item => item.category_id === selectedMenuCategory);
+        }
+      }
+    }
+
+    // Apply fuzzy priority-based search filter
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+
+      const getCategoryName = (item: MenuItem): string => {
+        const category = categories.find(cat => cat.id === item.category_id);
+        return category?.name || '';
+      };
+
+      const scoredItems = filtered.map(item => {
+        const itemName = item.name.toLowerCase();
+        const itemDescription = (item.menu_item_description || '').toLowerCase();
+        const categoryName = getCategoryName(item).toLowerCase();
+
+        let score = 0;
+
+        if (itemName === query) {
+          score = 1000;
+        } else if (itemName.startsWith(query)) {
+          score = 800;
+        } else if (itemName.includes(` ${query}`) || itemName.includes(query)) {
+          score = 600;
+        } else if (categoryName.includes(query)) {
+          score = 400;
+        } else if (itemDescription.includes(query)) {
+          score = 200;
+        }
+
+        return { item, score };
+      });
+
+      filtered = scoredItems
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ item }) => item);
+    }
+
+    // Convert set meals to menu item format and add to results
+    const setMealsCategory = categories.find(cat => cat.name === 'SET MEALS');
+    const setMealsCategoryId = setMealsCategory?.id || 'set-meals-category';
+
+    const setMealItems: MenuItem[] = setMeals
+      .filter(setMeal => setMeal.active)
+      .map(setMeal => ({
+        id: setMeal.id,
+        name: setMeal.name,
+        menu_item_description: setMeal.description || null,
+        image_url: setMeal.hero_image_url || null,
+        spice_indicators: null,
+        category_id: setMealsCategoryId,
+        featured: false,
+        dietary_tags: null,
+        item_code: setMeal.code,
+        menu_order: 999,
+        active: setMeal.active,
+        inherit_category_print_settings: false,
+        price: setMeal.set_price,
+        set_meal_data: {
+          individual_items_total: (setMeal as any).individual_items_total,
+          savings: (setMeal as any).savings,
+          items: (setMeal as any).items
+        },
+        item_type: 'set_meal' as const
+      } as unknown as MenuItem));
+
+    return [...filtered, ...setMealItems];
+  }, [bundle, searchQuery, selectedParentCategory, selectedMenuCategory]);
+
+  return {
+    filteredItems,
+    isLoading,
+    error,
+    bundle
+  };
 }
 
 // ============================================================================

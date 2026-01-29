@@ -11,7 +11,7 @@ import {
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
 import { useRestaurantSettings } from '../utils/useRestaurantSettings';
-import { usePOSSettings } from '../utils/posSettingsStore';
+import { usePOSSettingsQuery, useUpdatePOSSettings } from '../utils/posSettingsQueries';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { RestaurantManagementModal } from './RestaurantManagementModal';
 import { isManagementAuthenticated } from '../utils/management-auth';
@@ -33,8 +33,9 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
     settings?.general?.autoApproveOrders ?? true
   );
 
-  // POS settings hook for Variant Carousel toggle
-  const { settings: posSettings, updateSettings: updatePOSSettings, isLoading: isPOSLoading } = usePOSSettings();
+  // POS settings hook for Variant Carousel toggle (React Query)
+  const { data: posSettings, isLoading: isPOSLoading } = usePOSSettingsQuery();
+  const updatePOSSettingsMutation = useUpdatePOSSettings();
   const [variantCarouselEnabled, setVariantCarouselEnabled] = useState(
     posSettings?.variant_carousel_enabled ?? true
   );
@@ -87,14 +88,11 @@ export function SettingsDropdown({ className = '' }: SettingsDropdownProps) {
         variant_carousel_enabled: enabled
       };
 
-      const success = await updatePOSSettings(updatedSettings);
-      if (!success) {
-        setVariantCarouselEnabled(!enabled);
-      }
+      await updatePOSSettingsMutation.mutateAsync(updatedSettings);
     } catch (error) {
       console.error('Failed to update variant carousel setting:', error);
       setVariantCarouselEnabled(!enabled);
-      toast.error('Failed to update setting');
+      // Toast error is handled by the mutation hook
     }
   };
 

@@ -84,7 +84,7 @@ export const FIXED_SECTIONS = [
     name: 'STARTERS',
     displayName: 'Starters',
     order: 0,
-    codePrefix: 'APP',
+    codePrefix: 'STRT',
     icon: '🥗'
   },
   {
@@ -146,11 +146,36 @@ export const FIXED_SECTIONS = [
 export type SectionId = typeof FIXED_SECTIONS[number]['id'];
 
 /**
+ * Section indicators for kitchen ticket display
+ * Used when an item is served with a different section (e.g., starter served with mains)
+ * Shows the original section in parentheses: "Chicken Tikka (st)"
+ */
+export const SECTION_INDICATORS: Record<SectionId, string> = {
+  'starters': 'st',
+  'main-course': 'main',
+  'side-dishes': 'side',
+  'accompaniments': 'acc',
+  'desserts-coffee': 'des',
+  'drinks-wine': 'drk',
+  'set-meals': 'set'
+};
+
+/**
+ * Get the indicator string for a section
+ * @param sectionId - The section ID to get indicator for
+ * @returns The indicator string (e.g., 'st' for starters)
+ */
+export function getSectionIndicator(sectionId: SectionId): string {
+  return SECTION_INDICATORS[sectionId] || '';
+}
+
+/**
  * Category-to-Section mapping rules
  * Maps database category names and code prefixes to section IDs
  */
 const CATEGORY_TO_SECTION_MAP: Record<string, SectionId> = {
   // Starters
+  'STRT': 'starters',
   'APP': 'starters',
   'ST': 'starters',
   'APPETIZERS': 'starters',

@@ -101,8 +101,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
-import { shallow } from 'zustand/shallow';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { markBillPrinted } from 'utils/supabaseQueries';
 
 // ==================== TYPE DEFINITIONS ====================
@@ -692,8 +691,7 @@ export default function DineInFullReviewModal({
 
   // ==================== MENU STORE (for image_url and category_name enrichment) ====================
   // Uses same data source as POSMenuSelector - already has resolved image URLs
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
+  const { menuItems, categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Create lookup maps for efficient enrichment
   const menuItemsMap = useMemo(() =>

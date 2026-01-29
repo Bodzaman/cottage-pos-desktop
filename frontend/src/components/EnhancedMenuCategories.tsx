@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Category, MenuItem } from '../utils/menuTypes';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 interface EnhancedMenuCategoriesProps {
   categories: Category[];
@@ -45,7 +45,7 @@ export function EnhancedMenuCategories({
   onSetMealsSelect,
   isSetMealsSelected = false
 }: EnhancedMenuCategoriesProps) {
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // No longer need expanded categories or search focus state for parent-only view

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { WifiOff } from "lucide-react";
 import { colors } from "../utils/InternalDesignSystem";
@@ -20,10 +21,22 @@ const appShellVariants = {
 function Admin() {
   const { user, isLauncherView, activeApp, openApp, backToLauncher, backToPOS, logout, isOnline, isAdminUser } = useAdminAppRouting();
 
+  // Page entrance animation state
+  const [pageVisible, setPageVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setPageVisible(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (!user) return null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: colors.background.primary }}>
+    <motion.div
+      initial={{ opacity: 0, y: 15, scale: 0.99 }}
+      animate={pageVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
+      transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+    >
+      <div className="min-h-screen" style={{ backgroundColor: colors.background.primary }}>
       {/* Offline Banner */}
       <AnimatePresence>
         {!isOnline && (
@@ -71,7 +84,8 @@ function Admin() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </motion.div>
   );
 }
 

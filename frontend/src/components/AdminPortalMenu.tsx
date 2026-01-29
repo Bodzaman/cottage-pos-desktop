@@ -31,7 +31,7 @@ import { SortableItem } from "../components/SortableItem";
 import brain from "../brain";
 import { Category, MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
 import { MenuCategory, ProteinType as MasterProteinType } from '../utils/masterTypes'; // Import MenuCategory and ProteinType for type conversion
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { supabase } from '../utils/supabaseClient';
 import { eventBus, EVENTS, emitMenuChangeEvent } from '../utils/eventBus';
 import { toast } from 'sonner';
@@ -347,7 +347,7 @@ const AdminPortalMenu: React.FC<AdminPortalMenuProps> = ({ activeSubsection }) =
   } = useMenuData();
   
   // Real-time store for POS synchronization
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // Check if dine-in price is supported
 

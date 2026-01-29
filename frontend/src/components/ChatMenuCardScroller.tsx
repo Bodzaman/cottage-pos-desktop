@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { ChatMenuCard } from './ChatMenuCard';
 import { ItemInfoModal } from './ItemInfoModal';
 import { MenuItem } from '../utils/menuTypes';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useCartStore } from 'utils/cartStore';
 import { useCartProposalActions } from 'utils/chat-store';
 import { computeUnitPrice } from 'utils/priceUtils';
@@ -22,7 +22,7 @@ interface ChatMenuCardScrollerProps {
 const MAX_VISIBLE_CARDS = 8;
 
 export function ChatMenuCardScroller({ items, menuRefs, messageId }: ChatMenuCardScrollerProps) {
-  const { menuItems, itemVariants } = useRealtimeMenuStore();
+  const { menuItems, itemVariants } = useRealtimeMenuStoreCompat({ context: 'online' });
   const { currentOrderMode } = useCartStore();
   const { setPendingCartProposal, openCartConfirmDialog } = useCartProposalActions();
 

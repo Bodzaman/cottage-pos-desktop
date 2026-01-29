@@ -12,12 +12,14 @@
  * - Close button
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Users, User, Clock, StickyNote, UserPlus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { X, Plus, Users, User, Clock, StickyNote, UserPlus, Check } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { getTimeOccupied } from 'utils/tableTypes';
+import { toast } from 'sonner';
 
 /**
  * CustomerTab - Local interface matching Supabase schema (snake_case)
@@ -53,6 +55,7 @@ interface DineInWorkspaceHeaderProps {
   onEditGuestCount: () => void;
   onOpenNotes: () => void;
   onClose: () => void;
+  onRenameTab?: (tabId: string, newName: string) => Promise<boolean>;
 
   // Staging indicator
   stagingItemCount: number;
@@ -70,10 +73,71 @@ export function DineInWorkspaceHeader({
   onEditGuestCount,
   onOpenNotes,
   onClose,
+  onRenameTab,
   stagingItemCount,
 }: DineInWorkspaceHeaderProps) {
   // Live session timer state
   const [elapsedTime, setElapsedTime] = useState<string>('');
+
+  // Inline editing state
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingTabId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingTabId]);
+
+  // Handle double-click to start editing
+  const handleStartEditing = useCallback((tab: CustomerTab) => {
+    if (!onRenameTab) return;
+    setEditingTabId(tab.id);
+    setEditingName(tab.tab_name);
+  }, [onRenameTab]);
+
+  // Handle save on Enter or blur
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingTabId || !onRenameTab) {
+      setEditingTabId(null);
+      return;
+    }
+
+    const trimmedName = editingName.trim();
+    if (!trimmedName) {
+      toast.error('Tab name cannot be empty');
+      setEditingTabId(null);
+      return;
+    }
+
+    const currentTab = customerTabs.find(t => t.id === editingTabId);
+    if (currentTab && trimmedName === currentTab.tab_name) {
+      // No change
+      setEditingTabId(null);
+      return;
+    }
+
+    const success = await onRenameTab(editingTabId, trimmedName);
+    if (success) {
+      toast.success(`Tab renamed to "${trimmedName}"`);
+    } else {
+      toast.error('Failed to rename tab');
+    }
+    setEditingTabId(null);
+  }, [editingTabId, editingName, onRenameTab, customerTabs]);
+
+  // Handle keyboard events
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setEditingTabId(null);
+    }
+  }, [handleSaveEdit]);
 
   // Update timer every 60 seconds
   useEffect(() => {
@@ -239,17 +303,57 @@ export function DineInWorkspaceHeader({
             All Items
           </Button>
 
-          {/* Customer Tab Pills */}
+          {/* Customer Tab Pills - Double-click to rename */}
           {customerTabs
             .filter(tab => tab.status === 'active')
             .map((tab) => {
               const isActive = activeTabId === tab.id;
+              const isEditing = editingTabId === tab.id;
+
+              if (isEditing) {
+                // Inline edit mode
+                return (
+                  <div
+                    key={tab.id}
+                    className="flex items-center gap-1"
+                    style={{
+                      height: '32px',
+                      backgroundColor: QSAITheme.purple.primary,
+                      borderRadius: '16px',
+                      padding: '0 4px 0 10px',
+                    }}
+                  >
+                    <User size={14} className="text-white" />
+                    <Input
+                      ref={inputRef}
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={handleSaveEdit}
+                      className="h-6 w-24 px-1 py-0 text-sm bg-white/20 border-0 text-white placeholder:text-white/50 focus-visible:ring-0"
+                      style={{
+                        borderRadius: '4px',
+                      }}
+                      maxLength={20}
+                    />
+                    <button
+                      onClick={handleSaveEdit}
+                      className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-white/20"
+                    >
+                      <Check size={12} className="text-white" />
+                    </button>
+                  </div>
+                );
+              }
+
+              // Normal pill mode - double-click to edit
               return (
                 <Button
                   key={tab.id}
                   variant={isActive ? "default" : "outline"}
                   size="sm"
                   onClick={() => onSetActiveTabId(tab.id!)}
+                  onDoubleClick={() => handleStartEditing(tab)}
                   className="flex items-center gap-1 px-3"
                   style={{
                     height: '32px',
@@ -258,6 +362,7 @@ export function DineInWorkspaceHeader({
                     color: isActive ? 'white' : QSAITheme.text.muted,
                     borderRadius: '16px'
                   }}
+                  title={onRenameTab ? 'Double-click to rename' : undefined}
                 >
                   <User size={14} />
                   {tab.tab_name}

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '../utils/supabaseClient';
 import { useCategories, menuKeys } from '../utils/menuQueries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import brain from 'brain';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -100,9 +100,9 @@ export default function CategoryForm({ onSuccess, initialData, isEditing = false
   
   // React Query: Query client for manual cache invalidation
   const queryClient = useQueryClient();
-  
+
   // Real-time store for POS synchronization
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // Filter categories for parent dropdown (exclude self when editing)
   const categories = isEditing && initialData?.id

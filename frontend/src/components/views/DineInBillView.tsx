@@ -117,34 +117,36 @@ export function DineInBillView({
   }, [getCustomerTemplateId]);
 
   // Filter items based on selected tab
+  // ALWAYS use enrichedItems (from dine_in_order_items table) - never orderItems (stale JSONB)
   const displayItems = useMemo(() => {
-    if (!selectedTab) {
-      return orderItems;
-    }
-    // Filter by customer tab
-    return enrichedItems
-      .filter(item => item.customer_tab_id === selectedTab)
-      .map(item => ({
-        id: item.id,
-        menu_item_id: item.menu_item_id,
-        name: item.item_name,
-        price: item.unit_price,
-        quantity: item.quantity,
-        variantName: item.variant_name || undefined,
-        protein_type: item.protein_type || undefined,
-        notes: item.notes || undefined,
-        modifiers: item.customizations?.map(c => ({
-          id: c.customization_id,
-          name: c.name,
-          price: c.price_adjustment || 0,
-        })) || [],
-      })) as OrderItem[];
-  }, [selectedTab, orderItems, enrichedItems]);
+    const itemsToMap = selectedTab
+      ? enrichedItems.filter(item => item.customer_tab_id === selectedTab)
+      : enrichedItems;
 
-  // Calculate totals
+    return itemsToMap.map(item => ({
+      id: item.id,
+      menu_item_id: item.menu_item_id,
+      name: item.item_name,
+      price: item.unit_price,
+      quantity: item.quantity,
+      variantName: item.variant_name || undefined,
+      protein_type: item.protein_type || undefined,
+      notes: item.notes || undefined,
+      modifiers: item.customizations?.map((c: any) => ({
+        id: c.customization_id,
+        name: c.name,
+        price: c.price_adjustment || 0,
+      })) || [],
+    })) as OrderItem[];
+  }, [selectedTab, enrichedItems]);
+
+  // Calculate totals using line_total from enrichedItems (includes customization adjustments)
   const orderTotal = useMemo(() => {
-    return displayItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  }, [displayItems]);
+    const itemsToSum = selectedTab
+      ? enrichedItems.filter(item => item.customer_tab_id === selectedTab)
+      : enrichedItems;
+    return itemsToSum.reduce((sum, item) => sum + (item.line_total || (item.unit_price * item.quantity)), 0);
+  }, [selectedTab, enrichedItems]);
 
   // Map order data to receipt format
   const mapToReceiptOrderData = () => {
@@ -265,7 +267,7 @@ export function DineInBillView({
                 }}
               >
                 <Users size={14} className="mr-1" />
-                All ({orderItems.length})
+                All ({enrichedItems.length})
               </Button>
 
               {activeTabs.map(tab => {

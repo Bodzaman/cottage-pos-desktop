@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { MenuItem, OrderItem, SetMeal } from 'utils/menuTypes';
 import { globalColors } from 'utils/QSAIDesign';
 import { toast } from 'sonner';
-import { shallow } from 'zustand/shallow';
 
 interface SetMealItem {
   id: string;
@@ -54,8 +53,7 @@ interface Props {
  */
 export function SetMealCustomizeModal({ isOpen, onClose, setMealItem, onSave }: Props) {
   // 🚀 SELECTIVE SUBSCRIPTIONS: Only subscribe to what we need
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
+  const { menuItems, categories } = useRealtimeMenuStoreCompat({ context: 'online' });
   
   // Modal state
   const [quantity, setQuantity] = useState(1);

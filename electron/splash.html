@@ -326,6 +326,34 @@
       color: rgba(16, 185, 129, 0.6);
     }
 
+    /* ── Celebration Phase ── */
+    @keyframes celebratePulse {
+      0%, 100% {
+        transform: scale(1);
+        filter: brightness(1) drop-shadow(0 0 20px rgba(124, 58, 237, 0.4));
+      }
+      50% {
+        transform: scale(1.08);
+        filter: brightness(1.2) drop-shadow(0 0 35px rgba(16, 185, 129, 0.6));
+      }
+    }
+
+    @keyframes greenShimmer {
+      0% { background-position: -100% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .nucleus-container.celebrating {
+      animation: celebratePulse 0.5s ease-in-out 2;
+    }
+
+    .loading-bar-fill.celebrating {
+      background: linear-gradient(90deg,
+        #10B981 0%, #34D399 20%, #6EE7B7 50%, #34D399 80%, #10B981 100%);
+      background-size: 200% 100%;
+      animation: greenShimmer 0.8s ease-in-out;
+    }
+
     /* ── Version Number ── */
     .version-text {
       position: fixed;
@@ -516,12 +544,18 @@
       if (el) el.textContent = 'v' + version;
     }
 
-    // Choreographed exit sequence
+    // Choreographed exit sequence with celebration phase
     function startExit() {
       // First: mark progress complete
       updateProgress(100, 'Ready');
 
-      // After a beat, start the choreographed exit
+      // Celebration phase: nucleus pulses, green shimmer
+      const nucleus = document.querySelector('.nucleus-container');
+      const fill = document.getElementById('progressFill');
+      if (nucleus) nucleus.classList.add('celebrating');
+      if (fill) fill.classList.add('celebrating');
+
+      // After celebration (400ms for 2 pulses), start choreographed exit
       setTimeout(() => {
         document.body.classList.add('exiting');
 
@@ -529,7 +563,7 @@
         setTimeout(() => {
           document.body.classList.add('fade-out');
         }, 500);
-      }, 200);
+      }, 400);
     }
 
     // Listen for signals from main process

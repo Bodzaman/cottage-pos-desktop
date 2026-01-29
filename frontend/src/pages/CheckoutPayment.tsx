@@ -15,21 +15,7 @@ import { supabase } from 'utils/supabaseClient';
 import { FaCreditCard, FaLock, FaMapMarkerAlt, FaClock, FaPhone, FaUser, FaReceipt } from 'react-icons/fa';
 import { useCartStore } from 'utils/cartStore';
 import { AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
-
-// Types
-interface RestaurantConfig {
-  name: string;
-  address: string;
-  postcode: string;
-  phone: string;
-  email?: string;
-  delivery_fee: number;
-  delivery_free_over: number;
-  delivery_min_order: number;
-  estimated_delivery_time: string;
-  estimated_collection_time: string;
-  delivery_enabled: boolean;
-}
+import { useRestaurantConfig, type RestaurantConfig } from 'utils/restaurantConfigQueries';
 
 interface CheckoutData {
   items: Array<{
@@ -142,41 +128,20 @@ export default function CheckoutPayment() {
   const clearCart = useCartStore((state) => state.clearCart);
 
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
-  const [restaurantConfig, setRestaurantConfig] = useState<RestaurantConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [configLoading, setConfigLoading] = useState(true);
-  const [configError, setConfigError] = useState<string | null>(null);
   const [orderCreated, setOrderCreated] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
-  
+
   // Prevent duplicate order creation from React StrictMode double-mount
   const isCreatingOrderRef = useRef(false);
 
-  // Load restaurant configuration on mount
-  useEffect(() => {
-    const loadRestaurantConfig = async () => {
-      try {
-        setConfigLoading(true);
-        setConfigError(null);
-        const response = await brain.get_restaurant_config();
-        const data = await response.json();
-        
-        if (data.success && data.config) {
-          setRestaurantConfig(data.config);
-        } else {
-          setConfigError(data.message || 'Failed to load restaurant configuration');
-        }
-      } catch (error) {
-        console.error('Error loading restaurant config:', error);
-        setConfigError('Unable to connect to server. Please check your internet connection.');
-      } finally {
-        setConfigLoading(false);
-      }
-    };
-
-    loadRestaurantConfig();
-  }, []);
+  // Restaurant config via React Query (cached, auto-refetch)
+  const {
+    data: restaurantConfig,
+    isLoading: configLoading,
+    error: configError
+  } = useRestaurantConfig();
 
   // Initialize checkout data from Router state OR sessionStorage (fallback)
   useEffect(() => {
@@ -543,7 +508,9 @@ export default function CheckoutPayment() {
                   
                   <div>
                     <h3 className="text-lg font-semibold text-[#EAECEF] mb-2">Configuration Error</h3>
-                    <p className="text-sm text-[#B7BDC6]">{configError}</p>
+                    <p className="text-sm text-[#B7BDC6]">
+                      {configError instanceof Error ? configError.message : 'Unable to connect to server. Please check your internet connection.'}
+                    </p>
                   </div>
                   
                   <div className="flex gap-3 pt-4">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { AppApisTableOrdersOrderItem } from '../brain/data-contracts';
 import { MenuItem, MenuCategory } from 'types';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { CustomizeOrchestratorProvider } from 'components/CustomizeOrchestrator';
 import DineInCategoryList from 'components/DineInCategoryList';
 import DineInMenuGrid from 'components/DineInMenuGrid';
@@ -34,8 +34,14 @@ interface Props {
  * Purpose: Build sample orders for thermal receipt preview
  */
 export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Props) {
-  const realtimeMenuStore = useRealtimeMenuStore();
-  const { menuItems, categories, isLoading, isConnected } = realtimeMenuStore;
+  const {
+    menuItems,
+    categories,
+    isLoading,
+    isConnected,
+    initialize,
+    forceFullRefresh
+  } = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -49,7 +55,7 @@ export function ThermalReceiptMenuModal({ isOpen, onClose, onOrderComplete }: Pr
         setIsInitializing(true);
         try {
           console.log('🔄 ThermalReceiptMenuModal: Initializing menu store...');
-          await realtimeMenuStore.initialize();
+          await initialize();
           console.log('✅ ThermalReceiptMenuModal: Menu store initialized successfully');
         } catch (error) {
           console.error('❌ ThermalReceiptMenuModal: Failed to initialize menu store:', error);

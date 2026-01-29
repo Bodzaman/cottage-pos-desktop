@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -141,6 +141,41 @@ export default function POSLogin() {
     pinEnabled && lastUserId ? 'pin-login' : 'password'
   );
 
+  // Page animation states
+  const [pageVisible, setPageVisible] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+
+  // Track if this is the initial mount (for PIN pad animation timing)
+  // Only the first render after splash needs the long delay
+  const isInitialMount = useRef(true);
+  const isElectron = !!(window as any).electronAPI;
+
+  // Trigger page entrance animation after mount
+  // In Electron, delay longer to account for splash-to-main window transition
+  // The splash takes ~1000ms to fade after main window shows
+  useEffect(() => {
+    const delay = isElectron ? 800 : 50;
+    const timer = setTimeout(() => setPageVisible(true), delay);
+    return () => clearTimeout(timer);
+  }, [isElectron]);
+
+  // After initial entrance animation completes, mark as no longer initial mount
+  // This ensures PIN pad in subsequent views (like PIN setup) doesn't wait
+  useEffect(() => {
+    if (pageVisible && isInitialMount.current) {
+      const timer = setTimeout(() => {
+        isInitialMount.current = false;
+      }, 500); // Give time for entrance animation to complete
+      return () => clearTimeout(timer);
+    }
+  }, [pageVisible]);
+
+  // Helper for animated navigation - triggers exit then navigates
+  const navigateWithExit = useCallback((path: string) => {
+    setIsExiting(true);
+    setTimeout(() => navigate(path, { replace: true }), 350);
+  }, [navigate]);
+
   // Helper function to get redirect destination based on role
   const getRedirectPath = (role: UserRole | null | undefined): string => {
     return role === 'admin' ? '/admin' : '/pos-desktop';
@@ -188,6 +223,11 @@ export default function POSLogin() {
 
     setShakeError(false);
 
+    // CRITICAL: Block redirect BEFORE login() because Zustand triggers synchronous re-renders.
+    // When login() calls set({ isAuthenticated: true }), the redirect effect runs immediately
+    // before this function can continue. We must set the ref first to prevent premature redirect.
+    pinSetupActiveRef.current = true;
+
     try {
       await login(username, password);
 
@@ -196,11 +236,11 @@ export default function POSLogin() {
       const userRole = currentUser?.role;
       const redirectPath = getRedirectPath(userRole);
 
-      // If PIN not yet configured, prompt to set one
-      // For admin users, PIN is MANDATORY (no skip option)
-      if (!pinEnabled) {
-        // Block redirect immediately via ref (synchronous, no batching)
-        pinSetupActiveRef.current = true;
+      // Check PIN status from store (not component snapshot which is stale)
+      const currentPinEnabled = usePOSAuth.getState().pinEnabled;
+
+      if (!currentPinEnabled) {
+        // PIN not configured - show setup UI (ref already blocks redirect)
         setLoginSuccess(true);
         if (userRole === 'admin') {
           toast.success('Login successful — PIN setup required for offline access');
@@ -211,11 +251,14 @@ export default function POSLogin() {
         return;
       }
 
-      // PIN already configured — redirect based on role
+      // PIN already configured — allow redirect
+      pinSetupActiveRef.current = false;
       setLoginSuccess(true);
       toast.success('Welcome back!');
-      navigate(redirectPath, { replace: true });
+      navigateWithExit(redirectPath);
     } catch (err) {
+      // Reset ref on error so user can retry
+      pinSetupActiveRef.current = false;
       console.error('Login failed:', err);
       toast.error(err instanceof Error ? err.message : 'Invalid username or password');
       setShakeError(true);
@@ -227,7 +270,15 @@ export default function POSLogin() {
   const isDisabled = isLoading || !username || !password || loginSuccess;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.98 }}
+      animate={isExiting
+        ? { opacity: 0, y: -20, scale: 0.96 }
+        : pageVisible
+          ? { opacity: 1, y: 0, scale: 1 }
+          : {}
+      }
+      transition={{ duration: 0.4, ease: EASE }}
       className="h-dvh w-screen flex flex-col items-center justify-end relative overflow-hidden"
       style={{
         background: '#000000',
@@ -291,13 +342,14 @@ export default function POSLogin() {
               <PINPad
                 mode="login"
                 staffName={lastUserName || undefined}
+                delayAnimation={isInitialMount.current && isElectron}
                 onSubmit={async (pin) => {
                   const success = await loginWithPin(pin);
                   if (success) {
                     toast.success('Welcome back!');
                     const currentUser = usePOSAuth.getState().user;
                     const redirectPath = getRedirectPath(currentUser?.role || lastUserRole);
-                    setTimeout(() => navigate(redirectPath, { replace: true }), 300);
+                    setTimeout(() => navigateWithExit(redirectPath), 200);
                   }
                   return success;
                 }}
@@ -342,6 +394,7 @@ export default function POSLogin() {
               </div>
               <PINPad
                 mode="set"
+                delayAnimation={false}
                 onSubmit={async (pin) => {
                   const success = await setPin(pin);
                   if (success) {
@@ -349,7 +402,7 @@ export default function POSLogin() {
                     pinSetupActiveRef.current = false;
                     const currentUser = usePOSAuth.getState().user;
                     const redirectPath = getRedirectPath(currentUser?.role);
-                    setTimeout(() => navigate(redirectPath, { replace: true }), 500);
+                    setTimeout(() => navigateWithExit(redirectPath), 300);
                   }
                   return success;
                 }}
@@ -362,7 +415,7 @@ export default function POSLogin() {
                     pinSetupActiveRef.current = false;
                     const currentUser = usePOSAuth.getState().user;
                     const redirectPath = getRedirectPath(currentUser?.role);
-                    navigate(redirectPath, { replace: true });
+                    navigateWithExit(redirectPath);
                   }}
                   className="w-full text-center text-xs mt-4 transition-colors duration-200"
                   style={{ color: colors.text.muted }}
@@ -774,6 +827,6 @@ export default function POSLogin() {
           </span>
         </motion.footer>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -70,6 +70,11 @@ export interface OrderItem {
 
   // Kitchen status tracking
   status?: 'NEW' | 'PREPARING' | 'READY' | 'SERVED';
+
+  // Section override for "Serve With" feature
+  // When set, item prints/displays in this section instead of natural category section
+  serveWithSectionId?: string | null;
+  serve_with_section_id?: string | null; // Snake_case alias
 }
 
 /**
@@ -337,6 +342,7 @@ export function mapApiOrderItemToOrderItem(apiItem: any): OrderItem {
     customerTabId: apiItem.customer_tab_id,
     kitchenDisplayName: apiItem.kitchen_display_name,
     status: apiItem.status,
+    serveWithSectionId: apiItem.serve_with_section_id,
   };
 }
 
@@ -387,6 +393,7 @@ export function mapOrderItemToApi(item: OrderItem): any {
     customer_tab_id: item.customerTabId,
     kitchen_display_name: item.kitchenDisplayName,
     status: item.status,
+    serve_with_section_id: item.serveWithSectionId,
   };
 }
 

@@ -6,11 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Star } from 'lucide-react';
 import { MenuItem, OrderItem } from 'types';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { QSAITheme } from '../utils/QSAIDesign';
 import { POSMenuItemCard } from './POSMenuItemCard';
 import { PremiumMenuCard } from './PremiumMenuCard';
-import { shallow } from 'zustand/shallow';
 
 interface Props {
   selectedCategory: string | null;
@@ -31,15 +30,7 @@ export function DineInMenuGrid({
   className
 }: Props) {
   // ✅ USE STORE'S FILTERED ITEMS: Matches POSMenuSelector pattern
-  const { filteredMenuItems, isLoading, itemVariants, proteinTypes } = useRealtimeMenuStore(
-    (state) => ({
-      filteredMenuItems: state.filteredMenuItems,
-      isLoading: state.isLoading,
-      itemVariants: state.itemVariants,
-      proteinTypes: state.proteinTypes
-    }),
-    shallow
-  );
+  const { filteredMenuItems, isLoading, itemVariants, proteinTypes } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 

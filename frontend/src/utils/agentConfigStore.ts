@@ -1,9 +1,14 @@
 /**
  * Unified Agent Config Store
  *
- * Single source of truth for AI agent configuration.
- * Provides reactive updates when config changes via Supabase Realtime.
- * Used by both admin wizard (AIStaffManagementHub) AND customer chat (ChatLargeModal).
+ * @deprecated Phase 7: Use React Query hooks from agentQueries.ts instead.
+ * This store is kept for backward compatibility with imperative access patterns
+ * (e.g., chat-store.ts using .getState()).
+ *
+ * New code should use:
+ * - useAgentConfigQuery() for React components
+ * - useAgentIdentityQuery(), useAgentChatConfigQuery(), useAgentVoiceConfigQuery() for specific slices
+ * - useAgentRealtimeSync() for realtime updates
  *
  * Phase 6: AI Chat Frontend Architecture Fix
  */
@@ -31,6 +36,10 @@ export interface AgentConfig {
     nationality?: string;
     core_traits?: string;
   };
+
+  // Template system (Phase 0.5)
+  template_id?: string | null;
+  personality_traits?: string[];
 
   // Channel settings (chat and voice)
   channel_settings: {
@@ -95,6 +104,8 @@ interface AgentConfigStore {
     system_prompt?: string;
     first_response?: string;
     voice_model?: string;
+    agent_name?: string;
+    personality_traits?: string[];
   } | null;
 
   getPublishState: () => {
@@ -237,6 +248,8 @@ export const useAgentConfigStore = create<AgentConfigStore>()(
         system_prompt: voice?.system_prompt,
         first_response: voice?.first_response,
         voice_model: voice?.voice_model,
+        agent_name: config.agent_name,
+        personality_traits: config.personality_traits,
       };
     },
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MenuCategory } from '../utils/menuTypes';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { FIXED_SECTIONS } from 'utils/sectionMapping';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 
 interface Props {

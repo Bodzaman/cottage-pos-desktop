@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { MenuItem, ItemVariant, OrderItem } from '../utils/menuTypes';
 import { Minus, Plus, Sliders } from 'lucide-react';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { cn } from '../utils/cn';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { StaffCustomizationModal } from './StaffCustomizationModal';
+import { StaffUnifiedCustomizationModal } from './StaffUnifiedCustomizationModal';
 
 // POS Purple Theme Colors
 const POS_COLORS = {
@@ -48,7 +48,7 @@ export function StaffVariantSelector({
   onAddToOrder,
   orderType
 }: StaffVariantSelectorProps) {
-  const { proteinTypes } = useRealtimeMenuStore();
+  const { proteinTypes } = useRealtimeMenuStoreCompat({ context: 'pos' });
   const [variantQuantities, setVariantQuantities] = useState<VariantQuantities>({});
   const [variants, setVariants] = useState<ItemVariant[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<ItemVariant | null>(null);
@@ -348,15 +348,16 @@ export function StaffVariantSelector({
         </DialogContent>
       </Dialog>
 
-      {/* Staff Customization Modal - Opens when "Customise & Add" is clicked */}
+      {/* Staff Customization Modal - Updated to use Unified Modal */}
       {selectedVariant && (
-        <StaffCustomizationModal
+        <StaffUnifiedCustomizationModal
           item={item}
-          variant={selectedVariant}
+          itemVariants={variants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
           onConfirm={handleAddToOrderFromModal}
           orderType={orderType}
+          initialVariant={selectedVariant}
           initialQuantity={variantQuantities[selectedVariant.id] || 1}
         />
       )}

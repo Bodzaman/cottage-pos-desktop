@@ -34,7 +34,8 @@ import {
 import type { RestaurantTable } from '../utils/useRestaurantTables';
 import { getTimeOccupied } from '../utils/tableTypes';
 import { buildLinkedGroupColorMap, getLinkedTableColorFromMap, type LinkedTableColor } from '../utils/linkedTableColors';
-import { usePOSSettingsWithAutoFetch, DEFAULT_URGENCY_SETTINGS as POS_DEFAULT_URGENCY_SETTINGS } from '../utils/posSettingsStore';
+import { DEFAULT_URGENCY_SETTINGS as POS_DEFAULT_URGENCY_SETTINGS } from '../utils/posSettingsStore';
+import { usePOSSettingsQuery } from '../utils/posSettingsQueries';
 
 interface DineInTableDashboardProps {
   tables: RestaurantTable[];
@@ -199,8 +200,8 @@ export function DineInTableDashboard({
   // NEW: Get active orders for linking data (orders are source of truth)
   const { orders: activeOrders } = useActiveOrders();
 
-  // Get POS settings for urgency thresholds
-  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
+  // Get POS settings for urgency thresholds (React Query)
+  const { data: posSettings } = usePOSSettingsQuery();
   const urgencySettings = posSettings?.urgency_settings || DEFAULT_URGENCY_SETTINGS;
 
   // Derive enriched table data for all tables

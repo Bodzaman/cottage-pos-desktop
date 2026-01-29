@@ -43,6 +43,7 @@ import { CustomerDetailsSection } from 'components/CustomerDetailsSection';
 import { TimingScheduleSection } from 'components/TimingScheduleSection';
 import { SpecialInstructionsSection } from 'components/SpecialInstructionsSection';
 import { toast } from 'sonner';
+import { CMS_FONT_OPTIONS, loadFont, getFontFamily } from 'utils/cmsFonts';
 
 interface Props {
   className?: string;
@@ -115,6 +116,13 @@ export function ReceiptDesignerTabs({ className = '', isLoadingSettings = false,
     updateFormData({ orderItems: updatedItems });
     toast.success('Item removed');
   };
+
+  // Load business name font when it changes
+  useEffect(() => {
+    if (formData.businessNameFont) {
+      loadFont(formData.businessNameFont);
+    }
+  }, [formData.businessNameFont]);
 
   return (
     <div className={className}>
@@ -241,18 +249,94 @@ export function ReceiptDesignerTabs({ className = '', isLoadingSettings = false,
                     />
                   </div>
                   <div>
-                    <Label style={{ color: QSAITheme.text.secondary }}>VAT Number *</Label>
-                    <Input
-                      value={formData.vatNumber}
-                      onChange={(e) => updateField('vatNumber', e.target.value)}
-                      placeholder="GB123456789"
+                    <Label style={{ color: QSAITheme.text.secondary }}>Business Name Font</Label>
+                    <Select
+                      value={formData.businessNameFont || 'old-english'}
+                      onValueChange={(val) => updateField('businessNameFont', val)}
+                    >
+                      <SelectTrigger
+                        style={{
+                          backgroundColor: QSAITheme.background.secondary,
+                          border: `1px solid ${QSAITheme.border.light}`,
+                          color: QSAITheme.text.primary,
+                          fontFamily: getFontFamily(formData.businessNameFont || 'old-english')
+                        }}
+                      >
+                        <SelectValue placeholder="Select font style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CMS_FONT_OPTIONS.map((font) => (
+                          <SelectItem
+                            key={font.id}
+                            value={font.id}
+                            style={{ fontFamily: font.family }}
+                          >
+                            {font.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
+                      Decorative font for the restaurant name
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label style={{ color: QSAITheme.text.secondary }}>Business Name Font Size</Label>
+                  <div className="flex items-center gap-3 mt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateField('businessNameFontSize', Math.max(12, (formData.businessNameFontSize || 18) - 1))}
+                      disabled={(formData.businessNameFontSize || 18) <= 12}
                       style={{
                         backgroundColor: QSAITheme.background.secondary,
                         border: `1px solid ${QSAITheme.border.light}`,
                         color: QSAITheme.text.primary
                       }}
-                    />
+                    >
+                      <span className="text-lg font-bold">−</span>
+                    </Button>
+                    <span
+                      className="text-sm font-medium min-w-[50px] text-center"
+                      style={{ color: QSAITheme.text.primary }}
+                    >
+                      {formData.businessNameFontSize || 18}px
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateField('businessNameFontSize', Math.min(32, (formData.businessNameFontSize || 18) + 1))}
+                      disabled={(formData.businessNameFontSize || 18) >= 32}
+                      style={{
+                        backgroundColor: QSAITheme.background.secondary,
+                        border: `1px solid ${QSAITheme.border.light}`,
+                        color: QSAITheme.text.primary
+                      }}
+                    >
+                      <span className="text-lg font-bold">+</span>
+                    </Button>
                   </div>
+                  <p className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
+                    Adjust the size of the restaurant name (12-32px)
+                  </p>
+                </div>
+
+                <div>
+                  <Label style={{ color: QSAITheme.text.secondary }}>VAT Number *</Label>
+                  <Input
+                    value={formData.vatNumber}
+                    onChange={(e) => updateField('vatNumber', e.target.value)}
+                    placeholder="GB123456789"
+                    style={{
+                      backgroundColor: QSAITheme.background.secondary,
+                      border: `1px solid ${QSAITheme.border.light}`,
+                      color: QSAITheme.text.primary
+                    }}
+                  />
                 </div>
 
                 <div>

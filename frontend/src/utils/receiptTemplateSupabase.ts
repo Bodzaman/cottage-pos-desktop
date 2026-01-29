@@ -18,6 +18,7 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  warning?: string;  // For partial success scenarios (e.g., kitchen variant failed)
 }
 
 // Fields that should sync from parent to kitchen variant
@@ -161,6 +162,13 @@ export const createReceiptTemplate = async (
 ): Promise<ApiResponse<Template>> => {
   console.log('💾 [Supabase Direct] create_receipt_template called:', name);
   try {
+    // Get current user for user_id field
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('❌ [Supabase Direct] No authenticated user:', userError);
+      return { success: false, error: 'Authentication required to create template' };
+    }
+
     // Ensure we're creating a customer template (not a kitchen variant)
     const customerDesignData = {
       ...design_data,
@@ -174,7 +182,8 @@ export const createReceiptTemplate = async (
         name,
         description,
         design_data: customerDesignData,
-        paper_width
+        paper_width,
+        user_id: user.id
       })
       .select()
       .single();
@@ -195,12 +204,16 @@ export const createReceiptTemplate = async (
         description: `Kitchen variant of ${name}`,
         design_data: kitchenDesignData,
         paper_width,
-        parent_template_id: data.id
+        parent_template_id: data.id,
+        user_id: user.id
       });
+
+    // Track if kitchen variant creation failed
+    let kitchenVariantWarning: string | undefined;
 
     if (kitchenError) {
       console.warn('⚠️ [Supabase Direct] Failed to create kitchen variant:', kitchenError);
-      // Don't fail the whole operation - customer template was created successfully
+      kitchenVariantWarning = 'Template created but kitchen variant failed. Kitchen printing may not work correctly.';
     } else {
       console.log('✅ [Supabase Direct] Auto-created kitchen variant:', kitchenName);
     }
@@ -218,7 +231,11 @@ export const createReceiptTemplate = async (
     };
 
     console.log('✅ [Supabase Direct] Created template:', template.id);
-    return { success: true, data: template };
+    return {
+      success: true,
+      data: template,
+      warning: kitchenVariantWarning
+    };
   } catch (error) {
     console.error('❌ [Supabase Direct] Exception creating receipt template:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -262,46 +279,62 @@ export const updateReceiptTemplate = async (
       return { success: false, error: error.message };
     }
 
+    // Track sync warnings
+    let syncWarning: string | undefined;
+
     // If this is a parent template (not a kitchen variant), sync to kitchen variant
     if (!data.parent_template_id && updates.design_data) {
-      // Find the kitchen variant
-      const { data: kitchenVariant } = await supabase
-        .from('receipt_templates')
-        .select('*')
-        .eq('parent_template_id', templateId)
-        .single();
-
-      if (kitchenVariant) {
-        // Sync shared fields to kitchen variant
-        const syncedKitchenData = syncKitchenVariantDesignData(
-          kitchenVariant.design_data,
-          updates.design_data
-        );
-
-        const kitchenUpdateData: any = {
-          design_data: syncedKitchenData
-        };
-
-        // Sync name if changed
-        if (updates.name !== undefined) {
-          kitchenUpdateData.name = `${updates.name} - KITCHEN`;
-        }
-
-        // Sync paper width if changed
-        if (updates.paper_width !== undefined) {
-          kitchenUpdateData.paper_width = updates.paper_width;
-        }
-
-        const { error: syncError } = await supabase
+      try {
+        // Find the kitchen variant
+        const { data: kitchenVariant, error: findError } = await supabase
           .from('receipt_templates')
-          .update(kitchenUpdateData)
-          .eq('id', kitchenVariant.id);
+          .select('*')
+          .eq('parent_template_id', templateId)
+          .single();
 
-        if (syncError) {
-          console.warn('⚠️ [Supabase Direct] Failed to sync kitchen variant:', syncError);
-        } else {
-          console.log('✅ [Supabase Direct] Synced kitchen variant:', kitchenVariant.id);
+        if (findError) {
+          // PGRST116 = no rows returned - kitchen variant doesn't exist
+          if (findError.code !== 'PGRST116') {
+            console.warn('⚠️ [Supabase Direct] Error finding kitchen variant:', findError);
+            syncWarning = 'Could not sync kitchen variant - it may be out of sync.';
+          }
+          // If PGRST116 (not found), that's expected for some templates - no warning needed
+        } else if (kitchenVariant) {
+          // Sync shared fields to kitchen variant
+          const syncedKitchenData = syncKitchenVariantDesignData(
+            kitchenVariant.design_data,
+            updates.design_data
+          );
+
+          const kitchenUpdateData: any = {
+            design_data: syncedKitchenData
+          };
+
+          // Sync name if changed
+          if (updates.name !== undefined) {
+            kitchenUpdateData.name = `${updates.name} - KITCHEN`;
+          }
+
+          // Sync paper width if changed
+          if (updates.paper_width !== undefined) {
+            kitchenUpdateData.paper_width = updates.paper_width;
+          }
+
+          const { error: syncError } = await supabase
+            .from('receipt_templates')
+            .update(kitchenUpdateData)
+            .eq('id', kitchenVariant.id);
+
+          if (syncError) {
+            console.warn('⚠️ [Supabase Direct] Failed to sync kitchen variant:', syncError);
+            syncWarning = 'Template saved but kitchen variant sync failed. Kitchen receipts may show old data.';
+          } else {
+            console.log('✅ [Supabase Direct] Synced kitchen variant:', kitchenVariant.id);
+          }
         }
+      } catch (syncException) {
+        console.warn('⚠️ [Supabase Direct] Exception during kitchen variant sync:', syncException);
+        syncWarning = 'Template saved but kitchen variant sync failed unexpectedly.';
       }
     }
 
@@ -318,7 +351,11 @@ export const updateReceiptTemplate = async (
     };
 
     console.log('✅ [Supabase Direct] Updated template:', template.id);
-    return { success: true, data: template };
+    return {
+      success: true,
+      data: template,
+      warning: syncWarning
+    };
   } catch (error) {
     console.error('❌ [Supabase Direct] Exception updating receipt template:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -327,6 +364,9 @@ export const updateReceiptTemplate = async (
 
 /**
  * Delete a receipt template
+ * Handles cascading deletes for:
+ * 1. Kitchen variant (if this is a parent template)
+ * 2. Template assignments referencing this template
  */
 export const deleteReceiptTemplate = async (templateId: string): Promise<ApiResponse<void>> => {
   console.log('🗑️ [Supabase Direct] delete_receipt_template called:', templateId);
@@ -335,6 +375,40 @@ export const deleteReceiptTemplate = async (templateId: string): Promise<ApiResp
       return { success: false, error: 'Template ID required' };
     }
 
+    // Step 1: Delete kitchen variant if this is a parent template
+    const { error: kitchenDeleteError } = await supabase
+      .from('receipt_templates')
+      .delete()
+      .eq('parent_template_id', templateId);
+
+    if (kitchenDeleteError) {
+      console.warn('⚠️ [Supabase Direct] Failed to delete kitchen variant:', kitchenDeleteError);
+      // Continue anyway - kitchen variant may not exist
+    } else {
+      console.log('✅ [Supabase Direct] Deleted kitchen variant for parent:', templateId);
+    }
+
+    // Step 2: Clear template assignments referencing this template
+    // Set to null rather than delete to preserve assignment records
+    const { error: assignmentError1 } = await supabase
+      .from('template_assignments')
+      .update({ customer_template_id: null })
+      .eq('customer_template_id', templateId);
+
+    if (assignmentError1) {
+      console.warn('⚠️ [Supabase Direct] Failed to clear customer template assignments:', assignmentError1);
+    }
+
+    const { error: assignmentError2 } = await supabase
+      .from('template_assignments')
+      .update({ kitchen_template_id: null })
+      .eq('kitchen_template_id', templateId);
+
+    if (assignmentError2) {
+      console.warn('⚠️ [Supabase Direct] Failed to clear kitchen template assignments:', assignmentError2);
+    }
+
+    // Step 3: Delete the template itself
     const { error } = await supabase
       .from('receipt_templates')
       .delete()
@@ -345,7 +419,7 @@ export const deleteReceiptTemplate = async (templateId: string): Promise<ApiResp
       return { success: false, error: error.message };
     }
 
-    console.log('✅ [Supabase Direct] Deleted template:', templateId);
+    console.log('✅ [Supabase Direct] Deleted template and cleaned up references:', templateId);
     return { success: true };
   } catch (error) {
     console.error('❌ [Supabase Direct] Exception deleting receipt template:', error);

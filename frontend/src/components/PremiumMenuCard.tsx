@@ -19,8 +19,8 @@ import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
 import { CardDesignTokens } from 'utils/cardDesignTokens';
 import { DescriptionPopover } from 'components/DescriptionPopover';
 import { CompactProteinChips } from 'components/CompactProteinChips';
-import { StaffCustomizationModal, SelectedCustomization as StaffSelectedCustomization } from 'components/StaffCustomizationModal';
-import { CustomerCustomizationModal } from 'components/CustomerCustomizationModal';
+import { StaffUnifiedCustomizationModal, SelectedCustomization as StaffSelectedCustomization } from 'components/StaffUnifiedCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization as CustomerSelectedCustomization } from 'components/CustomerUnifiedCustomizationModal';
 import { CustomerVariantSelector } from 'components/CustomerVariantSelector';
 import { StaffVariantSelector } from 'components/StaffVariantSelector';
 import { VariantPopover } from 'components/VariantPopover';
@@ -28,8 +28,7 @@ import { colors } from 'utils/designSystem';
 import { toast } from 'sonner';
 import { cn } from 'utils/cn';
 import { DescriptionModal } from 'components/DescriptionModal';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
-import { shallow } from 'zustand/shallow';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useMenuItemImage } from 'utils/useMenuItemImage';
 
 // Helper function to check if a variant has any food details configured
@@ -105,14 +104,8 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
 }: PremiumMenuCardProps) {
   // 🚀 OPTIMIZED SUBSCRIPTIONS: Subscribe to item-specific data only
   // This prevents re-renders when OTHER items' variants change
-  const storeVariants = useRealtimeMenuStore(
-    state => state.variantsByMenuItem[item.id],
-    shallow
-  );
-  const storeProteinTypes = useRealtimeMenuStore(
-    state => state.proteinTypes,
-    shallow
-  );
+  const { variantsByMenuItem, proteinTypes: storeProteinTypes } = useRealtimeMenuStoreCompat({ context: 'online' });
+  const storeVariants = variantsByMenuItem[item.id];
   
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -564,14 +557,9 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
     setIsCustomizationModalOpen(true);
   };
 
+  // Always open unified customization modal - it handles both single and multi-variant items
   const handleCustomise = () => {
-    if (isMultiVariant) {
-      // For variant items, open the protein selection modal
-      setIsVariantSelectorOpen(true);
-    } else {
-      // For single items, open customization modal directly
-      setIsCustomizationModalOpen(true);
-    }
+    setIsCustomizationModalOpen(true);
   };
 
   // Handle info click to show details/modal
@@ -967,24 +955,24 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
           </button>
         </div>
 
-        {/* Modals */}
+        {/* Modals - Updated to use Unified Modals */}
         {orderType ? (
-          // POS Context: Use StaffCustomizationModal
-          <StaffCustomizationModal
+          // POS Context: Use StaffUnifiedCustomizationModal
+          <StaffUnifiedCustomizationModal
             item={item}
-            variant={selectedVariant || undefined}
+            itemVariants={activeVariants}
             isOpen={isCustomizationModalOpen}
             onClose={() => setIsCustomizationModalOpen(false)}
             onConfirm={(item, quantity, variant, customizations, notes) => {
               // Convert to POS order item format and call onAddToOrder
               if (onAddToOrder) {
-                const price = variant 
-                  ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) : 
+                const price = variant
+                  ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) :
                      orderType === 'DINE-IN' ? (variant.price_dine_in ?? variant.price) : variant.price)
                   : (orderType === 'DELIVERY' ? (item.price_delivery || item.price_takeaway || item.price || 0) :
-                     orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) : 
+                     orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) :
                      (item.price_takeaway || item.price || 0));
-                
+
                 const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
                 const totalPrice = (price + customizationsTotal) * quantity;
 
@@ -1003,25 +991,26 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
                     price: c.price_adjustment
                   })) || []
                 };
-                
+
                 onAddToOrder(orderItem);
               }
               setIsCustomizationModalOpen(false);
             }}
             orderType={orderType}
+            initialVariant={selectedVariant}
           />
         ) : (
-          // OnlineOrders Context: Use CustomerCustomizationModal
-          <CustomerCustomizationModal
+          // OnlineOrders Context: Use CustomerUnifiedCustomizationModal
+          <CustomerUnifiedCustomizationModal
+            item={item}
+            itemVariants={activeVariants}
             isOpen={isCustomizationModalOpen}
             onClose={() => setIsCustomizationModalOpen(false)}
-            item={item}
-            variant={selectedVariant || undefined}
             addToCart={(item, quantity, variant, customizations, notes) => {
-              // ✅ NEW SIGNATURE: Direct pass-through
               handleAddToCartWithCustomizations(item, quantity, variant, customizations, notes);
             }}
             mode={mode === 'dine-in' ? 'collection' : mode}
+            initialVariant={selectedVariant}
           />
         )}
         {orderType ? (
@@ -1585,24 +1574,24 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
         )}
       </div>
       
-      {/* Customization Modal - Conditionally render based on context */}
+      {/* Customization Modal - Updated to use Unified Modals */}
       {orderType ? (
-        // POS Context: Use StaffCustomizationModal
-        <StaffCustomizationModal
+        // POS Context: Use StaffUnifiedCustomizationModal
+        <StaffUnifiedCustomizationModal
           item={item}
-          variant={isMultiVariant ? selectedVariant : null}
+          itemVariants={activeVariants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
           onConfirm={(item, quantity, variant, customizations, notes) => {
             // Convert to POS order item format and call onAddToOrder
             if (onAddToOrder) {
-              const price = variant 
-                ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) : 
+              const price = variant
+                ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) :
                    orderType === 'DINE-IN' ? (variant.price_dine_in ?? variant.price) : variant.price)
                 : (orderType === 'DELIVERY' ? (item.price_delivery || item.price_takeaway || item.price || 0) :
-                   orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) : 
+                   orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) :
                    (item.price_takeaway || item.price || 0));
-              
+
               const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
               const totalPrice = (price + customizationsTotal) * quantity;
 
@@ -1627,19 +1616,20 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
             setIsCustomizationModalOpen(false);
           }}
           orderType={orderType}
+          initialVariant={isMultiVariant ? selectedVariant : undefined}
         />
       ) : (
-        // OnlineOrders Context: Use CustomerCustomizationModal
-        <CustomerCustomizationModal
+        // OnlineOrders Context: Use CustomerUnifiedCustomizationModal
+        <CustomerUnifiedCustomizationModal
           item={item}
-          variant={isMultiVariant ? selectedVariant : null}
+          itemVariants={activeVariants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
           addToCart={(item, quantity, variant, customizations, notes) => {
-            // ✅ NEW SIGNATURE: Direct pass-through
             handleAddToCartWithCustomizations(item, quantity, variant, customizations, notes);
           }}
           mode={mode === 'dine-in' ? 'collection' : mode}
+          initialVariant={isMultiVariant ? selectedVariant : undefined}
         />
       )}
 

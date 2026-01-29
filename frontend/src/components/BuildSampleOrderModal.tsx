@@ -8,6 +8,7 @@ import { Plus, X, Edit2, Trash2, Users, ShoppingCart, Table, ArrowRight, Link2 }
 import { toast } from 'sonner';
 import { DineInCategoryList } from './DineInCategoryList';
 import { DineInMenuGrid } from './DineInMenuGrid';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { OrderItem, CustomerTabInfo } from '../utils/receiptDesignerTypes';
@@ -51,7 +52,7 @@ export function BuildSampleOrderModal({
   onOrderBuilt,
   initialOrderItems = []
 }: Props) {
-  const { categories, menuItems } = useRealtimeMenuStore();
+  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // ✅ Initialize store when modal opens (matches POSDesktop pattern)
   useEffect(() => {

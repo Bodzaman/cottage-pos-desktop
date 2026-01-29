@@ -3,12 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams, useSearchParams as useSearchParamsHook, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { ShoppingCart, Filter, Grid, List, ArrowUp, Mic, Phone, MessageCircle, Plus, Minus, Search, Volume2, VolumeX, Shield, Users, MicOff, Home, Grid3X3, ChevronUp, X } from "lucide-react";
-import { shallow } from 'zustand/shallow';
 // TODO: Removed unused authStore, voiceStore, brainStore imports
 import { useCartStore } from 'utils/cartStore';
 import { useSimpleAuth } from 'utils/simple-auth-context';
 import { useVoiceAgentStore } from 'utils/voiceAgentStore';
-import { useRealtimeMenuStore, setMenuStoreContext } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 // TODO: Removed unused useSupabaseMenuData import
@@ -56,14 +55,8 @@ import { PAGE_SEO } from 'utils/seoData';
 type ViewMode = 'gallery' | 'compact';
 
 export default function OnlineOrders() {
-  // 🎯 DRAFT/PUBLISH WORKFLOW: Set Online context to only see published menu items
-  // This must be called BEFORE any store initialization AND must trigger a fresh data load
-  useEffect(() => {
-    setMenuStoreContext('online');
-    // Force fresh data load with publishedOnly=true filter
-    // This ensures Online Orders doesn't show draft items from cached admin data
-    useRealtimeMenuStore.getState().initialize();
-  }, []);
+  // 🎯 DRAFT/PUBLISH WORKFLOW: Context is now passed directly via useRealtimeMenuStoreCompat({ context: 'online' })
+  // The compat layer handles initialization and filtering for published-only menu items
 
   // 🎯 PERFORMANCE: Mark page start immediately
   if (typeof performance !== 'undefined') {
@@ -115,15 +108,17 @@ export default function OnlineOrders() {
   // **NEW: Error state for menu initialization**
   const [error, setError] = useState<string | null>(null);
   
-  // **PERFORMANCE FIX (MYA-1277): Use selective subscriptions instead of full store destructuring**
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
-  const itemVariants = useRealtimeMenuStore(state => state.itemVariants, shallow);
-  const proteinTypes = useRealtimeMenuStore(state => state.proteinTypes, shallow);
-  const isMenuLoading = useRealtimeMenuStore(state => state.isLoading);
-  const menuError = useRealtimeMenuStore(state => state.error);
-  const isConnected = useRealtimeMenuStore(state => state.isConnected);
-  const initialize = useRealtimeMenuStore(state => state.initialize);
+  // **PERFORMANCE FIX (MYA-1277): Use compat layer with 'online' context for published-only items**
+  const {
+    menuItems,
+    categories,
+    itemVariants,
+    proteinTypes,
+    isLoading: isMenuLoading,
+    error: menuError,
+    isConnected,
+    initialize
+  } = useRealtimeMenuStoreCompat({ context: 'online' });
 
   // ✅ PERFORMANCE: Track when data is loaded
   useEffect(() => {

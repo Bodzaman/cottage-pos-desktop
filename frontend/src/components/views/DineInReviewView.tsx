@@ -28,7 +28,7 @@ import {
   Send,
 } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { CompactDineInItemRow } from 'components/CompactDineInItemRow';
 import ThermalReceiptDisplay from 'components/ThermalReceiptDisplay';
 import { useTemplateAssignments } from 'utils/useTemplateAssignments';
@@ -134,7 +134,7 @@ export function DineInReviewView({
   onSendToKitchen,
 }: DineInReviewViewProps) {
   // Menu store for category lookups
-  const categories = useRealtimeMenuStore(state => state.categories);
+  const { categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
   const categoriesMap = useMemo(() =>
     Object.fromEntries(categories.map(cat => [cat.id, cat])), [categories]);
 
@@ -552,17 +552,16 @@ export function DineInReviewView({
     <>
     <div className="flex-1 flex flex-col min-h-0 px-6 pb-4">
       {/* 40/60 Split Layout - Controls LEFT, Preview RIGHT */}
-      <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
+      <div className="flex-1 flex gap-6 min-h-0">
         {/* LEFT PANEL (40%): Item Controls */}
         <div
-          className="flex flex-col"
+          className="flex flex-col overflow-hidden"
           style={{
             width: '40%',
-            minWidth: '320px',
+            minWidth: '480px',
             borderRadius: '8px',
             border: `1px solid ${QSAITheme.border.light}`,
             backgroundColor: QSAITheme.background.secondary,
-            overflow: 'hidden'
           }}
         >
           {/* Items Header */}
@@ -609,8 +608,8 @@ export function DineInReviewView({
           </div>
 
           {/* Items Content - Scrollable */}
-          <ScrollArea className="flex-1 px-3">
-            <div className="py-3">
+          <ScrollArea className="flex-1 w-full">
+            <div className="py-3 px-3 w-full max-w-full overflow-hidden">
               {viewMode === 'category' ? (
                 /* Category View */
                 <div className="space-y-3">
@@ -623,26 +622,26 @@ export function DineInReviewView({
                         {/* Category Header */}
                         <button
                           onClick={() => toggleCategory(categoryName)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-all hover:bg-white/5"
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-all hover:bg-white/5 overflow-hidden"
                           style={{
                             background: 'rgba(91, 33, 182, 0.08)',
                             border: `1px solid ${QSAITheme.border.accent}`,
                           }}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
                             {isCollapsed ? (
-                              <ChevronDown className="h-3.5 w-3.5" style={{ color: QSAITheme.purple.light }} />
+                              <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" style={{ color: QSAITheme.purple.light }} />
                             ) : (
-                              <ChevronUp className="h-3.5 w-3.5" style={{ color: QSAITheme.purple.light }} />
+                              <ChevronUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color: QSAITheme.purple.light }} />
                             )}
                             <h3
-                              className="text-xs font-bold uppercase tracking-wide"
+                              className="text-xs font-bold uppercase tracking-wide truncate"
                               style={{ color: QSAITheme.text.primary }}
                             >
                               {categoryName}
                             </h3>
                             <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full"
+                              className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
                               style={{
                                 background: 'rgba(91, 33, 182, 0.2)',
                                 color: QSAITheme.purple.light,
@@ -651,7 +650,7 @@ export function DineInReviewView({
                               {items.length}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold" style={{ color: QSAITheme.text.secondary }}>
+                          <p className="text-xs font-semibold flex-shrink-0 ml-2" style={{ color: QSAITheme.text.secondary }}>
                             £{categoryTotal.toFixed(2)}
                           </p>
                         </button>
@@ -666,6 +665,8 @@ export function DineInReviewView({
                                 onUpdateQuantity={handleDebouncedQuantityUpdate}
                                 onDeleteItem={onDeleteItem}
                                 onCustomizeItem={onCustomizeItem}
+                                customerTabs={customerTabs}
+                                onAssignItemToTab={onAssignItemToTab}
                               />
                             ))}
                           </div>
@@ -688,28 +689,28 @@ export function DineInReviewView({
                     >
                       <button
                         onClick={() => toggleTab('unassigned')}
-                        className="w-full px-3 py-2 flex items-center justify-between"
+                        className="w-full px-3 py-2 flex items-center justify-between overflow-hidden"
                         style={{
                           background: 'rgba(249, 115, 22, 0.05)',
                           borderBottom: `1px solid ${QSAITheme.border.light}`,
                         }}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           {collapsedTabs.has('unassigned') ? (
-                            <ChevronDown className="h-3.5 w-3.5" style={{ color: '#F97316' }} />
+                            <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#F97316' }} />
                           ) : (
-                            <ChevronUp className="h-3.5 w-3.5" style={{ color: '#F97316' }} />
+                            <ChevronUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#F97316' }} />
                           )}
-                          <Utensils className="h-4 w-4" style={{ color: '#F97316' }} />
-                          <h3 className="text-sm font-semibold text-white">Table Items</h3>
+                          <Utensils className="h-4 w-4 flex-shrink-0" style={{ color: '#F97316' }} />
+                          <h3 className="text-sm font-semibold text-white truncate">Table Items</h3>
                           <span
-                            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            className="px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
                             style={{ background: 'rgba(249, 115, 22, 0.15)', color: '#F97316' }}
                           >
                             {itemsByTab['unassigned'].length}
                           </span>
                         </div>
-                        <p className="text-xs font-semibold" style={{ color: QSAITheme.text.secondary }}>
+                        <p className="text-xs font-semibold flex-shrink-0 ml-2" style={{ color: QSAITheme.text.secondary }}>
                           £{calculateGroupSubtotal(itemsByTab['unassigned']).toFixed(2)}
                         </p>
                       </button>
@@ -722,6 +723,8 @@ export function DineInReviewView({
                               onUpdateQuantity={handleDebouncedQuantityUpdate}
                               onDeleteItem={onDeleteItem}
                               onCustomizeItem={onCustomizeItem}
+                              customerTabs={customerTabs}
+                              onAssignItemToTab={onAssignItemToTab}
                             />
                           ))}
                         </div>
@@ -749,28 +752,28 @@ export function DineInReviewView({
                         >
                           <button
                             onClick={() => toggleTab(tab.id!)}
-                            className="w-full px-3 py-2 flex items-center justify-between"
+                            className="w-full px-3 py-2 flex items-center justify-between overflow-hidden"
                             style={{
                               background: 'rgba(168, 85, 247, 0.05)',
                               borderBottom: `1px solid ${QSAITheme.border.light}`,
                             }}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               {isCollapsed ? (
-                                <ChevronDown className="h-3.5 w-3.5" style={{ color: '#A855F7' }} />
+                                <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#A855F7' }} />
                               ) : (
-                                <ChevronUp className="h-3.5 w-3.5" style={{ color: '#A855F7' }} />
+                                <ChevronUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#A855F7' }} />
                               )}
-                              <User className="h-4 w-4" style={{ color: '#A855F7' }} />
-                              <h3 className="text-sm font-semibold text-white">{tab.tab_name}</h3>
+                              <User className="h-4 w-4 flex-shrink-0" style={{ color: '#A855F7' }} />
+                              <h3 className="text-sm font-semibold text-white truncate">{tab.tab_name}</h3>
                               <span
-                                className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                className="px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
                                 style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#A855F7' }}
                               >
                                 {tabItems.length}
                               </span>
                             </div>
-                            <p className="text-xs font-semibold" style={{ color: QSAITheme.text.secondary }}>
+                            <p className="text-xs font-semibold flex-shrink-0 ml-2" style={{ color: QSAITheme.text.secondary }}>
                               £{calculateGroupSubtotal(tabItems).toFixed(2)}
                             </p>
                           </button>
@@ -783,6 +786,8 @@ export function DineInReviewView({
                                   onUpdateQuantity={handleDebouncedQuantityUpdate}
                                   onDeleteItem={onDeleteItem}
                                   onCustomizeItem={onCustomizeItem}
+                                  customerTabs={customerTabs}
+                                  onAssignItemToTab={onAssignItemToTab}
                                 />
                               ))}
                             </div>

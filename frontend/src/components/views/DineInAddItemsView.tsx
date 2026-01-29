@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Send } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { POSMenuSelector } from 'components/POSMenuSelector';
 import { POSSectionPills } from 'components/POSSectionPills';
@@ -61,7 +62,7 @@ export function DineInAddItemsView({
   onCustomizeItem,
 }: DineInAddItemsViewProps) {
   // Menu store - uses hook directly (same as Takeaway mode)
-  const { categories } = useRealtimeMenuStore();
+  const { categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Kitchen preview modal state
   const [showKitchenPreviewModal, setShowKitchenPreviewModal] = useState(false);

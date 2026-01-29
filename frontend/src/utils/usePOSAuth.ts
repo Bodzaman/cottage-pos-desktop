@@ -99,7 +99,9 @@ export const usePOSAuth = create<POSAuthStore>()(
             isLoading: false,
             lastUserId: user.user_id,
             lastUserName: user.full_name,
-            lastUserRole: user.role || 'staff'
+            lastUserRole: user.role || 'staff',
+            // Sync PIN status from database (overrides stale localStorage)
+            pinEnabled: user.pin_enabled ?? false
           });
         } catch (error) {
           set({ isLoading: false, isAuthenticated: false, user: null });

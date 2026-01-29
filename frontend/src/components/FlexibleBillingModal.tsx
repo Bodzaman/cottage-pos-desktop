@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, CreditCard, Receipt, Users, DollarSign } from 'lucide-react';
 import { OrderItem } from '../utils/menuTypes';
 import { TableData } from '../utils/tableTypes';
-import { useRealtimeMenuStore, BillingOption } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 interface FlexibleBillingModalProps {
   onPrintBill: (option: BillingOption) => void;
@@ -37,10 +37,10 @@ export function FlexibleBillingModal({
   onPrintBill
 }: FlexibleBillingModalProps) {
   // Get modal state from store instead of props
-  const { 
+  const {
     flexibleBillingModal,
-    closeFlexibleBillingModal 
-  } = useRealtimeMenuStore();
+    closeFlexibleBillingModal
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   const {
     isOpen,

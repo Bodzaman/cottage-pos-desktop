@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, Check, Search, UtensilsCrossed } from 'lucide-react';
+import { X, Plus, Minus, Check, Search, UtensilsCrossed, ChefHat } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
+import { FIXED_SECTIONS, findRootSection } from '../utils/sectionMapping';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
 
@@ -18,7 +20,7 @@ interface StaffCustomizationModalProps {
   variant?: ItemVariant | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (item: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string) => void;
+  onConfirm: (item: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string, serveWithSectionId?: string | null) => void;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   initialQuantity?: number;
 }
@@ -52,8 +54,8 @@ export function StaffCustomizationModal({
   orderType,
   initialQuantity = 1
 }: StaffCustomizationModalProps) {
-  const { customizations } = useRealtimeMenuStore();
-  
+  const { customizations, categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
+
   // State
   const [quantity, setQuantity] = useState(initialQuantity);
   const [selectedCustomizations, setSelectedCustomizations] = useState<SelectedCustomization[]>([]);
@@ -61,7 +63,22 @@ export function StaffCustomizationModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [prevTotal, setPrevTotal] = useState(0);
+  const [serveWithSectionId, setServeWithSectionId] = useState<string | null>(null);
   const notesInputRef = React.useRef<HTMLTextAreaElement>(null);
+
+  // Get item's natural section based on its category
+  const naturalSection = useMemo(() => {
+    if (!item.category_id) return null;
+    return findRootSection(item.category_id, categories);
+  }, [item.category_id, categories]);
+
+  // Get current selected section (either override or natural)
+  const currentSection = useMemo(() => {
+    if (serveWithSectionId) {
+      return FIXED_SECTIONS.find(s => s.uuid === serveWithSectionId) || null;
+    }
+    return naturalSection;
+  }, [serveWithSectionId, naturalSection]);
 
   // Update quantity when initialQuantity changes
   useEffect(() => {
@@ -75,6 +92,7 @@ export function StaffCustomizationModal({
       setSearchQuery('');
       setSelectedCustomizations([]);
       setSpecialInstructions('');
+      setServeWithSectionId(null);
     }
   }, [isOpen]);
 
@@ -210,7 +228,8 @@ export function StaffCustomizationModal({
       selectedCustomizations: selectedCustomizations,
       selectedCustomizationsLength: selectedCustomizations.length,
       quantity,
-      totalPrice
+      totalPrice,
+      serveWithSectionId: serveWithSectionId
     });
 
     onConfirm(
@@ -218,13 +237,15 @@ export function StaffCustomizationModal({
       quantity,
       variant,
       selectedCustomizations.length > 0 ? selectedCustomizations : undefined,
-      specialInstructions || undefined
+      specialInstructions || undefined,
+      serveWithSectionId
     );
 
     // Show success toast
     const variantName = variant ? ` (${variant.name})` : '';
+    const serveWithInfo = serveWithSectionId && currentSection ? ` • Serve with ${currentSection.displayName}` : '';
     toast.success(`${item.name}${variantName} added to order`, {
-      description: `Quantity: ${quantity} • £${totalPrice.toFixed(2)}`
+      description: `Quantity: ${quantity} • £${totalPrice.toFixed(2)}${serveWithInfo}`
     });
 
     // Reset and close
@@ -237,6 +258,7 @@ export function StaffCustomizationModal({
     setSelectedCustomizations([]);
     setSpecialInstructions('');
     setSearchQuery('');
+    setServeWithSectionId(null);
     onClose();
   };
 
@@ -335,6 +357,55 @@ export function StaffCustomizationModal({
             <span className="text-sm" style={{ color: POS_THEME.textMuted }}>Base Price:</span>
             <span className="text-lg font-bold" style={{ color: POS_THEME.primary }}>£{basePrice.toFixed(2)}</span>
           </div>
+
+          {/* Serve With Section Selector - for course override */}
+          {orderType === 'DINE-IN' && naturalSection && (
+            <div className="flex items-center justify-between pt-3">
+              <div className="flex items-center gap-2">
+                <ChefHat className="h-4 w-4" style={{ color: POS_THEME.textMuted }} />
+                <span className="text-sm" style={{ color: POS_THEME.textMuted }}>Serve With:</span>
+              </div>
+              <Select
+                value={serveWithSectionId || naturalSection.uuid}
+                onValueChange={(val) => {
+                  // If selecting the natural section, clear the override
+                  setServeWithSectionId(val === naturalSection.uuid ? null : val);
+                }}
+              >
+                <SelectTrigger
+                  className="w-[180px] h-9"
+                  style={{
+                    background: serveWithSectionId ? POS_THEME.primary : POS_THEME.backgroundLight,
+                    borderColor: serveWithSectionId ? POS_THEME.primary : POS_THEME.border,
+                    color: POS_THEME.text
+                  }}
+                >
+                  <SelectValue>
+                    {currentSection?.displayName || 'Select section'}
+                    {!serveWithSectionId && ' (now)'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  style={{
+                    background: POS_THEME.background,
+                    borderColor: POS_THEME.border
+                  }}
+                >
+                  {FIXED_SECTIONS.map(section => (
+                    <SelectItem
+                      key={section.uuid}
+                      value={section.uuid}
+                      style={{ color: POS_THEME.text }}
+                    >
+                      {section.displayName}
+                      {section.uuid === naturalSection.uuid && ' (now)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Separator style={{ background: POS_THEME.border, marginTop: '0.5rem' }} />
         </DialogHeader>
 

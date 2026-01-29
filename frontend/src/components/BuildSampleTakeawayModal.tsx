@@ -6,7 +6,7 @@ import { ShoppingCart, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DineInCategoryList } from './DineInCategoryList';
 import { DineInMenuGrid } from './DineInMenuGrid';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { OrderItem } from '../utils/receiptDesignerTypes';
 import { OrderItem as MenuOrderItem } from '../utils/menuTypes';
@@ -40,7 +40,7 @@ export function BuildSampleTakeawayModal({
   onOrderBuilt,
   initialOrderItems = []
 }: Props) {
-  const { categories, menuItems } = useRealtimeMenuStore();
+  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // Single customer order items
   const [orderItems, setOrderItems] = useState<OrderItem[]>(initialOrderItems);

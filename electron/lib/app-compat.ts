@@ -1169,9 +1169,71 @@ export const apiClient = {
   // ============================================================================
   verify_password: async (params: any) => {
     console.log('🔐 [app-compat] verify_password called with params:', params);
-    // FIX: Return { authenticated: true } instead of { valid: true }
-    // Desktop app uses a simple password check (no backend API needed)
-    return mockResponse({ authenticated: true });
+    try {
+      const password = (params?.password || '').trim();
+
+      if (!password) {
+        return mockResponse({
+          authenticated: false,
+          is_default_password: false,
+          message: 'Password is required'
+        });
+      }
+
+      // Check if there's a custom password stored in management_settings table
+      try {
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('management_settings')
+          .select('password')
+          .eq('setting_key', 'admin_password')
+          .limit(1);
+
+        if (!settingsError && settingsData && settingsData.length > 0) {
+          const storedPassword = settingsData[0].password;
+          if (password === storedPassword) {
+            console.log('✅ [app-compat] verify_password: authenticated with custom password');
+            return mockResponse({
+              authenticated: true,
+              is_default_password: false,
+              message: 'Authentication successful'
+            });
+          }
+        }
+      } catch (dbError) {
+        console.warn('⚠️ [app-compat] Custom password check failed:', dbError);
+      }
+
+      // Fallback to default passwords (matching backend logic)
+      const validPasswords: Record<string, boolean> = {
+        'admin123': true,    // Default admin password (is_default = true)
+        'manager456': false, // Manager password
+        'qsai2025': false,   // System password
+      };
+
+      if (password in validPasswords) {
+        const isDefault = validPasswords[password];
+        console.log(`✅ [app-compat] verify_password: authenticated with ${isDefault ? 'default' : 'preset'} password`);
+        return mockResponse({
+          authenticated: true,
+          is_default_password: isDefault,
+          message: 'Authentication successful'
+        });
+      }
+
+      console.log('❌ [app-compat] verify_password: authentication failed');
+      return mockResponse({
+        authenticated: false,
+        is_default_password: false,
+        message: 'Invalid password. Please try again.'
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] verify_password exception:', error);
+      return mockResponse({
+        authenticated: false,
+        is_default_password: false,
+        message: 'Error verifying password'
+      });
+    }
   },
 
   get_password_status: async () => mockResponse({ has_password: false }),
@@ -1183,9 +1245,95 @@ export const apiClient = {
   // ============================================================================
   // SET MEALS
   // ============================================================================
-  list_set_meals: async (params: any) => mockResponse({ set_meals: [] }),
+  list_set_meals: async (params: any) => {
+    console.log('🔄 [app-compat] list_set_meals called:', params);
+    try {
+      const { active_only = true, published_only = false } = params || {};
 
-  get_set_meal: async (params: any) => mockResponse({ set_meal: null }),
+      let query = supabase
+        .from('set_meals')
+        .select('*')
+        .order('name');
+
+      if (active_only) {
+        query = query.eq('active', true);
+      }
+
+      if (published_only) {
+        query = query.not('published_at', 'is', null);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        // If set_meals table doesn't exist, return empty array
+        if (error.code === '42P01') {
+          console.warn('⚠️ [app-compat] set_meals table not found');
+          return mockResponse({ success: true, set_meals: [] });
+        }
+        console.error('❌ [app-compat] list_set_meals error:', error);
+        return mockResponse({ success: false, set_meals: [], error: error.message });
+      }
+
+      console.log(`✅ [app-compat] list_set_meals found ${data?.length || 0} set meals`);
+      return mockResponse({ success: true, set_meals: data || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] list_set_meals exception:', error);
+      return mockResponse({ success: false, set_meals: [] });
+    }
+  },
+
+  get_set_meal: async (params: any) => {
+    console.log('🔄 [app-compat] get_set_meal called:', params);
+    try {
+      const setMealId = params?.id || params?.set_meal_id;
+
+      if (!setMealId) {
+        return mockResponse({ success: false, set_meal: null, error: 'set_meal_id is required' });
+      }
+
+      // Fetch set meal with items and their menu item details
+      const { data: setMeal, error } = await supabase
+        .from('set_meals')
+        .select('*, set_meal_items(id, menu_item_id, quantity, menu_items(id, name, description, base_price, image_url))')
+        .eq('id', setMealId)
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] get_set_meal error:', error);
+        return mockResponse({ success: false, set_meal: null, error: error.message });
+      }
+
+      // Transform items to a cleaner format
+      const items = (setMeal.set_meal_items || []).map((item: any) => ({
+        id: item.id,
+        menu_item_id: item.menu_item_id,
+        name: item.menu_items?.name || 'Unknown item',
+        description: item.menu_items?.description,
+        price: item.menu_items?.base_price || 0,
+        image_url: item.menu_items?.image_url,
+        quantity: item.quantity || 1,
+      }));
+
+      // Calculate total individual price
+      const total_individual_price = items.reduce(
+        (sum: number, item: any) => sum + (item.price * item.quantity),
+        0
+      );
+
+      const result = {
+        ...setMeal,
+        items,
+        total_individual_price,
+      };
+
+      console.log(`✅ [app-compat] get_set_meal loaded:`, setMeal.name);
+      return mockResponse({ success: true, set_meal: result });
+    } catch (error) {
+      console.error('❌ [app-compat] get_set_meal exception:', error);
+      return mockResponse({ success: false, set_meal: null });
+    }
+  },
 
   create_set_meal: async (data: any) => mockResponse({ success: true }),
 
@@ -3301,13 +3449,116 @@ export const apiClient = {
     }
   },
 
-  get_media_asset: async (params: any) => mockResponse({ asset: null }),
+  get_media_asset: async (params: any) => {
+    console.log('🔄 [app-compat] get_media_asset called:', params);
+    try {
+      const assetId = params?.id || params?.asset_id;
 
-  update_media_asset: async (params: any, data?: any) => mockResponse({ success: true }),
+      if (!assetId) {
+        return mockResponse({ success: false, asset: null, error: 'asset_id is required' });
+      }
 
-  delete_media_asset: async (params: any) => mockResponse({ success: true }),
+      const { data: asset, error } = await supabase
+        .from('media_assets')
+        .select('*')
+        .eq('id', assetId)
+        .single();
 
-  get_recent_media_assets: async (params: any) => mockResponse({ assets: [] }),
+      if (error) {
+        console.error('❌ [app-compat] get_media_asset error:', error);
+        return mockResponse({ success: false, asset: null, error: error.message });
+      }
+
+      console.log(`✅ [app-compat] get_media_asset loaded:`, asset?.id);
+      return mockResponse({ success: true, asset });
+    } catch (error) {
+      console.error('❌ [app-compat] get_media_asset exception:', error);
+      return mockResponse({ success: false, asset: null });
+    }
+  },
+
+  update_media_asset: async (params: any, data?: any) => {
+    console.log('🔄 [app-compat] update_media_asset called:', params);
+    try {
+      const assetId = params?.id || params?.asset_id;
+      const updateData = data || params;
+
+      if (!assetId) {
+        return mockResponse({ success: false, error: 'asset_id is required' });
+      }
+
+      const { error } = await supabase
+        .from('media_assets')
+        .update({
+          alt_text: updateData.alt_text,
+          asset_category: updateData.asset_category,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', assetId);
+
+      if (error) {
+        console.error('❌ [app-compat] update_media_asset error:', error);
+        return mockResponse({ success: false, error: error.message });
+      }
+
+      console.log(`✅ [app-compat] update_media_asset updated:`, assetId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] update_media_asset exception:', error);
+      return mockResponse({ success: false });
+    }
+  },
+
+  delete_media_asset: async (params: any) => {
+    console.log('🔄 [app-compat] delete_media_asset called:', params);
+    try {
+      const assetId = params?.id || params?.asset_id;
+
+      if (!assetId) {
+        return mockResponse({ success: false, error: 'asset_id is required' });
+      }
+
+      const { error } = await supabase
+        .from('media_assets')
+        .delete()
+        .eq('id', assetId);
+
+      if (error) {
+        console.error('❌ [app-compat] delete_media_asset error:', error);
+        return mockResponse({ success: false, error: error.message });
+      }
+
+      console.log(`✅ [app-compat] delete_media_asset deleted:`, assetId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] delete_media_asset exception:', error);
+      return mockResponse({ success: false });
+    }
+  },
+
+  get_recent_media_assets: async (params: any) => {
+    console.log('🔄 [app-compat] get_recent_media_assets called:', params);
+    try {
+      const limit = params?.limit || 20;
+
+      const { data, error } = await supabase
+        .from('media_assets')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('❌ [app-compat] get_recent_media_assets error:', error);
+        return mockResponse({ success: false, assets: [] });
+      }
+
+      console.log(`✅ [app-compat] get_recent_media_assets found ${data?.length || 0} assets`);
+      return mockResponse({ success: true, assets: data || [] });
+    } catch (error) {
+      console.error('❌ [app-compat] get_recent_media_assets exception:', error);
+      return mockResponse({ success: false, assets: [] });
+    }
+  },
 
   upload_avatar: async (data: any) => mockResponse({ success: true, url: '' }),
 
@@ -3532,38 +3783,125 @@ export const apiClient = {
   lookup_customer: async (params: any) => {
     console.log('🔄 [app-compat] lookup_customer called:', params);
     try {
-      const { phone, email, customer_reference } = params || {};
+      const { phone, email, customer_id, customer_reference } = params || {};
 
-      if (!phone && !email && !customer_reference) {
-        return mockResponse({ success: false, customer: null });
+      if (!phone && !email && !customer_id && !customer_reference) {
+        return mockResponse({
+          success: false,
+          customer: null,
+          error: 'No identifier provided. Please provide email, phone, customer_id, or customer_reference.'
+        });
       }
 
-      // Build query based on provided params
-      let query = supabase.from('customers').select('*');
+      let customer: any = null;
+      let error: any = null;
 
-      if (phone) {
-        // Normalize phone number for search (remove spaces, dashes)
-        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '');
-        query = query.or(`phone.ilike.%${normalizedPhone}%,phone_normalized.eq.${normalizedPhone}`);
+      // Try each identifier in order of preference (matching backend logic)
+      if (customer_id) {
+        const result = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', customer_id)
+          .limit(1);
+        customer = result.data?.[0] || null;
+        error = result.error;
       } else if (email) {
-        query = query.ilike('email', `%${email}%`);
-      } else if (customer_reference) {
-        query = query.eq('customer_reference', customer_reference);
-      }
+        // Try normalized email first (case-insensitive)
+        const normalizedEmail = email.toLowerCase().trim();
+        let result = await supabase
+          .from('customers')
+          .select('*')
+          .ilike('email', normalizedEmail)
+          .limit(1);
 
-      const { data: customers, error } = await query.limit(1);
+        if (!result.data || result.data.length === 0) {
+          // Fallback to partial match
+          result = await supabase
+            .from('customers')
+            .select('*')
+            .ilike('email', `%${normalizedEmail}%`)
+            .limit(1);
+        }
+        customer = result.data?.[0] || null;
+        error = result.error;
+      } else if (phone) {
+        // Normalize phone to E.164-like format (remove non-digits except +)
+        const cleanedPhone = phone.replace(/[\s\-\(\)]/g, '');
+
+        // Try exact E.164 match first
+        let result = await supabase
+          .from('customers')
+          .select('*')
+          .eq('phone_e164', cleanedPhone)
+          .limit(1);
+
+        // Fallback to original phone field if E.164 doesn't match
+        if (!result.data || result.data.length === 0) {
+          result = await supabase
+            .from('customers')
+            .select('*')
+            .eq('phone', phone)
+            .limit(1);
+        }
+
+        // Final fallback to partial match
+        if (!result.data || result.data.length === 0) {
+          result = await supabase
+            .from('customers')
+            .select('*')
+            .ilike('phone', `%${cleanedPhone}%`)
+            .limit(1);
+        }
+        customer = result.data?.[0] || null;
+        error = result.error;
+      } else if (customer_reference) {
+        // Use correct field name: customer_reference_number
+        const result = await supabase
+          .from('customers')
+          .select('*')
+          .eq('customer_reference_number', customer_reference)
+          .limit(1);
+        customer = result.data?.[0] || null;
+        error = result.error;
+      }
 
       if (error) {
         console.error('❌ [app-compat] lookup_customer error:', error);
-        return mockResponse({ success: false, customer: null });
+        return mockResponse({ success: false, customer: null, error: error.message });
       }
 
-      const customer = customers && customers.length > 0 ? customers[0] : null;
-      console.log(`✅ [app-compat] lookup_customer result:`, customer ? customer.id : 'not found');
-      return mockResponse({ success: !!customer, customer });
+      if (customer) {
+        console.log(`✅ [app-compat] lookup_customer found:`, customer.id);
+        // Format customer to match CustomerProfile model
+        return mockResponse({
+          success: true,
+          customer: {
+            id: customer.id,
+            email: customer.email || '',
+            first_name: customer.first_name,
+            last_name: customer.last_name,
+            phone: customer.phone,
+            phone_e164: customer.phone_e164,
+            customer_reference_number: customer.customer_reference_number,
+            total_orders: customer.total_orders || 0,
+            total_spend: customer.total_spend || 0,
+            last_order_at: customer.last_order_at,
+            created_at: customer.created_at,
+            updated_at: customer.updated_at,
+          },
+          message: 'Customer found successfully'
+        });
+      } else {
+        console.log('❌ [app-compat] lookup_customer: not found');
+        return mockResponse({
+          success: false,
+          customer: null,
+          message: 'Customer not found'
+        });
+      }
     } catch (error) {
       console.error('❌ [app-compat] lookup_customer exception:', error);
-      return mockResponse({ success: false, customer: null });
+      return mockResponse({ success: false, customer: null, error: 'Lookup failed' });
     }
   },
 
@@ -3602,11 +3940,20 @@ export const apiClient = {
 
         result.default_address = addresses && addresses.length > 0 ? addresses[0] : null;
 
-        // Fetch recent orders
+        // Fetch recent orders - match by customer_id OR phone OR phone_e164
+        // Build dynamic OR conditions for phone matching
+        const phoneConditions: string[] = [`customer_id.eq.${customer_id}`];
+        if (customer.phone) {
+          phoneConditions.push(`customer_phone.eq.${customer.phone}`);
+        }
+        if (customer.phone_e164) {
+          phoneConditions.push(`customer_phone.eq.${customer.phone_e164}`);
+        }
+
         const { data: orders } = await supabase
           .from('orders')
           .select('*')
-          .or(`customer_id.eq.${customer_id},customer_phone.eq.${customer.phone || ''}`)
+          .or(phoneConditions.join(','))
           .order('created_at', { ascending: false })
           .limit(10);
 
@@ -3656,28 +4003,101 @@ export const apiClient = {
       const { query, limit = 10 } = params || {};
 
       if (!query || query.length < 2) {
-        return mockResponse({ customers: [], total: 0 });
+        return mockResponse({ success: true, customers: [], total_count: 0, message: 'Query too short' });
       }
 
-      // Search customers by name, phone, or email
-      const searchTerm = `%${query}%`;
-      const { data: customers, error, count } = await supabase
-        .from('customers')
-        .select('*', { count: 'exact' })
-        .or(`name.ilike.${searchTerm},phone.ilike.${searchTerm},email.ilike.${searchTerm}`)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const searchTerm = query.trim();
+      let customers: any[] = [];
+      let error: any = null;
+
+      // Detect search type (matching backend logic from customer_crm/__init__.py)
+      // Check if it's a customer reference (CTRxxxxx or CTxxxxxxx)
+      if (/^CT[R]?\d+$/i.test(searchTerm)) {
+        const result = await supabase
+          .from('customers')
+          .select('*')
+          .eq('customer_reference_number', searchTerm.toUpperCase())
+          .limit(limit);
+        customers = result.data || [];
+        error = result.error;
+      }
+      // Check if it's an email (contains @)
+      else if (searchTerm.includes('@')) {
+        const normalizedEmail = searchTerm.toLowerCase().trim();
+        const result = await supabase
+          .from('customers')
+          .select('*')
+          .ilike('email', `%${normalizedEmail}%`)
+          .order('last_order_at', { ascending: false, nullsFirst: false })
+          .limit(limit);
+        customers = result.data || [];
+        error = result.error;
+      }
+      // Check if it's a phone number (starts with 0, +, or mostly digits)
+      else if (/^[\d\s\-\(\)\+]+$/.test(searchTerm) || searchTerm.startsWith('0') || searchTerm.startsWith('+')) {
+        const cleanedPhone = searchTerm.replace(/[\s\-\(\)]/g, '');
+        // Try exact E.164 match first
+        let result = await supabase
+          .from('customers')
+          .select('*')
+          .eq('phone_e164', cleanedPhone)
+          .limit(limit);
+
+        if (!result.data || result.data.length === 0) {
+          // Fallback to partial match on original phone
+          result = await supabase
+            .from('customers')
+            .select('*')
+            .ilike('phone', `%${cleanedPhone}%`)
+            .order('last_order_at', { ascending: false, nullsFirst: false })
+            .limit(limit);
+        }
+        customers = result.data || [];
+        error = result.error;
+      }
+      // Default: name search (first_name OR last_name)
+      else {
+        const result = await supabase
+          .from('customers')
+          .select('*')
+          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
+          .order('last_order_at', { ascending: false, nullsFirst: false })
+          .limit(limit);
+        customers = result.data || [];
+        error = result.error;
+      }
 
       if (error) {
         console.error('❌ [app-compat] crm_search_customers error:', error);
-        return mockResponse({ customers: [], total: 0 });
+        return mockResponse({ success: false, customers: [], total_count: 0, message: error.message });
       }
 
-      console.log(`✅ [app-compat] crm_search_customers found ${customers?.length || 0} customers`);
-      return mockResponse({ customers: customers || [], total: count || 0 });
+      // Map to expected response format (matching backend SearchResponse)
+      const formattedCustomers = customers.map((c: any) => ({
+        id: c.id,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        email: c.email,
+        phone: c.phone,
+        customer_reference_number: c.customer_reference_number,
+        total_orders: c.total_orders || 0,
+        total_spend: parseFloat(c.total_spend) || 0,
+        last_order_at: c.last_order_at,
+        tags: c.tags,
+        notes_summary: c.notes_summary,
+        created_source: c.created_source,
+      }));
+
+      console.log(`✅ [app-compat] crm_search_customers found ${formattedCustomers.length} customers`);
+      return mockResponse({
+        success: true,
+        customers: formattedCustomers,
+        total_count: formattedCustomers.length,
+        message: `Found ${formattedCustomers.length} customer(s)`
+      });
     } catch (error) {
       console.error('❌ [app-compat] crm_search_customers exception:', error);
-      return mockResponse({ customers: [], total: 0 });
+      return mockResponse({ success: false, customers: [], total_count: 0, message: 'Search failed' });
     }
   },
 
@@ -4525,9 +4945,187 @@ export const apiClient = {
 
   upload_multiple_files: async (files: any, path: string) => mockResponse({ success: true }),
 
-  list_refunds: async (params: any) => mockResponse({ refunds: [] }),
+  list_refunds: async (params: any) => {
+    console.log('🔄 [app-compat] list_refunds called:', params);
+    try {
+      const { order_id, limit = 50, offset = 0 } = params || {};
 
-  create_refund: async (data: any) => mockResponse({ success: true }),
+      // Query orders with REFUNDED status
+      let query = supabase
+        .from('orders')
+        .select('*', { count: 'exact' })
+        .eq('status', 'REFUNDED')
+        .order('updated_at', { ascending: false });
+
+      // If order_id provided, filter by it
+      if (order_id) {
+        query = supabase
+          .from('orders')
+          .select('*')
+          .eq('id', order_id)
+          .eq('status', 'REFUNDED');
+      } else {
+        query = query.range(offset, offset + limit - 1);
+      }
+
+      const { data: orders, error, count } = await query;
+
+      if (error) {
+        console.error('❌ [app-compat] list_refunds error:', error);
+        return mockResponse({ success: false, refunds: [], total_count: 0 });
+      }
+
+      // Transform orders to RefundInfo format
+      const refunds = (orders || []).map((o: any) => ({
+        refund_id: o.id,
+        order_id: o.id,
+        order_number: o.order_number,
+        stripe_refund_id: o.stripe_refund_id || null,
+        refund_amount: o.total_amount || o.total || 0,
+        refund_type: 'full',
+        reason: o.cancellation_reason || o.notes || 'Refund processed',
+        status: 'completed',
+        admin_user_id: o.cancelled_by || o.staff_id || '',
+        admin_notes: o.admin_notes || '',
+        created_at: o.updated_at || o.created_at,
+        processed_at: o.updated_at,
+        customer_notified: o.customer_notified || false,
+        customer_name: o.customer_name,
+        customer_phone: o.customer_phone,
+        customer_email: o.customer_email,
+      }));
+
+      const totalRefunded = refunds.reduce((sum: number, r: any) => sum + (r.refund_amount || 0), 0);
+
+      console.log(`✅ [app-compat] list_refunds found ${refunds.length} refunds`);
+      return mockResponse({
+        success: true,
+        refunds,
+        total_count: count || refunds.length,
+        total_refunded: totalRefunded
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] list_refunds exception:', error);
+      return mockResponse({ success: false, refunds: [], total_count: 0 });
+    }
+  },
+
+  create_refund: async (data: any) => {
+    console.log('🔄 [app-compat] create_refund called:', data);
+    try {
+      const {
+        order_id,
+        refund_type = 'full',
+        refund_amount,
+        reason = 'Refund requested',
+        admin_notes,
+        notify_customer = false,
+        admin_user_id
+      } = data || {};
+
+      if (!order_id) {
+        return mockResponse({ success: false, message: 'order_id is required' });
+      }
+
+      // First, get the order to verify it exists and get details
+      const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', order_id)
+        .single();
+
+      if (fetchError || !order) {
+        console.error('❌ [app-compat] create_refund: order not found', fetchError);
+        return mockResponse({ success: false, message: 'Order not found' });
+      }
+
+      // Check if already refunded
+      if (order.status === 'REFUNDED') {
+        return mockResponse({ success: false, message: 'Order is already refunded' });
+      }
+
+      // Calculate refund amount (full order amount if not specified)
+      const finalRefundAmount = refund_amount || order.total_amount || order.total || 0;
+
+      // Build history entry
+      const historyEntry = {
+        action: 'REFUNDED',
+        timestamp: new Date().toISOString(),
+        user_id: admin_user_id,
+        notes: reason,
+        changes: [{
+          field: 'status',
+          oldValue: order.status,
+          newValue: 'REFUNDED'
+        }, {
+          field: 'refund_amount',
+          oldValue: 0,
+          newValue: finalRefundAmount
+        }]
+      };
+
+      // Merge with existing history
+      const existingHistory = order.history || [];
+      const updatedHistory = [...existingHistory, historyEntry];
+
+      // Update order status to REFUNDED
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'REFUNDED',
+          cancellation_reason: reason,
+          cancelled_by: admin_user_id,
+          admin_notes: admin_notes || order.admin_notes,
+          customer_notified: notify_customer,
+          history: updatedHistory,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order_id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ [app-compat] create_refund: update failed', updateError);
+        return mockResponse({ success: false, message: 'Failed to process refund' });
+      }
+
+      // If order has Stripe payment, attempt Stripe refund via Electron IPC
+      let stripeRefundId = null;
+      if (order.stripe_payment_intent_id && typeof window !== 'undefined' && (window as any).electronAPI?.stripeRefund) {
+        try {
+          const stripeResult = await (window as any).electronAPI.stripeRefund({
+            payment_intent_id: order.stripe_payment_intent_id,
+            amount: Math.round(finalRefundAmount * 100) // Convert to pence
+          });
+          if (stripeResult.success) {
+            stripeRefundId = stripeResult.refund_id;
+            // Update order with Stripe refund ID
+            await supabase
+              .from('orders')
+              .update({ stripe_refund_id: stripeRefundId })
+              .eq('id', order_id);
+          }
+        } catch (stripeError) {
+          console.warn('⚠️ [app-compat] Stripe refund failed (cash refund only):', stripeError);
+        }
+      }
+
+      console.log(`✅ [app-compat] create_refund: refund processed for order ${order_id}`);
+      return mockResponse({
+        success: true,
+        refund_id: order_id,
+        stripe_refund_id: stripeRefundId,
+        order_id: order_id,
+        refund_amount: finalRefundAmount,
+        refund_status: refund_type === 'full' ? 'full' : 'partial',
+        message: 'Refund processed successfully',
+        order_updated: true
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] create_refund exception:', error);
+      return mockResponse({ success: false, message: 'Refund processing failed' });
+    }
+  },
 
   validate_opening_hours: async (params: any) => mockResponse({ valid: true }),
 

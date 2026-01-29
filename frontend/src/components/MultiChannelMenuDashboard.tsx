@@ -35,7 +35,7 @@ import OnlineOrdersCard from "./OnlineOrdersCard";
 
 // Placeholder for removed VoiceAgentCard
 const VoiceAgentCard = (_props: any) => null;
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 // Define TypeScript interfaces for our data structures
 interface MenuItem {
@@ -78,7 +78,7 @@ interface MenuStatusData {
 
 const MultiChannelMenuDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   const [menuData, setMenuData] = useState<MenuPreviewData | null>(null);
   const [menuStatus, setMenuStatus] = useState<MenuStatusData>({

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { THERMAL_FONTS } from 'utils/thermalFonts';
+import { loadFont as loadCmsFont, getFontFamily as getCmsFontFamily } from 'utils/cmsFonts';
 import { QSAITheme } from 'utils/QSAIDesign';
 import brain from 'brain';
 import { QRCodeConfig } from 'utils/receiptDesignerTypes';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
-import { SECTION_UUID_MAP, FIXED_SECTIONS, findRootSection } from 'utils/sectionMapping';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
+import { SECTION_UUID_MAP, FIXED_SECTIONS, findRootSection, SECTION_INDICATORS, SectionId } from 'utils/sectionMapping';
 import type { CanvasElement } from 'utils/visualTemplateTypes';
 
 interface OrderData {
@@ -62,6 +63,11 @@ interface GroupedReceiptItem {
   customizations?: Array<{ id: string; name: string; price: number; price_adjustment?: number; is_free?: boolean }>;
   instructions?: string;
   notes?: string;
+  // Section override fields - for "Serve With" feature
+  serveWithSectionId?: string | null;
+  serve_with_section_id?: string | null;
+  isOverride?: boolean;
+  originalSectionId?: string;
 }
 
 /**
@@ -123,9 +129,39 @@ function groupReceiptItems(
 
   for (const item of items) {
     // Get section info for this item
-    const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
-    const sectionNumber = categoryToSectionMap[categoryId] || 999;
-    const sectionName = sectionNameMap[sectionNumber] || '';
+    // Check for section override first (item served with different section)
+    const overrideId = item.serveWithSectionId || item.serve_with_section_id;
+    let sectionNumber: number;
+    let sectionName: string;
+    let isOverride = false;
+    let originalSectionId: string | undefined;
+
+    if (overrideId) {
+      // Find the override section by UUID
+      const overrideSection = FIXED_SECTIONS.find(s => s.uuid === overrideId);
+      if (overrideSection) {
+        sectionNumber = overrideSection.order + 1; // 0-indexed to 1-indexed
+        sectionName = overrideSection.name;
+        isOverride = true;
+        // Store original section ID for indicator display
+        const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+        const originalSection = categoryId
+          ? FIXED_SECTIONS.find(s => categoryToSectionMap[categoryId] === s.order + 1)
+          : null;
+        originalSectionId = originalSection?.id;
+      } else {
+        // Invalid override ID, fall back to natural section
+        const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+        sectionNumber = categoryToSectionMap[categoryId] || 999;
+        sectionName = sectionNameMap[sectionNumber] || '';
+      }
+    } else {
+      // Use natural section from category
+      const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+      sectionNumber = categoryToSectionMap[categoryId] || 999;
+      sectionName = sectionNameMap[sectionNumber] || '';
+    }
+
     const groupKey = generateGroupingKey(item, sectionNumber);
 
     // DEBUG: Log section resolution for each item
@@ -133,9 +169,10 @@ function groupReceiptItems(
       itemName: item.name,
       menu_item_id: item.menu_item_id,
       category_id: item.category_id,
-      resolvedCategoryId: categoryId,
       sectionNumber,
       sectionName,
+      isOverride,
+      originalSectionId,
       mapSizes: {
         itemToCategoryMap: Object.keys(itemToCategoryMap).length,
         categoryToSectionMap: Object.keys(categoryToSectionMap).length,
@@ -163,7 +200,9 @@ function groupReceiptItems(
           groupedTotal: unitPrice * item.quantity,
           isGrouped: false, // Will be set to true if more items join
           sectionNumber,
-          sectionName
+          sectionName,
+          isOverride,
+          originalSectionId
         });
       }
     } else {
@@ -176,7 +215,9 @@ function groupReceiptItems(
         groupedTotal: itemTotal,
         isGrouped: false,
         sectionNumber,
-        sectionName
+        sectionName,
+        isOverride,
+        originalSectionId
       });
     }
   }
@@ -221,6 +262,8 @@ function formatSectionSeparator(sectionName: string, charWidth: number): string 
 interface ThermalReceiptFormData {
   // Business Information
   businessName: string;
+  businessNameFont?: string;  // CMS font ID for business name (optional for backward compatibility)
+  businessNameFontSize?: number;  // Font size in pixels (optional for backward compatibility)
   address: string;
   phone: string;
   email: string;
@@ -361,8 +404,7 @@ export default function ThermalPreview({
   console.log('ThermalPreview received:', { mode, formData, paperWidth, receiptFormat });
   
   // Build category → section order map from store (in-memory, no API calls)
-  const categories = useRealtimeMenuStore(state => state.categories);
-  const menuItems = useRealtimeMenuStore(state => state.menuItems);
+  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // DEBUG: Log store state on every render to track when data becomes available
   console.log('🏪 ThermalPreview - Store state:', {
@@ -481,7 +523,14 @@ export default function ThermalPreview({
       }))
     });
   }
-  
+
+  // Load business name font when it changes (CMS font for decorative business name)
+  useEffect(() => {
+    if (formData?.businessNameFont) {
+      loadCmsFont(formData.businessNameFont);
+    }
+  }, [formData?.businessNameFont]);
+
   // If form mode and formData is provided, use form-based rendering
   if (mode === 'form' && formData) {
     // Use receiptFormat from props or formData
@@ -568,15 +617,18 @@ function renderFormBasedReceipt(
   
   // Helper function to render QR codes with positioning
   const renderQRCodes = (qrCodes: QRCodeConfig[], defaultAlign: 'left' | 'center' | 'right' = 'center') => {
+    // FIX: Only exclude explicitly disabled QR codes (allows undefined/true to pass)
     return qrCodes
-      .filter(qr => qr.enabled)
+      .filter(qr => qr.enabled !== false)
       .map((qr, index) => {
         const qrSize = qr.size === 'small' ? 64 : qr.size === 'medium' ? 96 : 128;
-        const alignStyle = qr.position === 'center' ? 'center' : qr.position === 'right' ? 'flex-end' : 'flex-start';
-        
+        // FIX: Ensure position is always a valid value with explicit type
+        const position: 'left' | 'center' | 'right' = qr.position || defaultAlign;
+
         return (
-          <div key={qr.id} className="my-2" style={{ display: 'flex', justifyContent: alignStyle }}>
-            <div className="text-center">
+          <div key={qr.id || index} className="my-2" style={{ textAlign: position }}>
+            {/* Use flexbox to ensure caption is always centered below QR code */}
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
               <QRCodeSVG
                 value={generateQRContent(qr)}
                 size={qrSize}
@@ -585,7 +637,14 @@ function renderFormBasedReceipt(
                 fgColor="#000000"
                 bgColor="#FFFFFF"
               />
-              {qr.type !== 'url' && (
+              {/* QR Code Caption - displays below the QR code */}
+              {qr.caption && (
+                <div className="mt-1" style={{ fontSize: '10px', fontWeight: 500, textAlign: 'center' }}>
+                  {qr.caption}
+                </div>
+              )}
+              {/* Type label for non-URL QR codes (only if no caption) */}
+              {!qr.caption && qr.type !== 'url' && (
                 <div className="text-xs mt-1" style={{ fontSize: '8px' }}>
                   {qr.type.toUpperCase()}
                 </div>
@@ -599,7 +658,7 @@ function renderFormBasedReceipt(
   // Helper to generate QR content
   const generateQRContent = (qrCode: QRCodeConfig): string => {
     if (!qrCode.content.trim()) return 'Preview QR Code';
-    
+
     switch (qrCode.type) {
       case 'wifi':
         return `WIFI:T:WPA;S:${qrCode.content.split(',')[0] || 'Network'};P:${qrCode.content.split(',')[1] || 'Password'};;`;
@@ -612,7 +671,27 @@ function renderFormBasedReceipt(
         return qrCode.content;
     }
   };
-  
+
+  // Helper to detect which courses are present in the order
+  const detectCourses = (items: any[]) => {
+    const hasStarters = items.some(item => {
+      const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+      const section = categoryToSectionMap[categoryId];
+      return section === 1;
+    });
+    const hasMains = items.some(item => {
+      const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+      const section = categoryToSectionMap[categoryId];
+      return [2, 3, 4, 7].includes(section);
+    });
+    const hasDesserts = items.some(item => {
+      const categoryId = itemToCategoryMap[item.menu_item_id] || item.category_id;
+      const section = categoryToSectionMap[categoryId];
+      return [5, 6].includes(section);
+    });
+    return { hasStarters, hasMains, hasDesserts };
+  };
+
   const calculateTotal = () => {
     const subtotal = data.subtotal || 0;
     const serviceCharge = data.serviceCharge || 0;
@@ -634,9 +713,9 @@ function renderFormBasedReceipt(
       }}
     >
       {/* Header QR Codes - Place at very top of receipt */}
-      {data.qrCodes && data.qrCodes.filter(qr => qr.placement === 'header').length > 0 && (
+      {data.headerQRCodes && data.headerQRCodes.length > 0 && (
         <div className="space-y-2 mb-4" style={{ fontFamily: receiptFont.cssFamily }}>
-          {renderQRCodes(data.qrCodes.filter(qr => qr.placement === 'header'))}
+          {renderQRCodes(data.headerQRCodes)}
         </div>
       )}
 
@@ -663,7 +742,17 @@ function renderFormBasedReceipt(
           </div>
         )}
         
-        <h1 className={`${headerSize} mb-1`} style={{ fontFamily: receiptFont.cssFamily }}>
+        <h1
+          className="mb-1"
+          style={{
+            fontFamily: data.businessNameFont
+              ? getCmsFontFamily(data.businessNameFont)
+              : receiptFont.cssFamily,
+            fontSize: data.businessNameFontSize ? `${data.businessNameFontSize}px` : (isKitchenReceipt ? '18px' : '16px'),
+            fontWeight: isKitchenReceipt ? 900 : 700,
+            lineHeight: 1.1  // Tight line-height to prevent large fonts pushing content down
+          }}
+        >
           {data.businessName || 'Restaurant Name'}
         </h1>
         <div className={`${restaurantInfoWeight} text-xs leading-tight`} style={{ fontFamily: receiptFont.cssFamily }}>
@@ -729,31 +818,31 @@ function renderFormBasedReceipt(
           )}
           
           {/* Conditional contextual chips based on Order Mode */}
-          {/* Dine-In → [Table 12] [4 pax] */}
+          {/* Dine-In → [Table 12] [4 pax] - Prominent styling for kitchen visibility */}
           {(data.orderMode === 'DINE-IN' || (!data.orderMode && data.orderType === 'dine_in')) && (
             <>
               {data.tableNumber && (
-                <span 
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                <span
+                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
                   style={{
-                    backgroundColor: '#F3F4F6',
-                    color: '#374151',
-                    fontSize: isKitchenReceipt ? '12px' : '10px'
+                    backgroundColor: '#7C3AED',
+                    color: 'white',
+                    fontSize: isKitchenReceipt ? '14px' : '10px'
                   }}
                 >
-                  Table {data.tableNumber}
+                  TABLE {data.tableNumber}
                 </span>
               )}
               {data.guestCount && data.guestCount > 0 && (
-                <span 
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                <span
+                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
                   style={{
-                    backgroundColor: '#F3F4F6',
-                    color: '#374151',
-                    fontSize: isKitchenReceipt ? '12px' : '10px'
+                    backgroundColor: '#7C3AED',
+                    color: 'white',
+                    fontSize: isKitchenReceipt ? '14px' : '10px'
                   }}
                 >
-                  {data.guestCount} pax
+                  {data.guestCount} PAX
                 </span>
               )}
             </>
@@ -1002,9 +1091,21 @@ function renderFormBasedReceipt(
                         // Determine display name for customer-grouped items:
                         // - Kitchen receipts: use kitchen_display_name (abbreviated) if available
                         // - Front of house: always use full item name
-                        const customerItemDisplayName = (isKitchenReceipt && item.kitchen_display_name)
-                          ? item.kitchen_display_name
-                          : item.name;
+                        // - If section is overridden, append original section indicator (e.g., "Chicken Tikka (st)")
+                        const customerItemDisplayName = (() => {
+                          const baseName = (isKitchenReceipt && item.kitchen_display_name)
+                            ? item.kitchen_display_name
+                            : item.name;
+
+                          // Add indicator if item has section override (served with different section)
+                          if (isKitchenReceipt && item.isOverride && item.originalSectionId) {
+                            const indicator = SECTION_INDICATORS[item.originalSectionId as SectionId];
+                            if (indicator) {
+                              return `${baseName} (${indicator})`;
+                            }
+                          }
+                          return baseName;
+                        })();
 
                         return (
                           <div key={item.id || idx}>
@@ -1112,27 +1213,39 @@ function renderFormBasedReceipt(
                   // Determine display name based on receipt format:
                   // - Kitchen receipts: use kitchen_display_name (abbreviated) if available
                   // - Front of house: always use full item name
+                  // - If section is overridden, append original section indicator (e.g., "Chicken Tikka (st)")
                   const displayName = (() => {
+                    let baseName: string;
+
                     // For kitchen receipts, use abbreviated kitchen_display_name if available
                     if (isKitchenReceipt && item.kitchen_display_name) {
-                      return item.kitchen_display_name;
+                      baseName = item.kitchen_display_name;
+                    } else if (!item.variant?.name) {
+                      // Front of house or no kitchen_display_name: use full item name
+                      // If no variant info exists, use name as-is
+                      baseName = item.name;
+                    } else {
+                      // Check if item.name already contains variant info (modern data format)
+                      const nameUpper = item.name.toUpperCase();
+                      const variantUpper = item.variant.name.toUpperCase();
+
+                      // If name already contains the variant name, use as-is (modern format)
+                      if (nameUpper.includes(variantUpper) || nameUpper === variantUpper) {
+                        baseName = item.name;
+                      } else {
+                        // Legacy fallback: append variant name for older data format
+                        baseName = `${item.name} (${item.variant.name})`;
+                      }
                     }
 
-                    // Front of house or no kitchen_display_name: use full item name
-                    // If no variant info exists, use name as-is
-                    if (!item.variant?.name) return item.name;
-
-                    // Check if item.name already contains variant info (modern data format)
-                    const nameUpper = item.name.toUpperCase();
-                    const variantUpper = item.variant.name.toUpperCase();
-
-                    // If name already contains the variant name, use as-is (modern format)
-                    if (nameUpper.includes(variantUpper) || nameUpper === variantUpper) {
-                      return item.name;
+                    // Add indicator if item has section override (served with different section)
+                    if (isKitchenReceipt && item.isOverride && item.originalSectionId) {
+                      const indicator = SECTION_INDICATORS[item.originalSectionId as SectionId];
+                      if (indicator) {
+                        return `${baseName} (${indicator})`;
+                      }
                     }
-
-                    // Legacy fallback: append variant name for older data format
-                    return `${item.name} (${item.variant.name})`;
+                    return baseName;
                   })();
 
                   return (
@@ -1282,17 +1395,39 @@ function renderFormBasedReceipt(
         );
       })()}
 
+      {/* Smart Course Indicator - Kitchen receipts only */}
+      {isKitchenReceipt && data.orderItems && data.orderItems.length > 0 && (() => {
+        const { hasStarters, hasMains, hasDesserts } = detectCourses(data.orderItems);
+        return (
+          <div
+            className="mt-3 border-t border-dashed border-gray-600 pt-2"
+            style={{ fontFamily: receiptFont.cssFamily }}
+          >
+            <div className="flex justify-center items-center text-sm font-bold">
+              <span>Starters: {hasStarters ? '☒' : '☐'}</span>
+              <span className="mx-2">|</span>
+              <span>Mains: {hasMains ? '☒' : '☐'}</span>
+              <span className="mx-2">|</span>
+              <span>Desserts: {hasDesserts ? '☒' : '☐'}</span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Kitchen QC Footer - Takeaway orders only (WAITING, COLLECTION, DELIVERY) */}
       {isKitchenReceipt &&
        ['WAITING', 'COLLECTION', 'DELIVERY'].includes(data.orderMode || '') &&
        (data.showContainerQtyField !== false || data.showCheckedField !== false) && (
         <div
-          className="mt-3 border-t border-dashed border-gray-600 pt-2"
+          className="mt-2 pt-2"
           style={{ fontFamily: receiptFont.cssFamily }}
         >
-          <div className="flex justify-center items-center gap-6 text-sm font-medium">
+          <div className="text-center text-sm font-medium whitespace-nowrap">
             {data.showContainerQtyField !== false && (
-              <span>Container/Item QTY: [____]</span>
+              <span>QTY: [____]</span>
+            )}
+            {data.showContainerQtyField !== false && data.showCheckedField !== false && (
+              <span className="mx-3">|</span>
             )}
             {data.showCheckedField !== false && (
               <span>Checked: ☐</span>
@@ -1328,12 +1463,14 @@ function renderFormBasedReceipt(
         </>
       )}
 
-      {/* Footer QR Codes - Only show footer placement QR codes */}
-      {data.qrCodes && data.qrCodes.filter(qr => qr.placement === 'footer').length > 0 && (
+      {/* Footer QR Codes - Read from footerQRCodes array (hide for DINE-IN kitchen copy) */}
+      {data.footerQRCodes &&
+       data.footerQRCodes.length > 0 &&
+       !(isKitchenReceipt && data.orderMode === 'DINE-IN') && (
         <>
           <div className="border-t border-black my-3" />
           <div className="space-y-2" style={{ fontFamily: receiptFont.cssFamily }}>
-            {renderQRCodes(data.qrCodes.filter(qr => qr.placement === 'footer'))}
+            {renderQRCodes(data.footerQRCodes)}
           </div>
         </>
       )}

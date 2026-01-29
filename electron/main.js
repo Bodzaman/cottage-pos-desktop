@@ -744,8 +744,8 @@ class CottageTandooriPOS {
         });
 
         this.mainWindow.once('ready-to-show', () => {
-            // Ensure splash shows for at least 2.5s so the animation is visible
-            const splashMinTime = 2500;
+            // Ensure splash shows for at least 4s for full brand animation + celebration
+            const splashMinTime = 4000;
             const elapsed = Date.now() - (this.splashStartTime || 0);
             const remainingDelay = Math.max(0, splashMinTime - elapsed);
 
@@ -755,20 +755,20 @@ class CottageTandooriPOS {
                     this.splashWindow.webContents.executeJavaScript(
                         "startExit()"
                     ).catch(() => {});
-                    // Allow exit animations to play (200ms beat + 500ms animations + 400ms fade = ~1100ms)
+                    // Allow exit animations to play (400ms celebration + 200ms beat + 500ms animations + 400ms fade = ~1500ms)
                     // Show main window partway through so it's ready behind the fading splash
                     setTimeout(() => {
                         this.mainWindow.maximize();
                         this.mainWindow.show();
                         this.mainWindow.focus();
                         log.info('POS window loaded successfully');
-                    }, 600);
+                    }, 1000);
                     setTimeout(() => {
                         if (this.splashWindow && !this.splashWindow.isDestroyed()) {
                             this.splashWindow.destroy();
                             this.splashWindow = null;
                         }
-                    }, 1200);
+                    }, 1600);
                 } else {
                     this.mainWindow.maximize();
                     this.mainWindow.show();

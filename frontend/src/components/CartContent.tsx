@@ -15,8 +15,8 @@ import { toast } from 'sonner';
 import { ItemRecommendations } from './ItemRecommendations';
 import { CartItemEditor } from './CartItemEditor'; // ✅ NEW: Import cart item editor
 import { CustomerVariantSelector } from './CustomerVariantSelector'; // ✅ NEW: Import for edit mode
-import { CustomerCustomizationModal } from './CustomerCustomizationModal'; // ✅ NEW: Import for edit mode
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore'; // ✅ NEW: To get variants
+import { CustomerUnifiedCustomizationModal } from './CustomerUnifiedCustomizationModal'; // ✅ Updated: Using unified modal
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat'; // ✅ NEW: To get variants
 import brain from 'brain';
 import { sortCartItemsByCategory } from 'utils/cartSorting';
 import { formatDistanceToNow } from 'date-fns';
@@ -112,7 +112,7 @@ export function CartContent({
   } = useCartStore();
   
   // ✅ NEW: Get itemVariants from realtime store for edit modal
-  const { itemVariants } = useRealtimeMenuStore();
+  const { itemVariants } = useRealtimeMenuStoreCompat({ context: 'online' });
   
   // ✅ NEW: Get the editing menu item from menuItems prop
   const editingCartItem = editingItemId ? items.find(i => i.id === editingItemId) : null;

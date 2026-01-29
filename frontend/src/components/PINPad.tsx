@@ -1,6 +1,22 @@
 import { useState, useCallback, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { Delete, X } from 'lucide-react';
+
+// Staggered button entrance animation variants
+const buttonVariants = {
+  hidden: { opacity: 0, scale: 0.8, y: 10 },
+  visible: (i: number) => ({
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.03, // 30ms stagger per button
+      duration: 0.25,
+      ease: [0.2, 0.8, 0.2, 1],
+    },
+  }),
+};
 
 interface PINPadProps {
   /** Mode: 'login' for PIN entry, 'set' for creating a new PIN */
@@ -13,14 +29,25 @@ interface PINPadProps {
   onSwitchToPassword?: () => void;
   /** Whether the component is in a loading state */
   isLoading?: boolean;
+  /** Whether to delay button animation (for splash transition sync) */
+  delayAnimation?: boolean;
 }
 
-export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoading = false }: PINPadProps) {
+export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoading = false, delayAnimation = false }: PINPadProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirming, setIsConfirming] = useState(false);
   const [shake, setShake] = useState(false);
   const [error, setError] = useState('');
+
+  // Staggered button entrance animation
+  // delayAnimation=true for initial splash transition, false for view switches
+  const [buttonsVisible, setButtonsVisible] = useState(false);
+  useEffect(() => {
+    const delay = delayAnimation ? 900 : 100;
+    const timer = setTimeout(() => setButtonsVisible(true), delay);
+    return () => clearTimeout(timer);
+  }, [delayAnimation]);
 
   const triggerShake = useCallback(() => {
     setShake(true);
@@ -177,37 +204,40 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
 
       {/* Keypad grid */}
       <div className="grid grid-cols-3 gap-3">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-          <button
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit, index) => (
+          <motion.button
             key={digit}
+            custom={index}
+            variants={buttonVariants}
+            initial="hidden"
+            animate={buttonsVisible ? "visible" : "hidden"}
             onClick={() => handleDigit(digit)}
             disabled={isLoading}
-            className="w-16 h-16 rounded-xl text-2xl font-semibold transition-all duration-150 active:scale-95"
+            className="w-16 h-16 rounded-xl text-2xl font-semibold transition-colors duration-150 active:scale-95"
             style={{
               background: QSAITheme.background.secondary,
               color: QSAITheme.text.primary,
               border: `1px solid rgba(124, 58, 237, 0.15)`,
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(124, 58, 237, 0.15)';
-              e.currentTarget.style.borderColor = QSAITheme.purple.primary;
-              e.currentTarget.style.boxShadow = `0 0 12px ${QSAITheme.purple.glow}`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = QSAITheme.background.secondary;
-              e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.15)';
-              e.currentTarget.style.boxShadow = 'none';
+            whileHover={{
+              background: 'rgba(124, 58, 237, 0.15)',
+              borderColor: QSAITheme.purple.primary,
+              boxShadow: `0 0 12px ${QSAITheme.purple.glow}`,
             }}
           >
             {digit}
-          </button>
+          </motion.button>
         ))}
 
         {/* Bottom row: Clear, 0, Backspace */}
-        <button
+        <motion.button
+          custom={9}
+          variants={buttonVariants}
+          initial="hidden"
+          animate={buttonsVisible ? "visible" : "hidden"}
           onClick={handleClear}
           disabled={isLoading}
-          className="w-16 h-16 rounded-xl flex items-center justify-center transition-all duration-150 active:scale-95"
+          className="w-16 h-16 rounded-xl flex items-center justify-center transition-colors duration-150 active:scale-95"
           style={{
             background: QSAITheme.background.secondary,
             color: QSAITheme.text.muted,
@@ -216,35 +246,38 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
           title="Clear"
         >
           <X className="w-5 h-5" />
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          custom={10}
+          variants={buttonVariants}
+          initial="hidden"
+          animate={buttonsVisible ? "visible" : "hidden"}
           onClick={() => handleDigit('0')}
           disabled={isLoading}
-          className="w-16 h-16 rounded-xl text-2xl font-semibold transition-all duration-150 active:scale-95"
+          className="w-16 h-16 rounded-xl text-2xl font-semibold transition-colors duration-150 active:scale-95"
           style={{
             background: QSAITheme.background.secondary,
             color: QSAITheme.text.primary,
             border: `1px solid rgba(124, 58, 237, 0.15)`,
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(124, 58, 237, 0.15)';
-            e.currentTarget.style.borderColor = QSAITheme.purple.primary;
-            e.currentTarget.style.boxShadow = `0 0 12px ${QSAITheme.purple.glow}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = QSAITheme.background.secondary;
-            e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.15)';
-            e.currentTarget.style.boxShadow = 'none';
+          whileHover={{
+            background: 'rgba(124, 58, 237, 0.15)',
+            borderColor: QSAITheme.purple.primary,
+            boxShadow: `0 0 12px ${QSAITheme.purple.glow}`,
           }}
         >
           0
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          custom={11}
+          variants={buttonVariants}
+          initial="hidden"
+          animate={buttonsVisible ? "visible" : "hidden"}
           onClick={handleBackspace}
           disabled={isLoading}
-          className="w-16 h-16 rounded-xl flex items-center justify-center transition-all duration-150 active:scale-95"
+          className="w-16 h-16 rounded-xl flex items-center justify-center transition-colors duration-150 active:scale-95"
           style={{
             background: QSAITheme.background.secondary,
             color: QSAITheme.text.muted,
@@ -253,7 +286,7 @@ export function PINPad({ mode, staffName, onSubmit, onSwitchToPassword, isLoadin
           title="Backspace"
         >
           <Delete className="w-5 h-5" />
-        </button>
+        </motion.button>
       </div>
 
       {/* Switch to password link */}

@@ -15,8 +15,8 @@ import {
   type KitchenTicketData,
   type CustomerReceiptData,
 } from './electronPrintService';
-import { useRealtimeMenuStore } from './realtimeMenuStore';
-import { findRootSection, FIXED_SECTIONS } from './sectionMapping';
+import { useRealtimeMenuStoreCompat } from './realtimeMenuStoreCompat';
+import { findRootSection, FIXED_SECTIONS, SECTION_INDICATORS, SectionId } from './sectionMapping';
 import { saveReceiptToHistory } from 'components/pos/ReprintDialog';
 
 /**
@@ -78,8 +78,7 @@ export function usePrintingOperations(
   const templateAssignments = useTemplateAssignments();
 
   // Get categories from realtime store for section mapping
-  const categories = useRealtimeMenuStore(state => state.categories);
-  const menuItems = useRealtimeMenuStore(state => state.menuItems);
+  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Build item to category lookup
   const itemToCategoryMap = useMemo(() => {
@@ -93,7 +92,33 @@ export function usePrintingOperations(
   }, [menuItems]);
 
   // Helper to get section info for an item
-  const getSectionInfo = useCallback((item: OrderItem): { sectionNumber: number; sectionName: string } => {
+  // Supports "Serve With" override - when item is served with a different section
+  const getSectionInfo = useCallback((item: OrderItem): {
+    sectionNumber: number;
+    sectionName: string;
+    isOverride?: boolean;
+    originalSectionId?: SectionId;
+    originalSectionName?: string;
+  } => {
+    // Check for section override first (item served with different section)
+    const overrideId = item.serveWithSectionId || item.serve_with_section_id;
+    if (overrideId) {
+      const overrideSection = FIXED_SECTIONS.find(s => s.uuid === overrideId);
+      if (overrideSection) {
+        // Find original section for indicator display
+        const originalCategoryId = item.category_id || itemToCategoryMap[item.menu_item_id];
+        const originalSection = originalCategoryId ? findRootSection(originalCategoryId, categories) : null;
+
+        return {
+          sectionNumber: overrideSection.order + 1,
+          sectionName: overrideSection.name,
+          isOverride: true,
+          originalSectionId: originalSection?.id as SectionId | undefined,
+          originalSectionName: originalSection?.name
+        };
+      }
+    }
+
     // Get category_id from item or lookup via menu_item_id
     const categoryId = item.category_id || itemToCategoryMap[item.menu_item_id];
     if (!categoryId) {
@@ -125,9 +150,11 @@ export function usePrintingOperations(
       });
       const assignment = await response.json();
 
+      // Handle null template IDs (database has NULL for some order modes)
+      // Fallback to classic_restaurant template if no template assigned
       return {
-        kitchenTemplateId: assignment.kitchen_template_id,
-        customerTemplateId: assignment.customer_template_id
+        kitchenTemplateId: assignment.kitchen_template_id || 'classic_restaurant',
+        customerTemplateId: assignment.customer_template_id || 'classic_restaurant'
       };
     } catch (error) {
       console.warn('⚠️ Failed to fetch template assignment, using defaults:', error);

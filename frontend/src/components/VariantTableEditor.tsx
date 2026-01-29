@@ -62,7 +62,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 
 interface VariantTableEditorProps {
   variants: Partial<MenuItemVariant>[];
@@ -123,9 +123,9 @@ export const VariantTableEditor: React.FC<VariantTableEditorProps> = ({
 }) => {
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  
+
   // Get protein types from real-time store for dynamic presets
-  const { proteinTypes } = useRealtimeMenuStore();
+  const { proteinTypes } = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // Set up drag-and-drop sensors
   const sensors = useSensors(

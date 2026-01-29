@@ -3,7 +3,7 @@ import { MenuItem, OrderItem } from '../utils/menuTypes';
 import { EditOrderItemModal } from './EditOrderItemModal';
 import { SetMealCustomizeModal } from './SetMealCustomizeModal';
 import { toast } from 'sonner';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 
 // Types for the orchestrator
 interface CustomizeRequest {
@@ -53,7 +53,7 @@ export function CustomizeOrchestratorProvider({ children }: CustomizeOrchestrato
   });
   
   // 🎯 Access categories to look up category_name
-  const { categories } = useRealtimeMenuStore();
+  const { categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Helper function to convert MenuItem to OrderItem
   const createOrderItemFromMenuItem = (menuItem: MenuItem): OrderItem => {

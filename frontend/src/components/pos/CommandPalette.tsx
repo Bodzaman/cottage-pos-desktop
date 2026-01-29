@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 import { globalColors } from '../../utils/QSAIDesign';
 import { colors as designColors } from '../../utils/designSystem';
-import { useRealtimeMenuStore } from '../../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../../utils/realtimeMenuStoreCompat';
 import { usePOSUIStore } from '../../utils/posUIStore';
-import { shallow } from 'zustand/shallow';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,7 +113,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   const listRef = useRef<HTMLDivElement>(null);
 
   // Menu items from store for searching
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
+  const { menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Build command registry
   const commands = useMemo<CommandItem[]>(() => {

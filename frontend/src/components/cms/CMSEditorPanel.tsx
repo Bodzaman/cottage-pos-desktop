@@ -10,6 +10,7 @@ import { HeroEditor } from './sections/HeroEditor';
 import { StoryEditor } from './sections/StoryEditor';
 import { TestimonialsEditor } from './sections/TestimonialsEditor';
 import { ContactEditor } from './sections/ContactEditor';
+import { GalleryEditor } from './sections/GalleryEditor';
 import { useAllWebsiteConfigs, useUpdateConfig } from '../../utils/websiteCmsQueries';
 import { colors } from '../../utils/InternalDesignSystem';
 import type { CMSPage } from '../../utils/websiteCmsTypes';
@@ -121,11 +122,12 @@ function renderSectionEditor(sectionKey: string, content: any, onUpdate: (c: any
       return <ContactEditor content={content} onUpdate={onUpdate} />;
     case 'about_heritage':
       return <StoryEditor content={content} onUpdate={onUpdate} />;
+    case 'gallery_images':
+      return <GalleryEditor content={content} onUpdate={onUpdate} />;
     case 'about_values':
     case 'about_timeline':
     case 'about_team':
     case 'about_awards':
-    case 'gallery_images':
       return (
         <div className="text-white/40 text-xs p-3 rounded border border-dashed"
           style={{ backgroundColor: colors.background.tertiary, borderColor: colors.border.medium }}>

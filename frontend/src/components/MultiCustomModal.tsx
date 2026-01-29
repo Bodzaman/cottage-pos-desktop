@@ -18,7 +18,7 @@ import { EditOrderItemModal } from './EditOrderItemModal';
 
 // Utils and Types
 import { MenuItem, OrderItem, ItemVariant } from '../utils/menuTypes';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { cn } from '@/lib/utils';
 

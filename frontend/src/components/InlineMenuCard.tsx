@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useCartStore } from 'utils/cartStore';
 import { ShoppingCart, Loader2, AlertCircle, Plus, Minus, Sliders } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,9 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { PremiumTheme } from 'utils/premiumTheme';
 import { cn } from 'utils/cn';
-import { CustomerVariantSelector } from './CustomerVariantSelector';
-import { CustomerCustomizationModal } from './CustomerCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { MenuItem, ItemVariant } from '../utils/menuTypes';
 import { useVariantImageCarousel } from 'utils/useVariantImageCarousel';
-import type { SelectedCustomization } from './CustomerCustomizationModal';
 import { computeUnitPrice } from 'utils/priceUtils';
 
 interface InlineMenuCardProps {
@@ -40,10 +38,9 @@ interface InlineMenuCardProps {
 export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0 }: InlineMenuCardProps) {
   // ✅ CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // This ensures consistent hook call order on every render (React Rules of Hooks)
-  const { menuItems, itemVariants, proteinTypes, customizations, isLoading } = useRealtimeMenuStore();
+  const { menuItems, itemVariants, proteinTypes, customizations, isLoading } = useRealtimeMenuStoreCompat({ context: 'online' });
   const { addItem, currentOrderMode } = useCartStore();
   const [isAddingToCart, setIsAddingToCart] = React.useState(false);
-  const [showVariantSelector, setShowVariantSelector] = React.useState(false);
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = React.useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const [selectedVariant, setSelectedVariant] = React.useState<ItemVariant | null>(null);
@@ -253,29 +250,17 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
     }
   };
 
-  // ✅ Handle customise button (opens variant selector)
+  // ✅ Handle customise button - Opens unified modal
   const handleCustomiseClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (isVariantBased) {
-      // For variant items, open the protein selection modal
-      setShowVariantSelector(true);
-    } else {
-      // For single items, open customization modal directly
-      setIsCustomizationModalOpen(true);
-    }
+    setIsCustomizationModalOpen(true);
   };
 
-  // ✅ Handle variant selector close
-  const handleVariantSelectorClose = () => {
-    setShowVariantSelector(false);
-  };
-
-  // ✅ Handle add to cart from variant selector (with customizations)
-  const handleAddToCartWithCustomizations = (
+  // ✅ Handle add to cart from unified modal (with customizations)
+  const handleAddToCartFromModal = (
     item: MenuItem,
-    variant: ItemVariant | null,
     qty: number,
+    variant: ItemVariant,
     customizationsList?: SelectedCustomization[],
     notes?: string
   ) => {
@@ -287,7 +272,7 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
       group: c.group
     }));
     addItem(item as any, variant, qty, cartCustomizations, mode, notes || '');
-    setShowVariantSelector(false);
+    setIsCustomizationModalOpen(false);
     toast.success(`Added ${item.name} to cart`, {
       description: variant?.name ? `Variant: ${variant.name} • Qty: ${qty}` : `Qty: ${qty}`,
       duration: 2000
@@ -517,35 +502,17 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
         </div>
       </Card>
 
-      {/* Customization Modal - For single items */}
-      <CustomerCustomizationModal
-        item={menuItem as any} // CustomerCustomizationModal uses menuTypes.MenuItem
-        variant={selectedVariant as any}
+      {/* Unified Customization Modal - Handles both variants and customizations */}
+      <CustomerUnifiedCustomizationModal
+        item={menuItem as any}
+        itemVariants={itemVariants as any[]}
         isOpen={isCustomizationModalOpen}
         onClose={() => setIsCustomizationModalOpen(false)}
-        addToCart={(item, qty, variant, customizations, notes) => {
-          // Modal callback order: (item, quantity, variant, customizations, notes)
-          handleAddToCartWithCustomizations(item as MenuItem, variant as ItemVariant, qty, customizations, notes);
-        }}
+        addToCart={handleAddToCartFromModal}
         mode={mode}
+        initialVariant={selectedVariant as any}
         initialQuantity={quantity}
       />
-
-      {/* Variant Selector Modal - For multi-variant items */}
-      {showVariantSelector && (
-        <CustomerVariantSelector
-          item={menuItem as any} // CustomerVariantSelector uses menuTypes.MenuItem
-          itemVariants={itemVariants as any[]}
-          isOpen={showVariantSelector}
-          onClose={handleVariantSelectorClose}
-          addToCart={(item, qty, variant, customizations, notes) =>
-            // Variant selector callback order: (item, quantity, variant, customizations?, notes?)
-            handleAddToCartWithCustomizations(item as MenuItem, variant as ItemVariant, qty, customizations, notes)
-          }
-          mode={mode}
-          initialVariant={selectedVariant as any}
-        />
-      )}
     </motion.div>
   );
 }

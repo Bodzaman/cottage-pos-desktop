@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { CategorySidebar } from 'components/CategorySidebar';
 import { MenuItemListView } from 'components/MenuItemListView';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { OrderItem } from 'utils/menuTypes';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 import brain from 'brain';
@@ -31,7 +31,7 @@ export function ThermalReceiptMenuSelector({ selectedItems, onItemsChange }: Pro
     isLoading: menuLoading,
     error: menuError,
     forceFullRefresh
-  } = useRealtimeMenuStore();
+  } = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // Load menu data on mount
   useEffect(() => {

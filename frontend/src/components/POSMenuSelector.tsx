@@ -5,12 +5,11 @@ import { POSMenuSearch } from './POSMenuSearch';
 import { PremiumMenuCard } from './PremiumMenuCard';
 import { POSMenuItemCard } from './POSMenuItemCard';
 import { POSMenuCardSkeleton } from './POSMenuCardSkeleton';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { groupItemsByHierarchy, getSectionDisplayName, getDisplayMode, groupItemsBySection } from 'utils/menuHelpers';
 import { QSAITheme } from '../utils/QSAIDesign';
 import type { MenuItem, ItemVariant, OrderItem as MenuOrderItem } from 'utils/menuTypes';
 import type { OrderItem } from 'types';
-import { shallow } from 'zustand/shallow';
 
 interface Props {
   onAddToOrder: (orderItem: OrderItem) => void;
@@ -42,13 +41,15 @@ export function POSMenuSelector({
   variantCarouselEnabled = true // NEW: POS Settings toggle
 }: Props) {
   // 🚀 SELECTIVE SUBSCRIPTIONS: Subscribe to specific fields only to prevent unnecessary re-renders
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
-  const filteredMenuItems = useRealtimeMenuStore(state => state.filteredMenuItems, shallow);
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const isLoading = useRealtimeMenuStore(state => state.isLoading);
-  const selectedMenuCategory = useRealtimeMenuStore(state => state.selectedMenuCategory);
-  const itemVariants = useRealtimeMenuStore(state => state.itemVariants, shallow);
-  const proteinTypes = useRealtimeMenuStore(state => state.proteinTypes, shallow);
+  const {
+    categories,
+    filteredMenuItems,
+    menuItems,
+    isLoading,
+    selectedMenuCategory,
+    itemVariants,
+    proteinTypes
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // View mode state (persisted to localStorage)
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {

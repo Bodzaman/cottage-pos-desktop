@@ -10,10 +10,11 @@ import { POSGuestCountModalWrapper } from "components/POSGuestCountModalWrapper"
 import { ChatTriggerButton } from "components/ChatTriggerButton";
 import { ChatLargeModal } from "components/ChatLargeModal";
 import { CartSidebar } from "components/CartSidebar";
-import { CustomerCustomizationModal } from "./CustomerCustomizationModal"; // ✅ FIX: Use relative path
+import { CustomerUnifiedCustomizationModal } from "./CustomerUnifiedCustomizationModal"; // ✅ Updated: Using unified modal
 import { GoogleMapsProvider } from "utils/googleMapsProvider";
 import { setupGlobalErrorHandlers, checkBrowserCompatibility } from "utils/errorHandling";
 import { useRealtimeMenuStore } from "utils/realtimeMenuStore";
+import { useRealtimeMenuStoreCompat } from "utils/realtimeMenuStoreCompat";
 import { useTableOrdersStore } from "utils/tableOrdersStore";
 import { useCartStore } from "utils/cartStore";
 import { useChatVisibility } from "utils/useChatVisibility";
@@ -43,7 +44,7 @@ function CustomerCustomizationModalWrapper() {
   const currentOrderMode = useCartStore((state) => state.currentOrderMode);
   
   // Get menu data from realtime store
-  const { menuItems } = useRealtimeMenuStore();
+  const { menuItems, itemVariants } = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // Find the editing cart item and menu item
   const editingCartItem = editingItemId ? items.find(i => i.id === editingItemId) : null;
@@ -75,15 +76,17 @@ function CustomerCustomizationModalWrapper() {
     return null;
   }
   
+  // Get variants for this menu item
+  const menuItemVariants = itemVariants?.filter(v => v.menu_item_id === editingMenuItem.id) || [];
+
   return (
-    <CustomerCustomizationModal
+    <CustomerUnifiedCustomizationModal
       item={editingMenuItem}
-      variant={editingCartItem.variant}
+      itemVariants={menuItemVariants}
       isOpen={true}
       onClose={handleCancelEdit}
       onModalClose={() => openCart()} // Reopen cart when modal closes
       addToCart={(item, quantity, variant, customizations, notes) => {
-        // ✅ NEW SIGNATURE: (item, quantity, variant, customizations, notes)
         // IMPORTANT: Update existing item, don't add new
         updateItem(editingItemId, {
           variant,
@@ -91,19 +94,21 @@ function CustomerCustomizationModalWrapper() {
           customizations,
           notes
         });
-        
+
         // Close editor and show success
         clearEditingItem();
         toast.success('Item updated successfully');
-        
+
         // Reopen cart to show updated item
         openCart();
       }}
       mode={currentOrderMode}
+      initialVariant={editingCartItem.variant}
       initialQuantity={editingCartItem.quantity}
       editMode={true}
+      editingCartItemId={editingItemId}
+      editingCartItem={editingCartItem}
       initialCustomizations={editingCartItem.customizations || []}
-      initialInstructions={editingCartItem.notes || ''}
     />
   );
 }

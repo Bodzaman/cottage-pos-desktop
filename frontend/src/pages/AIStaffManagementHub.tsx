@@ -7,16 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { 
-  User, 
-  Save, 
+import {
+  User,
+  Save,
   ChevronLeft,
   ChevronRight,
-  Upload, 
+  Upload,
   X,
   AlertCircle,
   CheckCircle2,
@@ -28,7 +29,10 @@ import {
   Rocket,
   TestTube,
   Loader2,
-  ImageIcon
+  ImageIcon,
+  Sparkles,
+  LayoutTemplate,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,7 +45,11 @@ import {
   updateUnifiedAgentConfig,
   getActiveVoicePrompt,
   uploadAgentAvatar,
-  publishWizardConfig
+  publishWizardConfig,
+  getActiveAITemplates,
+  getAITemplateById,
+  applyTemplateToConfig,
+  type AIPersonalityTemplate
 } from '../utils/supabaseQueries';
 import { supabase } from '../utils/supabaseClient';
 import { MultiNationalityPassportCard } from 'components/MultiNationalityPassportCard';
@@ -106,13 +114,14 @@ import {
   type StageValidationResult
 } from 'utils/wizardValidation';
 import { WizardPageSkeleton } from 'components/LoadingSkeleton';
-import { 
-  IdentityStageEmpty, 
-  ChatStageEmpty, 
-  VoiceStageEmpty, 
+import {
+  IdentityStageEmpty,
+  ChatStageEmpty,
+  VoiceStageEmpty,
   PreviewPanelEmpty,
-  NoAvatarPlaceholder 
+  NoAvatarPlaceholder
 } from 'components/EmptyState';
+import { DEFAULT_VOICE, getVoiceOptions } from 'utils/voiceConfigRegistry';
 import { SuccessFeedback } from 'components/SuccessFeedback';
 import { useKeyboardShortcuts } from 'utils/useKeyboardShortcuts';
 import { useAnnouncer } from 'components/AriaLiveRegion';
@@ -211,7 +220,7 @@ const AIStaffManagementHub: React.FC = () => {
     voice: {
       system_prompt: '',
       first_response: '',
-      voice_model: 'en-GB-Neural2-B',
+      voice_model: DEFAULT_VOICE,
     },
     isDraft: false,
     isPublished: false,
@@ -263,6 +272,13 @@ const AIStaffManagementHub: React.FC = () => {
 
   // Voice prompt source tracking
   const [promptSource, setPromptSource] = useState<'default' | 'custom'>('default');
+
+  // Template system state (Phase 0.5)
+  const [templates, setTemplates] = useState<AIPersonalityTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<AIPersonalityTemplate | null>(null);
+  const [personalityTraits, setPersonalityTraits] = useState<string[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   // Voice tester UI state
   const [voiceTesterExpanded, setVoiceTesterExpanded] = useState(false);
@@ -399,6 +415,27 @@ const AIStaffManagementHub: React.FC = () => {
       try {
         setIsLoading(true);
 
+        // Load templates first (Phase 0.5)
+        setIsLoadingTemplates(true);
+        try {
+          const templatesResult = await getActiveAITemplates();
+          if (templatesResult.success && templatesResult.data) {
+            setTemplates(templatesResult.data);
+            // Set default template if one is marked as default
+            const defaultTemplate = templatesResult.data.find(t => t.is_default);
+            if (defaultTemplate) {
+              setSelectedTemplateId(defaultTemplate.id);
+              setSelectedTemplate(defaultTemplate);
+              setPersonalityTraits(defaultTemplate.default_traits || []);
+            }
+          }
+        } catch (templateError) {
+          console.warn('[AIStaffManagementHub] Templates not available yet:', templateError);
+          // Continue without templates - they may not be seeded yet
+        } finally {
+          setIsLoadingTemplates(false);
+        }
+
         // Fetch unified_agent_config using direct Supabase query
         let result = await getUnifiedAgentConfig();
 
@@ -416,6 +453,22 @@ const AIStaffManagementHub: React.FC = () => {
 
         if (agentData) {
           await populateWizardState(agentData);
+
+          // If config has a template_id, use it (Phase 0.5)
+          const templateId = (agentData as any).template_id;
+          if (templateId) {
+            setSelectedTemplateId(templateId);
+            const templateResult = await getAITemplateById(templateId);
+            if (templateResult.success && templateResult.data) {
+              setSelectedTemplate(templateResult.data);
+            }
+          }
+
+          // Load personality traits from config if available
+          const traits = (agentData as any).personality_traits;
+          if (traits && Array.isArray(traits)) {
+            setPersonalityTraits(traits);
+          }
         }
 
         setHasUnsavedChanges(false);
@@ -478,7 +531,7 @@ const AIStaffManagementHub: React.FC = () => {
       voice: {
         system_prompt: finalVoicePrompt,
         first_response: (config.channel_settings as any)?.voice?.first_response || '',
-        voice_model: (config.channel_settings as any)?.voice?.voice_model || 'en-GB-Neural2-B',
+        voice_model: (config.channel_settings as any)?.voice?.voice_model || DEFAULT_VOICE,
       },
       isDraft: false,
       isPublished: config.is_active || false,
@@ -577,7 +630,7 @@ const AIStaffManagementHub: React.FC = () => {
       setShowPublishConfirm(false);
 
       // Prepare publish request
-      const publishRequest: PublishWizardConfigRequest = {
+      const publishRequest: PublishWizardConfigRequest & { template_id?: string; personality_traits?: string[] } = {
         agent_name: wizardState.identity.name,
         agent_role: wizardState.identity.title,
         nationality: wizardState.identity.nationality,
@@ -588,6 +641,9 @@ const AIStaffManagementHub: React.FC = () => {
         voice_system_prompt: wizardState.voice.system_prompt,
         voice_first_response: wizardState.voice.first_response,
         voice_model: wizardState.voice.voice_model,
+        // Phase 0.5: Include template and traits
+        template_id: selectedTemplateId || undefined,
+        personality_traits: personalityTraits.length > 0 ? personalityTraits : undefined,
       };
 
 
@@ -622,7 +678,7 @@ const AIStaffManagementHub: React.FC = () => {
       name: state.identity?.name || 'AI Assistant',
       description: state.identity?.title || 'AI Voice Assistant',
       avatar_url: (state.identity as any)?.avatar_url || null,
-      voice_type: state.voice?.voice_model || 'en-GB-Neural2-B',
+      voice_type: state.voice?.voice_model || DEFAULT_VOICE,
       personality: state.identity?.tone || 'friendly',
       gender: null,
       nationality: state.identity?.nationality || 'British',
@@ -734,6 +790,13 @@ const AIStaffManagementHub: React.FC = () => {
           nationality: wizardState.identity.nationality,
           core_traits: wizardState.identity.tone,
         };
+        // Save template and traits (Phase 0.5)
+        if (selectedTemplateId) {
+          updates.template_id = selectedTemplateId;
+        }
+        if (personalityTraits.length > 0) {
+          updates.personality_traits = personalityTraits;
+        }
       } else if (currentStage === 'chat') {
         // Phase 6: MERGE with existing channel_settings - preserve voice settings
         updates.channel_settings = {
@@ -911,6 +974,55 @@ const AIStaffManagementHub: React.FC = () => {
     }
   };
 
+  // Handle template selection (Phase 0.5)
+  const handleTemplateSelect = async (templateId: string) => {
+    try {
+      const template = templates.find(t => t.id === templateId);
+      if (!template) return;
+
+      setSelectedTemplateId(templateId);
+      setSelectedTemplate(template);
+      setPersonalityTraits(template.default_traits || []);
+
+      // Auto-populate wizard state from template defaults
+      setWizardState(prev => ({
+        ...prev,
+        identity: {
+          ...prev.identity,
+          name: prev.identity.name || template.default_agent_name,
+          // Keep user's existing values if set
+        },
+        chatBot: {
+          ...prev.chatBot,
+          system_prompt: template.system_prompt_chat,
+        },
+        voice: {
+          ...prev.voice,
+          system_prompt: template.system_prompt_voice,
+          first_response: prev.voice.first_response || template.default_greeting,
+          voice_model: template.default_voice_model || prev.voice.voice_model,
+        },
+      }));
+
+      setPromptSource('default');
+      toast.success(`Template "${template.name}" applied`);
+    } catch (error) {
+      console.error('Error applying template:', error);
+      toast.error('Failed to apply template');
+    }
+  };
+
+  // Handle personality trait toggle (Phase 0.5)
+  const handleTraitToggle = (trait: string) => {
+    setPersonalityTraits(prev => {
+      if (prev.includes(trait)) {
+        return prev.filter(t => t !== trait);
+      }
+      return [...prev, trait];
+    });
+    setHasUnsavedChanges(true);
+  };
+
   // Show loading skeleton during initial data fetch
   if (isLoading) {
     return <WizardPageSkeleton />;
@@ -979,11 +1091,93 @@ const AIStaffManagementHub: React.FC = () => {
                 {/* STAGE 1: Identity */}
                 {currentStage === 'identity' && (
                   <>
+                    {/* Template Selector (Phase 0.5) */}
+                    {templates.length > 0 && (
+                      <div className="space-y-3 pb-4 mb-4 border-b" style={{ borderColor: colors.border.medium }}>
+                        <div className="flex items-center gap-2">
+                          <LayoutTemplate className="h-5 w-5" style={{ color: colors.brand.purple }} />
+                          <Label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                            Personality Template
+                          </Label>
+                          <Badge
+                            variant="secondary"
+                            className="text-xs"
+                            style={{ backgroundColor: colors.background.highlight, color: colors.accent.turquoise }}
+                          >
+                            NEW
+                          </Badge>
+                        </div>
+                        <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                          Choose a pre-built personality that matches your restaurant style
+                        </p>
+                        <Select
+                          value={selectedTemplateId || ''}
+                          onValueChange={handleTemplateSelect}
+                        >
+                          <SelectTrigger
+                            className="input-animated transition-all duration-200"
+                            style={{
+                              backgroundColor: colors.background.tertiary,
+                              borderColor: selectedTemplateId ? colors.accent.turquoise : colors.border.medium,
+                              color: colors.text.primary
+                            }}
+                          >
+                            <SelectValue placeholder="Select a personality template..." />
+                          </SelectTrigger>
+                          <SelectContent
+                            style={{
+                              backgroundColor: colors.background.secondary,
+                              borderColor: colors.border.medium,
+                            }}
+                          >
+                            {templates.map((template) => (
+                              <SelectItem
+                                key={template.id}
+                                value={template.id}
+                                style={{ color: colors.text.primary }}
+                              >
+                                <div className="flex flex-col py-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{template.name}</span>
+                                    {template.is_default && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0" style={{ borderColor: colors.accent.gold, color: colors.accent.gold }}>
+                                        Default
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {template.description && (
+                                    <span className="text-xs" style={{ color: colors.text.tertiary }}>
+                                      {template.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedTemplate && (
+                          <div className="p-3 rounded-lg" style={{ backgroundColor: colors.background.tertiary, border: `1px solid ${colors.accent.turquoise}30` }}>
+                            <div className="flex items-start gap-2">
+                              <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: colors.accent.turquoise }} />
+                              <div>
+                                <p className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                                  {selectedTemplate.name}
+                                </p>
+                                <p className="text-xs mt-1" style={{ color: colors.text.secondary }}>
+                                  {selectedTemplate.description}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Show empty state if no name yet */}
-                    {!wizardState.identity.name && !touchedFields.has('name') && (
+                    {!wizardState.identity.name && !touchedFields.has('name') && !selectedTemplate && (
                       <IdentityStageEmpty />
                     )}
-                    
+
                     <div className="space-y-2">
                       <div className="flex items-center gap-1">
                         <Label htmlFor="agent-name" className="text-sm" style={{ color: colors.text.primary }}>Name</Label>
@@ -1115,6 +1309,52 @@ const AIStaffManagementHub: React.FC = () => {
                       <ErrorMessage fieldName="nationality" />
                     </div>
 
+                    {/* Personality Traits (Phase 0.5) */}
+                    {selectedTemplate && selectedTemplate.available_traits && selectedTemplate.available_traits.length > 0 && (
+                      <div className="space-y-3">
+                        <Label className="text-sm" style={{ color: colors.text.primary }}>
+                          Personality Traits
+                        </Label>
+                        <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                          Select traits that describe your AI's personality
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedTemplate.available_traits.map((trait) => (
+                            <label
+                              key={trait}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:scale-105"
+                              style={{
+                                backgroundColor: personalityTraits.includes(trait)
+                                  ? `${colors.brand.purple}20`
+                                  : colors.background.tertiary,
+                                border: `1px solid ${personalityTraits.includes(trait) ? colors.brand.purple : colors.border.medium}`,
+                              }}
+                            >
+                              <Checkbox
+                                checked={personalityTraits.includes(trait)}
+                                onCheckedChange={() => handleTraitToggle(trait)}
+                                className="border-gray-400"
+                              />
+                              <span
+                                className="text-sm capitalize"
+                                style={{
+                                  color: personalityTraits.includes(trait) ? colors.brand.purple : colors.text.secondary,
+                                  fontWeight: personalityTraits.includes(trait) ? 500 : 400
+                                }}
+                              >
+                                {trait}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        {personalityTraits.length > 0 && (
+                          <p className="text-xs" style={{ color: colors.accent.turquoise }}>
+                            Selected: {personalityTraits.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label style={{ color: colors.text.primary }}>Avatar Photo</Label>
                       <div className="flex items-center gap-3">
@@ -1173,179 +1413,132 @@ const AIStaffManagementHub: React.FC = () => {
                 {/* STAGE 2: Chat Bot */}
                 {currentStage === 'chat' && (
                   <>
-                    {/* Show empty state if no chat prompt yet */}
-                    {!wizardState.chatBot.system_prompt && !touchedFields.has('chatSystemPrompt') && (
-                      <ChatStageEmpty />
-                    )}
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1">
-                          <Label htmlFor="chat-system-prompt">System Prompt</Label>
-                          <RequiredIndicator />
-                          <div className="ml-2">
-                            <ValidationIcon state={getFieldState('chatSystemPrompt', wizardState.chatBot.system_prompt)} />
-                          </div>
+                    {/* Template-based prompt info (Phase 0.5) */}
+                    {selectedTemplate && (
+                      <div className="space-y-3 pb-4 mb-4 border-b" style={{ borderColor: colors.border.medium }}>
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-5 w-5" style={{ color: colors.brand.purple }} />
+                          <span className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                            Chat Personality: {selectedTemplate.name}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-xs"
+                            style={{ borderColor: colors.accent.turquoise, color: colors.accent.turquoise }}
+                          >
+                            Template Applied
+                          </Badge>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleGenerateChatPrompt}
-                          disabled={generatingChatPrompt}
-                          className="btn-animated"
-                          style={{ borderColor: colors.brand.purple }}
-                        >
-                          {generatingChatPrompt ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            '✨ Generate Prompt'
-                          )}
-                        </Button>
-                      </div>
-                      <Textarea
-                        id="chat-system-prompt"
-                        rows={6}
-                        value={wizardState.chatBot.system_prompt}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setWizardState(prev => ({
-                            ...prev,
-                            chatBot: { ...prev.chatBot, system_prompt: value }
-                          }));
-                          if (touchedFields.has('chatSystemPrompt')) {
-                            validateAndSetError('chatSystemPrompt', value);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          markFieldTouched('chatSystemPrompt');
-                          validateAndSetError('chatSystemPrompt', e.target.value);
-                        }}
-                        placeholder="Enter the system prompt that defines how the chat bot should behave and respond to customers..."
-                        maxLength={50000}
-                        className="input-animated transition-all duration-200 sm:rows-8 md:rows-10"
-                        style={{
-                          backgroundColor: colors.background.tertiary,
-                          borderColor: getBorderColor(getFieldState('chatSystemPrompt', wizardState.chatBot.system_prompt)),
-                          color: colors.text.primary
-                        }}
-                        aria-required="true"
-                        aria-invalid={fieldErrors['chatSystemPrompt'] ? 'true' : 'false'}
-                        aria-describedby={fieldErrors['chatSystemPrompt'] ? 'chatSystemPrompt-error' : undefined}
-                      />
-                      <div className="flex items-center justify-between">
-                        <ErrorMessage fieldName="chatSystemPrompt" />
-                        <p className="text-xs ml-auto" style={{ color: colors.text.tertiary }}>
-                          {wizardState.chatBot.system_prompt.length} / 50,000 characters
+                        <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                          Your chat bot uses the "{selectedTemplate.name}" personality template. The system prompt is pre-configured for optimal performance.
                         </p>
                       </div>
-                      
-                      {/* NEW: Complete Prompt Preview (read-only) */}
-                      {chatCompletePrompt && (
-                        <Accordion type="single" collapsible className="mt-4">
-                          <AccordionItem value="complete-prompt" style={{ borderColor: colors.border.medium }}>
-                            <AccordionTrigger 
-                              className="text-sm hover:no-underline"
+                    )}
+
+                    {/* Show empty state if no chat prompt yet */}
+                    {!wizardState.chatBot.system_prompt && !touchedFields.has('chatSystemPrompt') && !selectedTemplate && (
+                      <ChatStageEmpty />
+                    )}
+
+                    {/* Simplified view: Show prompt preview instead of editable textarea */}
+                    {selectedTemplate && wizardState.chatBot.system_prompt && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Label className="text-sm">Chat System Prompt</Label>
+                            <CheckCircle2 className="h-4 w-4" style={{ color: colors.accent.turquoise }} />
+                          </div>
+                          <Badge variant="secondary" style={{ backgroundColor: colors.background.highlight }}>
+                            {wizardState.chatBot.system_prompt.length.toLocaleString()} chars
+                          </Badge>
+                        </div>
+
+                        {/* Read-only preview */}
+                        <div
+                          className="p-4 rounded-lg max-h-[200px] overflow-y-auto"
+                          style={{
+                            backgroundColor: colors.background.tertiary,
+                            border: `1px solid ${colors.border.medium}`,
+                          }}
+                        >
+                          <p className="text-sm whitespace-pre-wrap line-clamp-6" style={{ color: colors.text.secondary }}>
+                            {wizardState.chatBot.system_prompt.substring(0, 500)}
+                            {wizardState.chatBot.system_prompt.length > 500 && '...'}
+                          </p>
+                        </div>
+
+                        {/* Advanced: Edit prompt accordion */}
+                        <Accordion type="single" collapsible className="mt-2">
+                          <AccordionItem value="edit-prompt" style={{ borderColor: colors.border.medium }}>
+                            <AccordionTrigger
+                              className="text-sm hover:no-underline py-2"
                               style={{ color: colors.text.secondary }}
                             >
-                              📋 View Complete Prompt (with CORE instructions)
+                              <div className="flex items-center gap-2">
+                                <ChevronDown className="h-4 w-4" />
+                                Advanced: Edit System Prompt
+                              </div>
                             </AccordionTrigger>
                             <AccordionContent>
-                              <div 
-                                className="p-4 rounded-md font-mono text-xs whitespace-pre-wrap"
-                                style={{
-                                  backgroundColor: colors.background.tertiary,
-                                  border: `1px solid ${colors.border.medium}`,
-                                  color: colors.text.tertiary,
-                                  maxHeight: '400px',
-                                  overflowY: 'auto'
-                                }}
-                              >
-                                {chatCompletePrompt}
+                              <div className="space-y-2 pt-2">
+                                <Textarea
+                                  id="chat-system-prompt"
+                                  rows={10}
+                                  value={wizardState.chatBot.system_prompt}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setWizardState(prev => ({
+                                      ...prev,
+                                      chatBot: { ...prev.chatBot, system_prompt: value }
+                                    }));
+                                    if (touchedFields.has('chatSystemPrompt')) {
+                                      validateAndSetError('chatSystemPrompt', value);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    markFieldTouched('chatSystemPrompt');
+                                    validateAndSetError('chatSystemPrompt', e.target.value);
+                                  }}
+                                  placeholder="Enter the system prompt..."
+                                  maxLength={50000}
+                                  className="input-animated transition-all duration-200 font-mono text-xs"
+                                  style={{
+                                    backgroundColor: colors.background.tertiary,
+                                    borderColor: getBorderColor(getFieldState('chatSystemPrompt', wizardState.chatBot.system_prompt)),
+                                    color: colors.text.primary
+                                  }}
+                                />
+                                <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                                  ⚠️ Editing the system prompt will override the template. {wizardState.chatBot.system_prompt.length.toLocaleString()} / 50,000 characters
+                                </p>
                               </div>
-                              <p className="text-xs mt-2" style={{ color: colors.text.tertiary }}>
-                                Complete prompt: {chatCompletePrompt.length.toLocaleString()} characters (includes CORE instructions + your customizations)
-                              </p>
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>
-                      )}
-                    </div>
-
-                    {/* ... existing custom instructions field stays unchanged ... */}
-                    <div className="space-y-2">
-                      <Label htmlFor="custom-instructions" className="text-sm" style={{ color: colors.text.primary }}>Custom Instructions</Label>
-                      <Textarea
-                        id="custom-instructions"
-                        value={wizardState.chatBot.custom_instructions}
-                        onChange={(e) => setWizardState(prev => ({
-                          ...prev,
-                          chatBot: { ...prev.chatBot, custom_instructions: e.target.value }
-                        }))}
-                        placeholder="Additional custom instructions..."
-                        rows={4}
-                        className="input-animated sm:rows-5"
-                        style={{
-                          backgroundColor: colors.background.tertiary,
-                          borderColor: colors.border.medium,
-                          color: colors.text.primary
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* STAGE 3: Voice */}
-                {currentStage === 'voice' && (
-                  <>
-                    {/* Show empty state if no voice prompt yet */}
-                    {!wizardState.voice.system_prompt && !touchedFields.has('voiceSystemPrompt') && (
-                      <VoiceStageEmpty />
+                      </div>
                     )}
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="voice-prompt" className="text-sm" style={{ color: colors.text.primary }}>Voice System Prompt</Label>
-                          <RequiredIndicator />
-                          <Badge 
-                            variant={promptSource === 'default' ? 'secondary' : 'default'}
-                            className={promptSource === 'default' ? 'badge-pulse' : ''}
-                            style={{ 
-                              backgroundColor: promptSource === 'default' ? colors.background.highlight : colors.brand.purple,
-                              color: colors.text.primary,
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            {promptSource === 'default' ? '🔒 Using Default' : '✏️ Custom Prompt'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {promptSource === 'custom' && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleRevertToDefaultPrompt}
-                              className="btn-animated"
-                              style={{ borderColor: colors.text.tertiary }}
-                            >
-                              🔄 Revert to Default
-                            </Button>
-                          )}
+
+                    {/* Fallback: Original editable textarea if no template selected */}
+                    {!selectedTemplate && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor="chat-system-prompt">System Prompt</Label>
+                            <RequiredIndicator />
+                            <div className="ml-2">
+                              <ValidationIcon state={getFieldState('chatSystemPrompt', wizardState.chatBot.system_prompt)} />
+                            </div>
+                          </div>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={handleGenerateVoicePrompt}
-                            disabled={generatingVoicePrompt}
+                            onClick={handleGenerateChatPrompt}
+                            disabled={generatingChatPrompt}
                             className="btn-animated"
                             style={{ borderColor: colors.brand.purple }}
                           >
-                            {generatingVoicePrompt ? (
+                            {generatingChatPrompt ? (
                               <>
                                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                                 Generating...
@@ -1355,86 +1548,355 @@ const AIStaffManagementHub: React.FC = () => {
                             )}
                           </Button>
                         </div>
+                        <Textarea
+                          id="chat-system-prompt"
+                          rows={6}
+                          value={wizardState.chatBot.system_prompt}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setWizardState(prev => ({
+                              ...prev,
+                              chatBot: { ...prev.chatBot, system_prompt: value }
+                            }));
+                            if (touchedFields.has('chatSystemPrompt')) {
+                              validateAndSetError('chatSystemPrompt', value);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            markFieldTouched('chatSystemPrompt');
+                            validateAndSetError('chatSystemPrompt', e.target.value);
+                          }}
+                          placeholder="Enter the system prompt that defines how the chat bot should behave and respond to customers..."
+                          maxLength={50000}
+                          className="input-animated transition-all duration-200 sm:rows-8 md:rows-10"
+                          style={{
+                            backgroundColor: colors.background.tertiary,
+                            borderColor: getBorderColor(getFieldState('chatSystemPrompt', wizardState.chatBot.system_prompt)),
+                            color: colors.text.primary
+                          }}
+                          aria-required="true"
+                          aria-invalid={fieldErrors['chatSystemPrompt'] ? 'true' : 'false'}
+                          aria-describedby={fieldErrors['chatSystemPrompt'] ? 'chatSystemPrompt-error' : undefined}
+                        />
+                        <div className="flex items-center justify-between">
+                          <ErrorMessage fieldName="chatSystemPrompt" />
+                          <p className="text-xs ml-auto" style={{ color: colors.text.tertiary }}>
+                            {wizardState.chatBot.system_prompt.length} / 50,000 characters
+                          </p>
+                        </div>
                       </div>
-                      <Textarea
-                        id="voice-prompt"
-                        value={wizardState.voice.system_prompt}
-                        onChange={(e) => {
-                          const newValue = e.target.value;
+                    )}
 
-                          // Mark as custom on first edit
-                          if (promptSource === 'default' && !hasMarkedCustom.current) {
-                            hasMarkedCustom.current = true;
-                            setPromptSource('custom');
-                          }
-                          
-                          setWizardState(prev => ({
-                            ...prev,
-                            voice: {
-                              ...prev.voice,
-                              system_prompt: newValue,
-                            },
-                          }));
-                          
-                          if (touchedFields.has('voiceSystemPrompt')) {
-                            validateAndSetError('voiceSystemPrompt', newValue);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          markFieldTouched('voiceSystemPrompt');
-                          validateAndSetError('voiceSystemPrompt', e.target.value);
-                        }}
-                        rows={6}
-                        placeholder="Enter the system prompt for your voice assistant..."
-                        maxLength={50000}
-                        className="input-animated transition-all duration-200 sm:rows-8 md:rows-10"
+                    {/* Complete Prompt Preview (read-only) */}
+                    {chatCompletePrompt && (
+                      <Accordion type="single" collapsible className="mt-4">
+                        <AccordionItem value="complete-prompt" style={{ borderColor: colors.border.medium }}>
+                          <AccordionTrigger
+                            className="text-sm hover:no-underline"
+                            style={{ color: colors.text.secondary }}
+                          >
+                            📋 View Complete Prompt (with CORE instructions)
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div
+                              className="p-4 rounded-md font-mono text-xs whitespace-pre-wrap"
+                              style={{
+                                backgroundColor: colors.background.tertiary,
+                                border: `1px solid ${colors.border.medium}`,
+                                color: colors.text.tertiary,
+                                maxHeight: '400px',
+                                overflowY: 'auto'
+                              }}
+                            >
+                              {chatCompletePrompt}
+                            </div>
+                            <p className="text-xs mt-2" style={{ color: colors.text.tertiary }}>
+                              Complete prompt: {chatCompletePrompt.length.toLocaleString()} characters (includes CORE instructions + your customizations)
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    )}
+
+                    {/* Custom instructions field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="custom-instructions" className="text-sm" style={{ color: colors.text.primary }}>
+                        Custom Instructions <span className="text-xs font-normal" style={{ color: colors.text.tertiary }}>(Optional)</span>
+                      </Label>
+                      <Textarea
+                        id="custom-instructions"
+                        value={wizardState.chatBot.custom_instructions}
+                        onChange={(e) => setWizardState(prev => ({
+                          ...prev,
+                          chatBot: { ...prev.chatBot, custom_instructions: e.target.value }
+                        }))}
+                        placeholder="Add any specific instructions for your restaurant (e.g., 'Always mention our Tuesday special')"
+                        rows={3}
+                        className="input-animated"
                         style={{
                           backgroundColor: colors.background.tertiary,
-                          borderColor: getBorderColor(getFieldState('voiceSystemPrompt', wizardState.voice.system_prompt)),
+                          borderColor: colors.border.medium,
                           color: colors.text.primary
                         }}
-                        aria-required="true"
-                        aria-invalid={fieldErrors['voiceSystemPrompt'] ? 'true' : 'false'}
-                        aria-describedby={fieldErrors['voiceSystemPrompt'] ? 'voiceSystemPrompt-error' : undefined}
                       />
-                      <div className="flex items-center justify-between">
-                        <ErrorMessage fieldName="voiceSystemPrompt" />
-                        <p className="text-xs ml-auto" style={{ color: colors.text.tertiary }}>
-                          Your customizations: {wizardState.voice.system_prompt.length.toLocaleString()} / 50,000 characters
+                      <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                        These will be appended to the system prompt
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* STAGE 3: Voice */}
+                {currentStage === 'voice' && (
+                  <>
+                    {/* Template-based prompt info (Phase 0.5) */}
+                    {selectedTemplate && (
+                      <div className="space-y-3 pb-4 mb-4 border-b" style={{ borderColor: colors.border.medium }}>
+                        <div className="flex items-center gap-2">
+                          <Mic className="h-5 w-5" style={{ color: colors.brand.purple }} />
+                          <span className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                            Voice Personality: {selectedTemplate.name}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-xs"
+                            style={{ borderColor: colors.accent.turquoise, color: colors.accent.turquoise }}
+                          >
+                            Template Applied
+                          </Badge>
+                        </div>
+                        <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                          Your voice assistant uses the "{selectedTemplate.name}" personality. The voice prompt is optimized for natural spoken interaction.
                         </p>
                       </div>
-                      
-                      {/* NEW: Complete Prompt Preview (read-only) */}
-                      {voiceCompletePrompt && (
-                        <Accordion type="single" collapsible className="mt-4">
-                          <AccordionItem value="complete-prompt" style={{ borderColor: colors.border.medium }}>
-                            <AccordionTrigger 
-                              className="text-sm hover:no-underline"
+                    )}
+
+                    {/* Show empty state if no voice prompt yet */}
+                    {!wizardState.voice.system_prompt && !touchedFields.has('voiceSystemPrompt') && !selectedTemplate && (
+                      <VoiceStageEmpty />
+                    )}
+
+                    {/* Simplified view: Show prompt preview instead of editable textarea */}
+                    {selectedTemplate && wizardState.voice.system_prompt && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Label className="text-sm">Voice System Prompt</Label>
+                            <CheckCircle2 className="h-4 w-4" style={{ color: colors.accent.turquoise }} />
+                          </div>
+                          <Badge variant="secondary" style={{ backgroundColor: colors.background.highlight }}>
+                            {wizardState.voice.system_prompt.length.toLocaleString()} chars
+                          </Badge>
+                        </div>
+
+                        {/* Read-only preview */}
+                        <div
+                          className="p-4 rounded-lg max-h-[200px] overflow-y-auto"
+                          style={{
+                            backgroundColor: colors.background.tertiary,
+                            border: `1px solid ${colors.border.medium}`,
+                          }}
+                        >
+                          <p className="text-sm whitespace-pre-wrap line-clamp-6" style={{ color: colors.text.secondary }}>
+                            {wizardState.voice.system_prompt.substring(0, 500)}
+                            {wizardState.voice.system_prompt.length > 500 && '...'}
+                          </p>
+                        </div>
+
+                        {/* Advanced: Edit prompt accordion */}
+                        <Accordion type="single" collapsible className="mt-2">
+                          <AccordionItem value="edit-prompt" style={{ borderColor: colors.border.medium }}>
+                            <AccordionTrigger
+                              className="text-sm hover:no-underline py-2"
                               style={{ color: colors.text.secondary }}
                             >
-                              📋 View Complete Prompt (with CORE instructions)
+                              <div className="flex items-center gap-2">
+                                <ChevronDown className="h-4 w-4" />
+                                Advanced: Edit Voice Prompt
+                              </div>
                             </AccordionTrigger>
                             <AccordionContent>
-                              <div 
-                                className="p-4 rounded-md font-mono text-xs whitespace-pre-wrap"
-                                style={{
-                                  backgroundColor: colors.background.tertiary,
-                                  border: `1px solid ${colors.border.medium}`,
-                                  color: colors.text.tertiary,
-                                  maxHeight: '400px',
-                                  overflowY: 'auto'
-                                }}
-                              >
-                                {voiceCompletePrompt}
+                              <div className="space-y-2 pt-2">
+                                <Textarea
+                                  id="voice-prompt"
+                                  rows={10}
+                                  value={wizardState.voice.system_prompt}
+                                  onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    if (promptSource === 'default' && !hasMarkedCustom.current) {
+                                      hasMarkedCustom.current = true;
+                                      setPromptSource('custom');
+                                    }
+                                    setWizardState(prev => ({
+                                      ...prev,
+                                      voice: { ...prev.voice, system_prompt: newValue }
+                                    }));
+                                    if (touchedFields.has('voiceSystemPrompt')) {
+                                      validateAndSetError('voiceSystemPrompt', newValue);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    markFieldTouched('voiceSystemPrompt');
+                                    validateAndSetError('voiceSystemPrompt', e.target.value);
+                                  }}
+                                  placeholder="Enter the voice system prompt..."
+                                  maxLength={50000}
+                                  className="input-animated transition-all duration-200 font-mono text-xs"
+                                  style={{
+                                    backgroundColor: colors.background.tertiary,
+                                    borderColor: getBorderColor(getFieldState('voiceSystemPrompt', wizardState.voice.system_prompt)),
+                                    color: colors.text.primary
+                                  }}
+                                />
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs" style={{ color: colors.text.tertiary }}>
+                                    ⚠️ Editing overrides the template. {wizardState.voice.system_prompt.length.toLocaleString()} / 50,000 chars
+                                  </p>
+                                  {promptSource === 'custom' && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleRevertToDefaultPrompt}
+                                      className="btn-animated"
+                                      style={{ borderColor: colors.text.tertiary }}
+                                    >
+                                      🔄 Revert
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-xs mt-2" style={{ color: colors.text.tertiary }}>
-                                Complete prompt: {voiceCompletePrompt.length.toLocaleString()} characters (includes CORE instructions + your customizations + voice optimizations)
-                              </p>
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>
-                      )}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Fallback: Original editable textarea if no template selected */}
+                    {!selectedTemplate && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="voice-prompt" className="text-sm" style={{ color: colors.text.primary }}>Voice System Prompt</Label>
+                            <RequiredIndicator />
+                            <Badge
+                              variant={promptSource === 'default' ? 'secondary' : 'default'}
+                              className={promptSource === 'default' ? 'badge-pulse' : ''}
+                              style={{
+                                backgroundColor: promptSource === 'default' ? colors.background.highlight : colors.brand.purple,
+                                color: colors.text.primary,
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              {promptSource === 'default' ? '🔒 Using Default' : '✏️ Custom Prompt'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {promptSource === 'custom' && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRevertToDefaultPrompt}
+                                className="btn-animated"
+                                style={{ borderColor: colors.text.tertiary }}
+                              >
+                                🔄 Revert to Default
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleGenerateVoicePrompt}
+                              disabled={generatingVoicePrompt}
+                              className="btn-animated"
+                              style={{ borderColor: colors.brand.purple }}
+                            >
+                              {generatingVoicePrompt ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                '✨ Generate Prompt'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        <Textarea
+                          id="voice-prompt"
+                          value={wizardState.voice.system_prompt}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            if (promptSource === 'default' && !hasMarkedCustom.current) {
+                              hasMarkedCustom.current = true;
+                              setPromptSource('custom');
+                            }
+                            setWizardState(prev => ({
+                              ...prev,
+                              voice: { ...prev.voice, system_prompt: newValue }
+                            }));
+                            if (touchedFields.has('voiceSystemPrompt')) {
+                              validateAndSetError('voiceSystemPrompt', newValue);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            markFieldTouched('voiceSystemPrompt');
+                            validateAndSetError('voiceSystemPrompt', e.target.value);
+                          }}
+                          rows={6}
+                          placeholder="Enter the system prompt for your voice assistant..."
+                          maxLength={50000}
+                          className="input-animated transition-all duration-200 sm:rows-8 md:rows-10"
+                          style={{
+                            backgroundColor: colors.background.tertiary,
+                            borderColor: getBorderColor(getFieldState('voiceSystemPrompt', wizardState.voice.system_prompt)),
+                            color: colors.text.primary
+                          }}
+                          aria-required="true"
+                          aria-invalid={fieldErrors['voiceSystemPrompt'] ? 'true' : 'false'}
+                          aria-describedby={fieldErrors['voiceSystemPrompt'] ? 'voiceSystemPrompt-error' : undefined}
+                        />
+                        <div className="flex items-center justify-between">
+                          <ErrorMessage fieldName="voiceSystemPrompt" />
+                          <p className="text-xs ml-auto" style={{ color: colors.text.tertiary }}>
+                            {wizardState.voice.system_prompt.length.toLocaleString()} / 50,000 characters
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Complete Prompt Preview (read-only) */}
+                    {voiceCompletePrompt && (
+                      <Accordion type="single" collapsible className="mt-4">
+                        <AccordionItem value="complete-prompt" style={{ borderColor: colors.border.medium }}>
+                          <AccordionTrigger
+                            className="text-sm hover:no-underline"
+                            style={{ color: colors.text.secondary }}
+                          >
+                            📋 View Complete Prompt (with CORE instructions)
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div
+                              className="p-4 rounded-md font-mono text-xs whitespace-pre-wrap"
+                              style={{
+                                backgroundColor: colors.background.tertiary,
+                                border: `1px solid ${colors.border.medium}`,
+                                color: colors.text.tertiary,
+                                maxHeight: '400px',
+                                overflowY: 'auto'
+                              }}
+                            >
+                              {voiceCompletePrompt}
+                            </div>
+                            <p className="text-xs mt-2" style={{ color: colors.text.tertiary }}>
+                              Complete prompt: {voiceCompletePrompt.length.toLocaleString()} characters
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    )}
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-1">
@@ -1978,17 +2440,12 @@ const AIStaffManagementHub: React.FC = () => {
 
 export default AIStaffManagementHub;
 
-// Voice model options for Gemini Live API
-const GEMINI_VOICE_OPTIONS = [
-  { value: 'Puck', label: 'Puck', description: 'Friendly and conversational (default)' },
-  { value: 'Charon', label: 'Charon', description: 'Deep and authoritative' },
-  { value: 'Kore', label: 'Kore', description: 'Neutral and professional' },
-  { value: 'Fenrir', label: 'Fenrir', description: 'Excitable and energetic' },
-  { value: 'Aoede', label: 'Aoede', description: 'Breezy and light' },
-  { value: 'Zephyr', label: 'Zephyr', description: 'Bright and cheerful' },
-  { value: 'Leda', label: 'Leda', description: 'Youthful and fresh' },
-  { value: 'Orus', label: 'Orus', description: 'Firm and steady' },
-];
+// Voice model options - sourced from centralized VoiceConfigRegistry
+const GEMINI_VOICE_OPTIONS = getVoiceOptions().map(v => ({
+  value: v.id,
+  label: v.label.replace(/\s*\([^)]*\)/, ''), // Extract base name without accent info
+  description: v.label.match(/\(([^)]+)\)/)?.[1] || 'Voice personality', // Extract accent/style info
+}));
 
 // Preview components
 import { ChatPreview } from 'components/ChatPreview';

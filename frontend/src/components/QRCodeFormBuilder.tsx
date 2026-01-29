@@ -21,6 +21,7 @@ export interface QRCodeConfig {
   position: 'left' | 'center' | 'right';
   placement?: 'header' | 'footer'; // Keep for backward compatibility
   enabled: boolean;
+  caption?: string; // Optional text displayed below the QR code
 }
 
 interface QRCodeFormBuilderProps {
@@ -225,11 +226,11 @@ export default function QRCodeFormBuilder({
                     <Label style={{ color: QSAITheme.text.secondary }}>Size</Label>
                     <Select
                       value={qrCode.size}
-                      onValueChange={(value: 'small' | 'medium' | 'large') => 
+                      onValueChange={(value: 'small' | 'medium' | 'large') =>
                         updateQRCode(qrCode.id, { size: value })
                       }
                     >
-                      <SelectTrigger 
+                      <SelectTrigger
                         style={{
                           backgroundColor: QSAITheme.background.secondary,
                           border: `1px solid ${QSAITheme.border.light}`,
@@ -252,7 +253,26 @@ export default function QRCodeFormBuilder({
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
+                  {/* Caption */}
+                  <div>
+                    <Label style={{ color: QSAITheme.text.secondary }}>Caption (optional)</Label>
+                    <Input
+                      value={qrCode.caption || ''}
+                      onChange={(e) => updateQRCode(qrCode.id, { caption: e.target.value })}
+                      style={{
+                        backgroundColor: QSAITheme.background.secondary,
+                        border: `1px solid ${QSAITheme.border.light}`,
+                        color: QSAITheme.text.primary
+                      }}
+                      placeholder="e.g., Scan to Order Online"
+                      maxLength={60}
+                    />
+                    <p className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
+                      Text displayed below the QR code
+                    </p>
+                  </div>
+
                   {/* Position Controls */}
                   <div>
                     <Label style={{ color: QSAITheme.text.secondary }}>Position</Label>
@@ -290,7 +310,7 @@ export default function QRCodeFormBuilder({
                 {/* QR Code Preview */}
                 <div className="space-y-2">
                   <Label style={{ color: QSAITheme.text.secondary }}>Preview</Label>
-                  <div 
+                  <div
                     className="p-4 rounded-lg border"
                     style={{
                       backgroundColor: QSAITheme.background.secondary,
@@ -298,7 +318,7 @@ export default function QRCodeFormBuilder({
                       textAlign: qrCode.position
                     }}
                   >
-                    <div className="inline-block">
+                    <div className="inline-block text-center">
                       <QRCodeSVG
                         value={generateQRContent(qrCode)}
                         size={QR_SIZES.find(s => s.value === qrCode.size)?.pixels || 96}
@@ -307,6 +327,15 @@ export default function QRCodeFormBuilder({
                         fgColor="#000000"
                         bgColor="#FFFFFF"
                       />
+                      {/* Caption preview */}
+                      {qrCode.caption && (
+                        <div
+                          className="mt-1 text-xs font-medium"
+                          style={{ color: '#000000' }}
+                        >
+                          {qrCode.caption}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

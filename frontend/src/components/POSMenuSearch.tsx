@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { QSAITheme } from 'utils/QSAIDesign';
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
  * - QSAI theme styling
  */
 export function POSMenuSearch({ className }: Props) {
-  const { searchQuery, setSearchQuery } = useRealtimeMenuStore();
+  const { searchQuery, setSearchQuery } = useRealtimeMenuStoreCompat({ context: 'pos' });
   const [localValue, setLocalValue] = useState(searchQuery);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

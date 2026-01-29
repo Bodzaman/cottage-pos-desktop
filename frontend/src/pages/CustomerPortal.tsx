@@ -41,7 +41,7 @@ import { KeyboardShortcutsHelp } from "components/KeyboardShortcutsHelp";
 import { VisuallyHidden } from "components/VisuallyHidden";
 import { useIsMobile } from "utils/useMediaQuery";
 import { useOfflineSync } from "utils/useOfflineSync";
-import { useRealtimeMenuStore } from "utils/realtimeMenuStore";
+import { useRealtimeMenuStoreCompat } from "utils/realtimeMenuStoreCompat";
 import {
   Select,
   SelectContent,
@@ -120,6 +120,9 @@ export default function CustomerPortal() {
   } = useSimpleAuth();
   const { addItem, openCart } = useCartStore();
   const { shouldShowWizard, wizardDismissed } = useOnboardingStore();
+
+  // Menu store for reorder functionality
+  const { menuItems: storeMenuItems, initialize: initializeMenuStore } = useRealtimeMenuStoreCompat({ context: 'online' });
   
   // NEW: Offline sync hook
   const {
@@ -680,13 +683,13 @@ export default function CustomerPortal() {
 
     try {
       // Get current menu items from store
-      const menuStore = useRealtimeMenuStore.getState();
-      let currentMenuItems = menuStore.menuItems;
+      let currentMenuItems = storeMenuItems;
 
       // If menu isn't loaded yet, try to initialize it
       if (!currentMenuItems || currentMenuItems.length === 0) {
-        await menuStore.initialize();
-        currentMenuItems = useRealtimeMenuStore.getState().menuItems;
+        await initializeMenuStore();
+        // After initialize, use storeMenuItems which will be updated by React Query
+        currentMenuItems = storeMenuItems;
       }
 
       // Validate each item against the current menu

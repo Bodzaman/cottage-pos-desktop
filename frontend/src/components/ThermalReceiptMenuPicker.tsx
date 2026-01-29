@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Plus, ImageIcon } from 'lucide-react';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { MenuItem, OrderItem, ItemVariant } from 'utils/menuTypes';
 import { globalColors as QSAITheme, styles } from 'utils/QSAIDesign';
 import { formatCurrency } from 'utils/formatters';
@@ -30,7 +30,7 @@ export function ThermalReceiptMenuPicker({ selectedItems, onItemsChange }: Props
     isLoading: menuLoading,
     error: menuError,
     forceFullRefresh
-  } = useRealtimeMenuStore();
+  } = useRealtimeMenuStoreCompat({ context: 'admin' });
   
   // 🔍 DEBUG: Log menu data to see if variants are populated
   useEffect(() => {

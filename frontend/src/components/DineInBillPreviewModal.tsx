@@ -33,7 +33,8 @@ import { toast } from 'sonner';
 interface DineInBillPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  orderItems: OrderItem[];
+  // Accepts both OrderItem[] and EnrichedDineInOrderItem[] for flexibility
+  orderItems: any[];
   tableNumber: number | null;
   guestCount: number;
   orderTotal: number;
@@ -92,26 +93,28 @@ export function DineInBillPreviewModal({
       guestCount: guestCount,
       items: orderItems.map(item => {
         // Use generateDisplayNameForReceipt to avoid duplicate variation names
+        // Note: EnrichedDineInOrderItem uses item_name, variant_name, unit_price, customizations
         const displayName = generateDisplayNameForReceipt(
-          item.name,
-          item.variantName,
+          item.item_name || item.name,           // EnrichedDineInOrderItem: item_name
+          item.variant_name || item.variantName, // EnrichedDineInOrderItem: variant_name
           item.protein_type
         );
 
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,
           name: displayName,
-          price: item.price,
+          price: item.unit_price ?? item.price,  // EnrichedDineInOrderItem: unit_price
           quantity: item.quantity,
-          variant: item.variantName ? {
-            id: item.id,
-            name: item.variantName,
+          variant: (item.variant_name || item.variantName) ? {
+            id: item.variant_id || item.id,
+            name: item.variant_name || item.variantName,
             price_adjustment: 0
           } : undefined,
-          customizations: item.modifiers?.map(mod => ({
-            id: mod.id || `mod-${Date.now()}`,
-            name: mod.name,
-            price: mod.price || 0
+          // EnrichedDineInOrderItem uses customizations, not modifiers
+          customizations: (item.customizations || item.modifiers)?.map((c: any) => ({
+            id: c.customization_id || c.id || `mod-${Date.now()}`,
+            name: c.name,
+            price: c.price_adjustment ?? c.price ?? 0
           })) || [],
           instructions: item.notes || undefined
         };

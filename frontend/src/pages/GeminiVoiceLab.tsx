@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mic, MicOff, Loader2, ShoppingCart, Trash2, Plus, Minus, Copy, RefreshCw, ChevronDown, ChevronUp, Check, ShieldAlert, ShieldCheck, Power, BarChart3, MessageSquare } from "lucide-react";
+import { Mic, MicOff, Loader2, ShoppingCart, Trash2, Plus, Minus, Copy, RefreshCw, ChevronDown, ChevronUp, Check, ShieldAlert, ShieldCheck, Power, BarChart3, MessageSquare, FileText, Save, AlertCircle, PlusCircle, Edit3, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { GeminiVoiceClient, GeminiVoiceState } from "utils/geminiVoiceClient";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +16,22 @@ import { AddItemRequest, RemoveItemRequest, UpdateQuantityRequest } from "types"
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceAgentStore } from "utils/voiceAgentStore";
 import { TranscriptsViewerTab } from "@/components/ai-lab/TranscriptsViewerTab";
 import { UsageDashboardTab } from "@/components/ai-lab/UsageDashboardTab";
+import {
+  getUnifiedAgentConfig,
+  updateUnifiedAgentConfig,
+  getActiveAITemplates,
+  getAITemplateById,
+  createAITemplate,
+  updateAITemplate,
+  deleteAITemplate,
+  type AIPersonalityTemplate,
+} from "utils/supabaseQueries";
+import { GEMINI_LIVE_VOICES, getVoiceOptions, DEFAULT_VOICE } from "utils/voiceConfigRegistry";
 
 // Dedicated lab page to build and test the Gemini Live API voice ordering flow safely.
 // No props. Router will mount this page at /gemini-voice-lab automatically.
@@ -47,17 +59,12 @@ interface FunctionCallLog {
   args: any;
 }
 
-// Voice model options for Gemini Live API
-const GEMINI_VOICE_OPTIONS = [
-  { value: 'Puck', label: 'Puck', description: 'Friendly and conversational (default)' },
-  { value: 'Charon', label: 'Charon', description: 'Deep and authoritative' },
-  { value: 'Kore', label: 'Kore', description: 'Neutral and professional' },
-  { value: 'Fenrir', label: 'Fenrir', description: 'Excitable and energetic' },
-  { value: 'Aoede', label: 'Aoede', description: 'Breezy and light' },
-  { value: 'Zephyr', label: 'Zephyr', description: 'Bright and cheerful' },
-  { value: 'Leda', label: 'Leda', description: 'Youthful and fresh' },
-  { value: 'Orus', label: 'Orus', description: 'Firm and steady' },
-];
+// Voice model options - sourced from centralized VoiceConfigRegistry
+const GEMINI_VOICE_OPTIONS = getVoiceOptions().map(v => ({
+  value: v.id,
+  label: v.id,
+  description: v.label,
+}));
 
 export default function GeminiVoiceLab() {
   const navigate = useNavigate();
@@ -93,6 +100,33 @@ export default function GeminiVoiceLab() {
   const setUnderMaintenance = useVoiceAgentStore((state) => state.setUnderMaintenance);
   const [isLoadingVoiceSettings, setIsLoadingVoiceSettings] = useState(true);
   const [isUpdatingVoiceSettings, setIsUpdatingVoiceSettings] = useState(false);
+
+  // ✅ PHASE 0: Template Editor State
+  const [templateName, setTemplateName] = useState<string>('Uncle Raj - Indian Restaurant');
+  const [templateVoicePrompt, setTemplateVoicePrompt] = useState<string>('');
+  const [templateChatPrompt, setTemplateChatPrompt] = useState<string>('');
+  const [templateFirstResponse, setTemplateFirstResponse] = useState<string>('');
+  const [templateVoiceModel, setTemplateVoiceModel] = useState<string>(DEFAULT_VOICE);
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(true);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [templateHasChanges, setTemplateHasChanges] = useState(false);
+  const [agentName, setAgentName] = useState<string>('Uncle Raj');
+  const [agentRole, setAgentRole] = useState<string>('Restaurant Assistant');
+
+  // ✅ PHASE 2: Template List & CRUD State
+  const [templates, setTemplates] = useState<AIPersonalityTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [templateCuisineType, setTemplateCuisineType] = useState<string>('indian');
+  const [templateDescription, setTemplateDescription] = useState<string>('');
+  const [templateDefaultTraits, setTemplateDefaultTraits] = useState<string[]>(['friendly', 'warm', 'patient']);
+  const [templateAvailableTraits, setTemplateAvailableTraits] = useState<string[]>([
+    'friendly', 'warm', 'patient', 'professional', 'knowledgeable',
+    'humorous', 'formal', 'casual', 'energetic', 'calm'
+  ]);
 
   const fetchVoiceSettings = async () => {
     try {
@@ -136,6 +170,287 @@ export default function GeminiVoiceLab() {
 
   useEffect(() => {
     fetchVoiceSettings();
+  }, []);
+
+  // ✅ PHASE 0: Load template data from unified_agent_config
+  const loadTemplateFromDatabase = async () => {
+    try {
+      setIsLoadingTemplate(true);
+      const result = await getUnifiedAgentConfig();
+
+      if (result.success && result.data) {
+        const config = result.data as any;
+
+        // Extract all template-relevant fields
+        setAgentName(config.agent_name || 'Uncle Raj');
+        setAgentRole(config.agent_role || 'Restaurant Assistant');
+        setTemplateVoicePrompt(config.channel_settings?.voice?.system_prompt || '');
+        setTemplateChatPrompt(config.channel_settings?.chat?.system_prompt || '');
+        setTemplateFirstResponse(config.channel_settings?.voice?.first_response || '');
+        setTemplateVoiceModel(config.channel_settings?.voice?.voice_model || DEFAULT_VOICE);
+
+        console.log('[GeminiVoiceLab] Template loaded from database');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to load template:', error);
+      toast.error('Failed to load template data');
+    } finally {
+      setIsLoadingTemplate(false);
+    }
+  };
+
+  // ✅ PHASE 0: Save template to unified_agent_config
+  const saveTemplateToDatabase = async () => {
+    try {
+      setIsSavingTemplate(true);
+
+      // Fetch existing config to merge with
+      const existingResult = await getUnifiedAgentConfig();
+      const existingConfig = existingResult.data as any;
+      const existingChannelSettings = existingConfig?.channel_settings || {};
+
+      const updates = {
+        agent_name: agentName,
+        agent_role: agentRole,
+        channel_settings: {
+          ...existingChannelSettings,
+          chat: {
+            ...(existingChannelSettings.chat || {}),
+            system_prompt: templateChatPrompt,
+          },
+          voice: {
+            ...(existingChannelSettings.voice || {}),
+            system_prompt: templateVoicePrompt,
+            first_response: templateFirstResponse,
+            voice_model: templateVoiceModel,
+          },
+        },
+      };
+
+      const result = await updateUnifiedAgentConfig(updates);
+
+      if (result.success) {
+        setTemplateHasChanges(false);
+        toast.success('Template saved successfully');
+        console.log('[GeminiVoiceLab] Template saved to database');
+
+        // Refresh the system prompt display
+        handleRefreshPrompt();
+      } else {
+        throw new Error(result.error || 'Failed to save template');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to save template:', error);
+      toast.error(error.message || 'Failed to save template');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTemplateFromDatabase();
+  }, []);
+
+  // ✅ PHASE 2: Load all templates from ai_personality_templates table
+  const loadTemplates = async () => {
+    try {
+      setIsLoadingTemplates(true);
+      const result = await getActiveAITemplates();
+
+      if (result.success && result.data) {
+        setTemplates(result.data);
+
+        // Auto-select first template if none selected
+        if (!selectedTemplateId && result.data.length > 0) {
+          const firstTemplate = result.data[0];
+          setSelectedTemplateId(firstTemplate.id);
+          loadTemplateIntoEditor(firstTemplate);
+        }
+
+        console.log('[GeminiVoiceLab] Loaded', result.data.length, 'templates');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to load templates:', error);
+      toast.error('Failed to load templates');
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  // ✅ PHASE 2: Load template into editor state
+  const loadTemplateIntoEditor = (template: AIPersonalityTemplate) => {
+    setTemplateName(template.name);
+    setAgentName(template.default_agent_name);
+    setAgentRole('Restaurant Assistant'); // Not stored in template, use default
+    setTemplateVoicePrompt(template.system_prompt_voice);
+    setTemplateChatPrompt(template.system_prompt_chat);
+    setTemplateFirstResponse(template.default_greeting);
+    setTemplateVoiceModel(template.default_voice_model || DEFAULT_VOICE);
+    setTemplateCuisineType(template.cuisine_type);
+    setTemplateDescription(template.description || '');
+    setTemplateDefaultTraits(template.default_traits || []);
+    setTemplateAvailableTraits(template.available_traits || []);
+    setTemplateHasChanges(false);
+  };
+
+  // ✅ PHASE 2: Handle template selection
+  const handleSelectTemplate = async (templateId: string) => {
+    if (templateHasChanges) {
+      const confirmed = window.confirm('You have unsaved changes. Switch template anyway?');
+      if (!confirmed) return;
+    }
+
+    setSelectedTemplateId(templateId);
+    setShowCreateForm(false);
+
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      loadTemplateIntoEditor(template);
+    }
+  };
+
+  // ✅ PHASE 2: Save template to ai_personality_templates table
+  const handleSaveTemplate = async () => {
+    if (!selectedTemplateId) return;
+
+    try {
+      setIsSavingTemplate(true);
+
+      const updates = {
+        name: templateName,
+        cuisine_type: templateCuisineType,
+        description: templateDescription,
+        system_prompt_chat: templateChatPrompt,
+        system_prompt_voice: templateVoicePrompt,
+        default_greeting: templateFirstResponse,
+        default_agent_name: agentName,
+        default_voice_model: templateVoiceModel,
+        default_traits: templateDefaultTraits,
+        available_traits: templateAvailableTraits,
+      };
+
+      const result = await updateAITemplate(selectedTemplateId, updates);
+
+      if (result.success) {
+        setTemplateHasChanges(false);
+        toast.success('Template saved successfully');
+
+        // Reload templates list to reflect changes
+        await loadTemplates();
+      } else {
+        throw new Error(result.error || 'Failed to save template');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to save template:', error);
+      toast.error(error.message || 'Failed to save template');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  // ✅ PHASE 2: Create new template
+  const handleCreateTemplate = async () => {
+    try {
+      setIsCreatingTemplate(true);
+
+      const newTemplate = {
+        name: templateName || 'New Template',
+        cuisine_type: templateCuisineType,
+        description: templateDescription,
+        system_prompt_chat: templateChatPrompt || '# AI Assistant\nYou are a helpful assistant.',
+        system_prompt_voice: templateVoicePrompt || '# Voice Assistant\nYou are a helpful voice assistant.',
+        default_greeting: templateFirstResponse || 'Hello! How can I help you today?',
+        default_agent_name: agentName || 'AI Assistant',
+        default_voice_model: templateVoiceModel || DEFAULT_VOICE,
+        default_traits: templateDefaultTraits,
+        available_traits: templateAvailableTraits,
+        is_active: true,
+        is_default: false,
+        sort_order: templates.length,
+      };
+
+      const result = await createAITemplate(newTemplate);
+
+      if (result.success && result.data) {
+        toast.success('Template created successfully');
+        setShowCreateForm(false);
+        setSelectedTemplateId(result.data.id);
+        setTemplateHasChanges(false);
+
+        // Reload templates list
+        await loadTemplates();
+      } else {
+        throw new Error(result.error || 'Failed to create template');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to create template:', error);
+      toast.error(error.message || 'Failed to create template');
+    } finally {
+      setIsCreatingTemplate(false);
+    }
+  };
+
+  // ✅ PHASE 2: Delete template (soft delete)
+  const handleDeleteTemplate = async (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${template.name}"?\n\nThis will hide the template but preserve it in the database.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsDeletingTemplate(true);
+
+      const result = await deleteAITemplate(templateId);
+
+      if (result.success) {
+        toast.success('Template deleted');
+
+        // If deleted the selected template, select another
+        if (selectedTemplateId === templateId) {
+          const remaining = templates.filter(t => t.id !== templateId);
+          if (remaining.length > 0) {
+            setSelectedTemplateId(remaining[0].id);
+            loadTemplateIntoEditor(remaining[0]);
+          } else {
+            setSelectedTemplateId(null);
+          }
+        }
+
+        // Reload templates list
+        await loadTemplates();
+      } else {
+        throw new Error(result.error || 'Failed to delete template');
+      }
+    } catch (error: any) {
+      console.error('[GeminiVoiceLab] Failed to delete template:', error);
+      toast.error(error.message || 'Failed to delete template');
+    } finally {
+      setIsDeletingTemplate(false);
+    }
+  };
+
+  // ✅ PHASE 2: Start creating a new template
+  const startCreateTemplate = () => {
+    setShowCreateForm(true);
+    setSelectedTemplateId(null);
+    setTemplateName('New Template');
+    setAgentName('AI Assistant');
+    setTemplateCuisineType('other');
+    setTemplateDescription('');
+    setTemplateVoicePrompt('');
+    setTemplateChatPrompt('');
+    setTemplateFirstResponse('Hello! How can I help you today?');
+    setTemplateVoiceModel(DEFAULT_VOICE);
+    setTemplateDefaultTraits([]);
+    setTemplateHasChanges(false);
+  };
+
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates();
   }, []);
 
   // Load voice configuration from localStorage on mount
@@ -563,7 +878,7 @@ export default function GeminiVoiceLab() {
         {/* Tab Navigation */}
         <Tabs defaultValue="voice-lab" className="w-full">
           <TabsList
-            className="grid w-full grid-cols-3 mb-6"
+            className="grid w-full grid-cols-4 mb-6"
             style={{
               backgroundColor: QSAITheme.background.tertiary,
               borderColor: QSAITheme.border.medium
@@ -576,6 +891,14 @@ export default function GeminiVoiceLab() {
             >
               <Mic className="h-4 w-4 mr-2" />
               Voice Lab
+            </TabsTrigger>
+            <TabsTrigger
+              value="templates"
+              className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-400"
+              style={{ color: QSAITheme.text.muted }}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Templates
             </TabsTrigger>
             <TabsTrigger
               value="usage"
@@ -1150,6 +1473,665 @@ export default function GeminiVoiceLab() {
               </CardContent>
             </Card>
           </div>
+            </div>
+          </TabsContent>
+
+          {/* Templates Tab - Phase 2: AI Personality Template Manager */}
+          <TabsContent value="templates" className="mt-0">
+            {/* Template Selector Bar */}
+            <Card
+              className="border-0 mb-6"
+              style={{
+                background: QSAITheme.background.tertiary,
+                border: `1px solid ${QSAITheme.border.accent}`,
+                boxShadow: `0 4px 12px ${QSAITheme.purple.glow}`,
+              }}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: QSAITheme.text.primary }}>
+                    AI Personality Templates
+                  </h2>
+                  <Button
+                    onClick={startCreateTemplate}
+                    disabled={isLoadingTemplates}
+                    className="border-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`,
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    New Template
+                  </Button>
+                </div>
+
+                {isLoadingTemplates ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: QSAITheme.purple.primary }} />
+                    <span className="ml-2 text-sm" style={{ color: QSAITheme.text.muted }}>Loading templates...</span>
+                  </div>
+                ) : templates.length === 0 ? (
+                  <div className="text-center py-8" style={{ color: QSAITheme.text.muted }}>
+                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">No templates found</p>
+                    <p className="text-xs mt-1">Create your first AI personality template</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {templates.map((template) => (
+                      <div
+                        key={template.id}
+                        className={`group relative px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                          selectedTemplateId === template.id ? 'ring-2' : ''
+                        }`}
+                        style={{
+                          background: selectedTemplateId === template.id
+                            ? QSAITheme.purple.primary + '30'
+                            : QSAITheme.background.panel,
+                          border: `1px solid ${selectedTemplateId === template.id ? QSAITheme.purple.primary : QSAITheme.border.medium}`,
+                          ringColor: QSAITheme.purple.primary,
+                        }}
+                        onClick={() => handleSelectTemplate(template.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" style={{ color: QSAITheme.purple.light }} />
+                          <span className="font-medium" style={{ color: QSAITheme.text.primary }}>
+                            {template.name}
+                          </span>
+                          {template.is_default && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs"
+                              style={{ borderColor: QSAITheme.purple.light, color: QSAITheme.purple.light }}
+                            >
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs mt-1" style={{ color: QSAITheme.text.muted }}>
+                          {template.cuisine_type} • {template.default_agent_name}
+                        </div>
+
+                        {/* Delete button (visible on hover) */}
+                        {!template.is_default && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{
+                              background: '#DC2626',
+                              color: '#FFFFFF',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTemplate(template.id);
+                            }}
+                            disabled={isDeletingTemplate}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Create new button inline */}
+                    {showCreateForm && (
+                      <div
+                        className="px-4 py-2 rounded-lg ring-2"
+                        style={{
+                          background: QSAITheme.purple.primary + '30',
+                          border: `1px solid ${QSAITheme.purple.primary}`,
+                          ringColor: QSAITheme.purple.primary,
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <PlusCircle className="h-4 w-4" style={{ color: QSAITheme.purple.light }} />
+                          <span className="font-medium" style={{ color: QSAITheme.text.primary }}>
+                            Creating New Template
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column: Template Identity & Voice Settings */}
+              <div className="space-y-6">
+                {/* Template Identity Card */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: QSAITheme.background.tertiary,
+                    border: `1px solid ${QSAITheme.border.medium}`,
+                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.35)'
+                  }}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle style={{ color: QSAITheme.text.primary }}>
+                        {showCreateForm ? 'New Template' : 'Template Identity'}
+                      </CardTitle>
+                      <Badge
+                        style={{
+                          background: templateCuisineType === 'indian'
+                            ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                            : templateCuisineType === 'chinese'
+                            ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                            : templateCuisineType === 'italian'
+                            ? 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)'
+                            : 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                          color: '#FFFFFF'
+                        }}
+                      >
+                        {templateCuisineType.charAt(0).toUpperCase() + templateCuisineType.slice(1)} Restaurant
+                      </Badge>
+                    </div>
+                    <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                      Configure the AI personality that will be used for this restaurant type.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {isLoadingTemplate ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" style={{ color: QSAITheme.purple.primary }} />
+                        <span className="ml-2" style={{ color: QSAITheme.text.muted }}>Loading template...</span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Template Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="template-name" style={{ color: QSAITheme.text.primary }}>
+                            Template Name
+                          </Label>
+                          <Input
+                            id="template-name"
+                            value={templateName}
+                            onChange={(e) => {
+                              setTemplateName(e.target.value);
+                              setTemplateHasChanges(true);
+                            }}
+                            placeholder="e.g., Uncle Raj - Indian Restaurant"
+                            style={{
+                              backgroundColor: QSAITheme.background.panel,
+                              borderColor: QSAITheme.border.medium,
+                              color: QSAITheme.text.primary
+                            }}
+                          />
+                        </div>
+
+                        {/* Agent Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="agent-name" style={{ color: QSAITheme.text.primary }}>
+                            Agent Name
+                          </Label>
+                          <Input
+                            id="agent-name"
+                            value={agentName}
+                            onChange={(e) => {
+                              setAgentName(e.target.value);
+                              setTemplateHasChanges(true);
+                            }}
+                            placeholder="e.g., Uncle Raj"
+                            style={{
+                              backgroundColor: QSAITheme.background.panel,
+                              borderColor: QSAITheme.border.medium,
+                              color: QSAITheme.text.primary
+                            }}
+                          />
+                          <p className="text-xs" style={{ color: QSAITheme.text.muted }}>
+                            This is the name customers will see and hear
+                          </p>
+                        </div>
+
+                        {/* Cuisine Type */}
+                        <div className="space-y-2">
+                          <Label htmlFor="cuisine-type" style={{ color: QSAITheme.text.primary }}>
+                            Cuisine Type
+                          </Label>
+                          <Select
+                            value={templateCuisineType}
+                            onValueChange={(value) => {
+                              setTemplateCuisineType(value);
+                              setTemplateHasChanges(true);
+                            }}
+                          >
+                            <SelectTrigger
+                              id="cuisine-type"
+                              style={{
+                                backgroundColor: QSAITheme.background.panel,
+                                borderColor: QSAITheme.border.medium,
+                                color: QSAITheme.text.primary
+                              }}
+                            >
+                              <SelectValue placeholder="Select cuisine type" />
+                            </SelectTrigger>
+                            <SelectContent
+                              style={{
+                                backgroundColor: QSAITheme.background.secondary,
+                                borderColor: QSAITheme.border.medium,
+                              }}
+                            >
+                              <SelectItem value="indian" style={{ color: QSAITheme.text.primary }}>
+                                🇮🇳 Indian
+                              </SelectItem>
+                              <SelectItem value="chinese" style={{ color: QSAITheme.text.primary }}>
+                                🇨🇳 Chinese
+                              </SelectItem>
+                              <SelectItem value="italian" style={{ color: QSAITheme.text.primary }}>
+                                🇮🇹 Italian
+                              </SelectItem>
+                              <SelectItem value="french" style={{ color: QSAITheme.text.primary }}>
+                                🇫🇷 French
+                              </SelectItem>
+                              <SelectItem value="mexican" style={{ color: QSAITheme.text.primary }}>
+                                🇲🇽 Mexican
+                              </SelectItem>
+                              <SelectItem value="japanese" style={{ color: QSAITheme.text.primary }}>
+                                🇯🇵 Japanese
+                              </SelectItem>
+                              <SelectItem value="thai" style={{ color: QSAITheme.text.primary }}>
+                                🇹🇭 Thai
+                              </SelectItem>
+                              <SelectItem value="other" style={{ color: QSAITheme.text.primary }}>
+                                🌍 Other
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Description */}
+                        <div className="space-y-2">
+                          <Label htmlFor="template-description" style={{ color: QSAITheme.text.primary }}>
+                            Description
+                          </Label>
+                          <Input
+                            id="template-description"
+                            value={templateDescription}
+                            onChange={(e) => {
+                              setTemplateDescription(e.target.value);
+                              setTemplateHasChanges(true);
+                            }}
+                            placeholder="Brief description for template selection"
+                            style={{
+                              backgroundColor: QSAITheme.background.panel,
+                              borderColor: QSAITheme.border.medium,
+                              color: QSAITheme.text.primary
+                            }}
+                          />
+                        </div>
+
+                        {/* Voice Model */}
+                        <div className="space-y-2">
+                          <Label htmlFor="template-voice-model" style={{ color: QSAITheme.text.primary }}>
+                            Voice Model
+                          </Label>
+                          <Select
+                            value={templateVoiceModel}
+                            onValueChange={(value) => {
+                              setTemplateVoiceModel(value);
+                              setTemplateHasChanges(true);
+                            }}
+                          >
+                            <SelectTrigger
+                              id="template-voice-model"
+                              style={{
+                                backgroundColor: QSAITheme.background.panel,
+                                borderColor: QSAITheme.border.medium,
+                                color: QSAITheme.text.primary
+                              }}
+                            >
+                              <SelectValue placeholder="Select a voice" />
+                            </SelectTrigger>
+                            <SelectContent
+                              style={{
+                                backgroundColor: QSAITheme.background.secondary,
+                                borderColor: QSAITheme.border.medium,
+                              }}
+                            >
+                              {GEMINI_VOICE_OPTIONS.map((voice) => (
+                                <SelectItem
+                                  key={voice.value}
+                                  value={voice.value}
+                                  style={{ color: QSAITheme.text.primary }}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{voice.label}</span>
+                                    <span className="text-xs" style={{ color: QSAITheme.text.muted }}>
+                                      {voice.description}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* First Response / Greeting */}
+                        <div className="space-y-2">
+                          <Label htmlFor="template-first-response" style={{ color: QSAITheme.text.primary }}>
+                            First Response / Greeting
+                          </Label>
+                          <Textarea
+                            id="template-first-response"
+                            value={templateFirstResponse}
+                            onChange={(e) => {
+                              setTemplateFirstResponse(e.target.value);
+                              setTemplateHasChanges(true);
+                            }}
+                            placeholder="Hello! Welcome to Cottage Tandoori..."
+                            rows={3}
+                            maxLength={500}
+                            style={{
+                              backgroundColor: QSAITheme.background.panel,
+                              borderColor: QSAITheme.border.medium,
+                              color: QSAITheme.text.primary
+                            }}
+                          />
+                          <p className="text-xs text-right" style={{ color: QSAITheme.text.muted }}>
+                            {templateFirstResponse.length} / 500 characters
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Save/Create Button */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: QSAITheme.background.tertiary,
+                    border: `1px solid ${(templateHasChanges || showCreateForm) ? QSAITheme.purple.primary : QSAITheme.border.medium}`,
+                  }}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        {showCreateForm ? (
+                          <div className="flex items-center gap-2">
+                            <PlusCircle className="h-4 w-4" style={{ color: QSAITheme.purple.light }} />
+                            <span className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                              Creating new template
+                            </span>
+                          </div>
+                        ) : templateHasChanges ? (
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                            <span className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                              You have unsaved changes
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                            Template is up to date
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {showCreateForm && (
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowCreateForm(false);
+                              if (templates.length > 0) {
+                                setSelectedTemplateId(templates[0].id);
+                                loadTemplateIntoEditor(templates[0]);
+                              }
+                            }}
+                            style={{
+                              borderColor: QSAITheme.border.medium,
+                              color: QSAITheme.text.muted,
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        <Button
+                          onClick={showCreateForm ? handleCreateTemplate : handleSaveTemplate}
+                          disabled={showCreateForm ? isCreatingTemplate : (isSavingTemplate || !templateHasChanges)}
+                          className="min-w-[140px] border-0"
+                          style={{
+                            background: (templateHasChanges || showCreateForm)
+                              ? `linear-gradient(135deg, ${QSAITheme.purple.primary} 0%, ${QSAITheme.purple.light} 100%)`
+                              : QSAITheme.background.panel,
+                            color: (templateHasChanges || showCreateForm) ? '#FFFFFF' : QSAITheme.text.muted,
+                            boxShadow: (templateHasChanges || showCreateForm) ? `0 0 15px ${QSAITheme.purple.glow}` : 'none',
+                          }}
+                        >
+                          {showCreateForm ? (
+                            isCreatingTemplate ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Creating...
+                              </>
+                            ) : (
+                              <>
+                                <PlusCircle className="h-4 w-4 mr-2" />
+                                Create Template
+                              </>
+                            )
+                          ) : (
+                            isSavingTemplate ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-2" />
+                                Save Template
+                              </>
+                            )
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Default Traits Editor */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: QSAITheme.background.tertiary,
+                    border: `1px solid ${QSAITheme.border.medium}`,
+                  }}
+                >
+                  <CardHeader>
+                    <CardTitle style={{ color: QSAITheme.text.primary }}>
+                      Default Personality Traits
+                    </CardTitle>
+                    <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                      Select traits that will be pre-selected when users choose this template.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {templateAvailableTraits.map((trait) => (
+                        <Button
+                          key={trait}
+                          variant="outline"
+                          size="sm"
+                          className={`transition-all duration-200 ${
+                            templateDefaultTraits.includes(trait) ? 'ring-2' : ''
+                          }`}
+                          style={{
+                            background: templateDefaultTraits.includes(trait)
+                              ? QSAITheme.purple.primary + '30'
+                              : 'transparent',
+                            borderColor: templateDefaultTraits.includes(trait)
+                              ? QSAITheme.purple.primary
+                              : QSAITheme.border.medium,
+                            color: templateDefaultTraits.includes(trait)
+                              ? QSAITheme.purple.light
+                              : QSAITheme.text.muted,
+                            ringColor: QSAITheme.purple.primary,
+                          }}
+                          onClick={() => {
+                            if (templateDefaultTraits.includes(trait)) {
+                              setTemplateDefaultTraits(templateDefaultTraits.filter(t => t !== trait));
+                            } else {
+                              setTemplateDefaultTraits([...templateDefaultTraits, trait]);
+                            }
+                            setTemplateHasChanges(true);
+                          }}
+                        >
+                          {templateDefaultTraits.includes(trait) && (
+                            <Check className="h-3 w-3 mr-1" />
+                          )}
+                          {trait}
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: System Prompts */}
+              <div className="space-y-6">
+                {/* Voice System Prompt */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: QSAITheme.background.tertiary,
+                    border: `1px solid ${QSAITheme.border.medium}`,
+                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.35)'
+                  }}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle style={{ color: QSAITheme.text.primary }}>
+                        Voice System Prompt
+                      </CardTitle>
+                      <Badge
+                        variant="outline"
+                        style={{ borderColor: QSAITheme.purple.light, color: QSAITheme.purple.light }}
+                      >
+                        {templateVoicePrompt.length.toLocaleString()} chars
+                      </Badge>
+                    </div>
+                    <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                      This prompt instructs the AI how to behave during voice calls.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingTemplate ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" style={{ color: QSAITheme.purple.primary }} />
+                      </div>
+                    ) : (
+                      <Textarea
+                        value={templateVoicePrompt}
+                        onChange={(e) => {
+                          setTemplateVoicePrompt(e.target.value);
+                          setTemplateHasChanges(true);
+                        }}
+                        placeholder="Enter the system prompt for voice interactions..."
+                        rows={12}
+                        maxLength={50000}
+                        className="font-mono text-sm"
+                        style={{
+                          backgroundColor: QSAITheme.background.panel,
+                          borderColor: QSAITheme.border.medium,
+                          color: QSAITheme.text.primary
+                        }}
+                      />
+                    )}
+                    <p className="text-xs mt-2 text-right" style={{ color: QSAITheme.text.muted }}>
+                      {templateVoicePrompt.length.toLocaleString()} / 50,000 characters
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Chat System Prompt */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: QSAITheme.background.tertiary,
+                    border: `1px solid ${QSAITheme.border.medium}`,
+                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.35)'
+                  }}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle style={{ color: QSAITheme.text.primary }}>
+                        Chat System Prompt
+                      </CardTitle>
+                      <Badge
+                        variant="outline"
+                        style={{ borderColor: QSAITheme.purple.light, color: QSAITheme.purple.light }}
+                      >
+                        {templateChatPrompt.length.toLocaleString()} chars
+                      </Badge>
+                    </div>
+                    <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                      This prompt instructs the AI how to behave during text chat.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingTemplate ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" style={{ color: QSAITheme.purple.primary }} />
+                      </div>
+                    ) : (
+                      <Textarea
+                        value={templateChatPrompt}
+                        onChange={(e) => {
+                          setTemplateChatPrompt(e.target.value);
+                          setTemplateHasChanges(true);
+                        }}
+                        placeholder="Enter the system prompt for chat interactions..."
+                        rows={12}
+                        maxLength={50000}
+                        className="font-mono text-sm"
+                        style={{
+                          backgroundColor: QSAITheme.background.panel,
+                          borderColor: QSAITheme.border.medium,
+                          color: QSAITheme.text.primary
+                        }}
+                      />
+                    )}
+                    <p className="text-xs mt-2 text-right" style={{ color: QSAITheme.text.muted }}>
+                      {templateChatPrompt.length.toLocaleString()} / 50,000 characters
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Help Card */}
+                <Card
+                  className="border-0"
+                  style={{
+                    background: 'rgba(91, 33, 182, 0.1)',
+                    border: `1px solid ${QSAITheme.purple.primary}40`,
+                  }}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{ background: QSAITheme.purple.primary + '30' }}
+                      >
+                        <AlertCircle className="h-5 w-5" style={{ color: QSAITheme.purple.light }} />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1" style={{ color: QSAITheme.text.primary }}>
+                          About Template Prompts
+                        </h4>
+                        <p className="text-sm" style={{ color: QSAITheme.text.muted }}>
+                          These prompts define the personality and behavior of your AI assistant.
+                          Changes here will affect how the AI responds in both voice calls and text chat.
+                          The prompts are combined with CORE instructions (function calling rules,
+                          safety protocols) at runtime.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 

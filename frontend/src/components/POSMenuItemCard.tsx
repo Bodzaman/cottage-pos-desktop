@@ -5,14 +5,11 @@ import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { colors } from 'utils/designSystem';
 import { getSpiceEmoji } from 'utils/premiumTheme';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, type OrderMode } from 'utils/variantPricing';
 import type { MenuItem, ItemVariant } from '../utils/menuTypes';
 import type { OrderItem } from 'types';
-import { shallow } from 'zustand/shallow';
-import { StaffCustomizationModal } from 'components/StaffCustomizationModal';
-import { StaffVariantSelector } from 'components/StaffVariantSelector';
-import type { SelectedCustomization } from 'components/StaffCustomizationModal';
+import { StaffUnifiedCustomizationModal, type SelectedCustomization } from 'components/StaffUnifiedCustomizationModal';
 import { useMenuItemImage } from 'utils/useMenuItemImage';
 import { supabase } from 'utils/supabaseClient';
 
@@ -45,14 +42,7 @@ export function POSMenuItemCard({
   isAboveFold = false // Default: lazy loading
 }: POSMenuItemCardProps) {
   // Subscribe to store data
-  const variantsByMenuItem = useRealtimeMenuStore(
-    state => state.variantsByMenuItem,
-    shallow
-  );
-  const proteinTypes = useRealtimeMenuStore(
-    state => state.proteinTypes,
-    shallow
-  );
+  const { variantsByMenuItem, proteinTypes } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Local state
   const [quantity, setQuantity] = useState(1);
@@ -62,8 +52,6 @@ export function POSMenuItemCard({
   const [showVariantInfoPopover, setShowVariantInfoPopover] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
-  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
-  const [selectedVariantForCustomization, setSelectedVariantForCustomization] = useState<ItemVariant | null>(null);
   const [previewedVariant, setPreviewedVariant] = useState<ItemVariant | null>(null);
   const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [is86d, setIs86d] = useState(item.is_available === false || item.isAvailable === false);
@@ -358,122 +346,56 @@ export function POSMenuItemCard({
     setQuantity(1);
   };
 
-  // Handle customize button - matches PremiumMenuCard pattern
+  // Handle customize button - opens unified modal (handles both variants + customizations)
   const handleCustomize = () => {
-    if (isMultiVariant) {
-      // For multi-variant items, open variant selector first
-      setIsVariantSelectorOpen(true);
-    } else {
-      // For single items, open customization modal directly
-      // Create synthetic variant from base item
-      const defaultVariant = activeVariants[0] || {
-        id: item.id,
-        menu_item_id: item.id,
-        variant_name: 'Standard',
-        price: item.price || item.base_price || 0,
-        is_default: true,
-        is_active: true,
-        display_order: 0,
-        protein_type_id: null,
-        protein_type_name: null,
-        image_url: item.image_url,
-        display_image_url: item.image_url
-      };
-
-      setSelectedVariantForCustomization(defaultVariant);
-      setIsCustomizationModalOpen(true);
-    }
+    setIsCustomizationModalOpen(true);
   };
 
-  // Handle customization confirmation
+  // Handle customization confirmation from unified modal
   const handleCustomizationConfirm = (
-    item: MenuItem,
-    quantity: number,
-    variant?: ItemVariant | null,
+    menuItem: MenuItem,
+    qty: number,
+    variant: ItemVariant,
     customizations?: SelectedCustomization[],
-    notes?: string
+    notes?: string,
+    serveWithSectionId?: string | null
   ) => {
-    // ✅ DEBUG: Log what we received from StaffCustomizationModal
-    console.log('[POSMenuItemCard] handleCustomizationConfirm received:', {
-      itemName: item.name,
-      quantity,
-      variant: variant ? { id: variant.id, name: variant.variant_name } : null,
-      customizations: customizations || [],
-      notes,
-      onCustomizeItemExists: !!onCustomizeItem
-    });
+    const price = getVariantPrice(variant);
+    const variantName = getVariantName(variant);
+    // For multi-variant items, use variant name as display name (not concatenated)
+    const displayName = isMultiVariant ? variantName : menuItem.name;
+
+    const orderItem: OrderItem = {
+      id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      menu_item_id: menuItem.id,
+      variant_id: variant.id,
+      name: displayName,
+      variantName: variantName || undefined,
+      quantity: qty,
+      price: price,
+      protein_type: variant.protein_type_name,
+      image_url: variant?.display_image_url || variant?.image_url || menuItem.image_url || '',
+      notes: notes || '',
+      customizations: customizations?.map(c => ({
+        id: c.id,
+        name: c.name,
+        price_adjustment: c.price_adjustment
+      })) || [],
+      item_type: 'menu_item',
+      category_id: menuItem.category_id,
+      serveWithSectionId: serveWithSectionId || null
+    };
 
     // If parent provided onCustomizeItem callback, use it
-    if (onCustomizeItem && variant) {
-      const price = getVariantPrice(variant);
-      const variantName = getVariantName(variant);
-      // ✅ FIX: For multi-variant items, use variant name as display name (not concatenated)
-      // This matches the pattern in handleVariantClick and prevents name duplication
-      const displayName = isMultiVariant ? variantName : item.name;
-
-      const orderItem: OrderItem = {
-        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        menu_item_id: item.id,
-        variant_id: variant.id,
-        name: displayName,
-        variantName: variantName || undefined,
-        quantity: quantity,
-        price: price,
-        protein_type: variant.protein_type_name,
-        image_url: variant?.display_image_url || variant?.image_url || item.image_url || '',
-        notes: notes || '',
-        customizations: customizations?.map(c => ({
-          id: c.id,
-          name: c.name,
-          price_adjustment: c.price_adjustment
-        })) || [],
-        item_type: 'menu_item',
-        category_id: item.category_id
-      };
-
-      console.log('[POSMenuItemCard] Using onCustomizeItem path, passing orderItem:', orderItem);
+    if (onCustomizeItem) {
       onCustomizeItem(orderItem);
     } else {
       // Fallback: Use onAddToOrder directly
-      console.log('[POSMenuItemCard] Using fallback onAddToOrder path');
-      // ✅ Use unified pricing: variant price if available, else priceDisplay from utility
-      const price = variant
-        ? getVariantPrice(variant)
-        : priceDisplay.displayPrice;
-
-      const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
-      const totalPrice = (price + customizationsTotal) * quantity;
-
-      // ✅ FIX: For multi-variant items, use variant name as display name
-      const displayName = variant && isMultiVariant ? getVariantName(variant) : item.name;
-
-      const orderItem: OrderItem = {
-        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        menu_item_id: item.id,
-        variant_id: variant?.id || null,
-        name: displayName,
-        variantName: variant ? getVariantName(variant) : undefined,
-        quantity: quantity,
-        price: totalPrice,
-        protein_type: variant?.protein_type_name,
-        // ✅ FIX: Use variant image when available
-        image_url: variant?.display_image_url || variant?.image_url || item.image_url || '',
-        notes: notes || '',
-        customizations: customizations?.map(c => ({
-          id: c.id,
-          name: c.name,
-          price_adjustment: c.price_adjustment
-        })) || [],
-        item_type: 'menu_item',
-        category_id: item.category_id
-      };
-
       onAddToOrder(orderItem);
     }
 
     // Close the modal
     setIsCustomizationModalOpen(false);
-    setSelectedVariantForCustomization(null);
   };
 
   // Truncate long variant names
@@ -973,28 +895,12 @@ export function POSMenuItemCard({
         </div>
       </div>
 
-      {/* Variant Selection Modal - Shows first for multi-variant items */}
-      <StaffVariantSelector
-        isOpen={isVariantSelectorOpen}
-        onClose={() => setIsVariantSelectorOpen(false)}
+      {/* Unified Customization Modal - handles both variants and customizations */}
+      <StaffUnifiedCustomizationModal
         item={item}
         itemVariants={activeVariants}
-        orderType={orderType}
-        onAddToOrder={(orderItem) => {
-          onAddToOrder(orderItem);
-          setIsVariantSelectorOpen(false);
-        }}
-      />
-
-      {/* Customization Modal */}
-      <StaffCustomizationModal
-        item={item}
-        variant={selectedVariantForCustomization || undefined}
         isOpen={isCustomizationModalOpen}
-        onClose={() => {
-          setIsCustomizationModalOpen(false);
-          setSelectedVariantForCustomization(null);
-        }}
+        onClose={() => setIsCustomizationModalOpen(false)}
         onConfirm={handleCustomizationConfirm}
         orderType={orderType}
         initialQuantity={quantity}

@@ -31,6 +31,7 @@ import {
 import { colors, InternalTheme } from "../utils/InternalDesignSystem";
 import { useQueryClient } from '@tanstack/react-query';
 import { useCategories, useMenuItems, useProteinTypes, menuKeys } from '../utils/menuQueries';
+import { useRealtimeMenuStoreCompat } from "../utils/realtimeMenuStoreCompat";
 import { useRealtimeMenuStore } from "../utils/realtimeMenuStore";
 import { useMountedRef, useSafeTimeout } from "utils/safeHooks";
 
@@ -135,7 +136,7 @@ export default function AdminPortalMenuContent() {
   const { setSafeTimeout } = useSafeTimeout();
 
   // Real-time store for POS synchronization
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // Load non-React Query data on mount
   useEffect(() => {

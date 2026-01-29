@@ -24,6 +24,8 @@ const POSDesktop = lazy(() => import('../frontend/src/pages/POSDesktop'));
 const POSLogin = lazy(() => import('../frontend/src/pages/POSLogin'));
 // Admin portal for admin/tenant users
 const Admin = lazy(() => import('../frontend/src/pages/Admin'));
+// Reconciliation page for Quick Tools access
+const Reconciliation = lazy(() => import('../frontend/src/pages/Reconciliation'));
 
 // Loading fallback for lazy components — uses inline styles to guarantee centering
 // even before Tailwind CSS loads
@@ -67,6 +69,8 @@ function ElectronApp() {
                 <Route path="/posdesktop" element={<POSDesktop />} />
                 {/* Admin portal for admin/tenant users */}
                 <Route path="/admin" element={<Admin />} />
+                {/* Reconciliation for Quick Tools access */}
+                <Route path="/reconciliation" element={<Reconciliation />} />
                 {/* Redirect any other routes to POS Login */}
                 <Route path="*" element={<Navigate to="/pos-login" replace />} />
               </Routes>
@@ -93,6 +97,23 @@ try {
   }
 } catch {
   // Ignore parse errors — store will initialize fresh
+}
+
+// Fix font path for Electron file:// protocol
+// The CSS uses absolute path /fonts/OldeEnglish.ttf which doesn't work with base: './'
+// This override uses relative path that works in Electron's packaged app
+if (typeof window !== 'undefined') {
+  const fontStyle = document.createElement('style');
+  fontStyle.textContent = `
+    @font-face {
+      font-family: 'Cloister Black';
+      src: url('./fonts/OldeEnglish.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+  `;
+  document.head.appendChild(fontStyle);
 }
 
 // Mount the app

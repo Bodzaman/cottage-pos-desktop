@@ -36,6 +36,7 @@ const ThermalReceiptDesignerV2 = lazy(() => import("./pages/ThermalReceiptDesign
 const Unauthorized = lazy(() => import("./pages/Unauthorized.tsx"));
 const UpdateKDS = lazy(() => import("./pages/UpdateKDS.tsx"));
 const UpdatePOSDesktop = lazy(() => import("./pages/UpdatePOSDesktop.tsx"));
+const DeploymentHub = lazy(() => import("./pages/DeploymentHub.tsx"));
 const WebsiteManagement = lazy(() => import("./pages/WebsiteManagement.tsx"));
 const CustomerDisplay = lazy(() => import("./pages/CustomerDisplay.tsx"));
 const FAQ = lazy(() => import("./pages/FAQ.tsx"));
@@ -96,6 +97,8 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/updatekds", element: <UpdateKDS />},
 	{ path: "/update-pos-desktop", element: <UpdatePOSDesktop />},
 	{ path: "/updateposdesktop", element: <UpdatePOSDesktop />},
+	{ path: "/deployment-hub", element: <DeploymentHub />},
+	{ path: "/deploymenthub", element: <DeploymentHub />},
 	{ path: "/website-management", element: <WebsiteManagement />},
 	{ path: "/customer-display", element: <CustomerDisplay />},
 	{ path: "/faq", element: <FAQ />},

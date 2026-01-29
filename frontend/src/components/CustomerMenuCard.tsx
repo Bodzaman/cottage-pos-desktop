@@ -20,12 +20,12 @@ import {
 import { MenuItem, ItemVariant, OrderItem } from '../utils/menuTypes';
 
 // Store Integrations (Same as POSDesktop)
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { useCartStore } from '../utils/cartStore';
 import { useSimpleAuth } from '../utils/simple-auth-context';
 
 // Components
-import { CustomerVariantSelector } from './CustomerVariantSelector';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 
 // Theme
 import { PremiumTheme } from '../utils/premiumTheme';
@@ -63,7 +63,7 @@ export function CustomerMenuCard({
   showFavorites = true
 }: CustomerMenuCardProps) {
   // Store Integrations (Same as POSDesktop)
-  const { itemVariants, isLoading } = useRealtimeMenuStore();
+  const { itemVariants, isLoading } = useRealtimeMenuStoreCompat({ context: 'online' });
   const { addItem } = useCartStore();
   const { isAuthenticated } = useSimpleAuth();
   
@@ -71,7 +71,7 @@ export function CustomerMenuCard({
   const variants = itemVariants?.filter(variant => variant.menu_item_id === item.id) || [];
   
   // Component State
-  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
+  const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false); // TODO: Connect to favorites store
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   
@@ -198,14 +198,54 @@ export function CustomerMenuCard({
     }
   };
   
-  // Handle Item Click (Same logic as POSMenuCard)
+  // Handle Item Click - Open unified customization modal
   const handleItemClick = () => {
-    if (variants.length === 0) {
-      // Single item - add directly to cart (Same as POSMenuCard)
-      handleAddToCart();
-    } else {
-      // Multi-variant item - open CustomerVariantSelector modal (Same as POSMenuCard)
-      setIsVariantSelectorOpen(true);
+    // Always open the unified modal for customization
+    // Single items can still have customizations (add-ons)
+    setIsCustomizationModalOpen(true);
+  };
+
+  // Handle add to cart from unified modal
+  const handleAddToCartFromModal = (
+    item: MenuItem,
+    quantity: number,
+    variant: ItemVariant,
+    customizations?: SelectedCustomization[],
+    notes?: string
+  ) => {
+    try {
+      const basePrice = getVariantPrice(variant);
+      const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
+
+      const orderItem: OrderItem = {
+        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        menu_item_id: item.id,
+        category_id: item.category_id,
+        variant_id: variant.id,
+        name: item.name,
+        variantName: getVariantDisplayName(variant),
+        quantity: quantity,
+        price: basePrice + customizationsTotal,
+        notes: notes,
+        protein_type: variant.protein_type_name,
+        image_url: item.image_url,
+        modifiers: [],
+        customizations: customizations?.map(c => ({
+          id: c.id,
+          name: c.name,
+          price: c.price_adjustment
+        }))
+      };
+
+      addItem(orderItem);
+      if (onAddToCart) {
+        onAddToCart(orderItem);
+      }
+
+      setIsCustomizationModalOpen(false);
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+      toast.error('Failed to add item to cart');
     }
   };
   
@@ -374,17 +414,14 @@ export function CustomerMenuCard({
         </Card>
       </motion.div>
       
-      {/* CustomerVariantSelector Modal */}
-      <CustomerVariantSelector
-        isOpen={isVariantSelectorOpen}
-        onClose={() => setIsVariantSelectorOpen(false)}
+      {/* Unified Customization Modal */}
+      <CustomerUnifiedCustomizationModal
+        isOpen={isCustomizationModalOpen}
+        onClose={() => setIsCustomizationModalOpen(false)}
         item={item}
-        variants={variants}
-        orderMode={orderMode}
-        onAddToCart={(selectedVariant) => {
-          handleAddToCart(selectedVariant);
-          setIsVariantSelectorOpen(false);
-        }}
+        itemVariants={itemVariants}
+        mode={orderMode}
+        addToCart={handleAddToCartFromModal}
       />
     </>
   );

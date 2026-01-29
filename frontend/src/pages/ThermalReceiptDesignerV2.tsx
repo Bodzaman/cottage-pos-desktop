@@ -19,10 +19,10 @@ import { QSAITheme, InternalTheme } from 'utils/QSAIDesign';
 import { useReceiptDesignerStoreV2, selectFormData, selectFormatToggle, selectHasUnsavedChanges, selectCurrentTemplate, selectTemplatesList } from 'utils/receiptDesignerStoreV2';
 import { ReceiptDesignerService } from 'utils/receiptDesignerService';
 import { EmptyStateCard } from 'components/EmptyStateCard';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 
 import { ReceiptDesignerHeader } from 'components/ReceiptDesignerHeader';
-import { ReceiptDesignerTabs } from 'components/ReceiptDesignerTabs';
+import { ReceiptDesignerAccordion } from 'components/ReceiptDesignerAccordion';
 import { ReceiptPreviewV2 } from 'components/ReceiptPreviewV2';
 import { OrderModeAssignmentModal } from 'components/OrderModeAssignmentModal';
 import { BuildSampleOrderModal } from 'components/BuildSampleOrderModal';
@@ -80,27 +80,34 @@ export default function ThermalReceiptDesignerV2() {
 
   // ==================== Lifecycle ====================
 
+  // Initialize menu store for section separator mapping in ThermalPreview
+  // This ensures categories and menuItems are loaded before receipt preview renders
+  const {
+    categories: menuCategories,
+    menuItems: menuStoreItems,
+    isLoading: menuStoreLoading,
+    initialize: initializeMenuStore
+  } = useRealtimeMenuStoreCompat({ context: 'admin' });
+
   // Inject Google Fonts for thermal font system
   useEffect(() => {
     injectGoogleFonts();
   }, []);
 
-  // Initialize menu store for section separator mapping in ThermalPreview
-  // This ensures categories and menuItems are loaded before receipt preview renders
+  // Log menu store state for debugging
   useEffect(() => {
-    const menuStore = useRealtimeMenuStore.getState();
     console.log('🏪 ThermalReceiptDesignerV2 - Checking menu store state:', {
-      categoriesCount: menuStore.categories.length,
-      menuItemsCount: menuStore.menuItems.length,
-      isLoading: menuStore.isLoading
+      categoriesCount: menuCategories.length,
+      menuItemsCount: menuStoreItems.length,
+      isLoading: menuStoreLoading
     });
 
     // Initialize if categories are empty (not yet loaded)
-    if (menuStore.categories.length === 0 && !menuStore.isLoading) {
+    if (menuCategories.length === 0 && !menuStoreLoading) {
       console.log('🔄 ThermalReceiptDesignerV2 - Initializing menu store for section mapping...');
-      menuStore.initialize();
+      initializeMenuStore();
     }
-  }, []);
+  }, [menuCategories.length, menuStoreItems.length, menuStoreLoading, initializeMenuStore]);
 
   // Load templates on mount and determine initial view mode
   useEffect(() => {
@@ -190,6 +197,10 @@ export default function ThermalReceiptDesignerV2() {
         if (response.success) {
           store.markAsSaved();
           toast.success('Template updated successfully');
+          // Show warning if kitchen variant sync failed
+          if (response.warning) {
+            toast.warning(response.warning);
+          }
           await loadTemplates(); // Refresh list
         } else {
           toast.error(response.error || 'Failed to update template');
@@ -211,6 +222,10 @@ export default function ThermalReceiptDesignerV2() {
           store.setCurrentTemplate(response.data);
           store.markAsSaved();
           toast.success('Template saved successfully');
+          // Show warning if kitchen variant failed
+          if (response.warning) {
+            toast.warning(response.warning);
+          }
           await loadTemplates(); // Refresh list
         } else {
           toast.error(response.error || 'Failed to save template');
@@ -233,7 +248,34 @@ export default function ThermalReceiptDesignerV2() {
     store.setIsSaving(true);
 
     try {
-      const newName = `${currentTemplate.metadata.name} (Copy)`;
+      // Generate unique name with smart counter
+      // Extract base name (strip existing "(Copy)" or "(Copy N)" suffix)
+      const copyPattern = /^(.+?)\s*\(Copy(?:\s+(\d+))?\)$/;
+      const match = currentTemplate.metadata.name.match(copyPattern);
+      const baseName = match ? match[1].trim() : currentTemplate.metadata.name;
+
+      // Find all existing copies with this base name
+      const existingNames = templatesList.map(t => t.metadata.name);
+      const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const copyRegex = new RegExp(`^${escapedBaseName}\\s*\\(Copy(?:\\s+(\\d+))?\\)$`);
+
+      // Find the highest copy number
+      let maxCopyNum = 0;
+      existingNames.forEach(name => {
+        if (name === `${baseName} (Copy)`) {
+          maxCopyNum = Math.max(maxCopyNum, 1);
+        }
+        const copyMatch = name.match(copyRegex);
+        if (copyMatch && copyMatch[1]) {
+          maxCopyNum = Math.max(maxCopyNum, parseInt(copyMatch[1], 10));
+        }
+      });
+
+      // Generate unique name
+      const newName = maxCopyNum === 0
+        ? `${baseName} (Copy)`
+        : `${baseName} (Copy ${maxCopyNum + 1})`;
+
       const response = await ReceiptDesignerService.saveTemplate(
         newName,
         currentTemplate.metadata.description,
@@ -245,6 +287,10 @@ export default function ThermalReceiptDesignerV2() {
         store.setCurrentTemplate(response.data);
         store.markAsSaved();
         toast.success(`Template duplicated as "${newName}"`);
+        // Show warning if kitchen variant failed
+        if (response.warning) {
+          toast.warning(response.warning);
+        }
         await loadTemplates();
       } else {
         toast.error(response.error || 'Failed to duplicate template');
@@ -255,7 +301,7 @@ export default function ThermalReceiptDesignerV2() {
     } finally {
       store.setIsSaving(false);
     }
-  }, [currentTemplate, formData, store, loadTemplates]);
+  }, [currentTemplate, formData, store, loadTemplates, templatesList]);
 
   const handleDelete = useCallback(async () => {
     if (!currentTemplate) {
@@ -572,8 +618,8 @@ export default function ThermalReceiptDesignerV2() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Column: Form (50%, scrollable) */}
         <div className="w-1/2 overflow-y-auto">
-          <div className="p-6">
-            <ReceiptDesignerTabs 
+          <div className="p-4">
+            <ReceiptDesignerAccordion
               isLoadingSettings={isLoadingSettings}
               onOpenSampleOrderModal={handleOpenSampleOrderModal}
             />

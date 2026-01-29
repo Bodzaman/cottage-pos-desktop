@@ -1,8 +1,8 @@
-import React, { useEffect, useState, memo, useRef } from "react";
-import brain from "brain";
+import React, { useState, memo, useRef, useEffect } from "react";
 import { SignatureDish } from "types";
 import { PremiumTheme } from "../utils/premiumTheme";
 import DishDetailsModal from "components/DishDetailsModal";
+import { useSignatureDishes } from "utils/signatureDishQueries";
 
 interface Tag {
   name: string;
@@ -35,109 +35,16 @@ const sizing = {
 };
 
 const SignatureDishSectionComponent: React.FC = () => {
-  const [dishes, setDishes] = useState<SignatureDish[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // React Query for signature dishes (cached, deduplicated)
+  const { data: dishes = [], isLoading: loading, error: queryError } = useSignatureDishes();
+  const error = queryError ? "Failed to load signature dishes" : null;
+
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [expandedDishes, setExpandedDishes] = useState<Set<string>>(new Set());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedDish, setSelectedDish] = useState<SignatureDish | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    const fetchDishes = async () => {
-      try {
-        setLoading(true);
-        const response = await brain.view_menu_items_with_variants();
-        const data = await response.json();
-
-        if (data.success && data.menu_items) {
-          // NEW LOGIC: Build flattened list of featured variants
-          const featuredVariants: SignatureDish[] = [];
-          
-          for (const item of data.menu_items) {
-            const baseFeatured = item.featured === true;
-            const hasVariants = item.variants && item.variants.length > 0;
-            
-            if (!hasVariants) {
-              // Single item (no variants) - use base featured flag
-              if (baseFeatured) {
-                const prices = [item.price].filter(p => p != null);
-                const minPrice = prices.length > 0 ? prices[0] : 0;
-                
-                featuredVariants.push({
-                  id: item.id,
-                  title: item.name,
-                  description: item.description || 'Delicious dish prepared with traditional spices and cooking methods.',
-                  main_image: item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                  spice_level: 0,
-                  tags: ['signature'],
-                  category: 'house-special',
-                  price: { 'Standard': `£${minPrice.toFixed(2)}` },
-                  has_variants: false,
-                  variants: []
-                } as SignatureDish);
-              }
-            } else {
-              // Item with variants - apply combined logic
-              const variants = item.variants;
-              const featuredVariantsList = variants.filter(v => v.featured === true);
-              
-              if (baseFeatured && featuredVariantsList.length === 0) {
-                // Base featured ON + No variant featured → Show all variants
-                for (const variant of variants) {
-                  featuredVariants.push({
-                    id: `${item.id}-${variant.id}`,
-                    title: `${item.name} (${variant.name || variant.variant_name})`,
-                    description: variant.description || item.description || 'Delicious dish prepared with traditional spices and cooking methods.',
-                    main_image: variant.image_url || item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                    spice_level: 0,
-                    tags: ['signature'],
-                    category: 'house-special',
-                    price: { 'Standard': `£${(variant.price || 0).toFixed(2)}` },
-                    has_variants: false,
-                    variants: []
-                  } as SignatureDish);
-                }
-              } else if (featuredVariantsList.length > 0) {
-                // Variant featured ON → Show only featured variants (base flag doesn't matter)
-                for (const variant of featuredVariantsList) {
-                  featuredVariants.push({
-                    id: `${item.id}-${variant.id}`,
-                    title: `${item.name} (${variant.name || variant.variant_name})`,
-                    description: variant.description || item.description || 'Delicious dish prepared with traditional spices and cooking methods.',
-                    main_image: variant.image_url || item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                    spice_level: 0,
-                    tags: ['signature'],
-                    category: 'house-special',
-                    price: { 'Standard': `£${(variant.price || 0).toFixed(2)}` },
-                    has_variants: false,
-                    variants: []
-                  } as SignatureDish);
-                }
-              }
-              // Both OFF → Item not featured (skip)
-            }
-          }
-          
-          setDishes(featuredVariants);
-          setError(null);
-        } else {
-          setDishes([]);
-          setError(null);
-        }
-      } catch (err) {
-        console.error("Error fetching featured menu items:", err);
-        setError("Failed to load signature dishes");
-        setDishes([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDishes();
-  }, []);
 
   // Autoplay functionality
   useEffect(() => {

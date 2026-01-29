@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import brain from 'brain';
-import { useAgentConfigStore } from './agentConfigStore';
+import { useAgentConfigQuery } from './agentQueries';
+import { useAgentRealtimeSync } from './agentRealtimeSync';
 
 /**
  * Dynamic Agent Configuration Hook
  *
- * Phase 6: Updated to use agentConfigStore for reactive agent config updates.
+ * Phase 7: Migrated to React Query for automatic caching and deduplication.
  *
  * Data Sources:
  * - Restaurant name: restaurant_settings.business_profile.name
- * - Agent profile: agentConfigStore (Zustand + Supabase Realtime)
+ * - Agent profile: React Query + Supabase Realtime invalidation
  *
  * Used by:
  * - ChatLargeModal (chat interface branding)
@@ -48,7 +49,7 @@ const DEFAULT_CONFIG: AgentConfig = {
 /**
  * Hook to fetch dynamic agent configuration
  *
- * Phase 6: Uses agentConfigStore for agent data with realtime updates.
+ * Phase 7: Uses React Query for agent data with realtime invalidation.
  * Restaurant name is still fetched separately.
  *
  * @returns AgentConfig object with restaurant and agent branding data
@@ -72,24 +73,11 @@ export function useAgentConfig(): AgentConfig {
   const [restaurantLoading, setRestaurantLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Phase 6: Get agent config from the unified store (with realtime updates)
-  const agentConfig = useAgentConfigStore((state) => state.config);
-  const fetchConfig = useAgentConfigStore((state) => state.fetchConfig);
-  const subscribeToChanges = useAgentConfigStore((state) => state.subscribeToChanges);
-  const storeIsLoading = useAgentConfigStore((state) => state.isLoading);
-  const storeError = useAgentConfigStore((state) => state.error);
+  // Phase 7: Get agent config from React Query (with automatic caching)
+  const { data: agentConfig, isLoading: configIsLoading, error: configError } = useAgentConfigQuery();
 
-  // Fetch agent config from store on mount
-  useEffect(() => {
-    fetchConfig();
-
-    // Subscribe to realtime updates
-    const unsubscribe = subscribeToChanges();
-
-    return () => {
-      unsubscribe();
-    };
-  }, [fetchConfig, subscribeToChanges]);
+  // Subscribe to realtime updates (invalidates React Query cache)
+  useAgentRealtimeSync({ enabled: true });
 
   // Fetch restaurant name separately (still from API)
   useEffect(() => {
@@ -122,9 +110,9 @@ export function useAgentConfig(): AgentConfig {
   }, []);
 
   // Combine loading states
-  const isLoading = restaurantLoading || storeIsLoading;
+  const isLoading = restaurantLoading || configIsLoading;
 
-  // Extract agent data from store with defaults
+  // Extract agent data from React Query with defaults
   const agentName = agentConfig?.agent_name || DEFAULT_CONFIG.agentName;
   const agentRole = agentConfig?.agent_role || DEFAULT_CONFIG.agentRole;
   const agentAvatar = agentConfig?.agent_avatar_url || DEFAULT_CONFIG.agentAvatar;
@@ -135,7 +123,7 @@ export function useAgentConfig(): AgentConfig {
     agentRole,
     agentAvatar,
     isLoading,
-    error: error || storeError,
+    error: error || (configError instanceof Error ? configError.message : null),
   };
 }
 

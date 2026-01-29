@@ -8,9 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { OrderItem } from 'types';
 import { MenuItem } from '../utils/menuTypes';
-import { useRealtimeMenuStore, getMenuDataForPOS } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { toast } from 'sonner';
-import { shallow } from 'zustand/shallow';
 
 interface POSMenuSectionProps {
   onAddToOrder: (item: OrderItem) => void;
@@ -24,20 +23,19 @@ interface POSMenuSectionProps {
  */
 export function POSMenuSection({ onAddToOrder, orderMode, className = '' }: POSMenuSectionProps) {
   // 🚀 SELECTIVE SUBSCRIPTIONS: Only subscribe to what we need
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
-  const filteredMenuItems = useRealtimeMenuStore(state => state.filteredMenuItems, shallow);
-  const isLoading = useRealtimeMenuStore(state => state.isLoading);
-  const selectedMenuCategory = useRealtimeMenuStore(state => state.selectedMenuCategory);
-  const searchQuery = useRealtimeMenuStore(state => state.searchQuery);
-  const setSelectedMenuCategory = useRealtimeMenuStore(state => state.setSelectedMenuCategory);
-  const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
+  const {
+    categories,
+    filteredMenuItems,
+    isLoading,
+    selectedMenuCategory,
+    searchQuery,
+    setSelectedMenuCategory,
+    setSearchQuery
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // Local state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
-  
-  // Get menu data
-  const menuData = getMenuDataForPOS();
   
   // Update search query with debounce
   useEffect(() => {

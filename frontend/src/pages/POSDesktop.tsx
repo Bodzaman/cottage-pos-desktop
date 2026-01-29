@@ -11,7 +11,9 @@ import brain from 'brain';
 
 // Store imports
 import { useSimpleAuth } from '../utils/simple-auth-context';
-import { useRealtimeMenuStore, loadPOSBundle, cleanupRealtimeMenuStore, startRealtimeSubscriptionsIfNeeded, setMenuStoreContext } from '../utils/realtimeMenuStore';
+// NEW: React Query-powered menu store (replaces realtimeMenuStore)
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
+import { cleanupMenuRealtimeSync } from '../utils/menuRealtimeSync';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { usePOSAuth } from 'utils/usePOSAuth';
@@ -63,7 +65,7 @@ import { CustomizeOrchestratorProvider } from '../components/CustomizeOrchestrat
 import { POSFooter } from 'components/POSFooter';
 import { POSLockScreen } from 'components/POSLockScreen';
 import { POSOfflineBanner } from 'components/POSOfflineBanner';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AdminSidePanel } from 'components/AdminSidePanel';
 import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
@@ -89,7 +91,7 @@ import { ReservationsPlaceholder } from 'components/ReservationsPlaceholder';
 // Utility imports
 import { MenuItem, OrderItem, ModifierSelection, PaymentResult } from '../utils/menuTypes';
 import { TipSelection } from '../components/POSTipSelector';
-import { usePOSSettingsWithAutoFetch } from '@/utils/posSettingsStore';
+import { usePOSSettingsQuery } from '@/utils/posSettingsQueries';
 
 // Custom hooks
 import { useOrderManagement } from 'utils/useOrderManagement';
@@ -114,6 +116,13 @@ export default function POSDesktop() {
   const location = useLocation();
   useSimpleAuth();
   const { user, isAuthenticated, isLoading: authLoading, logout, pinEnabled } = usePOSAuth();
+
+  // Page entrance animation state
+  const [pageVisible, setPageVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setPageVisible(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Lock screen state with 10-minute inactivity timeout
   const [isLocked, setIsLocked] = useState(false);
@@ -157,21 +166,16 @@ export default function POSDesktop() {
     if (pinEnabled) setIsLocked(true);
   }, [pinEnabled]);
 
-  // 🎯 DRAFT/PUBLISH WORKFLOW: Set POS context to only see published menu items
-  // This must be called BEFORE any store initialization
-  // NOTE: We do NOT call initialize() here - usePOSInitialization handles data loading
-  // This prevents the slow full refresh from overwriting the fast POS bundle
+  // 🎯 DRAFT/PUBLISH WORKFLOW: Context is now passed to useRealtimeMenuStoreCompat hook
+  // The hook handles:
+  // 1. Context-aware data fetching (POS sees only published items)
+  // 2. React Query caching and deduplication
+  // 3. Realtime subscriptions via useMenuRealtimeSync
   useEffect(() => {
-    setMenuStoreContext('pos');
-    // usePOSInitialization will:
-    // 1. Load fast POS bundle with resolved image URLs (~20ms)
-    // 2. Trigger background network refresh (~700ms, silent update)
-    // 3. Start real-time subscriptions for live updates
-
     // ✅ CLEANUP: Properly tear down realtime subscriptions on unmount
     // This prevents memory leaks from Supabase channels remaining subscribed
     return () => {
-      cleanupRealtimeMenuStore();
+      cleanupMenuRealtimeSync();
     };
   }, []);
 
@@ -199,11 +203,9 @@ export default function POSDesktop() {
   // ============================================================================
   // STORE SUBSCRIPTIONS — must be declared before any useEffect/useCallback that references them
   // ============================================================================
-  const categories = useRealtimeMenuStore(state => state.categories, shallow);
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const isLoading = useRealtimeMenuStore(state => state.isLoading);
-  const isConnected = useRealtimeMenuStore(state => state.isConnected);
-  const setSearchQuery = useRealtimeMenuStore(state => state.setSearchQuery);
+  // NEW: React Query-powered menu data (replaces realtimeMenuStore selectors)
+  const menuStore = useRealtimeMenuStoreCompat({ context: 'pos', enableRealtime: true });
+  const { categories, menuItems, isLoading, isConnected, setSearchQuery, setSelectedMenuCategory, refreshData: refreshMenuData } = menuStore;
 
   const orderType = usePOSOrderStore(state => state.orderType);
   const orderItems = usePOSOrderStore(state => state.orderItems, shallow);
@@ -459,7 +461,7 @@ export default function POSDesktop() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   
-  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
+  const { data: posSettings } = usePOSSettingsQuery();
   const variantCarouselEnabled = posSettings?.variant_carousel_enabled ?? true;
   
   const orderTotal = useMemo(() => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderItems]);
@@ -867,13 +869,10 @@ export default function POSDesktop() {
     if (printerStatus?.queuedJobs !== undefined) setQueuedJobsCount(printerStatus.queuedJobs);
   }, [printerStatus]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => { startRealtimeSubscriptionsIfNeeded(); }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+  // NOTE: Realtime subscriptions are now handled automatically by useRealtimeMenuStoreCompat
 
-  const handleSectionSelect = useCallback((id: string | null) => { setSelectedSectionId(id); setSelectedCategoryId(null); useRealtimeMenuStore.getState().setSelectedMenuCategory(id); }, []);
-  const handleCategorySelect = useCallback((id: string | null) => { setSelectedCategoryId(id); useRealtimeMenuStore.getState().setSelectedMenuCategory(id); }, []);
+  const handleSectionSelect = useCallback((id: string | null) => { setSelectedSectionId(id); setSelectedCategoryId(null); setSelectedMenuCategory(id); }, [setSelectedMenuCategory]);
+  const handleCategorySelect = useCallback((id: string | null) => { setSelectedCategoryId(id); setSelectedMenuCategory(id); }, [setSelectedMenuCategory]);
   const childCats = useMemo(() => selectedSectionId ? categories.filter(c => c.parent_category_id === selectedSectionId) : [], [categories, selectedSectionId]);
 
   // ============================================================================
@@ -1175,7 +1174,7 @@ export default function POSDesktop() {
           break;
         case 'F5':
           e.preventDefault();
-          loadPOSBundle();
+          refreshMenuData();
           break;
 
         // F6-F12: Section quick-select (Starters, Main, Sides, Accompaniments, Desserts, Drinks, Set Meals)
@@ -1187,7 +1186,7 @@ export default function POSDesktop() {
           if (section) {
             setSelectedSectionId(section.uuid);
             setSelectedCategoryId(null);
-            useRealtimeMenuStore.getState().setSelectedMenuCategory(section.uuid);
+            setSelectedMenuCategory(section.uuid);
           }
           break;
         }
@@ -1223,16 +1222,22 @@ export default function POSDesktop() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen, setOrderItems, setSelectedSectionId, setSelectedCategoryId]);
+  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen, setOrderItems, setSelectedSectionId, setSelectedCategoryId, setSelectedMenuCategory, refreshMenuData]);
 
   if (authLoading) return <div className="h-dvh w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
   if (!isAuthenticated) return null;
 
   return (
-    <CustomizeOrchestratorProvider>
-      {/* Offline/Online Status Banner - Fixed overlay, outside grid to prevent row mismatch */}
-      <POSOfflineBanner />
-      <div className="fixed inset-0 grid grid-rows-[auto_auto_1fr_auto] bg-black overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 15, scale: 0.99 }}
+      animate={pageVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
+      transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+      className="fixed inset-0"
+    >
+      <CustomizeOrchestratorProvider>
+        {/* Offline/Online Status Banner - Fixed overlay, outside grid to prevent row mismatch */}
+        <POSOfflineBanner />
+        <div className="fixed inset-0 grid grid-rows-[auto_auto_1fr_auto] bg-black overflow-hidden">
         <ManagementHeader
           title="POS"
           onAdminSuccess={handleManagementAuthSuccess}
@@ -1336,7 +1341,7 @@ export default function POSDesktop() {
             onCheckout: () => { if (orderItems.length > 0) setModal('showPaymentFlow', true); else toast.warning('Add items before checkout'); },
             onPrintReceipt: () => { if (orderItems.length > 0) printing.handlePrintReceipt(orderTotal); },
             onLockScreen: handleLockScreen,
-            onRefreshMenu: () => { loadPOSBundle(); },
+            onRefreshMenu: () => { refreshMenuData(); },
             onOpenReprint: () => setModal('showReprintDialog', true),
             onOpenKDS: () => { window.open(`${window.location.origin}/kds-v2?fullscreen=true`, 'kitchen-display', 'width=1920,height=1080'); },
             onOpenAllOrders: () => { document.dispatchEvent(new CustomEvent('open-all-orders')); },
@@ -1444,10 +1449,11 @@ export default function POSDesktop() {
             </div>
           </DialogContent>
         </Dialog>
-      {/* Lock Screen Overlay */}
-      <AnimatePresence>
-        {isLocked && <POSLockScreen onUnlock={handleUnlock} />}
-      </AnimatePresence>
-    </CustomizeOrchestratorProvider>
+        {/* Lock Screen Overlay */}
+        <AnimatePresence>
+          {isLocked && <POSLockScreen onUnlock={handleUnlock} />}
+        </AnimatePresence>
+      </CustomizeOrchestratorProvider>
+    </motion.div>
   );
 }

@@ -5,7 +5,7 @@ import { Minus, Plus, Trash2, Edit2, StickyNote, Cog } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import type { EnrichedOrderItem } from 'types';
 import type { OrderItem } from 'types';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 
 interface OrderItemCardProps {
   item: OrderItem | EnrichedOrderItem;
@@ -44,7 +44,7 @@ export function OrderItemCard({
   showRemoveButton = true
 }: OrderItemCardProps) {
   // Get item variants from store for image resolution
-  const itemVariants = useRealtimeMenuStore(state => state.itemVariants);
+  const { itemVariants } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Resolve variant image using correct hierarchy
   const resolveImageUrl = (): string | null => {

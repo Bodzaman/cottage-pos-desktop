@@ -126,6 +126,28 @@ export interface AboutAwardsContent {
 }
 
 // ============================================================================
+// GALLERY CONTENT
+// ============================================================================
+
+export interface GalleryImageItem {
+  id: number;
+  src: string;
+  alt: string;
+  category: 'venue' | 'food';
+  title: string;
+  description?: string;
+  order: number;
+}
+
+export interface GalleryImagesContent {
+  title: string;
+  subtitle?: string;
+  hero_image?: string;
+  images: GalleryImageItem[];
+  include_menu_images: boolean;
+}
+
+// ============================================================================
 // WEBSITE THEME (website_theme table)
 // ============================================================================
 

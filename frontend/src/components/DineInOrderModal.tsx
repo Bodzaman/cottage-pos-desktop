@@ -17,13 +17,14 @@ import { MenuItem, ItemVariant, SelectedCustomization } from 'types';
 import type { CustomerTab as TypesCustomerTab, OrderItem as TypesOrderItem } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { POSButton } from './POSButton';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useTableOrdersStore, tableOrdersStore } from 'utils/tableOrdersStore';
 import { DineInCategoryPillsHorizontal } from 'components/DineInCategoryPillsHorizontal';
 import { POSMenuSelector } from './POSMenuSelector';
 import { POSSectionPills } from './POSSectionPills';
 import { POSCategoryPills } from './POSCategoryPills';
-import { StaffCustomizationModal } from './StaffCustomizationModal';
+import { StaffUnifiedCustomizationModal } from './StaffUnifiedCustomizationModal';
 import {
   wrapCreateTabHandler,
   wrapRenameTabHandler,
@@ -40,6 +41,7 @@ import { toast } from 'sonner';
 import brain from 'brain';
 import { getElectronHeaders } from 'utils/electronDetection';
 import { supabase } from '@/utils/supabaseClient';
+import { completeTableOrder } from 'utils/supabaseQueries';
 import { EnrichedDineInOrderItem } from '../brain/data-contracts';
 
 // Local CustomerTab type that matches the tableOrdersStore interface
@@ -156,7 +158,7 @@ export function DineInOrderModal({
   enrichedLoading = false,
   enrichedError = null
 }: Props) {
-  const { menuItems, categories, filteredMenuItems, selectedMenuCategory } = useRealtimeMenuStore();
+  const { menuItems, categories, filteredMenuItems, selectedMenuCategory } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   const isEventDrivenMode = !!eventDrivenOrder || !!eventDrivenCustomerTabs;
   
@@ -700,8 +702,14 @@ export function DineInOrderModal({
           return;
         }
 
-        // Step 3: Success feedback and close
-        console.log('✅ [AUTO-CLEAR] Step 3: Order completed, closing modal');
+        // Step 3: Complete table order (reset tables, clear customer_tabs, handle linked tables)
+        console.log('✅ [AUTO-CLEAR] Step 3: Resetting tables via completeTableOrder...');
+        if (tableNumber) {
+          await completeTableOrder(tableNumber);
+        }
+
+        // Step 4: Success feedback and close
+        console.log('✅ [AUTO-CLEAR] Step 4: Order completed, closing modal');
         toast.success('Bill printed & table cleared', {
           description: 'Order completed successfully'
         });
@@ -1404,7 +1412,8 @@ export function DineInOrderModal({
     quantity: number,
     variant?: ItemVariant | null,
     customizations?: SelectedCustomization[],
-    notes?: string
+    notes?: string,
+    serveWithSectionId?: string | null
   ) => {
     if (!customizingItem) return;
 
@@ -1413,6 +1422,7 @@ export function DineInOrderModal({
       quantity,
       customizations,
       notes,
+      serveWithSectionId,
       isEventDriven: isEventDrivenMode
     });
 
@@ -1433,6 +1443,7 @@ export function DineInOrderModal({
               group: c.group || ''
             })) || [],
             special_instructions: notes || '',
+            serve_with_section_id: serveWithSectionId || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', customizingItem.id)
@@ -1473,7 +1484,8 @@ export function DineInOrderModal({
             price_adjustment: c.price_adjustment || 0,
             group: c.group || ''
           })) || [],
-          notes: notes || ''
+          notes: notes || '',
+          serveWithSectionId: serveWithSectionId || null
         };
 
         // Remove old item and add updated one via parent callbacks
@@ -1983,10 +1995,10 @@ export function DineInOrderModal({
       <DineInBillPreviewModal
         isOpen={showBillPreviewModal}
         onClose={() => setShowBillPreviewModal(false)}
-        orderItems={eventDrivenOrder?.items || []}
+        orderItems={enrichedItems}
         tableNumber={selectedTableTab}
         guestCount={currentTableCustomerTabs.length || 1}
-        orderTotal={(eventDrivenOrder?.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+        orderTotal={enrichedItems.reduce((sum, item) => sum + (item.line_total ?? ((item.unit_price || item.price || 0) * item.quantity)), 0)}
         onPrintBill={handleBillPrint}
       />
       
@@ -2065,30 +2077,34 @@ export function DineInOrderModal({
           return null;
         }
         
-        // Note: StaffCustomizationModal uses utils/menuTypes.MenuItem not types/menu.MenuItem
+        // Note: StaffUnifiedCustomizationModal uses utils/menuTypes.MenuItem not types/menu.MenuItem
         // The realtimeMenuStore also uses utils/menuTypes, so no conversion is needed
         // handleCustomizationConfirm expects types/menu.MenuItem, but here we receive utils/menuTypes.MenuItem
         // They are structurally similar enough for the usage
+        const menuItemVariants = itemVariants.filter(v => v.menu_item_id === fullMenuItem.id);
+
         return (
-          <StaffCustomizationModal
+          <StaffUnifiedCustomizationModal
             item={fullMenuItem}
-            variant={selectedVariant}
+            itemVariants={menuItemVariants}
             isOpen={isCustomizationModalOpen}
             onClose={() => {
               setIsCustomizationModalOpen(false);
               setCustomizingItem(null);
             }}
-            onConfirm={(item: MenuTypesMenuItem, quantity: number, variant?: MenuTypesItemVariant | null, customizations?: SelectedCustomization[], notes?: string) => {
+            onConfirm={(item: MenuTypesMenuItem, quantity: number, variant?: MenuTypesItemVariant | null, customizations?: SelectedCustomization[], notes?: string, serveWithSectionId?: string | null) => {
               // Cast menuTypes.MenuItem to types/menu.MenuItem through unknown
               handleCustomizationConfirm(
                 item as unknown as MenuItem,
                 quantity,
                 variant as unknown as ItemVariant | null,
                 customizations,
-                notes
+                notes,
+                serveWithSectionId
               );
             }}
             orderType="DINE-IN"
+            initialVariant={selectedVariant}
             initialQuantity={customizingItem.quantity}
           />
         );

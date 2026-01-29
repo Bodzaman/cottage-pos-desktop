@@ -17,11 +17,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { AlertTriangle, Clock, Users, ChefHat, Save } from 'lucide-react';
-import { usePOSSettingsWithAutoFetch, DEFAULT_URGENCY_SETTINGS, UrgencySettings, POSSettings } from '@/utils/posSettingsStore';
+import { DEFAULT_URGENCY_SETTINGS, UrgencySettings, POSSettings } from '@/utils/posSettingsStore';
+import { usePOSSettingsQuery, useUpdatePOSSettings } from '@/utils/posSettingsQueries';
 import { QSAITheme } from '@/utils/QSAIDesign';
 
 export function POSUrgencySettings() {
-  const { settings, updateSettings, isLoading } = usePOSSettingsWithAutoFetch();
+  const { data: settings, isLoading } = usePOSSettingsQuery();
+  const updateSettingsMutation = useUpdatePOSSettings();
   const [urgency, setUrgency] = useState<UrgencySettings>(DEFAULT_URGENCY_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -45,9 +47,11 @@ export function POSUrgencySettings() {
       urgency_settings: urgency
     };
 
-    const success = await updateSettings(updatedSettings);
-    if (success) {
+    try {
+      await updateSettingsMutation.mutateAsync(updatedSettings);
       setHasChanges(false);
+    } catch (error) {
+      // Error toast is handled by the mutation hook
     }
   };
 

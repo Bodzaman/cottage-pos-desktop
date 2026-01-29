@@ -37,6 +37,7 @@ import { AddCustomerTabDialog } from './AddCustomerTabDialog';
 // Utils & Types
 import { QSAITheme } from 'utils/QSAIDesign';
 import type { OrderItem } from 'utils/menuTypes';
+import { assignItemToTab } from 'utils/supabaseQueries';
 
 /**
  * EnrichedDineInOrderItem - Local interface matching backend response
@@ -314,6 +315,17 @@ export function DineInOrderWorkspace({
     console.log('Customize item:', item);
   }, []);
 
+  // Handle item assignment to customer tab
+  const handleAssignItemToTab = useCallback(async (itemId: string, tabId: string | null) => {
+    const result = await assignItemToTab(itemId, tabId);
+    if (result.success) {
+      toast.success(result.message);
+      // The enrichedItems will auto-refresh via real-time subscription
+    } else {
+      toast.error(result.message);
+    }
+  }, []);
+
   // Bill View
   const handleNavigateToReviewFromBill = useCallback(() => {
     handleNavigate('review');
@@ -356,6 +368,7 @@ export function DineInOrderWorkspace({
             onEditGuestCount={() => setShowGuestCountModal(true)}
             onOpenNotes={() => setShowNotesDialog(true)}
             onClose={onClose}
+            onRenameTab={onRenameTab}
             stagingItemCount={stagingItems.length}
           />
 
@@ -414,6 +427,7 @@ export function DineInOrderWorkspace({
                   onUpdateQuantity={handleUpdateQuantity}
                   onDeleteItem={handleDeleteItem}
                   onCustomizeItem={handleCustomizeItem}
+                  onAssignItemToTab={handleAssignItemToTab}
                   onNavigateToBill={handleNavigateToBill}
                   onNavigateToAddItems={handleNavigateToAddItems}
                   onSendToKitchen={onSendToKitchen}

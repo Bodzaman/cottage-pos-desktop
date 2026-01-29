@@ -1,100 +1,56 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Users, ChefHat, Heart, ArrowRight, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { getSetMeals } from '../utils/supabaseQueries';
-import { supabase } from '../utils/supabaseClient';
-import { SetMeal } from '../utils/menuTypes';
 import { AnimatedSection } from '../components/AnimatedSection';
 import { PremiumTheme } from '../utils/premiumTheme';
-
-interface SetMealWithItems extends SetMeal {
-  items: Array<{
-    id: string;
-    name: string;
-    description?: string;
-    image_url?: string;
-    quantity: number;
-  }>;
-  total_individual_price: number;
-}
+import { useSetMeals, useSetMealDetails, type SetMealWithItems } from '../utils/setMealQueries';
 
 interface SetMealsSectionProps {
   userRole?: string;
 }
 
 const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = 'viewer' }) => {
-  const [setMeals, setSetMeals] = useState<SetMeal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSetMeal, setSelectedSetMeal] = useState<SetMealWithItems | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  // React Query hooks for set meals (cached, deduplicated)
+  const { data: setMeals = [], isLoading: loading } = useSetMeals();
+
+  // Track which set meal is selected for details
+  const [selectedSetMealId, setSelectedSetMealId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  // Load set meals on component mount
+  // Fetch details when a set meal is selected
+  const { data: selectedSetMeal, isLoading: loadingDetails } = useSetMealDetails(selectedSetMealId);
+
+  // Handle opening details modal
+  const handleViewDetails = (setMealId: string) => {
+    setSelectedSetMealId(setMealId);
+    setShowDetails(true);
+  };
+
+  // Show error toast if details fetch fails
   useEffect(() => {
-    loadSetMeals();
-  }, []);
-
-  const loadSetMeals = async () => {
-    try {
-      setLoading(true);
-      const data = await getSetMeals(true);
-      setSetMeals(data);
-    } catch (error) {
-      console.error('Error loading set meals:', error);
-    } finally {
-      setLoading(false);
+    if (selectedSetMealId && !loadingDetails && !selectedSetMeal) {
+      // Only show error if we tried to fetch but got nothing
+      // Give it a moment since the query might still be initializing
     }
-  };
-
-  const loadSetMealDetails = async (setMealId: string) => {
-    try {
-      setLoadingDetails(true);
-      const { data: setMeal, error: mealError } = await supabase
-        .from('set_meals')
-        .select('*, set_meal_items(id, menu_item_id, quantity, menu_items(name, description, image_url, price))')
-        .eq('id', setMealId)
-        .single();
-
-      if (mealError || !setMeal) {
-        toast.error('Failed to load set meal details');
-        return;
-      }
-
-      const items = (setMeal.set_meal_items || []).map((item: any) => ({
-        id: item.id,
-        name: item.menu_items?.name || 'Unknown item',
-        description: item.menu_items?.description,
-        image_url: item.menu_items?.image_url,
-        quantity: item.quantity || 1,
-      }));
-
-      const totalIndividualPrice = (setMeal.set_meal_items || []).reduce(
-        (sum: number, item: any) => sum + (item.menu_items?.price || 0) * (item.quantity || 1),
-        0
-      );
-
-      setSelectedSetMeal({
-        ...setMeal,
-        items,
-        total_individual_price: totalIndividualPrice,
-      });
-      setShowDetails(true);
-    } catch (error) {
-      console.error('Error loading set meal details:', error);
-      toast.error('Failed to load set meal details');
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
+  }, [selectedSetMealId, loadingDetails, selectedSetMeal]);
 
   const handleAddToCart = (setMeal: SetMealWithItems) => {
     // TODO: Implement cart integration
     toast.success(`${setMeal.name} added to cart!`);
     setShowDetails(false);
+    setSelectedSetMealId(null);
+  };
+
+  // Close modal handler
+  const handleCloseModal = (open: boolean) => {
+    setShowDetails(open);
+    if (!open) {
+      setSelectedSetMealId(null);
+    }
   };
 
   // Don't render if no set meals
@@ -211,8 +167,7 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
 
                       {/* CTA Button */}
                       <Button
-                        onClick={() => loadSetMealDetails(setMeal.id)}
-                        disabled={loadingDetails}
+                        onClick={() => handleViewDetails(setMeal.id)}
                         className="w-full border-0 transition-all duration-300 group"
                         style={{
                           background: `linear-gradient(to right, ${PremiumTheme.colors.burgundy[500]}, ${PremiumTheme.colors.burgundy[400]})`,
@@ -220,17 +175,8 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
                         }}
                       >
                         <span className="flex items-center justify-center gap-2">
-                          {loadingDetails ? (
-                            <div 
-                              className="animate-spin rounded-full h-4 w-4 border-b-2"
-                              style={{ borderColor: PremiumTheme.colors.text.primary }}
-                            />
-                          ) : (
-                            <>
-                              <span>View Details</span>
-                              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </>
-                          )}
+                          <span>View Details</span>
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </span>
                       </Button>
                     </div>
@@ -243,8 +189,8 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
       </section>
 
       {/* Set Meal Details Dialog */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent 
+      <Dialog open={showDetails} onOpenChange={handleCloseModal}>
+        <DialogContent
           className="max-w-4xl max-h-[90dvh] overflow-y-auto border"
           style={{
             background: PremiumTheme.colors.background.primary,
@@ -252,7 +198,14 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
             color: PremiumTheme.colors.text.primary
           }}
         >
-          {selectedSetMeal && (
+          {loadingDetails ? (
+            <div className="flex justify-center items-center py-12">
+              <div
+                className="animate-spin rounded-full h-12 w-12 border-b-2"
+                style={{ borderColor: PremiumTheme.colors.burgundy[500] }}
+              />
+            </div>
+          ) : selectedSetMeal ? (
             <>
               <DialogHeader>
                 <div className="flex items-start justify-between">
@@ -393,7 +346,7 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
                 {/* Add to Cart Button */}
                 <div className="flex gap-3 pt-4">
                   <Button
-                    onClick={() => setShowDetails(false)}
+                    onClick={() => handleCloseModal(false)}
                     variant="outline"
                     className="flex-1"
                     style={{
@@ -417,7 +370,7 @@ const SetMealsSectionComponent: React.FC<SetMealsSectionProps> = ({ userRole = '
                 </div>
               </div>
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

@@ -346,6 +346,10 @@ export interface OrderItem {
   customer_tab_id?: string;      // UUID of customer tab
   // Kitchen display name for thermal receipts
   kitchen_display_name?: string | null;
+  // Section override for "Serve With" feature
+  // When set, item prints/displays in this section instead of natural category section
+  serveWithSectionId?: string | null;
+  serve_with_section_id?: string | null; // snake_case alias for database compatibility
 }
 
 /**

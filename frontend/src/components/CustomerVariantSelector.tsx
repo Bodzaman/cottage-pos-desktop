@@ -7,14 +7,14 @@ import { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { convertSpiceIndicatorsToEmoji } from '../utils/spiceLevelUtils';
 import { Minus, Plus, Info, Star, Heart, Sliders, X } from 'lucide-react';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { cn } from '../utils/cn';
 import { PremiumMenuCard } from './PremiumMenuCard';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { FavoriteHeartButton } from './FavoriteHeartButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { CustomerCustomizationModal, SelectedCustomization } from './CustomerCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { LazyImage } from './LazyImage';
 import { OptimizedImage } from './OptimizedImage';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +67,7 @@ export function CustomerVariantSelector({
   editingCartItem = null
 }: Props) {
   // Use the realtime menu store instead of direct Supabase calls
-  const { proteinTypes } = useRealtimeMenuStore();
+  const { proteinTypes } = useRealtimeMenuStoreCompat({ context: 'online' });
 
   const [selectedVariant, setSelectedVariant] = useState<ItemVariant | null>(null);
   const [loading, setLoading] = useState(false);
@@ -708,15 +708,16 @@ export function CustomerVariantSelector({
         </DialogContent>
       </Dialog>
       
-      {/* Customization Modal - Rendered as sibling to avoid nesting Dialogs */}
+      {/* Customization Modal - Updated to use Unified Modal */}
       {selectedVariant && (
-        <CustomerCustomizationModal
+        <CustomerUnifiedCustomizationModal
           item={item!}
-          variant={selectedVariant}
+          itemVariants={variants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
           addToCart={handleAddToCartWithCustomizations}
           mode={mode}
+          initialVariant={selectedVariant}
           initialQuantity={variantQuantities[selectedVariant.id] || 1}
         />
       )}

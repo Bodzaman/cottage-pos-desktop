@@ -24,7 +24,7 @@ import { ReceiptDesignerHeaderProps } from 'utils/receiptDesignerTypes';
 import { toast } from 'sonner';
 import { useSimpleAuth } from 'utils/simple-auth-context';
 import { useReceiptDesignerStoreV2 } from 'utils/receiptDesignerStoreV2';
-import { updateReceiptTemplate } from 'utils/supabaseQueries';
+import { updateReceiptTemplate } from 'utils/receiptTemplateSupabase';
 
 // Add onDuplicate to props interface
 interface EnhancedReceiptDesignerHeaderProps extends ReceiptDesignerHeaderProps {
@@ -76,39 +76,42 @@ export function ReceiptDesignerHeader({
       return;
     }
 
+    // Check if name already exists (excluding current template)
+    const nameExists = templatesList.some(
+      t => t.metadata.name.toLowerCase() === trimmedName.toLowerCase() && t.id !== currentTemplate.id
+    );
+    if (nameExists) {
+      toast.error(`A template named "${trimmedName}" already exists`);
+      return;
+    }
+
     try {
       setIsRenaming(true);
 
-      const data = await updateReceiptTemplate(
+      const result = await updateReceiptTemplate(
         currentTemplate.id,
         { name: trimmedName }
       );
 
-      if (data && data.id) {
-        // Transform backend TemplateResponse to frontend Template format
-        const updatedTemplate = {
-          id: data.id,
-          metadata: {
-            name: data.name,
-            description: data.description
-          },
-          design_data: data.design_data,
-          paper_width: data.paper_width || 80
-        };
-        
+      if (result.success && result.data) {
+        // Show warning if kitchen variant sync had issues
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
+
         toast.success(`Template renamed to "${trimmedName}"`);
         setShowRenameDialog(false);
-        
-        // Update current template in store with new data
+
+        // Update current template in store with new data (already in Template format)
         const store = useReceiptDesignerStoreV2.getState();
-        store.setCurrentTemplate(updatedTemplate);
-        
+        store.setCurrentTemplate(result.data);
+
         // Reload templates list to reflect the name change
         if (onTemplateReloaded) {
           await onTemplateReloaded();
         }
       } else {
-        toast.error('Failed to rename template');
+        toast.error(result.error || 'Failed to rename template');
       }
     } catch (error) {
       console.error('Error renaming template:', error);

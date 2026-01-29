@@ -9,10 +9,9 @@ import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { Plus, Minus, X, DollarSign, Info } from 'lucide-react';
 import { OrderItem, CustomizationSelection } from '../utils/menuTypes';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';
-import { shallow } from 'zustand/shallow';
 
 interface EditOrderItemModalProps {
   isOpen: boolean;
@@ -28,9 +27,8 @@ export function EditOrderItemModal({ isOpen, orderItem, onClose, onSave }: EditO
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationSelection[]>([]);
   const [basePrice, setBasePrice] = useState(0);
   
-  // 🚀 SELECTIVE SUBSCRIPTIONS: Only subscribe to what we need
-  const menuItems = useRealtimeMenuStore(state => state.menuItems, shallow);
-  const customizations = useRealtimeMenuStore(state => state.customizations, shallow);
+  // Get menu data from compat store
+  const { menuItems, customizations } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // Find the menu item to get available customizations
   const menuItem = menuItems.find(item => item.id === orderItem?.menu_item_id);

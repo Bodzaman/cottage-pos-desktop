@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import brain from 'brain';
 import type { MenuItem, MenuItemVariant, ProteinType } from 'utils/menuTypes';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, getVariantSummary } from '../utils/variantPricing';
 import { getSpiceEmoji } from 'utils/premiumTheme';
 import { colors } from '../utils/InternalDesignSystem';
@@ -92,7 +92,7 @@ export function CompactMenuItemCard({
   // ✅ OPTION B ARCHITECTURE (MYA-1479): Read variants from item prop (API-enriched)
   // The API resolves all variant data including image_url and image_variants
   // We only need proteinTypes from store for variant summary text calculations
-  const { proteinTypes } = useRealtimeMenuStore();
+  const { proteinTypes } = useRealtimeMenuStoreCompat({ context: 'online' });
   const variantsList = item.variants || [];
   
   // 🔍 DEBUG: Log what data we're actually receiving

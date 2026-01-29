@@ -34,14 +34,14 @@ import { OrderConfirmationModal } from './OrderConfirmationModal';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
-import { usePOSSettingsWithAutoFetch } from '../utils/posSettingsStore';
+import { usePOSSettingsQuery } from '../utils/posSettingsQueries';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
 import brain from 'brain';
 import { createLogger } from 'utils/logger';
 import { colors as designColors } from '@/utils/designSystem';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
-import { StaffCustomizationModal, SelectedCustomization } from './StaffCustomizationModal';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
+import { StaffUnifiedCustomizationModal, SelectedCustomization } from './StaffUnifiedCustomizationModal';
 import { CustomerData } from '../utils/customerTypes';
 import { TipSelection } from '../types/orders';
 
@@ -142,11 +142,11 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 }: Props) {
   const logger = createLogger('OrderSummaryPanel');
 
-  // ✅ Get POS settings from store
-  const { settings: posSettings } = usePOSSettingsWithAutoFetch();
+  // ✅ Get POS settings from React Query
+  const { data: posSettings } = usePOSSettingsQuery();
   
   // ✅ Get menu items from store for customization modal
-  const { menuItems, itemVariants } = useRealtimeMenuStore();
+  const { menuItems, itemVariants } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   // ✅ NEW: State for StaffCustomizationModal
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
@@ -1161,10 +1161,13 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           return null;
         }
 
+        // Get variants for this menu item
+        const menuItemVariants = itemVariants.filter(v => v.menu_item_id === menuItem.id);
+
         return (
-          <StaffCustomizationModal
+          <StaffUnifiedCustomizationModal
             item={menuItem}
-            variant={variant}
+            itemVariants={menuItemVariants}
             isOpen={isCustomizationModalOpen}
             onClose={() => {
               setIsCustomizationModalOpen(false);
@@ -1173,6 +1176,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
             }}
             onConfirm={handleCustomizationConfirm}
             orderType={orderType}
+            initialVariant={variant}
             initialQuantity={customizingOrderItem.quantity}
           />
         );

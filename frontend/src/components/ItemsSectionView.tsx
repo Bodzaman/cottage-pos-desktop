@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, Edit, Power, Trash2, ImageIcon, UtensilsCros
 import CompactMenuItemCard from './CompactMenuItemCard';
 import { colors } from '../utils/InternalDesignSystem';
 import { Button } from '@/components/ui/button';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, getVariantPrice as getVariantPriceByMode } from '../utils/variantPricing';
 
 // Types for grouped structure
@@ -66,8 +66,7 @@ export default function ItemsSectionView({
   onSelectionToggle,
 }: Props) {
   const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
-  const { itemVariants, proteinTypes } = useRealtimeMenuStore();
-  const { categories: allCategories } = useRealtimeMenuStore();
+  const { itemVariants, proteinTypes, categories: allCategories } = useRealtimeMenuStoreCompat({ context: 'admin' });
 
   // Helper to check if an item is a draft (published_at is null)
   const isDraft = (item: any): boolean => !item.published_at;

@@ -55,9 +55,9 @@ import { usePageContext } from '../utils/pageContext';
 import { detectDishMentionsFast } from '../utils/dishMentionDetector';
 import type { ChatMessage } from '../utils/chat-store';
 import type { CartItem } from '../utils/cartStore';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useVoiceAgentStore } from '../utils/voiceAgentStore';
-import { useAgentVoiceConfig } from '../utils/agentConfigStore';
+import { useAgentVoiceConfigQuery } from '../utils/agentQueries';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { GeminiVoiceClient, GeminiVoiceState } from 'utils/geminiVoiceClient';
 
@@ -507,8 +507,8 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
   // NEW: Get voice agent store
   const voiceAgentStore = useVoiceAgentStore();
 
-  // Get published voice configuration from AIStaffManagementHub
-  const publishedVoiceConfig = useAgentVoiceConfig();
+  // Get published voice configuration from AIStaffManagementHub (React Query)
+  const { data: publishedVoiceConfig } = useAgentVoiceConfigQuery();
 
   // NEW: Voice terms accepted handler - Initialize Gemini voice client
   const handleVoiceTermsAccepted = async () => {

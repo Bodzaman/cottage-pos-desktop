@@ -13,6 +13,7 @@ export interface QRCodeConfig {
   position: 'left' | 'center' | 'right'; // Changed from 'header'|'footer' to alignment
   placement?: 'header' | 'footer'; // Optional - for backward compatibility
   enabled?: boolean;
+  caption?: string; // Optional text displayed below the QR code
 }
 
 // ==================== Order Item Configuration ====================
@@ -83,6 +84,8 @@ export type PaymentMethod = 'cash' | 'card' | 'online';
 export interface FormData {
   // Business Information
   businessName: string;
+  businessNameFont: string;  // CMS font ID for business name (e.g., 'old-english', 'playfair-display')
+  businessNameFontSize: number;  // Font size in pixels for business name (default: 18)
   vatNumber: string;
   address: string;
   phone: string;
@@ -309,6 +312,8 @@ export interface ReceiptDesignerHeaderProps {
 export const DEFAULT_FORM_DATA: FormData = {
   // Business Information
   businessName: 'Cottage Tandoori Restaurant',
+  businessNameFont: 'old-english',  // Default to Old English matching CMS default
+  businessNameFontSize: 18,  // Default 18px for prominent header
   vatNumber: 'GB123456789',
   address: '123 High Street, London, SW1A 1AA',
   phone: '020 7123 4567',

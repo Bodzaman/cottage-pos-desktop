@@ -7,7 +7,7 @@
 import { supabase } from './supabaseClient';
 import { Template, FormData } from 'utils/receiptDesignerTypes';
 import {
-  listReceiptTemplates,
+  listParentTemplates,
   getReceiptTemplate,
   createReceiptTemplate,
   updateReceiptTemplate,
@@ -28,10 +28,11 @@ export const ReceiptDesignerService = {
   /**
    * Fetch all templates (shared resources)
    * Uses direct Supabase query - no backend server needed
+   * Returns only parent templates (excludes auto-created kitchen variants)
    */
   fetchTemplates: async (): Promise<ApiResponse<Template[]>> => {
-    console.log('📡 [ReceiptDesignerService] Fetching templates via Supabase direct...');
-    return await listReceiptTemplates();
+    console.log('📡 [ReceiptDesignerService] Fetching parent templates via Supabase direct...');
+    return await listParentTemplates();
   },
 
   /**

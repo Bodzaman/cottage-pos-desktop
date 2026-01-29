@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
@@ -56,7 +56,7 @@ export function CustomerCustomizationModal({
   initialInstructions = '',
   onModalClose // ✅ NEW: Destructure callback
 }: CustomerCustomizationModalProps) {
-  const { customizations } = useRealtimeMenuStore();
+  const { customizations } = useRealtimeMenuStoreCompat({ context: 'online' });
   
   // State
   const [quantity, setQuantity] = useState(initialQuantity);

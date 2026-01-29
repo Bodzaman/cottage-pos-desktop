@@ -365,28 +365,38 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
 
     const orderIds = activeOrders?.map(o => o.id) || [];
 
-    // Step 3: Delete customer_tabs for these orders
+    // Step 3: Soft-delete customer_tabs for these orders (set deleted_at for audit trail)
     if (orderIds.length > 0) {
       const { error: tabsError } = await supabase
         .from('customer_tabs')
-        .delete()
-        .in('order_id', orderIds);
+        .update({
+          deleted_at: new Date().toISOString(),
+          status: 'paid',
+          updated_at: new Date().toISOString()
+        })
+        .in('order_id', orderIds)
+        .is('deleted_at', null); // Only update non-deleted tabs
 
       if (tabsError) {
-        console.warn('[supabaseQueries] Failed to delete customer_tabs:', tabsError);
+        console.warn('[supabaseQueries] Failed to soft-delete customer_tabs:', tabsError);
         // Don't throw - continue with order completion
       }
     }
 
-    // Also delete any orphaned tabs by table_number (legacy cleanup)
+    // Also soft-delete any orphaned tabs by table_number (legacy cleanup)
     const { error: orphanedTabsError } = await supabase
       .from('customer_tabs')
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
       .in('table_number', allTableNumbers)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .is('deleted_at', null);
 
     if (orphanedTabsError) {
-      console.warn('[supabaseQueries] Failed to delete orphaned customer_tabs:', orphanedTabsError);
+      console.warn('[supabaseQueries] Failed to soft-delete orphaned customer_tabs:', orphanedTabsError);
     }
 
     // Step 4: Complete ALL table orders in the group (legacy table_orders)
@@ -553,6 +563,7 @@ export async function getCustomerTabsForTable(tableNumber: number): Promise<Cust
       .select('*')
       .eq('table_number', tableNumber)
       .eq('status', 'active')
+      .is('deleted_at', null) // Exclude soft-deleted tabs
       .order('created_at');
 
     if (error) throw error;
@@ -574,6 +585,7 @@ export async function getCustomerTabsForOrder(orderId: string): Promise<Customer
       .select('*')
       .eq('order_id', orderId)
       .eq('status', 'active')
+      .is('deleted_at', null) // Exclude soft-deleted tabs
       .order('created_at');
 
     if (error) throw error;
@@ -698,14 +710,21 @@ export async function closeCustomerTab(tabId: string): Promise<boolean> {
 }
 
 /**
- * Delete customer tab
+ * Delete customer tab (SOFT DELETE - sets deleted_at for audit trail)
  * Replaces: brain.delete_customer_tab()
+ *
+ * Note: We use soft delete instead of hard delete to maintain audit trail.
+ * The deleted_at column was added in the customer_tabs_cleanup migration.
  */
 export async function deleteCustomerTab(tabId: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('customer_tabs')
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
       .eq('id', tabId);
 
     if (error) throw error;
@@ -1396,10 +1415,13 @@ export async function getTemplateAssignment(orderMode: string): Promise<{
   kitchen_template_id: string | null;
 } | null> {
   try {
+    // Normalize to uppercase and replace hyphens with underscores for consistency
+    const normalizedMode = orderMode.toUpperCase().replace(/-/g, '_');
+
     const { data, error } = await supabase
       .from('template_assignments')
       .select('*')
-      .eq('order_mode', orderMode)
+      .eq('order_mode', normalizedMode)
       .single();
 
     if (error) {
@@ -2122,13 +2144,18 @@ export async function mergeCustomerTabsDirect(
 
     if (updateError) throw updateError;
 
-    // Delete source tab
-    const { error: deleteError } = await supabase
+    // Soft-delete source tab (mark as cancelled with merged_into_tab_id)
+    const { error: softDeleteError } = await supabase
       .from('customer_tabs')
-      .delete()
+      .update({
+        status: 'cancelled',
+        deleted_at: new Date().toISOString(),
+        merged_into_tab_id: targetTabId,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', sourceTabId);
 
-    if (deleteError) throw deleteError;
+    if (softDeleteError) throw softDeleteError;
 
     return { success: true };
   } catch (error) {
@@ -2189,6 +2216,125 @@ export async function moveItemsBetweenTabsDirect(
   } catch (error) {
     console.error(' [supabaseQueries] moveItemsBetweenTabsDirect failed:', error);
     return { success: false };
+  }
+}
+
+/**
+ * Assign a dine_in_order_item to a customer tab (SINGLE SOURCE OF TRUTH)
+ *
+ * This updates dine_in_order_items.customer_tab_id directly, avoiding the
+ * dual storage problem with JSONB order_items in customer_tabs.
+ *
+ * @param itemId - The dine_in_order_items.id to assign
+ * @param tabId - The customer_tabs.id to assign to (null = unassign/table-level)
+ * @returns Promise<{ success: boolean; message: string }>
+ */
+export async function assignItemToTab(
+  itemId: string,
+  tabId: string | null
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Validate item exists
+    const { data: item, error: itemError } = await supabase
+      .from('dine_in_order_items')
+      .select('id, item_name')
+      .eq('id', itemId)
+      .single();
+
+    if (itemError || !item) {
+      return { success: false, message: `Item not found: ${itemId}` };
+    }
+
+    // If assigning to a tab, validate tab exists and is active
+    if (tabId) {
+      const { data: tab, error: tabError } = await supabase
+        .from('customer_tabs')
+        .select('id, tab_name, status, deleted_at')
+        .eq('id', tabId)
+        .single();
+
+      if (tabError || !tab) {
+        return { success: false, message: `Customer tab not found: ${tabId}` };
+      }
+
+      if (tab.status !== 'active' || tab.deleted_at) {
+        return { success: false, message: `Customer tab is not active: ${tabId}` };
+      }
+    }
+
+    // Update the item's customer_tab_id
+    const { error: updateError } = await supabase
+      .from('dine_in_order_items')
+      .update({
+        customer_tab_id: tabId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId);
+
+    if (updateError) {
+      return { success: false, message: `Failed to update item: ${updateError.message}` };
+    }
+
+    const action = tabId ? 'assigned to tab' : 'unassigned (table-level)';
+    return { success: true, message: `Item ${action}` };
+  } catch (error) {
+    console.error('[supabaseQueries] assignItemToTab failed:', error);
+    return { success: false, message: `Error assigning item: ${error}` };
+  }
+}
+
+/**
+ * Bulk assign multiple dine_in_order_items to a customer tab
+ *
+ * @param itemIds - Array of dine_in_order_items.id to assign
+ * @param tabId - The customer_tabs.id to assign to (null = unassign all)
+ * @returns Promise<{ success: boolean; assignedCount: number; message: string }>
+ */
+export async function assignItemsToTabBulk(
+  itemIds: string[],
+  tabId: string | null
+): Promise<{ success: boolean; assignedCount: number; message: string }> {
+  try {
+    if (!itemIds || itemIds.length === 0) {
+      return { success: false, assignedCount: 0, message: 'No items provided' };
+    }
+
+    // If assigning to a tab, validate tab exists and is active
+    if (tabId) {
+      const { data: tab, error: tabError } = await supabase
+        .from('customer_tabs')
+        .select('id, tab_name, status, deleted_at')
+        .eq('id', tabId)
+        .single();
+
+      if (tabError || !tab) {
+        return { success: false, assignedCount: 0, message: `Customer tab not found: ${tabId}` };
+      }
+
+      if (tab.status !== 'active' || tab.deleted_at) {
+        return { success: false, assignedCount: 0, message: `Customer tab is not active: ${tabId}` };
+      }
+    }
+
+    // Update all items
+    const { error: updateError, count } = await supabase
+      .from('dine_in_order_items')
+      .update({
+        customer_tab_id: tabId,
+        updated_at: new Date().toISOString()
+      })
+      .in('id', itemIds);
+
+    if (updateError) {
+      return { success: false, assignedCount: 0, message: `Failed to update items: ${updateError.message}` };
+    }
+
+    const assignedCount = count || itemIds.length;
+    const action = tabId ? 'assigned to tab' : 'unassigned (table-level)';
+    return { success: true, assignedCount, message: `${assignedCount} items ${action}` };
+  } catch (error) {
+    console.error('[supabaseQueries] assignItemsToTabBulk failed:', error);
+    return { success: false, assignedCount: 0, message: `Error assigning items: ${error}` };
   }
 }
 
@@ -3878,6 +4024,309 @@ export async function removeAssetReferences(
     };
   } catch (error) {
     console.error('[supabaseQueries] removeAssetReferences failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+// ============================================================================
+// AI PERSONALITY TEMPLATES QUERIES
+// Phase 1: Database Template System
+// ============================================================================
+
+/**
+ * AI Personality Template type definition
+ */
+export interface AIPersonalityTemplate {
+  id: string;
+  name: string;
+  cuisine_type: string;
+  description: string | null;
+  system_prompt_chat: string;
+  system_prompt_voice: string;
+  default_greeting: string;
+  default_agent_name: string;
+  default_voice_model: string;
+  default_traits: string[];
+  available_traits: string[];
+  is_active: boolean;
+  is_default: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+/**
+ * Get all active AI personality templates
+ * Returns templates sorted by sort_order for dropdown display
+ */
+export async function getActiveAITemplates(): Promise<{
+  success: boolean;
+  data?: AIPersonalityTemplate[];
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_personality_templates')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data as AIPersonalityTemplate[],
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] getActiveAITemplates failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Get a single AI personality template by ID
+ */
+export async function getAITemplateById(templateId: string): Promise<{
+  success: boolean;
+  data?: AIPersonalityTemplate;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_personality_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data as AIPersonalityTemplate,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] getAITemplateById failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Get the default AI personality template
+ */
+export async function getDefaultAITemplate(): Promise<{
+  success: boolean;
+  data?: AIPersonalityTemplate;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_personality_templates')
+      .select('*')
+      .eq('is_default', true)
+      .eq('is_active', true)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data as AIPersonalityTemplate,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] getDefaultAITemplate failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Create a new AI personality template (developer use in GeminiVoiceLab)
+ */
+export async function createAITemplate(
+  template: Omit<AIPersonalityTemplate, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+): Promise<{
+  success: boolean;
+  data?: AIPersonalityTemplate;
+  error?: string;
+}> {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('ai_personality_templates')
+      .insert({
+        ...template,
+        created_by: userData?.user?.id || null,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    console.log('[supabaseQueries] Created AI template:', data?.name);
+
+    return {
+      success: true,
+      data: data as AIPersonalityTemplate,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] createAITemplate failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Update an existing AI personality template
+ */
+export async function updateAITemplate(
+  templateId: string,
+  updates: Partial<Omit<AIPersonalityTemplate, 'id' | 'created_at' | 'updated_at' | 'created_by'>>
+): Promise<{
+  success: boolean;
+  data?: AIPersonalityTemplate;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_personality_templates')
+      .update(updates)
+      .eq('id', templateId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    console.log('[supabaseQueries] Updated AI template:', data?.name);
+
+    return {
+      success: true,
+      data: data as AIPersonalityTemplate,
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] updateAITemplate failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Delete an AI personality template (soft delete by setting is_active = false)
+ */
+export async function deleteAITemplate(templateId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const { error } = await supabase
+      .from('ai_personality_templates')
+      .update({ is_active: false })
+      .eq('id', templateId);
+
+    if (error) throw error;
+
+    console.log('[supabaseQueries] Soft-deleted AI template:', templateId);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[supabaseQueries] deleteAITemplate failed:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+    };
+  }
+}
+
+/**
+ * Apply a template to the unified_agent_config
+ * This copies template values to the config and sets the template_id reference
+ */
+export async function applyTemplateToConfig(
+  templateId: string,
+  customizations?: {
+    agent_name?: string;
+    greeting?: string;
+    voice_model?: string;
+    traits?: string[];
+  }
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Fetch the template
+    const templateResult = await getAITemplateById(templateId);
+    if (!templateResult.success || !templateResult.data) {
+      throw new Error(templateResult.error || 'Template not found');
+    }
+
+    const template = templateResult.data;
+
+    // Fetch existing config to merge with
+    const configResult = await getUnifiedAgentConfig();
+    const existingConfig = configResult.data as any;
+    const existingChannelSettings = existingConfig?.channel_settings || {};
+
+    // Build the update with template values + customizations
+    const agentName = customizations?.agent_name || template.default_agent_name;
+    const greeting = customizations?.greeting || template.default_greeting;
+    const voiceModel = customizations?.voice_model || template.default_voice_model;
+    const traits = customizations?.traits || template.default_traits;
+
+    // Replace placeholders in prompts
+    const replacePlaceholders = (text: string) => {
+      return text
+        .replace(/\{agent_name\}/g, agentName)
+        .replace(/\{restaurant_name\}/g, existingConfig?.restaurant_name || 'our restaurant')
+        .replace(/\{traits\}/g, traits.join(', '));
+    };
+
+    const updates = {
+      template_id: templateId,
+      agent_name: agentName,
+      personality_traits: traits,
+      channel_settings: {
+        ...existingChannelSettings,
+        chat: {
+          ...(existingChannelSettings.chat || {}),
+          system_prompt: replacePlaceholders(template.system_prompt_chat),
+        },
+        voice: {
+          ...(existingChannelSettings.voice || {}),
+          system_prompt: replacePlaceholders(template.system_prompt_voice),
+          first_response: replacePlaceholders(greeting),
+          voice_model: voiceModel,
+        },
+      },
+    };
+
+    const result = await updateUnifiedAgentConfig(updates);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to apply template');
+    }
+
+    console.log('[supabaseQueries] Applied template to config:', template.name);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[supabaseQueries] applyTemplateToConfig failed:', error);
     return {
       success: false,
       error: (error as Error).message,

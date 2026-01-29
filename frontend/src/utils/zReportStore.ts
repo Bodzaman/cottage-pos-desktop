@@ -1,3 +1,20 @@
+/**
+ * Z-Report Store
+ *
+ * @deprecated Phase 7: Consider using React Query hooks from zReportQueries.ts.
+ * This store is kept for backward compatibility and UI state management.
+ *
+ * Architecture recommendation:
+ * - React Query (zReportQueries.ts): Config, business date, report data fetching
+ * - This store: UI state (cashCounted, localPaidOuts, notes, dateRange)
+ *
+ * Migration guide:
+ * - useZReportConfigQuery() for config
+ * - useCurrentBusinessDateQuery() for business date
+ * - useZReportQuery(businessDate) for report data
+ * - useUpdateZReportConfig(), useFinalizeZReport(), etc. for mutations
+ */
+
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import brain from 'brain';

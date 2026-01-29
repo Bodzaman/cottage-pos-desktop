@@ -4,20 +4,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { useSimpleAuth } from '../utils/simple-auth-context';
 import { useVoiceAgentStore } from '../utils/voiceAgentStore';
 import { CategoryNavigation } from '../components/CategoryNavigation';
 import { MenuGrid } from '../components/MenuGrid';
-import { CustomerVariantSelector } from '../components/CustomerVariantSelector';
-import { SelectedCustomization } from '../components/CustomerCustomizationModal';
+import { CustomerUnifiedCustomizationModal, SelectedCustomization } from '../components/CustomerUnifiedCustomizationModal';
 import { useCartStore } from '../utils/cartStore';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { MenuItem, ItemVariant } from '../utils/menuTypes';
 
 export function MenuOrderingView() {
   // Menu data and filtering - using reactive store (exactly like OnlineOrders)
-  const realtimeMenuStore = useRealtimeMenuStore();
+  const realtimeMenuStore = useRealtimeMenuStoreCompat({ context: 'admin' });
   const { menuItems, categories, itemVariants, isLoading: menuLoading } = realtimeMenuStore;
   
   // Auth integration (same as OnlineOrders)
@@ -354,7 +353,7 @@ export function MenuOrderingView() {
       </div>
       
       {/* Variant Selector Modal */}
-      <CustomerVariantSelector
+      <CustomerUnifiedCustomizationModal
         item={selectedItem}
         itemVariants={itemVariants}
         isOpen={isVariantSelectorOpen}
