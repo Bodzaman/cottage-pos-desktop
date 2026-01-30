@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, FileEdit, FilePlus2, ArrowRight, AlertCircle, CheckCircle2, RefreshCw, Utensils, Settings, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { getDraftItemsWithChanges, getDraftCustomizations, getDraftSetMeals, publishMenu, createSnapshotsForPublish } from '../utils/supabaseQueries';
+import { getDraftItemsWithChanges, getDraftCustomizations, getDraftSetMeals, publishMenuDirect, createSnapshotsForPublish } from '../utils/supabaseQueries';
 import type { DraftItemChange, FieldChange } from '../utils/draftTypes';
 import { formatFieldValue } from '../utils/draftTypes';
 
@@ -100,8 +100,8 @@ export default function PublishReviewModal({
         await createSnapshotsForPublish(itemIds);
       }
 
-      // Then publish the menu (backend will publish items, customizations, and set meals)
-      const result = await publishMenu();
+      // Then publish the menu (direct to Supabase - web app, no backend needed)
+      const result = await publishMenuDirect();
 
       if (!result.success) {
         toast.error(result.message || 'Failed to publish menu');

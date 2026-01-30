@@ -398,7 +398,7 @@ export default function POSDesktop() {
       if (!result?.isOpen) return;
       electronAPI.sendToCustomerDisplay({
         items: orderItems.map(item => ({
-          name: item.name || item.menuItemName || 'Item',
+          name: item.name || 'Item',
           quantity: item.quantity,
           price: item.price,
           modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
@@ -823,6 +823,36 @@ export default function POSDesktop() {
   const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
   const orderProcessing = useOrderProcessing(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
   const printing = usePrintingOperations(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
+
+  const handleDineInPrintBill = useCallback(async (orderTotal: number) => {
+    const itemsToPrint = (dineInEnrichedItems || []).map(item => ({
+      id: item.id,
+      menu_item_id: item.menu_item_id,
+      variant_id: item.variant_id || null,
+      name: item.item_name,
+      quantity: item.quantity,
+      price: item.unit_price,
+      variantName: item.variant_name || undefined,
+      protein_type: item.protein_type || undefined,
+      notes: item.notes || undefined,
+      modifiers: item.customizations?.map((c: any) => ({
+        id: c.customization_id || c.id,
+        name: c.name,
+        price_adjustment: c.price_adjustment ?? c.price ?? 0
+      })) || [],
+      category_id: item.category_id || undefined,
+      customer_tab_id: item.customer_tab_id || undefined,
+      serve_with_section_id: (item as any).serve_with_section_id || undefined,
+      serveWithSectionId: (item as any).serve_with_section_id || undefined,
+    }));
+
+    return printing.handlePrintBillForItems(
+      itemsToPrint,
+      orderTotal,
+      selectedTableNumber,
+      guestCount
+    );
+  }, [printing, dineInEnrichedItems, selectedTableNumber, guestCount]);
 
 
   const handleAddToOrder = useCallback((item: OrderItem) => {
@@ -1326,7 +1356,7 @@ export default function POSDesktop() {
                 setTimeout(() => {
                   api.sendToCustomerDisplay?.({
                     items: orderItems.map(item => ({
-                      name: item.name || item.menuItemName || 'Item',
+                      name: item.name || 'Item',
                       quantity: item.quantity,
                       price: item.price,
                       modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
@@ -1374,7 +1404,7 @@ export default function POSDesktop() {
           onRemoveFromStaging={removeFromStagingCart}
           onClearStaging={clearStagingCart}
           onPersistStaging={persistStagingCart}
-          onPrintBill={printing.handlePrintBill}
+          onPrintBill={handleDineInPrintBill}
           onCompleteOrder={async () => {
             // Mark order as COMPLETED and reset table to AVAILABLE
             if (dineInOrder?.id) {
@@ -1462,7 +1492,7 @@ export default function POSDesktop() {
           tableNumber={selectedTableNumber}
           guestCount={guestCount}
           orderTotal={dineInOrder?.total_amount || 0}
-          onPrintBill={printing.handlePrintBill}
+          onPrintBill={handleDineInPrintBill}
         />
 
         {/* Online Orders Reject Modal */}

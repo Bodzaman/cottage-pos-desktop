@@ -189,10 +189,11 @@ export function useMenuItems(options?: Partial<Omit<UseQueryOptions<MenuItem[]>,
   return useQuery({
     queryKey: menuKeys.menuItems(),
     queryFn: async () => {
-      const response = await (brain as any).get_menu_items();
-      const raw = await response.json();
-      const items = normalizeMenuItemsResponse(raw);
-      return items;
+      const menuResult = await getMenuWithOrdering({ includeInactive: true, publishedOnly: false });
+      if (!menuResult.success || !menuResult.data) {
+        return [] as MenuItem[];
+      }
+      return (menuResult.data.items || []) as MenuItem[];
     },
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

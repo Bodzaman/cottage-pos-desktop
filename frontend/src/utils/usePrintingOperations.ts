@@ -586,6 +586,145 @@ export function usePrintingOperations(
   }, [orderType, orderItems, selectedTableNumber, guestCount, templateAssignments, queuePrintJob]);
 
   // ============================================================================
+  // PRINT BILL (DINE-IN) - Explicit items variant (uses provided items)
+  // ============================================================================
+  const handlePrintBillForItems = useCallback(async (
+    items: OrderItem[],
+    orderTotal: number,
+    tableNumberOverride?: number | null,
+    guestCountOverride?: number,
+    paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'
+  ) => {
+    if (orderType !== 'DINE-IN') {
+      toast.error('Bill printing is only for dine-in orders');
+      return false;
+    }
+
+    if (items.length === 0) {
+      toast.error('No items to print');
+      return false;
+    }
+
+    const tableNumberToUse = tableNumberOverride ?? selectedTableNumber;
+    if (!tableNumberToUse) {
+      toast.error('Table number is required for bill printing');
+      return false;
+    }
+
+    setIsPrinting(true);
+
+    try {
+      const customerTemplateId = await templateAssignments.getCustomerTemplateId('DINE-IN');
+
+      const subtotal = orderTotal;
+      const serviceCharge = orderTotal * 0.125;
+      const tax = (orderTotal + serviceCharge) * 0.20;
+      const total = subtotal + serviceCharge + tax;
+
+      const receiptItems = items.map(item => {
+        let itemPrice = item.price;
+        if (item.modifiers && item.modifiers.length > 0) {
+          item.modifiers.forEach(mod => {
+            itemPrice += mod.price_adjustment ?? mod.price ?? 0;
+          });
+        }
+        return {
+          name: item.name,
+          variant_name: item.variantName || null,
+          quantity: item.quantity,
+          unitPrice: itemPrice,
+          total: itemPrice * item.quantity,
+          modifiers: item.modifiers?.map(m => m.name) || []
+        };
+      });
+
+      if (isESCPOSPrintAvailable()) {
+        console.log('🖨️ [HYBRID] Electron ESC/POS available, printing bill directly...');
+
+        const billData: CustomerReceiptData = {
+          items: receiptItems.map((item, idx) => {
+            const sectionInfo = getSectionInfo(items[idx]);
+            return {
+              name: item.name,
+              quantity: item.quantity,
+              price: item.unitPrice,
+              variantName: item.variant_name || undefined,
+              sectionNumber: sectionInfo.sectionNumber,
+              sectionName: sectionInfo.sectionName
+            };
+          }),
+          subtotal,
+          tax,
+          total,
+          orderNumber: `TABLE-${tableNumberToUse}-${Date.now()}`,
+          orderType: 'DINE-IN',
+          tableNumber: tableNumberToUse,
+          timestamp: new Date().toISOString(),
+          paymentMethod: 'Card',
+          paymentStatus
+        };
+
+        const result = await printCustomerReceiptESCPOS(billData);
+
+        if (result.success) {
+          setLastPrintedAt(new Date());
+          console.log('✅ [HYBRID] Direct bill print successful:', result);
+          saveReceiptToHistory(billData, {
+            orderNumber: billData.orderNumber || `T${tableNumberToUse}`,
+            orderType: 'DINE-IN',
+            total: billData.total,
+            tableNumber: tableNumberToUse,
+            itemCount: items.length
+          });
+          return true;
+        } else {
+          console.warn('⚠️ [HYBRID] Direct bill print failed, trying queue fallback:', result.error);
+        }
+      } else {
+        console.log('ℹ️ [HYBRID] Electron not available for bill, using Supabase queue');
+      }
+
+      const jobData = {
+        job_type: 'BILL',
+        order_data: {
+          orderNumber: `TABLE-${tableNumberToUse}-${Date.now()}`,
+          orderType: 'DINE-IN',
+          items: receiptItems,
+          tax,
+          deliveryFee: 0,
+          tableNumber: tableNumberToUse,
+          guestCount: guestCountOverride ?? guestCount,
+          subtotal,
+          serviceCharge,
+          total,
+          timestamp: new Date().toISOString(),
+          template_id: customerTemplateId || 'classic_restaurant',
+          table: `Table ${tableNumberToUse}`,
+          paymentMethod: 'Card',
+          paymentStatus
+        },
+        printer_id: null,
+        priority: 5
+      };
+
+      console.log('🖨️ [HYBRID] Queuing bill to Supabase for table:', tableNumberToUse);
+      const queued = await queuePrintJob(jobData);
+
+      if (queued) {
+        setLastPrintedAt(new Date());
+        return true;
+      }
+      throw new Error('Failed to queue bill print job');
+    } catch (error) {
+      console.error('❌ Error printing bill:', error);
+      toast.error('Failed to print bill');
+      return false;
+    } finally {
+      setIsPrinting(false);
+    }
+  }, [orderType, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, getSectionInfo]);
+
+  // ============================================================================
   // SEND TO KITCHEN (HYBRID: Electron ESC/POS → Supabase Queue)
   // ============================================================================
   const handleSendToKitchen = useCallback(async () => {
@@ -695,6 +834,7 @@ export function usePrintingOperations(
     handlePrintKitchen,
     handlePrintReceipt,
     handlePrintBill,
+    handlePrintBillForItems,
     handleSendToKitchen,
   };
 }

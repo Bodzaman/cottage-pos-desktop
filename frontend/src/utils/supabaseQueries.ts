@@ -174,8 +174,8 @@ export async function updateTableStatus(
 // ============================================================================
 
 /**
- * Get all active table orders
- * Replaces: brain.list_table_orders()
+ * Get all table orders (for table display)
+ * Replaces: brain.get_table_orders()
  */
 export async function getTableOrders(): Promise<TableOrder[]> {
   try {
@@ -198,7 +198,7 @@ export async function getTableOrders(): Promise<TableOrder[]> {
 }
 
 /**
- * Get table order by table number
+ * Get table order by number
  */
 export async function getTableOrderByNumber(tableNumber: number): Promise<TableOrder | null> {
   try {
@@ -222,8 +222,159 @@ export async function getTableOrderByNumber(tableNumber: number): Promise<TableO
 }
 
 /**
+ * Publish menu - calls backend endpoint to publish menu and sync all systems
+ * Replaces: brain.publish_menu()
+ *
+ * This calls to backend /routes/publish-menu endpoint which:
+ * - Updates database timestamps (published_at) on menu_items and menu_customizations
+ * - Syncs to AI Knowledge Corpus (ai_knowledge_corpus table)
+ * - Syncs to POS/Website/Voice customization caches
+ * - Invalidates menu cache
+ * 
+ * ⚠️ DEPRECATED: This function uses brain module which calls backend API.
+ * For web app, use publishMenuDirect() instead.
+ * For Electron POS Desktop, this function is still used.
+ */
+export async function publishMenu(): Promise<{
+  success: boolean;
+  menu_items?: number;
+  corpus_updated?: boolean;
+  message?: string;
+}> {
+  try {
+    // Use brain module (works on both web via HTTP and Electron via direct Supabase)
+    const brain = await import('brain');
+
+    // Call brain.publish_menu()
+    // - Web: Pass format: "json" to parse response, returns HttpResponse with .data property
+    // - Electron: Ignores format param, returns data directly (no wrapper)
+    const response = await (brain.default as any).publish_menu({ format: "json" });
+
+    // Extract result from response
+    // - Web: response.data contains parsed JSON
+    // - Electron: response IS data (not wrapped)
+    const result = response?.data || response;
+
+    if (!result || typeof result !== 'object') {
+      console.error('[supabaseQueries] publishMenu: Invalid response structure', { response, result });
+      return { success: false, message: 'Invalid response from server' };
+    }
+
+    // Electron brain returns 'error' field on failure, backend returns 'message'
+    return {
+      success: result.success ?? false,
+      menu_items: result.menu_items,
+      corpus_updated: result.corpus_updated,
+      message: result.message || result.error  // Handle both 'message' and 'error'
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] publishMenu failed:', error);
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+/**
+ * Publish menu directly to Supabase (Web App - No Backend Required)
+ * 
+ * This function publishes draft menu items, customizations, and set meals
+ * by setting published_at = NOW() directly in Supabase.
+ * 
+ * For web app use - bypasses brain/app-compat/backend entirely.
+ * Uses direct Supabase client like other functions in this file.
+ * 
+ * Replicates backend /routes/publish-menu logic:
+ * 1. Sets published_at = NOW() on active draft items (published_at IS NULL)
+ * 2. Publishes draft customizations and set meals
+ * 3. Returns counts and status
+ * 
+ * Returns:
+ *   { success: boolean, menu_items: number, message: string }
+ */
+export async function publishMenuDirect(): Promise<{
+  success: boolean;
+  menu_items?: number;
+  message?: string;
+}> {
+  try {
+    const publishTimestamp = new Date().toISOString();
+
+    // 1. Publish draft menu items (set published_at = NOW())
+    const { error: itemsError } = await supabase
+      .from('menu_items')
+      .update({ published_at: publishTimestamp })
+      .eq('is_active', true)
+      .is('published_at', null);
+
+    if (itemsError) throw itemsError;
+
+    // Count published draft items - use separate query
+    const { data: countResult, error: countError } = await supabase
+      .from('menu_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .eq('published_at', publishTimestamp);
+
+    if (countError) throw countError;
+    const draftItemsCount = (countResult as any)?.count || 0;
+
+    // 2. Publish draft customizations (set published_at = NOW())
+    const { error: customizationsError } = await supabase
+      .from('menu_customizations')
+      .update({ published_at: publishTimestamp })
+      .eq('is_active', true)
+      .is('published_at', null);
+
+    if (customizationsError) {
+      console.warn('[publishMenuDirect] Failed to publish customizations:', customizationsError);
+    }
+
+    // 3. Publish draft set meals (set published_at = NOW())
+    const { error: setMealsError } = await supabase
+      .from('set_meals')
+      .update({ published_at: publishTimestamp })
+      .eq('active', true)
+      .is('published_at', null);
+
+    if (setMealsError) {
+      console.warn('[publishMenuDirect] Failed to publish set meals:', setMealsError);
+    }
+
+    // 4. Count total published items
+    const { data: totalCountResult, error: totalError } = await supabase
+      .from('menu_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .not('published_at', 'is', null);
+
+    if (totalError) throw totalError;
+    const totalPublishedCount = (totalCountResult as any)?.count || 0;
+
+    const totalPublished = totalPublishedCount || 0;
+    const draftCount = draftItemsCount || 0;
+
+    console.log(`[publishMenuDirect] Published ${draftCount} items. Total published: ${totalPublished}`);
+
+    return {
+      success: true,
+      menu_items: totalPublished,
+      message: draftCount > 0
+        ? `Published ${draftCount} draft items. ${totalPublished} total items now live.`
+        : 'No draft items to publish. Menu is up to date.'
+    };
+  } catch (error) {
+    console.error('[supabaseQueries] publishMenuDirect failed:', error);
+    return {
+      success: false,
+      message: (error as Error).message || 'Failed to publish menu'
+    };
+  }
+}
+
+/**
  * Create a new table order (seat guests)
  * Replaces: brain.create_table_order()
+ * 
+ * Note: order_items are stored in a separate order_items table, not as JSONB in table_orders
  */
 export async function createTableOrder(
   tableNumber: number,
@@ -233,7 +384,6 @@ export async function createTableOrder(
   try {
     const newOrder = {
       table_number: tableNumber,
-      order_items: [],
       status: 'active',
       guest_count: guestCount,
       linked_tables: linkedTables,
@@ -639,7 +789,7 @@ export async function createCustomerTab(
  */
 export async function updateCustomerTab(
   tabId: string,
-  updates: { status?: string; total_amount?: number; notes?: string }
+  updates: { status?: string; total_amount?: number; notes?: string; order_items?: OrderItem[] }
 ): Promise<any> {
   try {
     const { data, error } = await supabase
@@ -2214,7 +2364,7 @@ export async function moveItemsBetweenTabsDirect(
 
     return { success: true };
   } catch (error) {
-    console.error(' [supabaseQueries] moveItemsBetweenTabsDirect failed:', error);
+    console.error('[supabaseQueries] moveItemsBetweenTabsDirect failed:', error);
     return { success: false };
   }
 }
@@ -2661,54 +2811,6 @@ export async function bulkToggleActive(
 }
 
 /**
- * Publish menu - calls backend endpoint to publish menu and sync all systems
- * Replaces: brain.publish_menu()
- *
- * This calls the backend /routes/publish-menu endpoint which:
- * - Updates database timestamps (published_at) on menu_items and menu_customizations
- * - Syncs to AI Knowledge Corpus (ai_knowledge_corpus table)
- * - Syncs to POS/Website/Voice customization caches
- * - Invalidates menu cache
- */
-export async function publishMenu(): Promise<{
-  success: boolean;
-  menu_items?: number;
-  corpus_updated?: boolean;
-  message?: string;
-}> {
-  try {
-    // Use brain module (works on both web via HTTP and Electron via direct Supabase)
-    const brain = await import('brain');
-
-    // Call brain.publish_menu()
-    // - Web: Pass format: "json" to parse response, returns HttpResponse with .data property
-    // - Electron: Ignores format param, returns data directly (no wrapper)
-    const response = await (brain.default as any).publish_menu({ format: "json" });
-
-    // Extract result from response
-    // - Web: response.data contains parsed JSON
-    // - Electron: response IS the data (not wrapped)
-    const result = response?.data || response;
-
-    if (!result || typeof result !== 'object') {
-      console.error('[supabaseQueries] publishMenu: Invalid response structure', { response, result });
-      return { success: false, message: 'Invalid response from server' };
-    }
-
-    // Electron brain returns 'error' field on failure, backend returns 'message'
-    return {
-      success: result.success ?? false,
-      menu_items: result.menu_items,
-      corpus_updated: result.corpus_updated,
-      message: result.message || result.error  // Handle both 'message' and 'error'
-    };
-  } catch (error) {
-    console.error('[supabaseQueries] publishMenu failed:', error);
-    return { success: false, message: (error as Error).message };
-  }
-}
-
-/**
  * Get next item display order
  * Replaces: brain.get_next_item_display_order()
  */
@@ -3083,22 +3185,24 @@ export async function getMenuStatus(): Promise<{
 }> {
   try {
     // Get published items count (active and has published_at)
-    const { count: publishedCount, error: pubError } = await supabase
+    const { data: publishedResult, error: pubError } = await supabase
       .from('menu_items')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
       .not('published_at', 'is', null);
 
     if (pubError) throw pubError;
+    const publishedCount = (publishedResult as any)?.count || 0;
 
     // Get draft items count (active but no published_at)
-    const { count: draftCount, error: draftError } = await supabase
+    const { data: draftResult, error: draftError } = await supabase
       .from('menu_items')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
       .is('published_at', null);
 
     if (draftError) throw draftError;
+    const draftCount = (draftResult as any)?.count || 0;
 
     // Get most recent published_at timestamp
     const { data: latestItem, error: latestError } = await supabase
@@ -3115,9 +3219,9 @@ export async function getMenuStatus(): Promise<{
       success: true,
       data: {
         last_published_at: latestItem?.published_at || null,
-        published_items: publishedCount || 0,
-        draft_items: draftCount || 0,
-        total_active_items: (publishedCount || 0) + (draftCount || 0)
+        published_items: publishedCount,
+        draft_items: draftCount,
+        total_active_items: publishedCount + draftCount
       }
     };
 
@@ -3624,7 +3728,7 @@ export async function createMenuItemSnapshot(
 
 /**
  * Get all draft items with their changes compared to published snapshots
- * Used by the PublishReviewModal to show before/after comparison
+ * Used by PublishReviewModal to show before/after comparison
  */
 export async function getDraftItemsWithChanges(): Promise<DraftChangesResponse> {
   try {
@@ -4005,7 +4109,7 @@ export async function replaceAssetInMenuItems(
 }
 
 /**
- * Remove asset references from menu items (clear the image_asset_id)
+ * Remove asset references from menu items (clear image_asset_id)
  */
 export async function removeAssetReferences(
   assetId: string
