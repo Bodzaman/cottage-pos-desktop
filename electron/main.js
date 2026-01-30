@@ -753,7 +753,9 @@ class CottageTandooriPOS {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
-                webSecurity: true
+                webSecurity: true,
+                // Enable clipboard API for copy/paste in forms
+                enableClipboard: true
             },
             title: 'Cottage Tandoori',
             show: false,
@@ -763,6 +765,17 @@ class CottageTandooriPOS {
         };
 
         this.mainWindow = new BrowserWindow(windowConfig);
+
+        // Grant clipboard permissions for the main window
+        this.mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+            if (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write') {
+                // Clipboard access is safe and necessary for form inputs
+                callback(true);
+            } else {
+                // Deny other permissions by default
+                callback(false);
+            }
+        });
 
         // Create application menu
         this.createApplicationMenu();

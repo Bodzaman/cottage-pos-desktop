@@ -1042,54 +1042,52 @@ function MenuItemForm({
     }
   }, [setFocus]);
 
-  // 🆕 Phase 3.2: Global keyboard shortcuts handler
+  // 🆕 Phase 3.2: Global keyboard shortcuts handler - DISABLED FOR CLIPBOARD DEBUGGING
   /**
    * Global keyboard shortcuts handler
    * 
-   * Shortcuts:
-   * - Ctrl/Cmd + Enter: Submit form (disabled in textareas)
-   * - Escape: Cancel form (only when no dialogs open)
-   * 
-   * Smart detection:
-   * - Skips Enter shortcut when typing in text inputs
-   * - Skips Escape when modal dialogs are open
+   * TEMPORARILY DISABLED to debug clipboard paste issue
    */
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in a textarea or contenteditable
-      const target = e.target as HTMLElement;
-      const isTextInput = 
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        (target.tagName === 'INPUT' && target.getAttribute('type') !== 'checkbox' && target.getAttribute('type') !== 'radio');
+  // useEffect(() => {
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     const target = e.target as HTMLElement;
+      
+  //     // ✅ CRITICAL: Identify text input elements first
+  //     const isTextInput = 
+  //       target.tagName === 'TEXTAREA' ||
+  //       target.isContentEditable ||
+  //       (target.tagName === 'INPUT' && target.getAttribute('type') !== 'checkbox' && target.getAttribute('type') !== 'radio');
 
-      // Enter to submit (only works when NOT in textarea)
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !isSubmitting) {
-        e.preventDefault();
-        handleSubmit(onSubmit)();
-        return;
-      }
+  //     // ✅ If user is in a text input, ONLY handle our specific shortcuts, let everything else pass through
+  //     if (isTextInput) {
+  //       // Only handle Ctrl+Enter for submit in text inputs (but not in multiline textareas)
+  //       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !isSubmitting && target.tagName !== 'TEXTAREA') {
+  //         e.preventDefault();
+  //         handleSubmit(onSubmit)();
+  //       }
+  //       // Let ALL other keys (including clipboard operations) pass through naturally
+  //       return;
+  //     }
 
-      // Escape to cancel
-      if (e.key === 'Escape' && !isSubmitting) {
-        // Don't close if there's an open dialog
-        const hasOpenDialog = document.querySelector('[role="dialog"][aria-hidden="false"]');
-        if (!hasOpenDialog) {
-          e.preventDefault();
-          handleCancel();
-        }
-        return;
-      }
-    };
+  //     // ✅ For non-text-input elements, handle escape
+  //     if (e.key === 'Escape' && !isSubmitting) {
+  //       // Don't close if there's an open dialog
+  //       const hasOpenDialog = document.querySelector('[role="dialog"][aria-hidden="false"]');
+  //       if (!hasOpenDialog) {
+  //         e.preventDefault();
+  //         handleCancel();
+  //       }
+  //     }
+  //   };
 
-    // Attach keyboard listener
-    document.addEventListener('keydown', handleKeyDown);
+  //   // Attach keyboard listener - no need for passive: false anymore since we're being selective
+  //   document.addEventListener('keydown', handleKeyDown);
 
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleSubmit, onSubmit, isSubmitting, handleCancel]);
+  //   // Cleanup
+  //   return () => {
+  //     document.removeEventListener('keydown', handleKeyDown);
+  //   };
+  // }, [handleSubmit, onSubmit, isSubmitting, handleCancel]);
 
   // ... existing useEffects for initialization and category auto-populate ...
 
@@ -1599,7 +1597,7 @@ function MenuItemForm({
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto"
           >
-            <div className="max-w-4xl mx-auto px-6 py-6 space-y-2 menu-item-form">
+            <div className="max-w-4xl mx-auto px-6 py-6 pb-24 space-y-2 menu-item-form">
               {/* Error Display */}
               <MenuItemFormErrorDisplay
                 submitError={submitError}

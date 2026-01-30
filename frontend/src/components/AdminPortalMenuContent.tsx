@@ -571,8 +571,10 @@ export default function AdminPortalMenuContent() {
           handleCancelDialog();
         }
       }}>
-        <DialogContent className="max-w-full sm:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-[98vw] sm:w-[95vw] max-h-[95dvh] sm:max-h-[90dvh] flex flex-col p-4 sm:p-6">
-          <DialogHeader>
+        <DialogContent 
+          className="max-w-full sm:max-w-3xl lg:max-w-5xl xl:max-w-7xl w-[98vw] sm:w-[96vw] h-[98vh] sm:h-[95vh] flex flex-col p-0 gap-0"
+        >
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/[0.07]">
             <DialogTitle className="text-lg sm:text-xl">{editingItem?.id ? 'Edit Menu Item' : 'Create New Menu Item'}</DialogTitle>
             <DialogDescription className="text-sm">
               {editingItem?.id
@@ -581,16 +583,18 @@ export default function AdminPortalMenuContent() {
               }
             </DialogDescription>
           </DialogHeader>
-          <MenuItemForm
-            menuItem={editingItem?.id ? editingItem : undefined}
-            onSave={handleSaveMenuItem}
-            onSuccess={() => { }}
-            onCancel={handleCancelDialog}
-            categories={categories}
-            proteinTypes={proteins}
-            isEditing={!!editingItem?.id}
-            configuration={itemConfiguration || undefined}
-          />
+          <div className="flex-1 overflow-hidden">
+            <MenuItemForm
+              menuItem={editingItem?.id ? editingItem : undefined}
+              onSave={handleSaveMenuItem}
+              onSuccess={() => { }}
+              onCancel={handleCancelDialog}
+              categories={categories}
+              proteinTypes={proteins}
+              isEditing={!!editingItem?.id}
+              configuration={itemConfiguration || undefined}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

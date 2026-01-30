@@ -108,102 +108,66 @@ export const MenuItemFormProgressFooter: React.FC<MenuItemFormProgressFooterProp
   return (
     <div
       className={cn(
-        'bg-[rgba(15,15,15,0.85)] backdrop-blur-2xl',
+        'bg-[rgba(15,15,15,0.95)] backdrop-blur-2xl',
         'border-t border-white/[0.07]',
         'shadow-2xl',
+        'transition-all duration-300',
         className
       )}
     >
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-6 py-3">
         {/* 🆕 Progress Bar Section - Only visible when incomplete */}
         {shouldShowProgress && (
-          <div className="mb-4">
+          <div className="mb-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                {canSave ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                ) : (
-                  <Info className="w-4 h-4 text-[#A78BFA]" />
-                )}
+                <Info className="w-4 h-4 text-[#A78BFA]" />
                 <span className="text-sm font-medium text-white">
-                  {canSave ? (
-                    'Ready to save!'
-                  ) : (
-                    `Form Progress: ${Math.round(progress)}% complete`
-                  )}
+                  Form Progress: {Math.round(progress)}% complete
                 </span>
               </div>
               
               <span className="text-xs text-gray-400">
-                {completedRequired} of {totalRequired} required section{totalRequired !== 1 ? 's' : ''}
+                {completedRequired} of {totalRequired} required
               </span>
             </div>
             
             {/* Progress Bar */}
             <Progress
               value={progress}
-              className={cn(
-                'h-2 bg-[rgba(30,30,30,0.6)]',
-                canSave && 'bg-green-900/30'
-              )}
-              indicatorClassName={cn(
-                'transition-all duration-500',
-                canSave ? 'bg-green-500' : 'bg-[#7C3AED]'
-              )}
+              className="h-1.5 bg-[rgba(30,30,30,0.6)] [&>div]:transition-all [&>div]:duration-500 [&>div]:bg-[#7C3AED]"
             />
           </div>
         )}
 
-        {/* Next Action Guidance - Only show when incomplete */}
-        {!canSave && nextStep && (
-          <Alert
-            className={cn(
-              'mb-4 border-[rgba(124,58,237,0.3)] bg-[rgba(124,58,237,0.1)]',
-              hasErrors && 'border-red-500/30 bg-red-500/10'
+        {/* Next Action Guidance - Compact inline version */}
+        {!canSave && nextStep && !hasErrors && (
+          <div className="mb-3 flex items-center justify-between text-xs text-gray-400 animate-in fade-in duration-300">
+            <span>
+              <strong className="text-gray-300">Next:</strong> {nextStep.title}
+            </span>
+            {onScrollToStep && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onScrollToStep(nextStep.id)}
+                className="h-6 text-xs text-[#A78BFA] hover:text-white hover:bg-[rgba(124,58,237,0.15)]"
+              >
+                Go →
+              </Button>
             )}
-          >
-            <Info className="h-4 w-4 text-[#A78BFA]" />
-            <AlertDescription className="text-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <strong className="text-white">
-                    {hasErrors ? 'Fix errors in:' : 'Next:'}
-                  </strong>
-                  {' '}
-                  <span className="text-gray-300">
-                    {nextStep.title}
-                  </span>
-                  {' '}
-                  <span className="text-gray-400">
-                    - {nextStep.description}
-                  </span>
-                </div>
-                
-                {onScrollToStep && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onScrollToStep(nextStep.id)}
-                    className="text-[#A78BFA] hover:text-white hover:bg-[rgba(124,58,237,0.15)]"
-                  >
-                    Go to section →
-                  </Button>
-                )}
-              </div>
-            </AlertDescription>
-          </Alert>
+          </div>
         )}
         
-        {/* 🗑️ REMOVED: Success Alert - Replaced by toast notification */}
-        
-        {/* Error Warning - Still show when errors present */}
+        {/* Error Warning - Compact version */}
         {hasErrors && (
-          <Alert className="mb-4 border-red-500/30 bg-red-500/10" variant="destructive">
-            <Info className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              Please fix the errors in the highlighted sections before saving.
-            </AlertDescription>
-          </Alert>
+          <div className="mb-3 p-2 rounded border border-red-500/30 bg-red-500/10 animate-in fade-in duration-300">
+            <p className="text-xs text-red-400 flex items-center gap-2">
+              <Info className="h-3 w-3" />
+              Fix errors in highlighted sections
+            </p>
+          </div>
         )}
 
         {/* Action Buttons - Always visible */}

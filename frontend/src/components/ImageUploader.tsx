@@ -127,11 +127,12 @@ export function ImageUploader({
 
       if (isElectronMode()) {
         // Electron: upload via brain (direct Supabase Storage)
-        response = await brain.upload_menu_image(formData);
+        // Note: Type definition expects different format, but implementation accepts FormData
+        response = await brain.upload_menu_image(formData as any);
         data = await response.json();
       } else {
         // Web: upload via backend API
-        const fetchResponse = await fetch(`${API_URL}/menu-image-upload/upload`, {
+        const fetchResponse = await fetch(`${API_URL}/routes/menu-image-upload/upload`, {
           method: 'POST',
           body: formData,
           credentials: 'include',
