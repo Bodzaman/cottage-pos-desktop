@@ -575,21 +575,68 @@ async function imageToRasterESCPOS(imageBuffer, paperWidth = 80) {
 // Use process.defaultApp to check if running in dev mode (synchronously available)
 const isDevelopment = process.defaultApp || /[\\/]electron[\\/]/.test(process.execPath);
 const envFileName = isDevelopment ? '.env.development' : '.env.production';
+
+// In packaged apps, use multiple strategies for correct path resolution
+const getEnvPath = () => {
+    const syncFs = require('fs');
+    const appPath = app.getAppPath();
+
+    log.info(`[ENV] === Environment Loading Debug ===`);
+    log.info(`[ENV] isDevelopment: ${isDevelopment}`);
+    log.info(`[ENV] envFileName: ${envFileName}`);
+    log.info(`[ENV] __dirname: ${__dirname}`);
+    log.info(`[ENV] app.getAppPath(): ${appPath}`);
+    log.info(`[ENV] process.resourcesPath: ${process.resourcesPath}`);
+
+    // Build list of paths to try (in order of preference)
+    const pathsToTry = [
+        // 1. Unpacked resources folder (for asarUnpack files)
+        path.join(process.resourcesPath, 'app.asar.unpacked', envFileName),
+        // 2. App path (inside ASAR)
+        path.join(appPath, envFileName),
+        // 3. __dirname (development)
+        path.join(__dirname, envFileName),
+        // 4. Resources folder directly
+        path.join(process.resourcesPath, envFileName),
+    ];
+
+    for (const envPath of pathsToTry) {
+        log.info(`[ENV] Checking: ${envPath}`);
+        try {
+            if (syncFs.existsSync(envPath)) {
+                log.info(`[ENV] ✓ Found env file at: ${envPath}`);
+                return envPath;
+            }
+        } catch (e) {
+            log.info(`[ENV] ✗ Error checking ${envPath}: ${e.message}`);
+        }
+    }
+
+    // If none found, return first path (will fail with clear error)
+    log.error(`[ENV] ✗ Env file not found at any location!`);
+    log.error(`[ENV] Tried paths: ${pathsToTry.join(', ')}`);
+    return pathsToTry[0];
+};
+
 try {
-    const envPath = path.join(__dirname, envFileName);
+    const envPath = getEnvPath();
     const envContent = require('fs').readFileSync(envPath, 'utf8');
+    let loadedKeys = [];
     envContent.split('\n').forEach(line => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
             const [key, ...valueParts] = trimmed.split('=');
             if (key && valueParts.length > 0) {
                 process.env[key.trim()] = valueParts.join('=').trim();
+                loadedKeys.push(key.trim());
             }
         }
     });
-    log.info(`Loaded environment from ${envFileName}`);
+    log.info(`[ENV] Loaded ${loadedKeys.length} env vars from ${envFileName}: ${loadedKeys.join(', ')}`);
+    log.info(`[ENV] STRIPE_SECRET_KEY present: ${loadedKeys.includes('STRIPE_SECRET_KEY')}`);
 } catch (e) {
-    log.warn(`Could not load ${envFileName}:`, e.message);
+    log.error(`[ENV] Failed to load ${envFileName}: ${e.message}`);
+    log.error(`[ENV] Stack: ${e.stack}`);
 }
 
 // Initialize Stripe with secret key from environment
