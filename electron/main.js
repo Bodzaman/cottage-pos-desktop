@@ -571,26 +571,25 @@ async function imageToRasterESCPOS(imageBuffer, paperWidth = 80) {
     }
 }
 
-// Load environment variables from .env file in development
+// Load environment variables from appropriate .env file
 // Use process.defaultApp to check if running in dev mode (synchronously available)
 const isDevelopment = process.defaultApp || /[\\/]electron[\\/]/.test(process.execPath);
-if (isDevelopment) {
-    try {
-        const envPath = path.join(__dirname, '.env.development');
-        const envContent = require('fs').readFileSync(envPath, 'utf8');
-        envContent.split('\n').forEach(line => {
-            const trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith('#')) {
-                const [key, ...valueParts] = trimmed.split('=');
-                if (key && valueParts.length > 0) {
-                    process.env[key.trim()] = valueParts.join('=').trim();
-                }
+const envFileName = isDevelopment ? '.env.development' : '.env.production';
+try {
+    const envPath = path.join(__dirname, envFileName);
+    const envContent = require('fs').readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+            const [key, ...valueParts] = trimmed.split('=');
+            if (key && valueParts.length > 0) {
+                process.env[key.trim()] = valueParts.join('=').trim();
             }
-        });
-        log.info('Loaded environment from .env.development');
-    } catch (e) {
-        log.warn('Could not load .env.development:', e.message);
-    }
+        }
+    });
+    log.info(`Loaded environment from ${envFileName}`);
+} catch (e) {
+    log.warn(`Could not load ${envFileName}:`, e.message);
 }
 
 // Initialize Stripe with secret key from environment

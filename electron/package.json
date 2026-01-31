@@ -1,6 +1,6 @@
 {
   "name": "cottage-tandoori-pos-electron",
-  "version": "4.2.4",
+  "version": "4.2.5",
   "description": "Cottage Tandoori POS Desktop - Electron wrapper for USB thermal printing",
   "main": "main.js",
   "author": "Cottage Tandoori",
@@ -49,7 +49,8 @@
       "settings-preload.js",
       "settings.html",
       "splash.html",
-      "assets/**/*"
+      "assets/**/*",
+      ".env.production"
     ],
     "asarUnpack": [
       "node_modules/sharp/**/*",
