@@ -26,6 +26,27 @@ import { AppApisTableOrdersOrderItem } from '../brain/data-contracts';
 import cn from 'classnames';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 
+/**
+ * Get the correct order number prefix based on order type and source
+ * POS prefixes: PC (Collection), PD (Delivery), DI (Dine-In), PW (Waiting)
+ * Online prefixes: OC (Collection), OD (Delivery)
+ */
+const getOrderPrefix = (orderType: string, orderSource: 'POS' | 'ONLINE' = 'POS'): string => {
+  const prefixMap: Record<string, Record<string, string>> = {
+    POS: {
+      COLLECTION: 'PC',
+      DELIVERY: 'PD',
+      'DINE-IN': 'DI',
+      WAITING: 'PW',
+    },
+    ONLINE: {
+      COLLECTION: 'OC',
+      DELIVERY: 'OD',
+    },
+  };
+  return prefixMap[orderSource]?.[orderType] || 'XX';
+};
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -104,7 +125,7 @@ export function OrderConfirmationModal({
   const mapToReceiptOrderData = () => {
     return {
       orderId: `POS-${Date.now()}`,
-      orderNumber: `OC-${Math.floor(Math.random() * 9000) + 1000}`,
+      orderNumber: `${getOrderPrefix(orderType, 'POS')}-${Math.floor(Math.random() * 9000) + 1000}`,
       orderType: orderType,
       items: orderItems.map(item => ({
         id: item.id || item.menu_item_id || `item-${Date.now()}`,

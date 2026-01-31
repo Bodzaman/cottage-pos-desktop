@@ -46,6 +46,27 @@ import {
   captureReceiptAsImage
 } from '../utils/electronPrintService';
 
+/**
+ * Get the correct order number prefix based on order type and source
+ * POS prefixes: PC (Collection), PD (Delivery), DI (Dine-In), PW (Waiting)
+ * Online prefixes: OC (Collection), OD (Delivery)
+ */
+const getOrderPrefix = (orderType: string, orderSource: 'POS' | 'ONLINE' = 'POS'): string => {
+  const prefixMap: Record<string, Record<string, string>> = {
+    POS: {
+      COLLECTION: 'PC',
+      DELIVERY: 'PD',
+      'DINE-IN': 'DI',
+      WAITING: 'PW',
+    },
+    ONLINE: {
+      COLLECTION: 'OC',
+      DELIVERY: 'OD',
+    },
+  };
+  return prefixMap[orderSource]?.[orderType] || 'XX';
+};
+
 export function OrderConfirmationView({
   orderItems,
   orderType,
@@ -193,7 +214,7 @@ export function OrderConfirmationView({
     
     return {
       orderId: `POS-${Date.now()}`,
-      orderNumber: `${orderType.charAt(0)}${orderType.charAt(1)}-${Math.floor(Math.random() * 9000) + 1000}`,
+      orderNumber: `${getOrderPrefix(orderType, 'POS')}-${Math.floor(Math.random() * 9000) + 1000}`,
       orderType: orderType,
       items: orderItems.map(item => {
         // ✅ FIX: Use generateDisplayNameForReceipt to avoid duplicate variation names
