@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveConfig: (config) => ipcRenderer.invoke('save-config', config),
 
     // Stripe payment methods (secure - calls main process which has secret key)
+    stripeGetStatus: () => ipcRenderer.invoke('stripe-get-status'),
     stripeCreatePaymentIntent: (data) => ipcRenderer.invoke('stripe-create-payment-intent', data),
     stripeConfirmPayment: (data) => ipcRenderer.invoke('stripe-confirm-payment', data),
 

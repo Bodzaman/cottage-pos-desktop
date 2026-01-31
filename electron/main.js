@@ -571,93 +571,63 @@ async function imageToRasterESCPOS(imageBuffer, paperWidth = 80) {
     }
 }
 
-// Load environment variables from appropriate .env file
-// Use process.defaultApp to check if running in dev mode (synchronously available)
+// Load .env.development only in development mode (for convenience)
+// In production, Stripe reads from Windows System Environment Variables
 const isDevelopment = process.defaultApp || /[\\/]electron[\\/]/.test(process.execPath);
-const envFileName = isDevelopment ? '.env.development' : '.env.production';
+log.info(`[ENV] isDevelopment: ${isDevelopment}`);
 
-// In packaged apps, use multiple strategies for correct path resolution
-const getEnvPath = () => {
-    const syncFs = require('fs');
-    const appPath = app.getAppPath();
-
-    log.info(`[ENV] === Environment Loading Debug ===`);
-    log.info(`[ENV] isDevelopment: ${isDevelopment}`);
-    log.info(`[ENV] envFileName: ${envFileName}`);
-    log.info(`[ENV] __dirname: ${__dirname}`);
-    log.info(`[ENV] app.getAppPath(): ${appPath}`);
-    log.info(`[ENV] process.resourcesPath: ${process.resourcesPath}`);
-
-    // Build list of paths to try (in order of preference)
-    const pathsToTry = [
-        // 1. Unpacked resources folder (for asarUnpack files)
-        path.join(process.resourcesPath, 'app.asar.unpacked', envFileName),
-        // 2. App path (inside ASAR)
-        path.join(appPath, envFileName),
-        // 3. __dirname (development)
-        path.join(__dirname, envFileName),
-        // 4. Resources folder directly
-        path.join(process.resourcesPath, envFileName),
-    ];
-
-    for (const envPath of pathsToTry) {
-        log.info(`[ENV] Checking: ${envPath}`);
-        try {
-            if (syncFs.existsSync(envPath)) {
-                log.info(`[ENV] ✓ Found env file at: ${envPath}`);
-                return envPath;
+if (isDevelopment) {
+    try {
+        const envPath = path.join(__dirname, '.env.development');
+        const envContent = require('fs').readFileSync(envPath, 'utf8');
+        let loadedKeys = [];
+        envContent.split('\n').forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) {
+                const [key, ...valueParts] = trimmed.split('=');
+                if (key && valueParts.length > 0) {
+                    process.env[key.trim()] = valueParts.join('=').trim();
+                    loadedKeys.push(key.trim());
+                }
             }
-        } catch (e) {
-            log.info(`[ENV] ✗ Error checking ${envPath}: ${e.message}`);
-        }
+        });
+        log.info(`[ENV] Loaded .env.development: ${loadedKeys.join(', ')}`);
+    } catch (e) {
+        log.info('[ENV] No .env.development found (using system env vars)');
     }
-
-    // If none found, return first path (will fail with clear error)
-    log.error(`[ENV] ✗ Env file not found at any location!`);
-    log.error(`[ENV] Tried paths: ${pathsToTry.join(', ')}`);
-    return pathsToTry[0];
-};
-
-try {
-    const envPath = getEnvPath();
-    const envContent = require('fs').readFileSync(envPath, 'utf8');
-    let loadedKeys = [];
-    envContent.split('\n').forEach(line => {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-            const [key, ...valueParts] = trimmed.split('=');
-            if (key && valueParts.length > 0) {
-                process.env[key.trim()] = valueParts.join('=').trim();
-                loadedKeys.push(key.trim());
-            }
-        }
-    });
-    log.info(`[ENV] Loaded ${loadedKeys.length} env vars from ${envFileName}: ${loadedKeys.join(', ')}`);
-    log.info(`[ENV] STRIPE_SECRET_KEY present: ${loadedKeys.includes('STRIPE_SECRET_KEY')}`);
-} catch (e) {
-    log.error(`[ENV] Failed to load ${envFileName}: ${e.message}`);
-    log.error(`[ENV] Stack: ${e.stack}`);
+} else {
+    log.info('[ENV] Production mode - using Windows System Environment Variables');
 }
 
-// Initialize Stripe with secret key from environment
+// Initialize Stripe with secret key from machine environment variable
+// In production: Set STRIPE_SECRET_KEY in Windows System Environment Variables
+// In development: Set in .env.development file
 let stripe = null;
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY;
+let stripeConfigured = false;
+
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
 if (STRIPE_SECRET_KEY) {
-    // Log key format for debugging (safely - only prefix and length)
     const keyPrefix = STRIPE_SECRET_KEY.substring(0, 12);
     const keyLength = STRIPE_SECRET_KEY.length;
-    log.info(`Stripe key detected: ${keyPrefix}... (${keyLength} chars)`);
+    log.info(`[STRIPE] Key detected: ${keyPrefix}... (${keyLength} chars)`);
 
-    // Typical Stripe test secret keys are 100+ chars
     if (keyLength < 80) {
-        log.warn(`Stripe key appears truncated! Expected 100+ chars, got ${keyLength}. Please check if the full key was copied.`);
+        log.warn(`[STRIPE] Key appears truncated! Expected 100+ chars, got ${keyLength}`);
     }
 
-    const Stripe = require('stripe');
-    stripe = new Stripe(STRIPE_SECRET_KEY);
-    log.info('Stripe initialized successfully');
+    try {
+        const Stripe = require('stripe');
+        stripe = new Stripe(STRIPE_SECRET_KEY);
+        stripeConfigured = true;
+        log.info('[STRIPE] Initialized successfully');
+    } catch (err) {
+        log.error(`[STRIPE] Failed to initialize: ${err.message}`);
+    }
 } else {
-    log.warn('Stripe secret key not configured - payment processing will be unavailable');
+    log.warn('[STRIPE] STRIPE_SECRET_KEY not found in environment');
+    log.warn('[STRIPE] Card payments will be disabled on this device');
+    log.warn('[STRIPE] To enable: Set STRIPE_SECRET_KEY in Windows System Environment Variables');
 }
 
 // Configure logging
@@ -1235,18 +1205,23 @@ Powered by QuickServe AI`
     }
 
     setupStripePayments() {
+        // Check Stripe configuration status (for Settings UI)
+        ipcMain.handle('stripe-get-status', () => {
+            return {
+                configured: stripeConfigured,
+                message: stripeConfigured
+                    ? 'Card payments enabled'
+                    : 'Card payments disabled. Set STRIPE_SECRET_KEY in Windows System Environment Variables, then restart the app.'
+            };
+        });
+
         // Create Payment Intent handler
         ipcMain.handle('stripe-create-payment-intent', async (event, data) => {
-            if (!stripe) {
-                log.error('Stripe not initialized - secret key missing or invalid');
-                const keyLength = STRIPE_SECRET_KEY ? STRIPE_SECRET_KEY.length : 0;
-                let errorMsg = 'Stripe not configured. Add STRIPE_SECRET_KEY to .env.development';
-                if (keyLength > 0 && keyLength < 80) {
-                    errorMsg = `Stripe secret key appears truncated (${keyLength} chars). Full keys are 100+ chars. Please copy the complete key from Stripe Dashboard.`;
-                }
+            if (!stripe || !stripeConfigured) {
+                log.error('[STRIPE] Payment intent failed - Stripe not configured');
                 return {
                     success: false,
-                    error: errorMsg
+                    error: 'Card payments not configured on this device. Set STRIPE_SECRET_KEY in Windows System Environment Variables, then restart the app.'
                 };
             }
 
