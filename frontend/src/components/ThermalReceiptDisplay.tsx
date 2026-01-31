@@ -307,10 +307,12 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
           throw new Error(`No template assignment found for ${storageKey}`);
         }
 
-        // NEW FLOW: Always use customer_template_id for the template
-        // The receiptFormat prop controls whether to render as FOH or kitchen style
-        // (Kitchen copy is a view/format of the same template, not a separate template)
-        const templateIdToUse = assignmentData.customer_template_id;
+        // Use kitchen_template_id for kitchen receipts, customer_template_id otherwise
+        // Kitchen variant is auto-resolved when user assigns template in OrderModeAssignmentModal
+        const isKitchenReceipt = receiptFormat === 'kitchen' || receiptFormat === 'kitchen_customer';
+        const templateIdToUse = isKitchenReceipt
+          ? (assignmentData.kitchen_template_id || assignmentData.customer_template_id)
+          : assignmentData.customer_template_id;
 
         if (templateIdToUse) {
           // Load the assigned template (no userId needed)

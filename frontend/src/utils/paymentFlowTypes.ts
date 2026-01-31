@@ -124,6 +124,14 @@ export interface PaymentFlowState {
 // ============================================================================
 
 /**
+ * Captured receipt images for WYSIWYG printing
+ */
+export interface CapturedReceiptImages {
+  kitchen?: string;
+  customer?: string;
+}
+
+/**
  * Props for OrderConfirmationView
  */
 export interface OrderConfirmationViewProps {
@@ -134,9 +142,9 @@ export interface OrderConfirmationViewProps {
   guestCount?: number;
   customerData?: CustomerData;
   deliveryFee?: number;
-  // NEW: Separate handlers for each action
-  onTakePaymentNow: () => void;   // Proceed to Stripe payment flow
-  onPayOnCollection: () => void;  // Print receipt and complete (no payment)
+  // NEW: Separate handlers for each action - now receive captured images for WYSIWYG printing
+  onTakePaymentNow: (capturedImages: CapturedReceiptImages) => void;   // Proceed to Stripe payment flow
+  onPayOnCollection: (capturedImages: CapturedReceiptImages) => void;  // Print receipt and complete (no payment)
   onBack: () => void;             // Close modal, return to cart
 }
 

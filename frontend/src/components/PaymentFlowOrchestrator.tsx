@@ -22,7 +22,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { AnimatePresence } from 'framer-motion';
-import { PaymentFlowOrchestratorProps, PaymentFlowStep, PaymentMethod } from '../utils/paymentFlowTypes';
+import { PaymentFlowOrchestratorProps, PaymentFlowStep, PaymentMethod, CapturedReceiptImages } from '../utils/paymentFlowTypes';
 import { OrderConfirmationView } from './OrderConfirmationView';
 import { PaymentProcessingView } from './PaymentProcessingView';
 import { PaymentResultView } from './PaymentResultView';
@@ -56,6 +56,9 @@ export function PaymentFlowOrchestrator({
     errorMessage?: string;
   } | null>(null);
 
+  // Store captured receipt images for WYSIWYG printing (from OrderConfirmationView)
+  const [capturedReceiptImages, setCapturedReceiptImages] = useState<CapturedReceiptImages>({});
+
   // Generate unique order ID for this payment session
   const orderId = `POS-${Date.now()}`;
 
@@ -68,6 +71,7 @@ export function PaymentFlowOrchestrator({
       setCurrentStep(PaymentFlowStep.ORDER_CONFIRMATION);
       setSelectedPaymentMethod(null);
       setPaymentResult(null);
+      setCapturedReceiptImages({});
     }
   }, [isOpen]);
 
@@ -112,14 +116,17 @@ export function PaymentFlowOrchestrator({
 
   // "Take Payment Now" - Proceed directly to Stripe card payment
   // Note: DINE-IN uses DineInOrderModal, not this orchestrator
-  const handleTakePaymentNow = () => {
+  const handleTakePaymentNow = (capturedImages: CapturedReceiptImages) => {
+    // Store captured images for use after payment completes
+    setCapturedReceiptImages(capturedImages);
     setSelectedPaymentMethod('STRIPE');
     setCurrentStep(PaymentFlowStep.PAYMENT_PROCESSING);
   };
 
   // "Pay on Collection/Delivery/at Counter" - Complete without payment, print receipts
-  const handlePayOnCollection = () => {
+  const handlePayOnCollection = (capturedImages: CapturedReceiptImages) => {
     // Complete flow immediately with no payment taken
+    // Include captured images for WYSIWYG printing
     // Receipts will be printed WITHOUT PAID badge
     onPaymentComplete({
       success: true,
@@ -128,7 +135,8 @@ export function PaymentFlowOrchestrator({
       tipAmount: 0,
       paymentMethod: 'CASH', // Default to CASH for pay-later
       paymentStatus: undefined, // No PAID badge
-      orderId
+      orderId,
+      capturedReceiptImages: capturedImages
     });
     onClose();
   };
@@ -173,6 +181,7 @@ export function PaymentFlowOrchestrator({
     if (paymentResult?.success) {
       // Call parent callback with successful payment data
       // Include paymentStatus: 'PAID' for PAID badge on receipts
+      // Include captured images for WYSIWYG printing
       onPaymentComplete({
         success: true,
         orderItems,
@@ -182,7 +191,8 @@ export function PaymentFlowOrchestrator({
         paymentStatus: 'PAID', // Payment was successful - show PAID badge
         pspReference: paymentResult.pspReference,
         sessionId: paymentResult.sessionId,
-        orderId
+        orderId,
+        capturedReceiptImages
       });
     }
     onClose();

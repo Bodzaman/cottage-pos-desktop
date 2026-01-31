@@ -8,8 +8,14 @@
  * - "Take Payment Now" → proceeds to Stripe payment flow
  * - "Pay on Collection/Delivery/at Counter" → prints receipt directly (no payment)
  * - "Back to Cart" → closes modal and returns to cart
+ *
+ * WYSIWYG PRINTING:
+ * - Renders both customer and kitchen receipts (kitchen hidden off-screen)
+ * - Captures receipt images when user clicks action buttons
+ * - Passes captured images to parent for raster printing
  */
 
+import { useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -25,15 +31,20 @@ import {
   ArrowRight,
   ArrowLeft,
   CreditCard,
-  Printer
+  Printer,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { OrderConfirmationViewProps } from '../utils/paymentFlowTypes';
+import { OrderConfirmationViewProps, CapturedReceiptImages } from '../utils/paymentFlowTypes';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { safeCurrency } from '../utils/numberUtils';
 import { OrderItem } from '../utils/menuTypes';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { generateDisplayNameForReceipt } from '../utils/menuHelpers';
+import {
+  isRasterPrintAvailable,
+  captureReceiptAsImage
+} from '../utils/electronPrintService';
 
 export function OrderConfirmationView({
   orderItems,
@@ -47,7 +58,72 @@ export function OrderConfirmationView({
   onPayOnCollection,
   onBack
 }: OrderConfirmationViewProps) {
-  
+  // Refs for WYSIWYG receipt capture
+  const customerReceiptRef = useRef<HTMLDivElement>(null);
+  const kitchenReceiptRef = useRef<HTMLDivElement>(null);
+
+  // State for capture in progress
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  /**
+   * Capture both customer and kitchen receipts for WYSIWYG printing
+   * Called before any action that requires printing
+   */
+  const captureReceipts = useCallback(async (): Promise<CapturedReceiptImages> => {
+    const images: CapturedReceiptImages = {};
+
+    if (!isRasterPrintAvailable()) {
+      console.log('ℹ️ [OrderConfirmationView] Raster print not available, skipping capture');
+      return images;
+    }
+
+    try {
+      // Capture kitchen receipt first (hidden element)
+      if (kitchenReceiptRef.current) {
+        console.log('🖨️ [OrderConfirmationView] Capturing kitchen receipt...');
+        images.kitchen = await captureReceiptAsImage(kitchenReceiptRef.current, 80);
+        console.log('✅ Kitchen receipt captured:', images.kitchen ? `${images.kitchen.length} bytes` : 'null');
+      }
+
+      // Capture customer receipt (visible element)
+      if (customerReceiptRef.current) {
+        console.log('🖨️ [OrderConfirmationView] Capturing customer receipt...');
+        images.customer = await captureReceiptAsImage(customerReceiptRef.current, 80);
+        console.log('✅ Customer receipt captured:', images.customer ? `${images.customer.length} bytes` : 'null');
+      }
+    } catch (error) {
+      console.error('❌ [OrderConfirmationView] Receipt capture error:', error);
+    }
+
+    return images;
+  }, []);
+
+  /**
+   * Handle "Take Payment Now" with receipt capture
+   */
+  const handleTakePaymentNow = useCallback(async () => {
+    setIsCapturing(true);
+    try {
+      const capturedImages = await captureReceipts();
+      onTakePaymentNow(capturedImages);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [captureReceipts, onTakePaymentNow]);
+
+  /**
+   * Handle "Pay on Collection/Delivery" with receipt capture
+   */
+  const handlePayOnCollection = useCallback(async () => {
+    setIsCapturing(true);
+    try {
+      const capturedImages = await captureReceipts();
+      onPayOnCollection(capturedImages);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [captureReceipts, onPayOnCollection]);
+
   // Get order type display info
   const getOrderTypeInfo = () => {
     switch (orderType) {
@@ -213,12 +289,34 @@ export function OrderConfirmationView({
         scrollbarColor: 'rgba(255, 255, 255, 0.2) transparent'
       }}>
         <div className="flex justify-center py-4">
+          {/* Customer receipt - visible preview */}
           <ThermalReceiptDisplay
+            ref={customerReceiptRef}
             orderMode={orderType}
             orderData={mapToReceiptOrderData()}
             paperWidth={80}
             showZoomControls={false}
             className="shadow-2xl"
+          />
+        </div>
+
+        {/* Kitchen receipt - hidden off-screen for WYSIWYG capture */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            top: 0,
+            pointerEvents: 'none'
+          }}
+          aria-hidden="true"
+        >
+          <ThermalReceiptDisplay
+            ref={kitchenReceiptRef}
+            orderMode={orderType}
+            orderData={mapToReceiptOrderData()}
+            paperWidth={80}
+            showZoomControls={false}
+            receiptFormat="kitchen"
           />
         </div>
       </div>
@@ -229,7 +327,8 @@ export function OrderConfirmationView({
       <div className="flex-none space-y-3 pt-4 border-t border-white/10">
         {/* Primary: Take Payment Now (Stripe) */}
         <Button
-          onClick={onTakePaymentNow}
+          onClick={handleTakePaymentNow}
+          disabled={isCapturing}
           className="w-full h-14 text-white font-bold text-lg"
           style={{
             ...styles.frostedGlassStyle,
@@ -237,18 +336,27 @@ export function OrderConfirmationView({
             boxShadow: effects.outerGlow('medium')
           }}
         >
-          <CreditCard className="h-5 w-5 mr-2" />
+          {isCapturing ? (
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+          ) : (
+            <CreditCard className="h-5 w-5 mr-2" />
+          )}
           Take Payment Now
         </Button>
 
         {/* Secondary: Pay on Collection/Delivery/at Counter */}
         <Button
-          onClick={onPayOnCollection}
+          onClick={handlePayOnCollection}
+          disabled={isCapturing}
           variant="outline"
           className="w-full h-12 border-white/30 text-white hover:bg-white/10 hover:border-purple-500/50"
           style={styles.frostedGlassStyle}
         >
-          <Clock className="h-4 w-4 mr-2" />
+          {isCapturing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Clock className="h-4 w-4 mr-2" />
+          )}
           {getPayLaterLabel()}
         </Button>
 
