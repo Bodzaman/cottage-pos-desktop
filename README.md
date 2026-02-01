@@ -1,3 +1,7 @@
+> ⚠️ **DEPRECATED** - This repo is now release-host only. All development has moved to [cottage-tandoori-app-main](https://github.com/Bodzaman/cottage-tandoori-app-main/tree/main/electron). See [DEPRECATED.md](DEPRECATED.md) for details.
+
+---
+
 # Cottage Tandoori POS Desktop
 
 Windows Electron app for Cottage Tandoori POS with native thermal printing support.
