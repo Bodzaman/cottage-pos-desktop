@@ -1,17 +1,24 @@
 /**
  * Outbox Sync Manager
  * Handles queuing and synchronization of orders when offline
+ *
+ * DUAL-MODE PERSISTENCE:
+ * - Web/Browser: Uses IndexedDB via offlineStorage
+ * - Electron: Uses SQLite via IPC (SOLE source of truth, IndexedDB bypassed)
+ *
+ * This ensures queue state is crash-safe in Electron and prevents drift/double-sync.
  */
 
 import { offlineStorage, OfflineOrder, OfflineSyncOperation } from './offlineStorage';
 import brain from 'brain';
 import { OrderItem } from './menuTypes';
 import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager';
+import { isElectronOfflineAvailable, getElectronAPI, ElectronOfflineOrderRecord } from '../types/electron';
 
 const isDev = import.meta.env?.DEV;
 
 // Sync operation types
-export type SyncOperationType = 
+export type SyncOperationType =
   | 'CREATE_ORDER'
   | 'UPDATE_ORDER_STATUS'
   | 'CREATE_PAYMENT'
@@ -58,6 +65,7 @@ class OutboxSyncManager {
   private statusCallbacks: Array<(status: OutboxSyncStatus) => void> = [];
   private maxConcurrentSyncs = 3;
   private activeSyncs = new Set<string>();
+  private useElectronPersistence = false;
 
   // ============================================================================
   // INITIALIZATION
@@ -67,8 +75,25 @@ class OutboxSyncManager {
     if (this.isInitialized) return;
 
     try {
-      await offlineStorage.initialize();
-      
+      // Determine persistence mode
+      this.useElectronPersistence = isElectronOfflineAvailable();
+
+      if (this.useElectronPersistence) {
+        // Electron mode: SQLite is the SOLE source of truth
+        // No IndexedDB initialization needed
+        if (isDev) console.log('📦 [OutboxSync] Using Electron SQLite persistence (IndexedDB bypassed)');
+
+        // Log current queue stats
+        const response = await getElectronAPI()?.offlineOrderGetStats();
+        if (response?.success && response.stats) {
+          if (isDev) console.log('📦 [OutboxSync] SQLite queue stats:', response.stats);
+        }
+      } else {
+        // Web mode: use IndexedDB
+        await offlineStorage.initialize();
+        if (isDev) console.log('📦 [OutboxSync] Using IndexedDB persistence');
+      }
+
       // Set up offline status monitoring
       onOfflineStatusChange((isOffline) => {
         if (!isOffline) {
@@ -111,36 +136,57 @@ class OutboxSyncManager {
     customer_data?: any;
     payment_method?: string;
   }): Promise<string> {
-    
+
     const orderId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const idempotencyKey = `create_order_${orderId}`;
 
-    // Create offline order record
-    const offlineOrder: OfflineOrder = {
-      id: orderId,
-      ...orderData,
-      status: 'PENDING_SYNC',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      sync_attempts: 0
-    };
+    if (this.useElectronPersistence) {
+      // Electron mode: write ONLY to SQLite
+      const electronAPI = getElectronAPI();
+      if (!electronAPI) {
+        throw new Error('Electron API not available');
+      }
 
-    // Save to offline storage
-    await offlineStorage.saveOrder(offlineOrder);
+      const response = await electronAPI.offlineOrderEnqueue({
+        id: orderId,
+        idempotency_key: idempotencyKey,
+        local_id: orderId,
+        order_data: orderData
+      });
 
-    // Queue sync operation
-    const operationId = await offlineStorage.addSyncOperation({
-      type: 'CREATE_ORDER',
-      data: {
-        orderId,
-        orderData,
-        idempotencyKey
-      },
-      status: 'PENDING',
-      retry_count: 0
-    });
+      // IPC returns { success: true, order: {...} }
+      if (!response?.success) {
+        throw new Error('Failed to enqueue order to SQLite');
+      }
 
-    if (isDev) console.log(`📤 [OutboxSync] Queued order creation: ${orderId}`);
+      if (isDev) console.log(`📤 [OutboxSync] Queued order to SQLite: ${orderId}`);
+    } else {
+      // Web mode: use IndexedDB
+      const offlineOrder: OfflineOrder = {
+        id: orderId,
+        ...orderData,
+        status: 'PENDING_SYNC',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        sync_attempts: 0
+      };
+
+      await offlineStorage.saveOrder(offlineOrder);
+
+      await offlineStorage.addSyncOperation({
+        type: 'CREATE_ORDER',
+        data: {
+          orderId,
+          orderData,
+          idempotencyKey
+        },
+        status: 'PENDING',
+        retry_count: 0
+      });
+
+      if (isDev) console.log(`📤 [OutboxSync] Queued order to IndexedDB: ${orderId}`);
+    }
+
     this.notifyStatusCallbacks();
 
     // Try immediate sync if online
@@ -157,8 +203,10 @@ class OutboxSyncManager {
   async queueOrderStatusUpdate(orderId: string, status: string, notes?: string): Promise<void> {
     const idempotencyKey = `update_order_${orderId}_${status}_${Date.now()}`;
 
+    // Note: Status updates are less critical for crash recovery
+    // For now, just use IndexedDB in both modes (can be enhanced later)
     await offlineStorage.addSyncOperation({
-      type: 'UPDATE_ORDER', // Changed from UPDATE_ORDER_STATUS to match OfflineSyncOperation type
+      type: 'UPDATE_ORDER',
       data: {
         orderId,
         status,
@@ -243,24 +291,13 @@ class OutboxSyncManager {
     this.notifyStatusCallbacks();
 
     try {
-      const pendingOps = await offlineStorage.getPendingSyncOperations();
-      
-      if (pendingOps.length === 0) {
-        if (isDev) console.log('ℹ️ [OutboxSync] No pending operations to sync');
-        return;
+      if (this.useElectronPersistence) {
+        // Electron mode: sync from SQLite
+        await this.triggerSyncElectron();
+      } else {
+        // Web mode: sync from IndexedDB
+        await this.triggerSyncIndexedDB();
       }
-
-      if (isDev) console.log(`🔄 [OutboxSync] Starting sync of ${pendingOps.length} operations`);
-
-      // Process operations in priority order
-      const sortedOps = pendingOps.sort((a, b) => {
-        // Sort by priority (if we add priority field), then by creation time
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      // Process operations with concurrency limit
-      await this.processSyncOperationsBatch(sortedOps);
-
     } catch (error) {
       console.error('❌ [OutboxSync] Sync process failed:', error);
     } finally {
@@ -270,7 +307,135 @@ class OutboxSyncManager {
   }
 
   /**
-   * Process sync operations in batches
+   * Sync orders from SQLite (Electron mode)
+   */
+  private async triggerSyncElectron(): Promise<void> {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return;
+
+    // Get pending orders from SQLite
+    const response = await electronAPI.offlineOrderList('pending');
+
+    // IPC returns { success: true, orders: [...] }
+    if (!response?.success || !response.orders) {
+      if (isDev) console.log('ℹ️ [OutboxSync] Failed to get pending orders from SQLite');
+      return;
+    }
+
+    const pendingOrders = response.orders;
+
+    if (pendingOrders.length === 0) {
+      if (isDev) console.log('ℹ️ [OutboxSync] No pending orders in SQLite');
+      return;
+    }
+
+    if (isDev) console.log(`🔄 [OutboxSync] Starting sync of ${pendingOrders.length} orders from SQLite`);
+
+    // Process each order
+    for (const order of pendingOrders) {
+      if (this.activeSyncs.has(order.id)) {
+        continue; // Already processing
+      }
+
+      this.activeSyncs.add(order.id);
+
+      try {
+        await this.syncOrderFromSQLite(order);
+      } catch (error) {
+        console.error(`❌ [OutboxSync] Error syncing order ${order.id}:`, error);
+      } finally {
+        this.activeSyncs.delete(order.id);
+      }
+    }
+  }
+
+  /**
+   * Sync a single order from SQLite
+   */
+  private async syncOrderFromSQLite(order: ElectronOfflineOrderRecord): Promise<void> {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return;
+
+    try {
+      // Parse order data
+      const orderData = typeof order.order_data === 'string'
+        ? JSON.parse(order.order_data)
+        : order.order_data;
+
+      if (isDev) console.log(`🔄 [OutboxSync] Syncing order ${order.local_id} from SQLite`);
+
+      // Call the backend to create the order
+      const response = await (brain as any).place_order({
+        order_type: orderData.order_type,
+        table_number: orderData.table_number,
+        guest_count: orderData.guest_count,
+        items: orderData.items,
+        total_amount: orderData.total_amount,
+        customer_data: orderData.customer_data,
+        payment_method: orderData.payment_method,
+        idempotency_key: order.idempotency_key
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Mark as synced in SQLite
+        const serverId = result.order?.id || result.id || 'unknown';
+        await electronAPI.offlineOrderMarkSynced(order.id, serverId);
+        if (isDev) console.log(`✅ [OutboxSync] Order synced: ${order.id} -> ${serverId}`);
+      } else {
+        const errorMessage = result.detail || 'Failed to create order';
+
+        // Check if we should retry
+        const shouldRetry = response.status >= 500;
+
+        if (shouldRetry && order.retry_count < 5) {
+          // Will be retried on next sync cycle
+          if (isDev) console.log(`⏳ [OutboxSync] Order ${order.id} will retry (attempt ${order.retry_count + 1})`);
+        } else {
+          // Mark as failed in SQLite
+          await electronAPI.offlineOrderMarkFailed(order.id, errorMessage);
+          console.error(`❌ [OutboxSync] Order failed: ${order.id} - ${errorMessage}`);
+        }
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Network error';
+
+      // Mark as failed after max retries
+      if (order.retry_count >= 4) {
+        await electronAPI.offlineOrderMarkFailed(order.id, errorMessage);
+        console.error(`❌ [OutboxSync] Order failed after retries: ${order.id}`);
+      } else {
+        if (isDev) console.log(`⏳ [OutboxSync] Order ${order.id} network error, will retry`);
+      }
+    }
+  }
+
+  /**
+   * Sync orders from IndexedDB (Web mode)
+   */
+  private async triggerSyncIndexedDB(): Promise<void> {
+    const pendingOps = await offlineStorage.getPendingSyncOperations();
+
+    if (pendingOps.length === 0) {
+      if (isDev) console.log('ℹ️ [OutboxSync] No pending operations to sync');
+      return;
+    }
+
+    if (isDev) console.log(`🔄 [OutboxSync] Starting sync of ${pendingOps.length} operations`);
+
+    // Process operations in priority order
+    const sortedOps = pendingOps.sort((a, b) => {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+    // Process operations with concurrency limit
+    await this.processSyncOperationsBatch(sortedOps);
+  }
+
+  /**
+   * Process sync operations in batches (IndexedDB mode)
    */
   private async processSyncOperationsBatch(operations: OfflineSyncOperation[]): Promise<void> {
     const chunks = [];
@@ -281,14 +446,14 @@ class OutboxSyncManager {
     for (const chunk of chunks) {
       const promises = chunk.map(op => this.processSyncOperation(op));
       await Promise.allSettled(promises);
-      
+
       // Small delay between batches to avoid overwhelming the server
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
   /**
-   * Process a single sync operation
+   * Process a single sync operation (IndexedDB mode)
    */
   private async processSyncOperation(operation: OfflineSyncOperation): Promise<void> {
     if (this.activeSyncs.has(operation.id)) {
@@ -319,7 +484,7 @@ class OutboxSyncManager {
         if (shouldRetry) {
           // Schedule retry with exponential backoff
           const retryDelay = Math.min(1000 * Math.pow(2, newRetryCount), 30000);
-          
+
           await offlineStorage.updateSyncOperation(operation.id, {
             status: 'PENDING',
             retry_count: newRetryCount,
@@ -342,7 +507,7 @@ class OutboxSyncManager {
 
     } catch (error) {
       console.error(`❌ [OutboxSync] Error processing operation ${operation.id}:`, error);
-      
+
       await offlineStorage.updateSyncOperation(operation.id, {
         status: 'FAILED',
         error_message: error instanceof Error ? error.message : 'Unknown error'
@@ -353,7 +518,7 @@ class OutboxSyncManager {
   }
 
   /**
-   * Execute a specific sync operation
+   * Execute a specific sync operation (IndexedDB mode)
    */
   private async executeSyncOperation(operation: OfflineSyncOperation): Promise<SyncResult> {
     const { type, data } = operation;
@@ -386,12 +551,11 @@ class OutboxSyncManager {
   }
 
   // ============================================================================
-  // SYNC OPERATION HANDLERS
+  // SYNC OPERATION HANDLERS (IndexedDB mode)
   // ============================================================================
 
   private async syncCreateOrder(data: any): Promise<SyncResult> {
     try {
-      // TODO: Update Brain SDK to include place_order endpoint
       const response = await (brain as any).place_order({
         order_type: data.orderData.order_type,
         table_number: data.orderData.table_number,
@@ -432,7 +596,6 @@ class OutboxSyncManager {
 
   private async syncUpdateOrderStatus(data: any): Promise<SyncResult> {
     try {
-      // TODO: Update Brain SDK to include update_order_status endpoint
       const response = await (brain as any).update_order_status({
         order_id: data.orderId,
         status: data.status,
@@ -461,7 +624,6 @@ class OutboxSyncManager {
 
   private async syncCreatePayment(data: any): Promise<SyncResult> {
     try {
-      // TODO: Update Brain SDK to include process_payment2 endpoint
       const response = await (brain as any).process_payment2({
         order_id: data.orderId,
         payment_method: data.paymentData.payment_method,
@@ -493,24 +655,56 @@ class OutboxSyncManager {
   // ============================================================================
 
   async getStatus(): Promise<OutboxSyncStatus> {
+    if (this.useElectronPersistence) {
+      // Electron mode: read ONLY from SQLite
+      try {
+        const electronAPI = getElectronAPI();
+        const response = await electronAPI?.offlineOrderGetStats();
+
+        // IPC returns { success: true, stats: {...} }
+        if (response?.success && response.stats) {
+          const stats = response.stats;
+          return {
+            isOnline: !getOfflineStatus(),
+            isSyncing: this.isSyncing,
+            pendingOperations: (stats.pending || 0) + (stats.syncing || 0),
+            failedOperations: stats.failed || 0,
+            lastSyncAttempt: stats.oldest_pending || undefined,
+            errors: []
+          };
+        }
+      } catch (error) {
+        console.error('⚠️ [OutboxSync] Failed to get SQLite stats:', error);
+      }
+
+      // Fallback if SQLite fails
+      return {
+        isOnline: !getOfflineStatus(),
+        isSyncing: this.isSyncing,
+        pendingOperations: 0,
+        failedOperations: 0,
+        errors: ['Failed to read queue status']
+      };
+    }
+
+    // Web mode: read from IndexedDB
     const pendingOps = await offlineStorage.getPendingSyncOperations();
-    // Use getSyncOperations instead of getCompletedSyncOperations (private method)
     const allOps = await (offlineStorage as any).getSyncOperations?.() || [];
     const failedOps = allOps.filter((op: any) => op.status === 'FAILED');
-    
+
     return {
       isOnline: !getOfflineStatus(),
       isSyncing: this.isSyncing,
       pendingOperations: pendingOps.length,
       failedOperations: failedOps.length,
       lastSyncAttempt: pendingOps.length > 0 ? pendingOps[0].last_attempt : undefined,
-      errors: failedOps.slice(0, 5).map(op => op.error_message || 'Unknown error')
+      errors: failedOps.slice(0, 5).map((op: any) => op.error_message || 'Unknown error')
     };
   }
 
   onStatusChange(callback: (status: OutboxSyncStatus) => void): () => void {
     this.statusCallbacks.push(callback);
-    
+
     return () => {
       const index = this.statusCallbacks.indexOf(callback);
       if (index > -1) {
@@ -521,7 +715,7 @@ class OutboxSyncManager {
 
   private async notifyStatusCallbacks(): Promise<void> {
     if (this.statusCallbacks.length === 0) return;
-    
+
     try {
       const status = await this.getStatus();
       this.statusCallbacks.forEach(callback => {
@@ -542,13 +736,15 @@ class OutboxSyncManager {
 
   async cleanup(): Promise<void> {
     this.stopPeriodicSync();
-    
+
     // Clear retry timeouts
     this.retryTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     this.retryTimeouts.clear();
-    
-    // Clean up old completed operations
-    await offlineStorage.cleanupOldData(7); // Keep 7 days of data
+
+    // Clean up old completed operations (IndexedDB only, SQLite has its own cleanup)
+    if (!this.useElectronPersistence) {
+      await offlineStorage.cleanupOldData(7); // Keep 7 days of data
+    }
   }
 }
 

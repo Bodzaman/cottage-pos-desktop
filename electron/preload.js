@@ -100,5 +100,54 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     removeNotificationClickedListener: () => {
         ipcRenderer.removeAllListeners('notification-clicked');
-    }
+    },
+
+    // ============================================================================
+    // OFFLINE ORDER QUEUE (SQLite persistence - survives app restarts)
+    // ============================================================================
+
+    // Enqueue an order for offline sync
+    // order: { id, idempotency_key, local_id, order_data }
+    offlineOrderEnqueue: (order) => ipcRenderer.invoke('offline-order-enqueue', order),
+
+    // List orders by status (optional status filter: 'pending', 'syncing', 'synced', 'failed')
+    offlineOrderList: (status) => ipcRenderer.invoke('offline-order-list', status),
+
+    // Mark order as synced with server ID
+    offlineOrderMarkSynced: (id, serverId) => ipcRenderer.invoke('offline-order-mark-synced', { id, serverId }),
+
+    // Mark order as failed with error message
+    offlineOrderMarkFailed: (id, error) => ipcRenderer.invoke('offline-order-mark-failed', { id, error }),
+
+    // Get offline order queue statistics
+    offlineOrderGetStats: () => ipcRenderer.invoke('offline-order-get-stats'),
+
+    // Delete an offline order
+    offlineOrderDelete: (id) => ipcRenderer.invoke('offline-order-delete', id),
+
+    // ============================================================================
+    // PRINT QUEUE (SQLite persistence - retry failed prints)
+    // ============================================================================
+
+    // Enqueue a print job
+    // job: { id, order_id?, job_type: 'receipt'|'kitchen'|'z-report', print_data, printer_name? }
+    printQueueEnqueue: (job) => ipcRenderer.invoke('print-queue-enqueue', job),
+
+    // List print jobs by status (optional status filter: 'pending', 'printing', 'printed', 'failed')
+    printQueueList: (status) => ipcRenderer.invoke('print-queue-list', status),
+
+    // Mark print job as printed
+    printQueueMarkPrinted: (id) => ipcRenderer.invoke('print-queue-mark-printed', id),
+
+    // Mark print job as failed with error message
+    printQueueMarkFailed: (id, error) => ipcRenderer.invoke('print-queue-mark-failed', { id, error }),
+
+    // Retry a failed print job (reset to pending)
+    printQueueRetry: (id) => ipcRenderer.invoke('print-queue-retry', id),
+
+    // Get print queue statistics
+    printQueueGetStats: () => ipcRenderer.invoke('print-queue-get-stats'),
+
+    // Delete a print job
+    printQueueDelete: (id) => ipcRenderer.invoke('print-queue-delete', id)
 });

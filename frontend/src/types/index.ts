@@ -355,6 +355,48 @@ export {
 } from './structured-events';
 
 // ================================
+// ELECTRON TYPES
+// ================================
+export {
+  // Offline order queue types
+  type ElectronOfflineOrder,
+  type ElectronOfflineOrderRecord,
+  type OfflineOrderStats,
+
+  // Offline order IPC response types
+  type OfflineOrderEnqueueResponse,
+  type OfflineOrderListResponse,
+  type OfflineOrderStatsResponse,
+  type OfflineOrderOperationResponse,
+  type OfflineOrderDeleteResponse,
+
+  // Print queue types
+  type ElectronPrintJob,
+  type ElectronPrintJobRecord,
+  type PrintQueueStats,
+
+  // Print queue IPC response types
+  type PrintQueueEnqueueResponse,
+  type PrintQueueListResponse,
+  type PrintQueueStatsResponse,
+  type PrintQueueOperationResponse,
+  type PrintQueueDeleteResponse,
+
+  // Stripe types
+  type StripeStatus,
+  type StripePaymentIntentResult,
+  type StripeConfirmResult,
+
+  // Main API interface
+  type ElectronAPI,
+
+  // Helper functions
+  isElectronOfflineAvailable,
+  isElectronPrintQueueAvailable,
+  getElectronAPI,
+} from './electron';
+
+// ================================
 // RE-EXPORTS FOR COMPATIBILITY
 // ================================
 

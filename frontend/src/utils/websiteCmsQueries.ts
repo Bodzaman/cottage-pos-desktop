@@ -31,7 +31,7 @@ export const websiteKeys = {
 } as const;
 
 // ============================================================================
-// BACKEND API HELPER
+// BACKEND API HELPER + ELECTRON DIRECT SUPABASE FALLBACK
 // ============================================================================
 
 const BACKEND_URL = import.meta.env.VITE_RIFF_BACKEND_URL || '';
@@ -39,10 +39,232 @@ const API_BASE = BACKEND_URL
   ? `${BACKEND_URL}/routes/website-cms`
   : '/routes/website-cms';
 
+// Detect if we're in Electron mode (no backend available)
+const isElectronMode = typeof window !== 'undefined' &&
+  'electronAPI' in window &&
+  !BACKEND_URL;
+
+/**
+ * Direct Supabase implementation for Electron mode.
+ * Handles all CMS operations when backend is not available.
+ */
+async function electronCmsApi<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = options.method || 'GET';
+  const body = options.body ? JSON.parse(options.body as string) : null;
+
+  // Parse path and query params
+  const [pathPart, queryString] = path.split('?');
+  const params = new URLSearchParams(queryString || '');
+  const state = params.get('state') || 'draft';
+  const pathSegments = pathPart.split('/').filter(Boolean);
+
+  // Route to appropriate handler
+  if (pathSegments[0] === 'config') {
+    if (method === 'GET') {
+      if (pathSegments.length === 1) {
+        // GET /config - fetch all sections
+        const { data, error } = await supabase
+          .from('website_config')
+          .select('*')
+          .order('section');
+        if (error) throw new Error(error.message);
+        return { success: true, sections: data || [] } as T;
+      } else {
+        // GET /config/{section}
+        const section = pathSegments[1];
+        const { data, error } = await supabase
+          .from('website_config')
+          .select('*')
+          .eq('section', section)
+          .single();
+        if (error) throw new Error(error.message);
+        return data as T;
+      }
+    } else if (method === 'PUT' && pathSegments.length === 2) {
+      // PUT /config/{section}
+      const section = pathSegments[1];
+      const { error } = await supabase
+        .from('website_config')
+        .update({ draft_content: body.draft_content, updated_at: new Date().toISOString() })
+        .eq('section', section);
+      if (error) throw new Error(error.message);
+      return { success: true } as T;
+    }
+  }
+
+  if (pathSegments[0] === 'theme') {
+    if (method === 'GET') {
+      // GET /theme
+      const { data, error } = await supabase
+        .from('website_theme')
+        .select('*')
+        .order('theme_key');
+      if (error) throw new Error(error.message);
+      return { success: true, variables: data || [] } as T;
+    } else if (method === 'PUT' && pathSegments.length === 2) {
+      // PUT /theme/{theme_key}
+      const themeKey = pathSegments[1];
+      const { error } = await supabase
+        .from('website_theme')
+        .update({ draft_value: body.draft_value, updated_at: new Date().toISOString() })
+        .eq('theme_key', themeKey);
+      if (error) throw new Error(error.message);
+      return { success: true } as T;
+    }
+  }
+
+  if (pathSegments[0] === 'layout') {
+    if (method === 'GET' && pathSegments.length === 2) {
+      // GET /layout/{page}
+      const page = pathSegments[1];
+      const { data, error } = await supabase
+        .from('website_layout')
+        .select('*')
+        .eq('page', page)
+        .order('layout_key');
+      if (error) throw new Error(error.message);
+      return { success: true, layouts: data || [] } as T;
+    } else if (method === 'PUT' && pathSegments.length === 3) {
+      // PUT /layout/{page}/{layout_key}
+      const page = pathSegments[1];
+      const layoutKey = pathSegments[2];
+      const { error } = await supabase
+        .from('website_layout')
+        .update({ draft_config: body.draft_config, updated_at: new Date().toISOString() })
+        .eq('page', page)
+        .eq('layout_key', layoutKey);
+      if (error) throw new Error(error.message);
+      return { success: true } as T;
+    }
+  }
+
+  if (pathSegments[0] === 'publish' && method === 'POST') {
+    // Publish: copy draft to live for all tables
+    // Fetch all records and update live_* from draft_*
+    const [configRes, themeRes, layoutRes] = await Promise.all([
+      supabase.from('website_config').select('*'),
+      supabase.from('website_theme').select('*'),
+      supabase.from('website_layout').select('*'),
+    ]);
+
+    if (configRes.error || themeRes.error || layoutRes.error) {
+      throw new Error('Failed to fetch data for publish');
+    }
+
+    // Update configs: copy draft_content to live_content
+    const configUpdates = (configRes.data || []).map(row =>
+      supabase.from('website_config')
+        .update({ live_content: row.draft_content, updated_at: new Date().toISOString() })
+        .eq('section', row.section)
+    );
+
+    // Update theme: copy draft_value to live_value
+    const themeUpdates = (themeRes.data || []).map(row =>
+      supabase.from('website_theme')
+        .update({ live_value: row.draft_value, updated_at: new Date().toISOString() })
+        .eq('theme_key', row.theme_key)
+    );
+
+    // Update layout: copy draft_config to live_config
+    const layoutUpdates = (layoutRes.data || []).map(row =>
+      supabase.from('website_layout')
+        .update({ live_config: row.draft_config, updated_at: new Date().toISOString() })
+        .eq('id', row.id)
+    );
+
+    await Promise.all([...configUpdates, ...themeUpdates, ...layoutUpdates]);
+    return { success: true, message: 'All changes published successfully' } as T;
+  }
+
+  if (pathSegments[0] === 'discard' && method === 'POST') {
+    // Discard: copy live back to draft for all tables
+    const [configRes, themeRes, layoutRes] = await Promise.all([
+      supabase.from('website_config').select('*'),
+      supabase.from('website_theme').select('*'),
+      supabase.from('website_layout').select('*'),
+    ]);
+
+    if (configRes.error || themeRes.error || layoutRes.error) {
+      throw new Error('Failed to fetch data for discard');
+    }
+
+    // Update configs: copy live_content back to draft_content
+    const configUpdates = (configRes.data || []).map(row =>
+      supabase.from('website_config')
+        .update({ draft_content: row.live_content, updated_at: new Date().toISOString() })
+        .eq('section', row.section)
+    );
+
+    // Update theme: copy live_value back to draft_value
+    const themeUpdates = (themeRes.data || []).map(row =>
+      supabase.from('website_theme')
+        .update({ draft_value: row.live_value, updated_at: new Date().toISOString() })
+        .eq('theme_key', row.theme_key)
+    );
+
+    // Update layout: copy live_config back to draft_config
+    const layoutUpdates = (layoutRes.data || []).map(row =>
+      supabase.from('website_layout')
+        .update({ draft_config: row.live_config, updated_at: new Date().toISOString() })
+        .eq('id', row.id)
+    );
+
+    await Promise.all([...configUpdates, ...themeUpdates, ...layoutUpdates]);
+    return { success: true, message: 'All changes discarded' } as T;
+  }
+
+  if (pathSegments[0] === 'unpublished-changes' && method === 'GET') {
+    // Count unpublished changes by comparing draft vs live
+    const [configRes, themeRes, layoutRes] = await Promise.all([
+      supabase.from('website_config').select('section, draft_content, live_content'),
+      supabase.from('website_theme').select('theme_key, draft_value, live_value'),
+      supabase.from('website_layout').select('id, draft_config, live_config'),
+    ]);
+
+    let configChanges = 0, themeChanges = 0, layoutChanges = 0;
+
+    // Count config changes (where draft != live)
+    (configRes.data || []).forEach(row => {
+      if (JSON.stringify(row.draft_content) !== JSON.stringify(row.live_content)) {
+        configChanges++;
+      }
+    });
+
+    // Count theme changes
+    (themeRes.data || []).forEach(row => {
+      if (row.draft_value !== row.live_value) {
+        themeChanges++;
+      }
+    });
+
+    // Count layout changes
+    (layoutRes.data || []).forEach(row => {
+      if (JSON.stringify(row.draft_config) !== JSON.stringify(row.live_config)) {
+        layoutChanges++;
+      }
+    });
+
+    const totalChanges = configChanges + themeChanges + layoutChanges;
+    return {
+      success: true,
+      total_changes: totalChanges,
+      by_type: { config: configChanges, theme: themeChanges, layout: layoutChanges }
+    } as T;
+  }
+
+  throw new Error(`Unsupported CMS operation: ${method} ${path}`);
+}
+
 async function cmsApi<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // Use direct Supabase in Electron mode
+  if (isElectronMode) {
+    return electronCmsApi<T>(path, options);
+  }
+
+  // Standard backend API call
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers as Record<string, string> },
     ...options,
@@ -216,6 +438,34 @@ export function useUploadWebsiteImage() {
 
   return useMutation<ImageUploadResponse, Error, { file: File; section: string; alt_text?: string }>({
     mutationFn: async ({ file, section, alt_text }) => {
+      // Electron mode: upload directly to Supabase Storage
+      if (isElectronMode) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${section}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('website-assets')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw new Error(uploadError.message);
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('website-assets')
+          .getPublicUrl(fileName);
+
+        return {
+          success: true,
+          url: urlData.publicUrl,
+          asset_id: fileName,
+          alt_text: alt_text || ''
+        };
+      }
+
+      // Standard backend API call
       const formData = new FormData();
       formData.append('file', file);
       formData.append('section', section);
@@ -245,8 +495,20 @@ export function useDeleteWebsiteImage() {
   const queryClient = useQueryClient();
 
   return useMutation<any, Error, { asset_id: string; section: string }>({
-    mutationFn: ({ asset_id, section }) =>
-      cmsApi(`/image/${asset_id}?section=${section}`, { method: 'DELETE' }),
+    mutationFn: async ({ asset_id, section }) => {
+      // Electron mode: delete directly from Supabase Storage
+      if (isElectronMode) {
+        const { error } = await supabase.storage
+          .from('website-assets')
+          .remove([asset_id]);
+
+        if (error) throw new Error(error.message);
+        return { success: true };
+      }
+
+      // Standard backend API call
+      return cmsApi(`/image/${asset_id}?section=${section}`, { method: 'DELETE' });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: websiteKeys.configs() });
     },

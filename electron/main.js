@@ -13,6 +13,9 @@ const execAsync = util.promisify(exec);
 const os = require('os');
 const sharp = require('sharp');
 
+// Offline database for order queue and print queue persistence
+const offlineDb = require('./lib/offline-db');
+
 // Section UUID mapping for receipt section separators
 // Matches the frontend sectionMapping.ts SECTION_UUID_MAP
 const SECTION_UUID_MAP = {
@@ -672,6 +675,7 @@ class CottageTandooriPOS {
             this.sendSplashProgress(40, 'Setting up printing...');
             this.setupPrinting();
             this.setupStripePayments();
+            this.setupOfflineDatabase();
             this.setupLocalCache();
             this.sendSplashProgress(60, 'Configuring services...');
             this.setupCrashRecovery();
@@ -1297,6 +1301,170 @@ Powered by QuickServe AI`
         log.info('Stripe payment handlers registered');
     }
 
+    setupOfflineDatabase() {
+        // Initialize SQLite database for offline order and print queue persistence
+        try {
+            offlineDb.initDatabase();
+            log.info('[OFFLINE-DB] Database initialized');
+        } catch (error) {
+            log.error(`[OFFLINE-DB] Failed to initialize database: ${error.message}`);
+            // Don't throw - app should still work, just without persistence
+        }
+
+        // ============================================================================
+        // OFFLINE ORDER QUEUE IPC HANDLERS
+        // ============================================================================
+
+        // Enqueue an order for offline sync
+        ipcMain.handle('offline-order-enqueue', async (event, order) => {
+            try {
+                const result = offlineDb.offlineOrderEnqueue(order);
+                return { success: true, order: result };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to enqueue order: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // List orders by status (optional status filter)
+        ipcMain.handle('offline-order-list', async (event, status) => {
+            try {
+                const orders = offlineDb.offlineOrderList(status);
+                return { success: true, orders };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to list orders: ${error.message}`);
+                return { success: false, error: error.message, orders: [] };
+            }
+        });
+
+        // Mark order as synced with server ID
+        ipcMain.handle('offline-order-mark-synced', async (event, { id, serverId }) => {
+            try {
+                offlineDb.offlineOrderMarkSynced(id, serverId);
+                return { success: true };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to mark order synced: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Mark order as failed
+        ipcMain.handle('offline-order-mark-failed', async (event, { id, error: errorMsg }) => {
+            try {
+                offlineDb.offlineOrderMarkFailed(id, errorMsg);
+                return { success: true };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to mark order failed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Get offline order queue statistics
+        ipcMain.handle('offline-order-get-stats', async () => {
+            try {
+                const stats = offlineDb.offlineOrderGetStats();
+                return { success: true, stats };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to get order stats: ${error.message}`);
+                return { success: false, error: error.message, stats: null };
+            }
+        });
+
+        // Delete an offline order
+        ipcMain.handle('offline-order-delete', async (event, id) => {
+            try {
+                const deleted = offlineDb.offlineOrderDelete(id);
+                return { success: true, deleted };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to delete order: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // ============================================================================
+        // PRINT QUEUE IPC HANDLERS
+        // ============================================================================
+
+        // Enqueue a print job
+        ipcMain.handle('print-queue-enqueue', async (event, job) => {
+            try {
+                const result = offlineDb.printQueueEnqueue(job);
+                return { success: true, job: result };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to enqueue print job: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // List print jobs by status (optional status filter)
+        ipcMain.handle('print-queue-list', async (event, status) => {
+            try {
+                const jobs = offlineDb.printQueueList(status);
+                return { success: true, jobs };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to list print jobs: ${error.message}`);
+                return { success: false, error: error.message, jobs: [] };
+            }
+        });
+
+        // Mark print job as printed
+        ipcMain.handle('print-queue-mark-printed', async (event, id) => {
+            try {
+                offlineDb.printQueueMarkPrinted(id);
+                return { success: true };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to mark job printed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Mark print job as failed
+        ipcMain.handle('print-queue-mark-failed', async (event, { id, error: errorMsg }) => {
+            try {
+                offlineDb.printQueueMarkFailed(id, errorMsg);
+                return { success: true };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to mark job failed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Retry a failed print job
+        ipcMain.handle('print-queue-retry', async (event, id) => {
+            try {
+                offlineDb.printQueueRetry(id);
+                return { success: true };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to retry print job: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Get print queue statistics
+        ipcMain.handle('print-queue-get-stats', async () => {
+            try {
+                const stats = offlineDb.printQueueGetStats();
+                return { success: true, stats };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to get print stats: ${error.message}`);
+                return { success: false, error: error.message, stats: null };
+            }
+        });
+
+        // Delete a print job
+        ipcMain.handle('print-queue-delete', async (event, id) => {
+            try {
+                const deleted = offlineDb.printQueueDelete(id);
+                return { success: true, deleted };
+            } catch (error) {
+                log.error(`[OFFLINE-DB] Failed to delete print job: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        log.info('[OFFLINE-DB] IPC handlers registered');
+    }
+
     async initializePrinter() {
         try {
             const printers = await this.discoverPrinters();
@@ -1584,6 +1752,14 @@ Powered by QuickServe AI`
                 clearInterval(this.printerStatusInterval);
                 this.printerStatusInterval = null;
                 log.info('[Cleanup] Cleared printer status interval');
+            }
+
+            // Close offline database
+            try {
+                offlineDb.closeDatabase();
+                log.info('[Cleanup] Closed offline database');
+            } catch (e) {
+                log.error('[Cleanup] Failed to close offline database:', e.message);
             }
 
             // Remove crash state file

@@ -26,6 +26,8 @@ const POSLogin = lazy(() => import('../frontend/src/pages/POSLogin'));
 const Admin = lazy(() => import('../frontend/src/pages/Admin'));
 // Reconciliation page for Quick Tools access
 const Reconciliation = lazy(() => import('../frontend/src/pages/Reconciliation'));
+// Kitchen Display System for Quick Tools
+const KDS_V2 = lazy(() => import('../frontend/src/pages/KDS_V2'));
 
 // Loading fallback for lazy components — uses inline styles to guarantee centering
 // even before Tailwind CSS loads
@@ -71,6 +73,8 @@ function ElectronApp() {
                 <Route path="/admin" element={<Admin />} />
                 {/* Reconciliation for Quick Tools access */}
                 <Route path="/reconciliation" element={<Reconciliation />} />
+                {/* Kitchen Display System for Quick Tools */}
+                <Route path="/kds-v2" element={<KDS_V2 />} />
                 {/* Redirect any other routes to POS Login */}
                 <Route path="*" element={<Navigate to="/pos-login" replace />} />
               </Routes>
