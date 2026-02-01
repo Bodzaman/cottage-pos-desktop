@@ -1560,11 +1560,26 @@ Powered by QuickServe AI`
                 const printers = JSON.parse(stdout);
                 const printerList = Array.isArray(printers) ? printers : [printers];
 
+                // Helper to determine if printer is available
+                // PrinterStatus can be: 0=Normal, 1=Paused, 2=Error, 3=Deleting, etc.
+                // Or string values like 'Normal', 'Paused', 'Error'
+                const isPrinterAvailable = (status) => {
+                    if (status === 0 || status === 'Normal' || status === '0') return true;
+                    if (typeof status === 'string') {
+                        const s = status.toLowerCase();
+                        // Available if not explicitly offline/error/paused
+                        return !s.includes('error') && !s.includes('offline') &&
+                               !s.includes('paused') && !s.includes('deleting');
+                    }
+                    // For other numeric codes, assume available unless it's a known error code
+                    return status !== 2 && status !== 3 && status !== 4;
+                };
+
                 return printerList.map(printer => ({
                     name: printer.Name,
                     driver: printer.DriverName,
                     status: printer.PrinterStatus,
-                    available: printer.PrinterStatus === 'Normal'
+                    available: isPrinterAvailable(printer.PrinterStatus)
                 }));
             }
         } catch (error) {
