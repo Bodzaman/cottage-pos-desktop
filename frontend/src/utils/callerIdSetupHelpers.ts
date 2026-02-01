@@ -3,16 +3,15 @@
  * Utilities for the Caller ID phone setup wizard
  */
 
-// Detect Electron environment
-// In Electron, there's no Vite proxy, so we need the full backend URL
-const isElectron = typeof window !== 'undefined' &&
-  (window as any).electronAPI !== undefined;
-
-// Backend URL - in Electron use full URL, in web browser use relative (Vite proxies to backend)
-const BACKEND_URL = isElectron ? 'http://127.0.0.1:8000' : '';
+// Backend URL from environment (same pattern as websiteCmsQueries.ts)
+// - In production Electron: Uses VITE_RIFF_BACKEND_URL (https://cottage-tandoori-app-main.vercel.app)
+// - In dev web: Uses relative paths (Vite proxies /routes/* to localhost:8000)
+const BACKEND_URL = import.meta.env.VITE_RIFF_BACKEND_URL || '';
 
 // API base path
-const API_BASE = `${BACKEND_URL}/routes/callerid`;
+const API_BASE = BACKEND_URL
+  ? `${BACKEND_URL}/routes/callerid`
+  : '/routes/callerid';
 
 // =============================================================================
 // Types
