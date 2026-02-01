@@ -35,7 +35,6 @@ const SignUp = lazy(() => import("./pages/SignUp.tsx"));
 const ThermalReceiptDesignerV2 = lazy(() => import("./pages/ThermalReceiptDesignerV2.tsx"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized.tsx"));
 const UpdateKDS = lazy(() => import("./pages/UpdateKDS.tsx"));
-const UpdatePOSDesktop = lazy(() => import("./pages/UpdatePOSDesktop.tsx"));
 const DeploymentHub = lazy(() => import("./pages/DeploymentHub.tsx"));
 const WebsiteManagement = lazy(() => import("./pages/WebsiteManagement.tsx"));
 const CustomerDisplay = lazy(() => import("./pages/CustomerDisplay.tsx"));
@@ -94,12 +93,12 @@ export const userRoutes: RouteObject[] = [
 	{ path: "/unauthorized", element: <Unauthorized />},
 	{ path: "/update-kds", element: <UpdateKDS />},
 	{ path: "/updatekds", element: <UpdateKDS />},
-	{ path: "/update-pos-desktop", element: <UpdatePOSDesktop />},
-	{ path: "/updateposdesktop", element: <UpdatePOSDesktop />},
 	{ path: "/deployment-hub", element: <DeploymentHub />},
 	{ path: "/deploymenthub", element: <DeploymentHub />},
 	{ path: "/website-management", element: <WebsiteManagement />},
 	{ path: "/customer-display", element: <CustomerDisplay />},
 	{ path: "/faq", element: <FAQ />},
 	{ path: "/allergens", element: <Allergens />},
+	{ path: "/z-report", element: <ZReport />},
+	{ path: "/zreport", element: <ZReport />},
 ];
