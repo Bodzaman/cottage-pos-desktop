@@ -3,7 +3,7 @@ import { Check, X, Clock, Zap, UserCheck, Timer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useZReportStore } from '../../utils/zReportStore';
-import { supabase } from '../../utils/supabase';
+import { supabase } from '../../utils/supabaseClient';
 
 interface AcceptanceMetrics {
   totalOrders: number;
