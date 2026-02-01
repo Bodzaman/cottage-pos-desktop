@@ -4,7 +4,7 @@ import { globalColors } from '../utils/QSAIDesign';
 import { Button } from '@/components/ui/button';
 import { CompletedOrder } from '../utils/orderManagementService';
 import { formatCurrency } from '../utils/formatters';
-import { AlertCircle, Check, Clock, MessageSquare, Phone, Printer, ShoppingBag, Truck, X, Headphones } from 'lucide-react';
+import { AlertCircle, Check, Clock, Edit2, MessageSquare, Phone, Printer, ShoppingBag, Truck, X, Headphones } from 'lucide-react';
 import brain from '../brain';
 import { toast } from 'sonner';
 
@@ -12,6 +12,7 @@ export interface OrderActionPanelProps {
   order: CompletedOrder | null;
   onApprove?: (orderId: string) => void;
   onReject?: (orderId: string) => void;
+  onAcceptWithChanges?: (orderId: string) => void;
   onProcess?: (orderId: string) => void;
   onComplete?: (orderId: string) => void;
   onCallCustomer?: (phone: string) => void;
@@ -28,6 +29,7 @@ export function OrderActionPanel({
   order,
   onApprove,
   onReject,
+  onAcceptWithChanges,
   onProcess,
   onComplete,
   onCallCustomer,
@@ -59,7 +61,8 @@ export function OrderActionPanel({
   const isVoiceOrder = order.order_source === 'AI_VOICE';
 
   // Determine which actions to show based on order status
-  const isNewOrder = order.status === 'NEW';
+  const isNewOrder = order.status === 'NEW' || order.status === 'AWAITING_ACCEPT';
+  const isAwaitingAccept = order.status === 'AWAITING_ACCEPT';
   const isProcessing = order.status === 'PROCESSING' || order.status === 'APPROVED' || order.status === 'IN_PROGRESS';
   const isReady = order.status === 'READY';
   
@@ -139,26 +142,44 @@ export function OrderActionPanel({
 
         {/* Actions based on order status */}
         {isNewOrder && onApprove && onReject && (
-          <div className="grid grid-cols-2 gap-3">
-            <Button 
-              variant="outline"
-              onClick={() => onReject(order.order_id)}
-              className="justify-center"
-              style={{ 
-                border: `1px solid ${designColors.status.error}40`,
-                color: designColors.status.error,
-                backgroundColor: `${designColors.background.secondary}80`
-              }}
-            >
-              <X className="h-4 w-4 mr-2" /> Reject
-            </Button>
-            
-            <Button 
-              onClick={() => onApprove(order.order_id)}
-              className="justify-center bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md"
-            >
-              <Check className="h-4 w-4 mr-2" /> Approve
-            </Button>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                onClick={() => onReject(order.order_id)}
+                className="justify-center"
+                style={{
+                  border: `1px solid ${designColors.status.error}40`,
+                  color: designColors.status.error,
+                  backgroundColor: `${designColors.background.secondary}80`
+                }}
+              >
+                <X className="h-4 w-4 mr-2" /> Reject
+              </Button>
+
+              <Button
+                onClick={() => onApprove(order.order_id)}
+                className="justify-center bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md"
+              >
+                <Check className="h-4 w-4 mr-2" /> {isAwaitingAccept ? 'Accept' : 'Approve'}
+              </Button>
+            </div>
+
+            {/* Accept with Changes button */}
+            {onAcceptWithChanges && (
+              <Button
+                variant="outline"
+                onClick={() => onAcceptWithChanges(order.order_id)}
+                className="w-full justify-center"
+                style={{
+                  border: `1px solid ${designColors.status.warning}40`,
+                  color: designColors.status.warning,
+                  backgroundColor: `${designColors.background.secondary}80`
+                }}
+              >
+                <Edit2 className="h-4 w-4 mr-2" /> Accept with Changes
+              </Button>
+            )}
           </div>
         )}
         

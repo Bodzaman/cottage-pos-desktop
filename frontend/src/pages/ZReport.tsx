@@ -8,6 +8,7 @@ import {
   ZReportKPICards,
   ZReportBreakdownSection,
   CashDrawerPanel,
+  OrderAcceptanceMetrics,
 } from '../components/z-report';
 
 export default function ZReport() {
@@ -58,6 +59,7 @@ export default function ZReport() {
               {/* Left Column - Breakdowns (2/3 width on desktop) */}
               <div className="lg:col-span-2 space-y-4">
                 <ZReportBreakdownSection />
+                <OrderAcceptanceMetrics />
               </div>
 
               {/* Right Column - Cash Drawer (1/3 width on desktop) */}

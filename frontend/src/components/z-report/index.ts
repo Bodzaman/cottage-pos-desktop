@@ -3,3 +3,4 @@ export { ZReportKPICards } from './ZReportKPICards';
 export { ZReportBreakdownSection } from './ZReportBreakdownSection';
 export { CashDrawerPanel } from './CashDrawerPanel';
 export { DatePresetSelector } from './DatePresetSelector';
+export { OrderAcceptanceMetrics } from './OrderAcceptanceMetrics';

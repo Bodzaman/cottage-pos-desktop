@@ -67,6 +67,40 @@ export interface OrderingHoursEntry {
   closeTime?: string;
 }
 
+// Order Acceptance Settings (Smart Order Acceptance System)
+export interface OrderTypeAcceptanceRule {
+  autoAccept: boolean;
+  manualThreshold: number; // Orders over this amount require manual review
+}
+
+export interface RushHourScheduleEntry {
+  enabled: boolean;
+  start: string; // HH:MM format
+  end: string;   // HH:MM format
+}
+
+export interface OrderAcceptanceSettings {
+  autoAcceptEnabled: boolean; // Master toggle
+  rules: {
+    COLLECTION: OrderTypeAcceptanceRule;
+    DELIVERY: OrderTypeAcceptanceRule;
+  };
+  advanced: {
+    manualForFirstTimeCustomers: boolean;
+    manualDuringRushHours: boolean;
+    rushHoursSchedule: Record<string, RushHourScheduleEntry>;
+  };
+  deadlines: {
+    COLLECTION: number; // Minutes to accept before auto-reject
+    DELIVERY: number;
+  };
+  notifications: {
+    notifyCustomerOnAccept: boolean;
+    notifyCustomerOnReject: boolean;
+    warnStaffBeforeTimeout: number; // Minutes before deadline to warn staff
+  };
+}
+
 export interface OnlineOrdersSettings {
   notifications: {
     playSound: boolean;
@@ -74,7 +108,7 @@ export interface OnlineOrdersSettings {
     repeatUntilAcknowledged: boolean;
   };
   processing: {
-    autoApproveOrders: boolean;
+    autoApproveOrders: boolean;  // Legacy - kept for backward compat
     autoPrintOnAccept: boolean;
   };
   prepTimeSchedule: PrepTimeSchedule[];
@@ -85,6 +119,8 @@ export interface OnlineOrdersSettings {
     orderCutoffMinutes: number;
   };
   orderingHours?: OrderingHoursEntry[];
+  // Smart Order Acceptance settings
+  orderAcceptance?: OrderAcceptanceSettings;
 }
 
 export interface RestaurantSettings {
@@ -111,7 +147,7 @@ export const defaultBusinessProfile: BusinessProfile = {
   name: "Cottage Tandoori",
   address: "25 West St, Storrington, Pulborough, West Sussex",
   postcode: "RH20 4DZ",
-  phone: "01903 743343",
+  phone: "01903 743605",
   email: "contact@cottagetandoori.co.uk",
   website: "www.cottagetandoori.co.uk",
   description: "Authentic Indian cuisine in a warm and welcoming environment",

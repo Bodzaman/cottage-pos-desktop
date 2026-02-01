@@ -16,6 +16,13 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Shield,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  DollarSign,
+  Timer,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { globalColors } from '../utils/QSAIDesign';
@@ -24,6 +31,7 @@ import {
   type OrderingHoursEntry,
   type OnlineOrdersSettings,
   type TimeSlot,
+  type OrderAcceptanceSettings,
 } from '../utils/useRestaurantSettings';
 import { toast } from 'sonner';
 
@@ -70,6 +78,36 @@ function migrateOrderingHours(entries: OrderingHoursEntry[]): OrderingHoursEntry
   });
 }
 
+const DEFAULT_ORDER_ACCEPTANCE: OrderAcceptanceSettings = {
+  autoAcceptEnabled: true,
+  rules: {
+    COLLECTION: { autoAccept: true, manualThreshold: 75 },
+    DELIVERY: { autoAccept: true, manualThreshold: 75 },
+  },
+  advanced: {
+    manualForFirstTimeCustomers: false,
+    manualDuringRushHours: false,
+    rushHoursSchedule: {
+      monday: { enabled: false, start: '18:00', end: '21:00' },
+      tuesday: { enabled: false, start: '18:00', end: '21:00' },
+      wednesday: { enabled: false, start: '18:00', end: '21:00' },
+      thursday: { enabled: false, start: '18:00', end: '21:00' },
+      friday: { enabled: true, start: '18:00', end: '22:00' },
+      saturday: { enabled: true, start: '17:00', end: '23:00' },
+      sunday: { enabled: false, start: '17:00', end: '21:00' },
+    },
+  },
+  deadlines: {
+    COLLECTION: 15,
+    DELIVERY: 20,
+  },
+  notifications: {
+    notifyCustomerOnAccept: true,
+    notifyCustomerOnReject: true,
+    warnStaffBeforeTimeout: 5,
+  },
+};
+
 const DEFAULT_SETTINGS: OnlineOrdersSettings = {
   notifications: {
     playSound: true,
@@ -88,6 +126,7 @@ const DEFAULT_SETTINGS: OnlineOrdersSettings = {
     orderCutoffMinutes: 30,
   },
   orderingHours: DEFAULT_ORDERING_HOURS,
+  orderAcceptance: DEFAULT_ORDER_ACCEPTANCE,
 };
 
 // ============================================================================
@@ -100,6 +139,7 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
   const [localSettings, setLocalSettings] = useState<OnlineOrdersSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showAdvancedRules, setShowAdvancedRules] = useState(false);
 
   // Load settings from database when modal opens
   useEffect(() => {
@@ -124,6 +164,30 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
           ...settings.onlineOrders.availability,
         },
         orderingHours: migrateOrderingHours(rawHours),
+        orderAcceptance: {
+          ...DEFAULT_ORDER_ACCEPTANCE,
+          ...settings.onlineOrders.orderAcceptance,
+          rules: {
+            ...DEFAULT_ORDER_ACCEPTANCE.rules,
+            ...settings.onlineOrders.orderAcceptance?.rules,
+          },
+          advanced: {
+            ...DEFAULT_ORDER_ACCEPTANCE.advanced,
+            ...settings.onlineOrders.orderAcceptance?.advanced,
+            rushHoursSchedule: {
+              ...DEFAULT_ORDER_ACCEPTANCE.advanced.rushHoursSchedule,
+              ...settings.onlineOrders.orderAcceptance?.advanced?.rushHoursSchedule,
+            },
+          },
+          deadlines: {
+            ...DEFAULT_ORDER_ACCEPTANCE.deadlines,
+            ...settings.onlineOrders.orderAcceptance?.deadlines,
+          },
+          notifications: {
+            ...DEFAULT_ORDER_ACCEPTANCE.notifications,
+            ...settings.onlineOrders.orderAcceptance?.notifications,
+          },
+        },
       });
       setHasChanges(false);
     }
@@ -139,6 +203,66 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
       [section]: {
         ...(prev[section] as any),
         ...updates,
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  // Update order acceptance settings
+  const updateAcceptance = (updates: Partial<OrderAcceptanceSettings>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      orderAcceptance: {
+        ...(prev.orderAcceptance || DEFAULT_ORDER_ACCEPTANCE),
+        ...updates,
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateAcceptanceRules = (
+    orderType: 'COLLECTION' | 'DELIVERY',
+    updates: Partial<{ autoAccept: boolean; manualThreshold: number }>
+  ) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      orderAcceptance: {
+        ...(prev.orderAcceptance || DEFAULT_ORDER_ACCEPTANCE),
+        rules: {
+          ...(prev.orderAcceptance?.rules || DEFAULT_ORDER_ACCEPTANCE.rules),
+          [orderType]: {
+            ...(prev.orderAcceptance?.rules?.[orderType] || DEFAULT_ORDER_ACCEPTANCE.rules[orderType]),
+            ...updates,
+          },
+        },
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateAcceptanceAdvanced = (updates: Partial<OrderAcceptanceSettings['advanced']>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      orderAcceptance: {
+        ...(prev.orderAcceptance || DEFAULT_ORDER_ACCEPTANCE),
+        advanced: {
+          ...(prev.orderAcceptance?.advanced || DEFAULT_ORDER_ACCEPTANCE.advanced),
+          ...updates,
+        },
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateAcceptanceDeadlines = (updates: Partial<{ COLLECTION: number; DELIVERY: number }>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      orderAcceptance: {
+        ...(prev.orderAcceptance || DEFAULT_ORDER_ACCEPTANCE),
+        deadlines: {
+          ...(prev.orderAcceptance?.deadlines || DEFAULT_ORDER_ACCEPTANCE.deadlines),
+          ...updates,
+        },
       },
     }));
     setHasChanges(true);
@@ -512,34 +636,40 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
               </div>
             </section>
 
-            {/* ── Section: Order Processing ── */}
+            {/* ── Section: Order Acceptance ── */}
             <section
               className="rounded-lg border p-4"
               style={{ borderColor: globalColors.border.light, backgroundColor: globalColors.background.tertiary }}
             >
               <div className="flex items-center gap-2 mb-4">
-                <Settings className="h-5 w-5" style={{ color: globalColors.purple.primary }} />
+                <Shield className="h-5 w-5" style={{ color: globalColors.purple.primary }} />
                 <h4 className="text-base font-semibold" style={{ color: globalColors.text.primary }}>
-                  Order Processing
+                  Order Acceptance
                 </h4>
               </div>
 
               <div className="space-y-4">
+                {/* Master toggle */}
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
-                      Auto-approve orders
+                      Auto-accept orders
                     </label>
                     <p className="text-xs" style={{ color: globalColors.text.secondary }}>
-                      Automatically accept incoming orders
+                      Automatically accept paid orders. When off, staff must manually accept.
                     </p>
                   </div>
                   <Switch
-                    checked={localSettings.processing.autoApproveOrders}
-                    onCheckedChange={(checked) => updateSection('processing', { autoApproveOrders: checked })}
+                    checked={localSettings.orderAcceptance?.autoAcceptEnabled ?? true}
+                    onCheckedChange={(checked) => {
+                      updateAcceptance({ autoAcceptEnabled: checked });
+                      // Keep legacy field in sync
+                      updateSection('processing', { autoApproveOrders: checked });
+                    }}
                   />
                 </div>
 
+                {/* Auto-print on accept */}
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
@@ -554,6 +684,211 @@ export function OnlineOrderSettingsModal({ isOpen, onClose }: OnlineOrderSetting
                     onCheckedChange={(checked) => updateSection('processing', { autoPrintOnAccept: checked })}
                   />
                 </div>
+
+                {/* Per order type settings */}
+                <div className="pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <p className="text-xs font-medium mb-3" style={{ color: globalColors.text.secondary }}>
+                    Per Order Type Settings
+                  </p>
+
+                  {/* Collection */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" style={{ color: globalColors.purple.primary }} />
+                      <div>
+                        <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+                          Collection: Auto-accept
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs" style={{ color: globalColors.text.secondary }}>
+                          Manual if over £
+                        </span>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={500}
+                          value={localSettings.orderAcceptance?.rules?.COLLECTION?.manualThreshold ?? 75}
+                          onChange={(e) => updateAcceptanceRules('COLLECTION', { manualThreshold: parseInt(e.target.value) || 75 })}
+                          className="w-16 h-7 text-center text-xs"
+                          disabled={!localSettings.orderAcceptance?.rules?.COLLECTION?.autoAccept}
+                        />
+                      </div>
+                      <Switch
+                        checked={localSettings.orderAcceptance?.rules?.COLLECTION?.autoAccept ?? true}
+                        onCheckedChange={(checked) => updateAcceptanceRules('COLLECTION', { autoAccept: checked })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Delivery */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" style={{ color: globalColors.purple.primary }} />
+                      <div>
+                        <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+                          Delivery: Auto-accept
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs" style={{ color: globalColors.text.secondary }}>
+                          Manual if over £
+                        </span>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={500}
+                          value={localSettings.orderAcceptance?.rules?.DELIVERY?.manualThreshold ?? 75}
+                          onChange={(e) => updateAcceptanceRules('DELIVERY', { manualThreshold: parseInt(e.target.value) || 75 })}
+                          className="w-16 h-7 text-center text-xs"
+                          disabled={!localSettings.orderAcceptance?.rules?.DELIVERY?.autoAccept}
+                        />
+                      </div>
+                      <Switch
+                        checked={localSettings.orderAcceptance?.rules?.DELIVERY?.autoAccept ?? true}
+                        onCheckedChange={(checked) => updateAcceptanceRules('DELIVERY', { autoAccept: checked })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acceptance Deadlines */}
+                <div className="pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <p className="text-xs font-medium mb-3" style={{ color: globalColors.text.secondary }}>
+                    Acceptance Deadlines (for manual acceptance)
+                  </p>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" style={{ color: globalColors.text.muted }} />
+                      <span className="text-xs" style={{ color: globalColors.text.secondary }}>Collection:</span>
+                      <Input
+                        type="number"
+                        min={5}
+                        max={60}
+                        value={localSettings.orderAcceptance?.deadlines?.COLLECTION ?? 15}
+                        onChange={(e) => updateAcceptanceDeadlines({ COLLECTION: parseInt(e.target.value) || 15 })}
+                        className="w-16 h-7 text-center text-xs"
+                      />
+                      <span className="text-xs" style={{ color: globalColors.text.secondary }}>mins</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" style={{ color: globalColors.text.muted }} />
+                      <span className="text-xs" style={{ color: globalColors.text.secondary }}>Delivery:</span>
+                      <Input
+                        type="number"
+                        min={5}
+                        max={60}
+                        value={localSettings.orderAcceptance?.deadlines?.DELIVERY ?? 20}
+                        onChange={(e) => updateAcceptanceDeadlines({ DELIVERY: parseInt(e.target.value) || 20 })}
+                        className="w-16 h-7 text-center text-xs"
+                      />
+                      <span className="text-xs" style={{ color: globalColors.text.secondary }}>mins</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advanced Rules Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedRules(!showAdvancedRules)}
+                  className="flex items-center gap-2 pt-2 text-sm font-medium hover:opacity-80 transition-opacity"
+                  style={{ color: globalColors.purple.primary }}
+                >
+                  {showAdvancedRules ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  Advanced Rules
+                </button>
+
+                {/* Advanced Rules Section */}
+                {showAdvancedRules && (
+                  <div className="space-y-4 pt-2 pl-4 border-l-2" style={{ borderColor: globalColors.purple.primary + '40' }}>
+                    {/* First-time customers */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" style={{ color: globalColors.text.muted }} />
+                        <div>
+                          <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+                            Manual for first-time customers
+                          </label>
+                          <p className="text-xs" style={{ color: globalColors.text.secondary }}>
+                            Require manual review for new customers
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={localSettings.orderAcceptance?.advanced?.manualForFirstTimeCustomers ?? false}
+                        onCheckedChange={(checked) => updateAcceptanceAdvanced({ manualForFirstTimeCustomers: checked })}
+                      />
+                    </div>
+
+                    {/* Rush hours */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-4 w-4" style={{ color: globalColors.text.muted }} />
+                        <div>
+                          <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+                            Manual during rush hours
+                          </label>
+                          <p className="text-xs" style={{ color: globalColors.text.secondary }}>
+                            Require manual review during busy periods
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={localSettings.orderAcceptance?.advanced?.manualDuringRushHours ?? false}
+                        onCheckedChange={(checked) => updateAcceptanceAdvanced({ manualDuringRushHours: checked })}
+                      />
+                    </div>
+
+                    {/* Rush hours schedule hint */}
+                    {localSettings.orderAcceptance?.advanced?.manualDuringRushHours && (
+                      <div
+                        className="text-xs p-2 rounded"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: globalColors.text.secondary }}
+                      >
+                        <AlertTriangle className="h-3 w-3 inline mr-1" />
+                        Rush hours: Fri 18:00-22:00, Sat 17:00-23:00
+                      </div>
+                    )}
+
+                    {/* Staff timeout warning */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium" style={{ color: globalColors.text.primary }}>
+                          Warn staff before timeout
+                        </label>
+                        <p className="text-xs" style={{ color: globalColors.text.secondary }}>
+                          Alert staff this many minutes before auto-reject
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={localSettings.orderAcceptance?.notifications?.warnStaffBeforeTimeout ?? 5}
+                          onChange={(e) =>
+                            setLocalSettings((prev) => ({
+                              ...prev,
+                              orderAcceptance: {
+                                ...(prev.orderAcceptance || DEFAULT_ORDER_ACCEPTANCE),
+                                notifications: {
+                                  ...(prev.orderAcceptance?.notifications || DEFAULT_ORDER_ACCEPTANCE.notifications),
+                                  warnStaffBeforeTimeout: parseInt(e.target.value) || 5,
+                                },
+                              },
+                            }))
+                          }
+                          className="w-16 h-7 text-center text-xs"
+                        />
+                        <span className="text-xs" style={{ color: globalColors.text.secondary }}>mins</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 

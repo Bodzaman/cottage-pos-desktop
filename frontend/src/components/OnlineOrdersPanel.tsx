@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { OrderQueuePanel } from "./OrderQueuePanel";
 import { OrderDetailPanel } from "./OrderDetailPanel";
 import { OrderActionPanel } from "./OrderActionPanel";
+import { RejectionReasonModal } from "./RejectionReasonModal";
+import { PartialAcceptModal } from "./PartialAcceptModal";
 import { useNavigate } from "react-router-dom";
 import { useSimpleAuth } from "../utils/simple-auth-context";
 import { orderManagementService, CompletedOrder, OrderFilterParams } from "../utils/orderManagementService";
@@ -40,6 +42,14 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
   const [orders, setOrders] = useState<CompletedOrder[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [newOrderNotification, setNewOrderNotification] = useState(false);
+
+  // Rejection modal state
+  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+  const [orderToReject, setOrderToReject] = useState<CompletedOrder | null>(null);
+
+  // Partial accept modal state
+  const [partialAcceptModalOpen, setPartialAcceptModalOpen] = useState(false);
+  const [orderToPartialAccept, setOrderToPartialAccept] = useState<CompletedOrder | null>(null);
   
   // Auto-approve orders setting
   const [autoApprove, setAutoApprove] = useState(autoApproveEnabled);
@@ -88,12 +98,18 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
       setOrders(result.orders);
       setTotalCount(result.totalCount);
       
-      // Check for new orders
-      const newOrders = result.orders.filter(order => order.status === 'NEW');
-      if (newOrders.length > 0) {
+      // Check for new orders or orders awaiting acceptance
+      const pendingOrders = result.orders.filter(
+        order => order.status === 'NEW' || order.status === 'AWAITING_ACCEPT'
+      );
+      if (pendingOrders.length > 0) {
         setNewOrderNotification(true);
         // Play notification sound for new orders
-        const audio = new Audio('/assets/notification.mp3');
+        const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
+        const soundPath = isElectron
+          ? './audio-sounds/online_order_notification_sound_pos.mp3'
+          : '/audio-sounds/online_order_notification_sound_pos.mp3';
+        const audio = new Audio(soundPath);
         audio.play().catch(() => {
           // Audio playback failed, possibly due to autoplay restrictions
         });
@@ -145,30 +161,122 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
     setSelectedOrder(order || null);
   };
 
-  // Handle order approval action
+  // Handle order approval/acceptance action
   const handleApproveAction = async (orderId: string) => {
-    await handleApproveOrder(orderId);
-  };
-
-  // Handle order rejection action
-  const handleRejectAction = async (orderId: string) => {
     try {
-      const response = await brain.update_order_tracking_status({
-        order_id: orderId,
-        new_status: OrderStatus.CANCELLED,
+      // Call the new accept endpoint which handles status update, printing, and logging
+      const response = await fetch('/routes/order-acceptance/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          staff_id: user?.id,
+        }),
       });
+
       const result = await response.json();
-      
+
       if (result.success) {
-        toast.success(`Order ${orderId} rejected`);
+        toast.success(`Order accepted and sent to kitchen`);
+        if (result.print_triggered) {
+          toast.success('Kitchen tickets printed');
+        }
         fetchOrders();
       } else {
-        toast.error(`Failed to reject order: ${result.message}`);
+        // Fallback to legacy method if new endpoint fails
+        console.warn('New accept endpoint failed, using fallback:', result);
+        await handleApproveOrder(orderId);
       }
     } catch (error) {
-      console.error('Error rejecting order:', error);
-      toast.error('Failed to reject order');
+      console.error('Error accepting order:', error);
+      // Fallback to legacy method
+      await handleApproveOrder(orderId);
     }
+  };
+
+  // Handle order rejection action - opens the rejection modal
+  const handleRejectAction = async (orderId: string) => {
+    const order = orders.find(o => o.order_id === orderId);
+    if (order) {
+      setOrderToReject(order);
+      setRejectionModalOpen(true);
+    }
+  };
+
+  // Handle rejection confirmation from modal
+  const handleConfirmRejection = async (reasonId: string, note?: string) => {
+    if (!orderToReject) return;
+
+    const response = await fetch('/routes/order-acceptance/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: orderToReject.order_id,
+        staff_id: user?.id,
+        reason_id: reasonId,
+        note: note,
+        initiate_refund: true,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to reject order');
+    }
+
+    toast.success(`Order ${orderToReject.order_id} rejected`);
+    if (result.refund_initiated) {
+      toast.info('Refund has been initiated');
+    }
+    fetchOrders();
+  };
+
+  // Handle accept with changes action - opens the partial accept modal
+  const handleAcceptWithChangesAction = (orderId: string) => {
+    const order = orders.find(o => o.order_id === orderId);
+    if (order) {
+      setOrderToPartialAccept(order);
+      setPartialAcceptModalOpen(true);
+    }
+  };
+
+  // Handle partial accept confirmation from modal
+  const handleConfirmPartialAccept = async (
+    removedItems: { item_id: string; name: string; quantity: number; price: number }[],
+    modifiedItems: { item_id: string; name: string; original_quantity: number; new_quantity: number; price: number }[],
+    refundAmount: number
+  ) => {
+    if (!orderToPartialAccept) return;
+
+    const response = await fetch('/routes/order-acceptance/accept-with-changes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: orderToPartialAccept.order_id,
+        staff_id: user?.id,
+        removed_items: removedItems,
+        modified_items: modifiedItems,
+        refund_amount: refundAmount,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to accept order with changes');
+    }
+
+    toast.success(`Order accepted with changes`);
+    if (result.refund_initiated) {
+      toast.info(`Partial refund of £${refundAmount.toFixed(2)} initiated`);
+    }
+    if (result.print_triggered) {
+      toast.success('Kitchen tickets printed');
+    }
+    setPartialAcceptModalOpen(false);
+    setOrderToPartialAccept(null);
+    fetchOrders();
   };
 
   // Handle order processing action
@@ -242,7 +350,32 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
         onOpenChange={setDetailDialogOpen}
         orderSource="WEBSITE"
       />
-      
+
+      {/* Rejection Reason Modal */}
+      <RejectionReasonModal
+        isOpen={rejectionModalOpen}
+        onClose={() => {
+          setRejectionModalOpen(false);
+          setOrderToReject(null);
+        }}
+        onConfirm={handleConfirmRejection}
+        orderNumber={orderToReject?.order_id}
+        orderTotal={orderToReject?.total || orderToReject?.total_amount}
+      />
+
+      {/* Partial Accept Modal */}
+      <PartialAcceptModal
+        isOpen={partialAcceptModalOpen}
+        onClose={() => {
+          setPartialAcceptModalOpen(false);
+          setOrderToPartialAccept(null);
+        }}
+        onConfirm={handleConfirmPartialAccept}
+        orderNumber={orderToPartialAccept?.order_number || orderToPartialAccept?.order_id?.slice(0, 8)}
+        orderTotal={orderToPartialAccept?.total || orderToPartialAccept?.total_amount || 0}
+        items={orderToPartialAccept?.items || []}
+      />
+
       {/* Header with controls */}
       <div className="flex justify-between items-center mb-4">
         <div>
@@ -256,7 +389,12 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
             Website Orders
           </h2>
           <p className="text-sm" style={{ color: designColors.text.secondary }}>
-            {totalCount} new online order{totalCount !== 1 ? 's' : ''} waiting for approval
+            {(() => {
+              const awaitingCount = orders.filter(o => o.status === 'NEW' || o.status === 'AWAITING_ACCEPT').length;
+              return awaitingCount > 0
+                ? `${awaitingCount} order${awaitingCount !== 1 ? 's' : ''} awaiting acceptance`
+                : `${totalCount} online order${totalCount !== 1 ? 's' : ''}`;
+            })()}
           </p>
         </div>
         
@@ -336,6 +474,7 @@ export function OnlineOrdersPanel({ onBack, autoApproveEnabled = false, onAutoAp
               order={selectedOrder}
               onApprove={handleApproveAction}
               onReject={handleRejectAction}
+              onAcceptWithChanges={handleAcceptWithChangesAction}
               onProcess={handleProcessAction}
               onComplete={handleCompleteAction}
               onCallCustomer={handleCallCustomer}
