@@ -7,7 +7,7 @@
 
 import brain from 'brain';
 import { offlineStorage, OfflineOrder, OfflineSyncOperation } from './offlineStorage';
-import { MenuItem } from './menuTypes';
+import { MenuItem } from './types';
 
 export interface SyncStatus {
   isOnline: boolean;

@@ -1,4 +1,4 @@
-import { OrderItem } from './menuTypes';
+import { OrderItem } from './types';
 
 export interface MultiCustomGroup {
   groupId: string;

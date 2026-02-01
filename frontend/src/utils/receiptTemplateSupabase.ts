@@ -27,8 +27,13 @@ const SYNC_FIELDS: (keyof FormData)[] = [
   'showPhone', 'showEmail', 'showWebsite', 'showVatNumber', 'showCategorySubheadings',
   'logoFile', 'logoUrl', 'logoImage', 'logoPosition', 'logoWidth', 'logoHeight',
   'qrCodes', 'headerQRCodes', 'footerQRCodes',
+  'headerText',  // Custom header text/welcome message
   'selectedFont', 'useItemsFont', 'useItemsThermalFont', 'receiptFont', 'itemsFont',
-  'footerMessage', 'terms', 'socialMedia', 'customFooterText', 'showCustomFooter'
+  'footerMessage', 'terms', 'socialMedia', 'customFooterText', 'showCustomFooter',
+  // Kitchen visibility settings
+  'kitchenShowHeader', 'kitchenShowBusinessInfo', 'kitchenShowLogo', 'kitchenShowQRCodes',
+  'kitchenShowOrderInfo', 'kitchenShowTableInfo', 'kitchenShowCustomerDetails',
+  'kitchenShowTiming', 'kitchenShowSpecialInstructions', 'kitchenShowTotals', 'kitchenShowFooter'
 ];
 
 /**

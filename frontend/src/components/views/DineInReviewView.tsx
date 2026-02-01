@@ -37,7 +37,7 @@ import {
   isRasterPrintAvailable,
   captureReceiptAsImage,
 } from 'utils/electronPrintService';
-import { generateDisplayNameForReceipt } from 'utils/menuHelpers';
+import { resolveItemDisplayName } from 'utils/menuHelpers';
 import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal';
 import { toast } from 'sonner';
 import Skeleton from 'react-loading-skeleton';
@@ -285,11 +285,14 @@ export function DineInReviewView({
       tableNumber: tableNumber?.toString(),
       guestCount: guestCount,
       items: sortedEnrichedItems.map(item => {
-        const displayName = generateDisplayNameForReceipt(
-          item.item_name,
-          item.variant_name || undefined,
-          item.protein_type || undefined
-        );
+        // Use resolveItemDisplayName for intelligent variant handling
+        // Pass enriched item fields (item_name, variant_name, kitchen_display_name)
+        const displayName = resolveItemDisplayName({
+          name: item.item_name,
+          variant_name: item.variant_name,
+          protein_type: item.protein_type,
+          kitchen_display_name: item.kitchen_display_name
+        }, { useKitchenName: true });
 
         return {
           id: item.id,

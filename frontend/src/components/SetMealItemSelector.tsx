@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Search, Plus, Minus, ImageOff, ChevronDown, ChevronRight } from 'lucide-react';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 import { useCategories, useMenuItems } from '../utils/menuQueries';
 import { formatCurrency } from '../utils/formatUtils';
 

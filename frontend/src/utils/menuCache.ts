@@ -6,7 +6,7 @@
  */
 
 import { create } from 'zustand';
-import { Category, MenuItem, ProteinType, ItemVariant, CustomizationBase } from './menuTypes';
+import { Category, MenuItem, ProteinType, ItemVariant, Customization } from './types';
 import { supabase } from './supabaseClient';
 import { useSimpleAuth } from './simple-auth-context';
 import { toast } from 'sonner';
@@ -33,7 +33,7 @@ interface MenuCache {
   menuItemsByCategory: Record<string, CacheItem<MenuItem[]>>;
   proteinTypes: CacheItem<ProteinType[]> | null;
   itemVariants: CacheItem<ItemVariant[]> | null;
-  customizations: CacheItem<CustomizationBase[]> | null;
+  customizations: CacheItem<Customization[]> | null;
   
   // Cache getters with automatic expiration checking
   getCategories: () => Category[] | null;
@@ -41,7 +41,7 @@ interface MenuCache {
   getMenuItemsByCategory: (categoryId: string) => MenuItem[] | null;
   getProteinTypes: () => ProteinType[] | null;
   getItemVariants: () => ItemVariant[] | null;
-  getCustomizations: () => CustomizationBase[] | null;
+  getCustomizations: () => Customization[] | null;
   
   // Cache setters
   setCategories: (data: Category[], ttl?: number) => void;
@@ -49,7 +49,7 @@ interface MenuCache {
   setMenuItemsByCategory: (categoryId: string, data: MenuItem[], ttl?: number) => void;
   setProteinTypes: (data: ProteinType[], ttl?: number) => void;
   setItemVariants: (data: ItemVariant[], ttl?: number) => void;
-  setCustomizations: (data: CustomizationBase[], ttl?: number) => void;
+  setCustomizations: (data: Customization[], ttl?: number) => void;
   
   // Cache invalidation
   invalidateCache: () => void;
@@ -147,7 +147,7 @@ export const useMenuCache = create<MenuCache>((set, get) => ({
     });
   },
 
-  setCustomizations: (data: CustomizationBase[], ttl = DEFAULT_TTL) => {
+  setCustomizations: (data: Customization[], ttl = DEFAULT_TTL) => {
     set({
       customizations: {
         data,
@@ -218,9 +218,9 @@ let proteinTypesCache: ProteinType[] | null = null;
 let proteinTypesLastFetch = 0;
 let proteinTypesFetchPromise: Promise<ProteinType[]> | null = null;
 
-let customizationsCache: CustomizationBase[] | null = null;
+let customizationsCache: Customization[] | null = null;
 let customizationsLastFetch = 0;
-let customizationsFetchPromise: Promise<CustomizationBase[]> | null = null;
+let customizationsFetchPromise: Promise<Customization[]> | null = null;
 
 // Cache change listeners for reactive updates
 type CacheChangeListener = () => void;
@@ -457,7 +457,7 @@ export function useMenuData() {
   };
   
   // Function to fetch customizations
-  const fetchCustomizations = async (): Promise<CustomizationBase[]> => {
+  const fetchCustomizations = async (): Promise<Customization[]> => {
     // Check if we have a valid cache
     const now = Date.now();
     if (customizationsCache && now - customizationsLastFetch < CACHE_TTL) {

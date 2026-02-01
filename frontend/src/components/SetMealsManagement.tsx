@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSetMeals, deleteSetMeal } from '../utils/supabaseQueries';
-import { SetMeal } from '../utils/menuTypes';
+import { SetMeal } from '../utils/types';
 import { styles, globalColors } from '../utils/QSAIDesign';
 import SetMealForm from './SetMealForm';
 import SetMealCard from './SetMealCard';

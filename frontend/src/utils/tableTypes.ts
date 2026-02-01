@@ -195,17 +195,42 @@ export const getTableStatusLabel = (status: TableStatus): string => {
 
 export const getTimeOccupied = (occupiedAt: Date | null): string => {
   if (!occupiedAt) return "0m";
-  
+
   const now = new Date();
   const diffMs = now.getTime() - occupiedAt.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  
-  if (diffHours > 0) {
-    return `${diffHours}h ${diffMins % 60}m`;
-  } else {
-    return `${diffMins}m`;
+
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  // Years: "1y 3mo" for orders > 365 days
+  if (years > 0) {
+    const remainingMonths = Math.floor((days % 365) / 30);
+    return remainingMonths > 0 ? `${years}y ${remainingMonths}mo` : `${years}y`;
   }
+
+  // Months: "2mo 5d" for orders > 30 days
+  if (months > 0) {
+    const remainingDays = days % 30;
+    return remainingDays > 0 ? `${months}mo ${remainingDays}d` : `${months}mo`;
+  }
+
+  // Days: "1d 5h" for orders 1-30 days
+  if (days > 0) {
+    const remainingHours = hours % 24;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  }
+
+  // Hours: "2h 30m" for orders < 24 hours
+  if (hours > 0) {
+    const remainingMins = minutes % 60;
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+  }
+
+  // Minutes: "45m" for orders < 1 hour
+  return `${minutes}m`;
 };
 
 // Generate a unique ID for orders

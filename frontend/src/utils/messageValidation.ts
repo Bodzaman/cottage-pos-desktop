@@ -9,7 +9,7 @@
  */
 
 import type { ChatMessage } from './chat-store';
-import type { MenuItem } from './menuTypes';
+import type { MenuItem } from './types';
 
 /**
  * Validates and sanitizes a ChatMessage to ensure content is always a string.

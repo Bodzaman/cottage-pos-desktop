@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, ProteinType } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { Check } from 'lucide-react';

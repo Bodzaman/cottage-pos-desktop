@@ -37,9 +37,9 @@ import { StaffCustomizationModal, type SelectedCustomization } from './StaffCust
 
 // Utils & Types
 import { QSAITheme } from 'utils/QSAIDesign';
-import type { OrderItem, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/menuTypes';
+import type { OrderItem, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/types';
 import { assignItemToTab, updateOrderItemCustomizations } from 'utils/supabaseQueries';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { supabase } from 'utils/supabaseClient';
 
 /**
@@ -204,6 +204,12 @@ export function DineInOrderWorkspace({
   onPrintBill,
   onCompleteOrder,
 }: DineInOrderWorkspaceProps) {
+  // ============================================================================
+  // MENU DATA (React Query via compat layer)
+  // ============================================================================
+
+  const { menuItems: allMenuItems, itemVariants } = useRealtimeMenuStoreCompat({ context: 'pos' });
+
   // ============================================================================
   // VIEW STATE
   // ============================================================================
@@ -636,7 +642,6 @@ export function DineInOrderWorkspace({
 
       {/* Customization Modal for editing item customizations */}
       {isCustomizationModalOpen && customizingItem && (() => {
-        const { menuItems: allMenuItems, itemVariants } = useRealtimeMenuStore.getState();
         const fullMenuItem = allMenuItems.find(mi => mi.id === customizingItem.menu_item_id);
 
         if (!fullMenuItem) {

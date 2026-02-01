@@ -2,7 +2,7 @@ import React from 'react';
 import { Label } from '@/components/ui/label';
 import { globalColors } from '../utils/QSAIDesign';
 import { MenuCategory } from '../utils/masterTypes';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 
 // Accept both type schemas for backward compatibility
 type CategoryLike = MenuCategory | Category;

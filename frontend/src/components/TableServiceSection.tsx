@@ -9,6 +9,7 @@ import { Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { OrderTabSection } from 'components/OrderTabSection';
 import { FormData, DineInTemplateType } from 'utils/receiptDesignerTypes';
@@ -108,6 +109,21 @@ export function TableServiceSection({ formData, updateField }: Props) {
               <SelectItem value="final_bill">Final Bill</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      {/* Kitchen Visibility Toggle */}
+      <div className="pt-3 border-t mt-3" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs block" style={{ color: QSAITheme.text.muted }}>Show on Kitchen</span>
+            <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display table info (table #, covers, linked tables) on kitchen</span>
+          </div>
+          <Switch
+            checked={formData.kitchenShowTableInfo !== false}
+            onCheckedChange={(checked) => updateField('kitchenShowTableInfo', checked)}
+            className="scale-90"
+          />
         </div>
       </div>
     </OrderTabSection>

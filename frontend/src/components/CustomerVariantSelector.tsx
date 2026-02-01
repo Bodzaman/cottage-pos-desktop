@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, ProteinType } from '../utils/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { convertSpiceIndicatorsToEmoji } from '../utils/spiceLevelUtils';
 import { Minus, Plus, Info, Star, Heart, Sliders, X } from 'lucide-react';

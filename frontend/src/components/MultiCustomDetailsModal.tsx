@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { MultiCustomGroup, generatePortionVariantName, calculateCustomizationCost, getBasePrice } from '../utils/multiCustomGrouping';
 import { colors } from '../utils/designSystem';
 import { globalColors } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 
 interface MultiCustomDetailsModalProps {
   isOpen: boolean;

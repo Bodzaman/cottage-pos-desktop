@@ -32,7 +32,6 @@ import { colors, InternalTheme } from "../utils/InternalDesignSystem";
 import { useQueryClient } from '@tanstack/react-query';
 import { useCategories, useMenuItems, useProteinTypes, menuKeys } from '../utils/menuQueries';
 import { useRealtimeMenuStoreCompat } from "../utils/realtimeMenuStoreCompat";
-import { useRealtimeMenuStore } from "../utils/realtimeMenuStore";
 import { useMountedRef, useSafeTimeout } from "utils/safeHooks";
 
 // Import modular components
@@ -267,7 +266,7 @@ export default function AdminPortalMenuContent() {
       if (result.success) {
         toast.success(`Item ${active ? 'activated' : 'deactivated'} successfully`);
         await queryClient.invalidateQueries({ queryKey: menuKeys.menuItems() });
-        await useRealtimeMenuStore.getState().fallbackRefreshData();
+        await realtimeMenuStore.forceFullRefresh();
       } else {
         throw new Error('Failed to toggle item status');
       }

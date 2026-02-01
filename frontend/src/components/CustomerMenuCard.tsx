@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 // Types (Same as POSDesktop)
-import { MenuItem, ItemVariant, OrderItem } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, OrderItem } from '../utils/types';
 
 // Store Integrations (Same as POSDesktop)
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';

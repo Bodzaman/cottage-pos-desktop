@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MenuItem, ItemVariant, ProteinType } from 'utils/menuTypes';
+import { MenuItem, ItemVariant, ProteinType } from 'utils/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Star, Leaf, Sliders, Check, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';

@@ -9,8 +9,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, ensureSupabaseConfigured } from './supabaseClient';
-import { Category, MenuItem, ItemVariant, ProteinType, CustomizationBase, SetMeal } from './menuTypes';
-import { OrderItem } from './menuTypes';
+import { Category, MenuItem, ItemVariant, ProteinType, Customization, SetMeal, OrderItem } from './types';
 import { TableData } from './tableTypes';
 import { toast } from 'sonner';
 // Direct Supabase queries - replaces brain API calls
@@ -96,7 +95,7 @@ interface MenuStoreState {
   menuItems: MenuItem[];
   setMeals: SetMeal[];
   proteinTypes: ProteinType[];
-  customizations: CustomizationBase[];
+  customizations: Customization[];
   itemVariants: ItemVariant[];
   
   // 🚀 NEW: Pre-computed lookup tables for O(1) access
@@ -171,7 +170,7 @@ interface MenuStoreState {
   setSetMeals: (setMeals: SetMeal[]) => void; // Add Set Meals setter
   fetchSetMeals: () => Promise<void>; // Fetch Set Meals from backend
   setProteinTypes: (types: ProteinType[]) => void;
-  setCustomizations: (customizations: CustomizationBase[]) => void;
+  setCustomizations: (customizations: Customization[]) => void;
   setItemVariants: (variants: ItemVariant[]) => void;
   updateDerivedData: () => void;
   setLoading: (loading: boolean) => void;
@@ -185,8 +184,8 @@ interface MenuStoreState {
   computeLookups: () => void;
 
   // NEW: Customization helper methods
-  getWebsiteCustomizations: () => CustomizationBase[];
-  getCustomizationsByGroup: () => Record<string, CustomizationBase[]>;
+  getWebsiteCustomizations: () => Customization[];
+  getCustomizationsByGroup: () => Record<string, Customization[]>;
 }
 
 // 🎯 DRAFT/PUBLISH WORKFLOW: Store context determines data filtering
@@ -1005,7 +1004,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
         get().computeLookups();
       },
       
-      setCustomizations: (customizations: CustomizationBase[]) => {
+      setCustomizations: (customizations: Customization[]) => {
         set({ customizations });
       },
 
@@ -1152,7 +1151,7 @@ export const useRealtimeMenuStore = create<MenuStoreState>(
 
       getCustomizationsByGroup: () => {
         const { customizations } = get();
-        const customizationsByGroup: Record<string, CustomizationBase[]> = {};
+        const customizationsByGroup: Record<string, Customization[]> = {};
 
         customizations.forEach(customization => {
           if (customization.is_active && customization.show_on_website) {
@@ -1338,16 +1337,16 @@ function handleCustomizationsChange(payload: any) {
   const store = useRealtimeMenuStore.getState();
   
   if (payload.eventType === 'INSERT') {
-    const newCustomization = payload.new as CustomizationBase;
+    const newCustomization = payload.new as Customization;
     store.setCustomizations([...store.customizations, newCustomization]);
   } else if (payload.eventType === 'UPDATE') {
-    const updatedCustomization = payload.new as CustomizationBase;
+    const updatedCustomization = payload.new as Customization;
     const customizations = store.customizations.map(custom => 
       custom.id === updatedCustomization.id ? updatedCustomization : custom
     );
     store.setCustomizations(customizations);
   } else if (payload.eventType === 'DELETE') {
-    const deletedCustomization = payload.old as CustomizationBase;
+    const deletedCustomization = payload.old as Customization;
     const customizations = store.customizations.filter(custom => custom.id !== deletedCustomization.id);
     store.setCustomizations(customizations);
   }

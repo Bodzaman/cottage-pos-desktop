@@ -101,7 +101,7 @@ export const ELEMENT_LIBRARY: PaletteElement[] = [
     icon: 'Building',
     category: 'header',
     defaultData: {
-      text: 'Cottage Tandoori Restaurant\n25 West St, Storrington\nPhone: 01903 741 777',
+      text: 'Cottage Tandoori Restaurant\n25 West St, Storrington\nPhone: 01903 743605',
       placeholder: 'Edit business information'
     },
     defaultStyle: {

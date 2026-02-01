@@ -8,7 +8,7 @@
 import { useNavigate } from "react-router-dom";
 import { usePOSOrderStore } from "../utils/posOrderStore";
 import { usePOSCustomerStore } from "../utils/posCustomerStore";
-import { OrderItem, ModifierSelection, CustomizationSelection } from "../utils/menuTypes";
+import { OrderItem, ModifierSelection, CustomizationSelection } from "../utils/types";
 
 // Types for the full order from CRM API (matches actual database schema)
 interface FullOrderItem {

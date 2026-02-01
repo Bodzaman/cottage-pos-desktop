@@ -149,5 +149,48 @@ contextBridge.exposeInMainWorld('electronAPI', {
     printQueueGetStats: () => ipcRenderer.invoke('print-queue-get-stats'),
 
     // Delete a print job
-    printQueueDelete: (id) => ipcRenderer.invoke('print-queue-delete', id)
+    printQueueDelete: (id) => ipcRenderer.invoke('print-queue-delete', id),
+
+    // ============================================================================
+    // AUTO-UPDATE (Software updates with progress UI)
+    // ============================================================================
+
+    // Trigger manual update check
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+
+    // Install downloaded update (will quit and restart app)
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+
+    // Start downloading available update
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+
+    // Update event listeners
+    onUpdateChecking: (callback) => {
+        ipcRenderer.on('update-checking', () => callback());
+    },
+    onUpdateAvailable: (callback) => {
+        ipcRenderer.on('update-available', (event, info) => callback(info));
+    },
+    onUpdateNotAvailable: (callback) => {
+        ipcRenderer.on('update-not-available', (event, info) => callback(info));
+    },
+    onUpdateDownloadProgress: (callback) => {
+        ipcRenderer.on('update-download-progress', (event, progress) => callback(progress));
+    },
+    onUpdateDownloaded: (callback) => {
+        ipcRenderer.on('update-downloaded', (event, info) => callback(info));
+    },
+    onUpdateError: (callback) => {
+        ipcRenderer.on('update-error', (event, error) => callback(error));
+    },
+
+    // Remove all update listeners (for cleanup)
+    removeUpdateListeners: () => {
+        ipcRenderer.removeAllListeners('update-checking');
+        ipcRenderer.removeAllListeners('update-available');
+        ipcRenderer.removeAllListeners('update-not-available');
+        ipcRenderer.removeAllListeners('update-download-progress');
+        ipcRenderer.removeAllListeners('update-downloaded');
+        ipcRenderer.removeAllListeners('update-error');
+    }
 });

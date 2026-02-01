@@ -12,7 +12,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { colors, cardStyle } from '../utils/designSystem';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 
 // Types for the component
 interface MenuPreviewData {

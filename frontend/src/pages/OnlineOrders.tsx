@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 // TODO: Removed unused useSupabaseMenuData import
 import { MenuItem as TypesMenuItem, Category as TypesCategory, ItemVariant as TypesItemVariant, OrderMode } from 'types';
 // Use menu types from utils/menuTypes for component compatibility (snake_case fields)
-import { MenuItem, Category, ItemVariant, ProteinType } from 'utils/menuTypes';
+import { MenuItem, Category, ItemVariant, ProteinType } from 'utils/types';
 import { MenuGrid } from 'components/MenuGrid';
 import { CompactMenuList } from 'components/CompactMenuList';
 // TODO: VoiceGlassOverlay component not used - removed import

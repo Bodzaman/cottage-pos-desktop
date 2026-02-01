@@ -99,6 +99,10 @@ export interface TableCardData {
   tabsDisplayFormatted: string | null; // Shows first 1-2 names + "+X" if more
   tabsOverflowCount: number; // Number of additional tabs not shown
 
+  // Item counts (from dine_in_order_items - source of truth)
+  itemCount?: number;
+  hasUnsentItems?: boolean;
+
   // Financial data
   billTotal: number | null;
 }

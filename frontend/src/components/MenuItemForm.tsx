@@ -8,6 +8,22 @@
 
 
 
+/**
+ * @fileoverview MenuItemForm - Comprehensive form for creating and editing menu items
+ *
+ * MIGRATION NOTE:
+ * This component has reusable logic extracted into hooks for new implementations:
+ * - useFormDraft (src/hooks/useFormDraft.ts) - Auto-save draft management
+ * - useMenuItemForm (src/hooks/useMenuItemForm.ts) - Form state and submission
+ *
+ * These hooks can be used for:
+ * - New wizard-style forms
+ * - Simpler menu item forms
+ * - Other forms needing draft functionality
+ *
+ * This file remains the production implementation until a full migration is tested.
+ */
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm, UseFormRegister, UseFormSetValue, UseFormWatch, FieldErrors, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

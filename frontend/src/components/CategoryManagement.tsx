@@ -86,7 +86,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 import brain from 'brain';
-import { Category as MenuCategory } from '../utils/menuTypes';
+import { Category as MenuCategory } from '../utils/types';
 import { FIXED_SECTIONS, type SectionId, getSectionById, organizeCategoriesBySection } from 'utils/sectionMapping';
 import { CategorySectionView } from './CategorySectionView';
 import { SectionChangeWarningDialog } from './SectionChangeWarningDialog';

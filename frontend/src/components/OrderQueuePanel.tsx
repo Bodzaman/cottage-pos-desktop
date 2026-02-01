@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { colors as designColors } from '../utils/designSystem';
 import { globalColors, effects } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { formatCurrency } from '../utils/formatters';
 import { Phone, ShoppingBag, Truck, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { CompletedOrder } from '../utils/orderManagementService';

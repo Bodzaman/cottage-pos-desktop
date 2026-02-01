@@ -24,6 +24,8 @@ interface CustomerDetailsModalProps {
   onManagerOverride?: () => void;
   requestManagerApproval?: () => Promise<boolean>;
   managerOverrideGranted?: boolean;
+  /** Called when user explicitly cancels the modal (not when saved). Used to dismiss caller ID events. */
+  onCancel?: () => void;
 }
 
 interface CustomerData {
@@ -52,7 +54,8 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   onOrderTypeSwitch,
   onManagerOverride,
   requestManagerApproval,
-  managerOverrideGranted
+  managerOverrideGranted,
+  onCancel
 }) => {
   const [customerData, setCustomerData] = useState<CustomerData>({
     firstName: '',
@@ -494,7 +497,10 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
             background: `linear-gradient(135deg, ${globalColors.background.secondary} 0%, ${globalColors.background.primary} 100%)`
           }}
         >
-          <POSButton variant="tertiary" onClick={onClose}>
+          <POSButton variant="tertiary" onClick={() => {
+            onCancel?.();
+            onClose();
+          }}>
             Cancel
           </POSButton>
 

@@ -1,7 +1,7 @@
 import { API_URL } from '../utils/environment';
 import { ChatRequest } from 'types';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
-import type { MenuItem } from './menuTypes';
+import type { MenuItem } from './types';
 
 // Types for the new structured streaming protocol
 export interface ContentChunk {

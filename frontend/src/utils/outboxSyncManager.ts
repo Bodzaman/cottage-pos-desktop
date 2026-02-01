@@ -11,7 +11,7 @@
 
 import { offlineStorage, OfflineOrder, OfflineSyncOperation } from './offlineStorage';
 import brain from 'brain';
-import { OrderItem } from './menuTypes';
+import { OrderItem } from './types';
 import { getOfflineStatus, onOfflineStatusChange } from './serviceWorkerManager';
 import { isElectronOfflineAvailable, getElectronAPI, ElectronOfflineOrderRecord } from '../types/electron';
 

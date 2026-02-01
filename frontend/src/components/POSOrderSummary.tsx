@@ -32,9 +32,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { OrderItem, ModifierSelection, CustomizationSelection } from '../utils/menuTypes';
+import { OrderItem, ModifierSelection, CustomizationSelection, PaymentResult as MenuPaymentResult } from '../utils/types';
 import { TipSelection } from './POSTipSelector';
-import { PaymentResult as MenuPaymentResult } from '../utils/menuTypes';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
 
 // Extended modifier structure for grouped modifiers with options

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, Customization } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { FIXED_SECTIONS, findRootSection } from '../utils/sectionMapping';
 import { cn } from '../utils/cn';
@@ -140,7 +140,7 @@ export function StaffCustomizationModal({
 
   // Group customizations by customization_group
   const groupedCustomizations = useMemo(() => {
-    const groups: Record<string, CustomizationBase[]> = {};
+    const groups: Record<string, Customization[]> = {};
     
     filteredCustomizations.forEach(customization => {
       const groupName = customization.customization_group || 'Other';
@@ -198,7 +198,7 @@ export function StaffCustomizationModal({
   }, [selectedCustomizations]);
 
   // Handle customization toggle
-  const handleCustomizationToggle = (customization: CustomizationBase, checked: boolean) => {
+  const handleCustomizationToggle = (customization: Customization, checked: boolean) => {
     console.log('[StaffCustomizationModal] handleCustomizationToggle called:', {
       customization: { id: customization.id, name: customization.name, price: customization.price },
       checked,

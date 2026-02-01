@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, CustomizationBase } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, Customization } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
@@ -222,7 +222,7 @@ export function CustomerUnifiedCustomizationModal({
 
   // Group customizations
   const groupedCustomizations = useMemo(() => {
-    const groups: Record<string, CustomizationBase[]> = {};
+    const groups: Record<string, Customization[]> = {};
     filteredCustomizations.forEach(customization => {
       const groupName = customization.customization_group || customization.name || 'Other';
       if (!groups[groupName]) {
@@ -248,7 +248,7 @@ export function CustomerUnifiedCustomizationModal({
   };
 
   // Handle customization toggle
-  const handleCustomizationToggle = (customization: CustomizationBase, checked: boolean) => {
+  const handleCustomizationToggle = (customization: Customization, checked: boolean) => {
     if (checked) {
       setSelectedCustomizations(prev => [
         ...prev,

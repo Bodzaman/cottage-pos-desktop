@@ -5,7 +5,7 @@
  * for clear visual hierarchy in Zone 3 (POSMenuSelector).
  */
 
-import { MenuItem, Category } from './menuTypes';
+import { MenuItem, Category } from './types';
 import { FIXED_SECTIONS, SECTION_UUID_MAP } from './sectionMapping';
 
 /**
@@ -97,6 +97,79 @@ export function generateDisplayNameForReceipt(
   
   // No variant info, just return base name
   return baseName;
+}
+
+/**
+ * Intelligent display name resolution for order items
+ *
+ * Handles multiple data formats:
+ * - Modern format: item.name already contains variant info (e.g., "CHICKEN SHASHLICK BHUNA")
+ * - Legacy format: item.name is base name, variant in separate field (e.g., "SHASHLICK", variant="CHICKEN")
+ * - Kitchen receipts: uses abbreviated kitchen_display_name when available
+ *
+ * This matches the logic in ThermalPreview.tsx (ThermalReceiptDesignerV2)
+ *
+ * @param item - Object containing name, variantName, kitchen_display_name, protein_type
+ * @param options - Configuration options
+ * @returns Properly formatted display name
+ */
+export function resolveItemDisplayName(
+  item: {
+    name: string;
+    variantName?: string | null;
+    variant_name?: string | null;
+    kitchen_display_name?: string | null;
+    kitchenDisplayName?: string | null;
+    protein_type?: string | null;
+    proteinType?: string | null;
+    variant?: { name?: string } | null;
+    item_name?: string | null; // For enriched dine-in items
+  },
+  options: { useKitchenName?: boolean } = {}
+): string {
+  const { useKitchenName = false } = options;
+
+  // Get normalized values (handle snake_case and camelCase)
+  const kitchenDisplayName = item.kitchen_display_name || item.kitchenDisplayName;
+  const variantName = item.variantName || item.variant_name || item.variant?.name;
+  const proteinType = item.protein_type || item.proteinType;
+
+  // Use item_name if available (enriched dine-in items), otherwise use name
+  const baseName = item.item_name || item.name;
+
+  // For kitchen receipts, use abbreviated kitchen_display_name if available
+  if (useKitchenName && kitchenDisplayName) {
+    return kitchenDisplayName;
+  }
+
+  // If no variant info exists, use name as-is
+  if (!variantName) {
+    // Fallback: append protein_type if available
+    if (proteinType) {
+      return `${baseName} (${proteinType})`;
+    }
+    return baseName;
+  }
+
+  // Check data format and choose the right display name
+  const nameUpper = baseName.toUpperCase();
+  const variantUpper = variantName.toUpperCase();
+
+  // Case 1: variantName contains baseName → variantName is the full display name
+  // e.g., baseName="TIKKA MASALA", variantName="LAMB TIKKA MASALA" → use "LAMB TIKKA MASALA"
+  if (variantUpper.includes(nameUpper)) {
+    return variantName;
+  }
+
+  // Case 2: baseName contains variantName → baseName is already the full display name (modern format)
+  // e.g., baseName="LAMB TIKKA MASALA", variantName="LAMB" → use "LAMB TIKKA MASALA"
+  if (nameUpper.includes(variantUpper) || nameUpper === variantUpper) {
+    return baseName;
+  }
+
+  // Case 3: Legacy fallback - neither contains the other, append variant name
+  // e.g., baseName="TIKKA MASALA", variantName="Lamb" → "TIKKA MASALA (Lamb)"
+  return `${baseName} (${variantName})`;
 }
 
 /**

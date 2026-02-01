@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { OrderItem } from "../utils/menuTypes";
+import { OrderItem } from "../utils/types";
 import { Check, Plus, Trash2, User, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { QSAITheme } from "../utils/QSAIDesign";

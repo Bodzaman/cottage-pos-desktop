@@ -13,7 +13,6 @@ import { UnifiedCart } from "components/cart/UnifiedCart";
 import { CustomerUnifiedCustomizationModal } from "./CustomerUnifiedCustomizationModal"; // ✅ Updated: Using unified modal
 import { GoogleMapsProvider } from "utils/googleMapsProvider";
 import { setupGlobalErrorHandlers, checkBrowserCompatibility } from "utils/errorHandling";
-import { useRealtimeMenuStore } from "utils/realtimeMenuStore";
 import { useRealtimeMenuStoreCompat } from "utils/realtimeMenuStoreCompat";
 import { useTableOrdersStore } from "utils/tableOrdersStore";
 import { useCartStore } from "utils/cartStore";
@@ -113,31 +112,35 @@ function CustomerCustomizationModalWrapper() {
   );
 }
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
-  
-  // ✅ NEW: Check if chat should be visible on current route
+/**
+ * Inner provider component that runs INSIDE QueryClientProvider
+ * This is needed because hooks like useRealtimeMenuStoreCompat use React Query
+ * and must be called within the QueryClientProvider context.
+ */
+function AppProviderInner({ children }: { children: React.ReactNode }) {
+  // ✅ Check if chat should be visible on current route
   const isChatAllowed = useChatVisibility();
-  
+
   // Global cart drawer state
   const isCartOpen = useCartStore((state) => state.isCartOpen);
   const closeCart = useCartStore((state) => state.closeCart);
-  
+
   // Global menu store initialization for dish detection on all pages
-  const { initialize: initializeMenuStore, isConnected, menuItems } = useRealtimeMenuStore();
-  
-  // ✅ NEW (MYA-1531): Initialize session manager on app mount
+  // NOTE: This hook uses React Query internally, so it MUST be inside QueryClientProvider
+  const { initialize: initializeMenuStore, isConnected, menuItems: globalMenuItems } = useRealtimeMenuStoreCompat({ context: 'admin' });
+
+  // ✅ (MYA-1531): Initialize session manager on app mount
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
-    
-    // ✅ PHASE 5f: Update cartStore sessionId if not already set
+
+    // PHASE 5f: Update cartStore sessionId if not already set
     const cartStore = useCartStore.getState();
     if (!cartStore.sessionId && sessionId) {
       useCartStore.setState({ sessionId });
     }
   }, []);
-  
-  // ✅ NEW (MYA-1550): Initialize cart from Supabase on app mount
+
+  // ✅ (MYA-1550): Initialize cart from Supabase on app mount
   // This ensures customizations and all cart data are loaded fresh from database
   useEffect(() => {
     const initCart = async () => {
@@ -149,37 +152,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     initCart();
   }, []);
-  
-  // ✅ PHASE 5f: Cleanup cart subscription on app unmount only
+
+  // PHASE 5f: Cleanup cart subscription on app unmount only
   useEffect(() => {
     return () => {
       const cartStore = useCartStore.getState();
       cartStore.cleanupRealtimeSubscription();
     };
   }, []);
-  
+
   // Initialize error handlers on app startup
   useEffect(() => {
     setupGlobalErrorHandlers();
     checkBrowserCompatibility();
   }, []);
-  
+
   // Initialize global menu store for dish detection across all pages
   useEffect(() => {
     const initMenu = async () => {
-      
       try {
         await initializeMenuStore();
         // DEFENSIVE: Safely access menuItems with fallback
-        const state = useRealtimeMenuStore.getState();
-        const itemCount = Array.isArray(state?.menuItems) ? state.menuItems.length : 0;
+        // globalMenuItems is from the compat hook (React Query)
+        const itemCount = Array.isArray(globalMenuItems) ? globalMenuItems.length : 0;
       } catch (error) {
         console.error(' AppProvider: Failed to initialize global menu store:', error);
       }
     };
-    
+
     initMenu();
-  }, [initializeMenuStore]);
+  }, [initializeMenuStore, globalMenuItems]);
 
   // ============================================================================
   // SINGLETON INITIALIZATION: Table Orders Store
@@ -189,15 +191,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // React StrictMode guard - prevents double initialization
     let isActive = true;
-    
+
     const initTableOrders = async () => {
       if (!isActive) {
         return;
       }
-      
+
       try {
         await useTableOrdersStore.getState().loadTableOrders();
-        
+
         if (!isActive) {
           return;
         }
@@ -207,28 +209,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     initTableOrders();
-    
+
     // Cleanup function for React StrictMode
     return () => {
       isActive = false;
     };
   }, []);
-  
+
+  return (
+    <>
+      {children}
+      <ConnectionStatusIndicator />
+      <POSGuestCountModalWrapper />
+      {isChatAllowed && <ChatTriggerButton />}
+      {isChatAllowed && <ChatLargeModal />}
+      <CustomerCustomizationModalWrapper />
+      {/* Global cart - visible on customer-facing pages */}
+      {isChatAllowed && <UnifiedCart />}
+    </>
+  );
+}
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+
   // Get Google Maps API key from environment variable (no backend needed)
   useEffect(() => {
     const envKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (envKey) {
       setGoogleMapsApiKey(envKey);
-    } else {
     }
   }, []);
-  
-  // Cart analytics table setup - disabled (no backend dependency)
-  // The cart_analytics table should be set up directly in Supabase if needed
-  // useEffect(() => {
-  //   // Cart analytics table management moved to Supabase migrations
-  // }, []);
-  
+
+  // NOTE: QueryClientProvider must be the outermost provider for any component
+  // that uses React Query hooks (like useRealtimeMenuStoreCompat)
   return (
     <QueryClientProvider client={queryClient}>
       <GoogleMapsProvider apiKey={googleMapsApiKey}>
@@ -243,14 +257,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   duration: 4000,
                 }}
               />
-              {children}
-              <ConnectionStatusIndicator />
-              <POSGuestCountModalWrapper />
-              {isChatAllowed && <ChatTriggerButton />}
-              {isChatAllowed && <ChatLargeModal />}
-              <CustomerCustomizationModalWrapper />
-              {/* Global cart - visible on customer-facing pages */}
-              {isChatAllowed && <UnifiedCart />}
+              <AppProviderInner>
+                {children}
+              </AppProviderInner>
             </TooltipProvider>
           </NavigationProvider>
         </SimpleAuthProvider>

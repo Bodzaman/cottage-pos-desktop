@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from 'utils/supabaseClient';
-import { MenuItem, Category, ItemVariant } from 'utils/menuTypes';
+import { MenuItem, Category, ItemVariant } from 'utils/types';
 
 interface MenuData {
   menuItems: MenuItem[];

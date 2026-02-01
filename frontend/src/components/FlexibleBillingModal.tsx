@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Check, CreditCard, Receipt, Users, DollarSign } from 'lucide-react';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { TableData } from '../utils/tableTypes';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 

@@ -323,6 +323,21 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                     ))}
                   </div>
                 </div>
+
+                {/* Kitchen Visibility Toggle */}
+                <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs block" style={mutedStyle}>Show on Kitchen</span>
+                      <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display business info on kitchen tickets</span>
+                    </div>
+                    <Switch
+                      checked={formData.kitchenShowBusinessInfo !== false}
+                      onCheckedChange={(checked) => updateField('kitchenShowBusinessInfo', checked)}
+                      className="scale-90"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </AccordionContent>
@@ -375,6 +390,44 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                   onQRCodesChange={(codes) => updateFormData({ headerQRCodes: codes })}
                   currentSection="header"
                 />
+              </div>
+
+              {/* Kitchen Visibility Toggles */}
+              <div className="pt-3 border-t space-y-2" style={{ borderColor: QSAITheme.border.light }}>
+                <Label className="text-xs mb-2 block" style={labelStyle}>Kitchen Visibility</Label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs block" style={mutedStyle}>Show Header Text</span>
+                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display header on kitchen tickets</span>
+                  </div>
+                  <Switch
+                    checked={formData.kitchenShowHeader === true}
+                    onCheckedChange={(checked) => updateField('kitchenShowHeader', checked)}
+                    className="scale-90"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs block" style={mutedStyle}>Show Logo</span>
+                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display logo on kitchen tickets</span>
+                  </div>
+                  <Switch
+                    checked={formData.kitchenShowLogo === true}
+                    onCheckedChange={(checked) => updateField('kitchenShowLogo', checked)}
+                    className="scale-90"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs block" style={mutedStyle}>Show QR Codes</span>
+                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display QR codes on kitchen tickets</span>
+                  </div>
+                  <Switch
+                    checked={formData.kitchenShowQRCodes === true}
+                    onCheckedChange={(checked) => updateField('kitchenShowQRCodes', checked)}
+                    className="scale-90"
+                  />
+                </div>
               </div>
             </div>
           </AccordionContent>
@@ -582,6 +635,21 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                   onQRCodesChange={(codes) => updateFormData({ footerQRCodes: codes })}
                   currentSection="footer"
                 />
+              </div>
+
+              {/* Kitchen Footer Visibility */}
+              <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs block" style={mutedStyle}>Show Footer on Kitchen</span>
+                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display footer messages on kitchen tickets</span>
+                  </div>
+                  <Switch
+                    checked={formData.kitchenShowFooter === true}
+                    onCheckedChange={(checked) => updateField('kitchenShowFooter', checked)}
+                    className="scale-90"
+                  />
+                </div>
               </div>
 
               {/* Kitchen Copy Options */}

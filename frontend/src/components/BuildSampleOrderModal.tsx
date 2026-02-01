@@ -9,10 +9,9 @@ import { toast } from 'sonner';
 import { DineInCategoryList } from './DineInCategoryList';
 import { DineInMenuGrid } from './DineInMenuGrid';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
-import { useRealtimeMenuStore } from '../utils/realtimeMenuStore';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { OrderItem, CustomerTabInfo } from '../utils/receiptDesignerTypes';
-import { OrderItem as MenuOrderItem } from '../utils/menuTypes';
+import { OrderItem as MenuOrderItem } from '../utils/types';
 import { v4 as uuidv4 } from 'uuid';
 import { CustomizeOrchestratorProvider } from './CustomizeOrchestrator';
 import { ModalShell3Col } from 'components/ModalShell3Col';
@@ -52,34 +51,34 @@ export function BuildSampleOrderModal({
   onOrderBuilt,
   initialOrderItems = []
 }: Props) {
-  const { categories, menuItems } = useRealtimeMenuStoreCompat({ context: 'pos' });
+  const {
+    categories,
+    menuItems,
+    proteinTypes,
+    itemVariants,
+    isLoading,
+    initialize,
+    setSelectedMenuCategory
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // ✅ Initialize store when modal opens (matches POSDesktop pattern)
   useEffect(() => {
     if (!isOpen) return;
 
     const initializeMenu = async () => {
-      const store = useRealtimeMenuStore.getState();
-
-      // Only initialize if store is empty (check protein types too)
-      if (store.categories.length === 0 || store.menuItems.length === 0 || store.proteinTypes.length === 0) {
+      // Only initialize if data is not loaded yet (check protein types too)
+      if (categories.length === 0 || menuItems.length === 0 || proteinTypes.length === 0) {
         console.log('[BuildSampleOrderModal] Initializing menu store...');
 
-        // ✅ Use store.initialize() instead of manually calling getPOSBundle
-        // This loads ALL data: categories, items, variants, protein types, customizations
-        await store.initialize();
+        // ✅ Use initialize() from compat hook - triggers React Query refetch
+        await initialize();
 
-        console.log('[BuildSampleOrderModal] Menu store initialized:', {
-          categories: store.categories.length,
-          items: store.menuItems.length,
-          proteinTypes: store.proteinTypes.length,
-          variants: store.itemVariants.length
-        });
+        console.log('[BuildSampleOrderModal] Menu store initialized');
       }
     };
 
     initializeMenu();
-  }, [isOpen]);
+  }, [isOpen, categories.length, menuItems.length, proteinTypes.length, initialize]);
 
   // Local state for customer tabs
   const [customerTabs, setCustomerTabs] = useState<LocalCustomerTab[]>([
@@ -110,8 +109,8 @@ export function BuildSampleOrderModal({
     setSelectedCategory(categoryId);
 
     // 2. Update store to trigger filtering (matches POSDesktop pattern)
-    useRealtimeMenuStore.getState().setSelectedMenuCategory(categoryId);
-  }, []);
+    setSelectedMenuCategory(categoryId);
+  }, [setSelectedMenuCategory]);
 
   // Continue to menu browsing step
   const handleContinueToMenu = () => {

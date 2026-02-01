@@ -12,13 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, Plus, Users, User, Edit2, Save, Trash2, Check, XCircle, Link2, Receipt, Send } from 'lucide-react';
-import { OrderItem, Category, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/menuTypes';
+import { OrderItem, Category, MenuItem as MenuTypesMenuItem, ItemVariant as MenuTypesItemVariant } from 'utils/types';
 import { MenuItem, ItemVariant, SelectedCustomization } from 'types';
 import type { CustomerTab as TypesCustomerTab, OrderItem as TypesOrderItem } from 'types';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { POSButton } from './POSButton';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { useTableOrdersStore, tableOrdersStore } from 'utils/tableOrdersStore';
 import { DineInCategoryPillsHorizontal } from 'components/DineInCategoryPillsHorizontal';
 import { POSMenuSelector } from './POSMenuSelector';
@@ -158,7 +157,15 @@ export function DineInOrderModal({
   enrichedLoading = false,
   enrichedError = null
 }: Props) {
-  const { menuItems, categories, filteredMenuItems, selectedMenuCategory } = useRealtimeMenuStoreCompat({ context: 'pos' });
+  const {
+    menuItems,
+    categories,
+    filteredMenuItems,
+    selectedMenuCategory,
+    itemVariants,
+    setSelectedMenuCategory,
+    setSelectedParentCategory
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
   
   const isEventDrivenMode = !!eventDrivenOrder || !!eventDrivenCustomerTabs;
   
@@ -263,25 +270,22 @@ export function DineInOrderModal({
   const handleSectionSelect = useCallback((sectionId: string | null) => {
     setSelectedSectionId(sectionId);
     setSelectedCategoryId(null); // Reset category when section changes
-    
+
     // Update menu store to filter by section
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(sectionId);
-    menuStore.setSelectedParentCategory(null); // Clear parent filter to show all items when "All Items" clicked
-  }, []);
+    setSelectedMenuCategory(sectionId);
+    setSelectedParentCategory(null); // Clear parent filter to show all items when "All Items" clicked
+  }, [setSelectedMenuCategory, setSelectedParentCategory]);
 
   // ✅ Handle category selection - matches POSDesktop pattern
   const handleCategorySelect = useCallback((categoryId: string | null) => {
     setSelectedCategoryId(categoryId);
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(categoryId);
-  }, []);
-  
+    setSelectedMenuCategory(categoryId);
+  }, [setSelectedMenuCategory]);
+
   // ✅ Handle category change - for POSMenuSelector (MYA-1727)
   const handleCategoryChange = useCallback((categoryId: string | null) => {
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(categoryId);
-  }, []);
+    setSelectedMenuCategory(categoryId);
+  }, [setSelectedMenuCategory]);
   
   // Handle switching between linked tables
   const handleTableTabSwitch = (tableNumber: number) => {
@@ -1358,7 +1362,7 @@ export function DineInOrderModal({
 
   // ✅ NEW: Handle customizing item from Full Review Modal (MYA-1700)
   const handleCustomizeItemFromModal = (item: EnrichedDineInOrderItem) => {
-    const allMenuItems = menuItems; // From useRealtimeMenuStore
+    const allMenuItems = menuItems; // From React Query via compat hook
 
     console.log('🔧 [DineInOrderModal] Opening customization modal for item:', {
       itemId: item.id,
@@ -2091,19 +2095,19 @@ export function DineInOrderModal({
       
       {/* ✅ MYA-1700: StaffCustomizationModal for editing item customizations from Review Modal */}
       {isCustomizationModalOpen && customizingItem && (() => {
-        const { menuItems: allMenuItems, itemVariants } = useRealtimeMenuStore.getState();
-        const fullMenuItem = allMenuItems.find(mi => mi.id === customizingItem.menu_item_id);
-        const selectedVariant = customizingItem.variant_id 
+        // Using menuItems and itemVariants from compat hook (React Query)
+        const fullMenuItem = menuItems.find(mi => mi.id === customizingItem.menu_item_id);
+        const selectedVariant = customizingItem.variant_id
           ? itemVariants.find(v => v.id === customizingItem.variant_id)
           : null;
-        
+
         if (!fullMenuItem) {
           console.error('❌ Menu item not found for customization modal:', customizingItem.menu_item_id);
           return null;
         }
-        
+
         // Note: StaffUnifiedCustomizationModal uses utils/menuTypes.MenuItem not types/menu.MenuItem
-        // The realtimeMenuStore also uses utils/menuTypes, so no conversion is needed
+        // The React Query compat layer also uses utils/menuTypes, so no conversion is needed
         // handleCustomizationConfirm expects types/menu.MenuItem, but here we receive utils/menuTypes.MenuItem
         // They are structurally similar enough for the usage
         const menuItemVariants = itemVariants.filter(v => v.menu_item_id === fullMenuItem.id);

@@ -166,8 +166,9 @@ export default function Contact() {
                   
                   {/* Action Buttons */}
                   <div className="flex items-center space-x-4">
-                    <a 
+                    <a
                       href={`tel:${activePhone.replace(/\s/g, '')}`}
+                      aria-label={`Call Cottage Tandoori at ${activePhone}`}
                       className="px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2 text-white"
                       style={{
                         backgroundColor: PremiumTheme.colors.burgundy[500]
@@ -181,13 +182,14 @@ export default function Contact() {
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
-                      <FaPhone className="text-sm" />
+                      <FaPhone className="text-sm" aria-hidden="true" />
                       <span>Call Now</span>
                     </a>
-                    <a 
+                    <a
                       href="https://www.google.com/maps/dir//25+West+St,+Storrington,+Pulborough+RH20+4DZ"
                       target="_blank"
                       rel="noopener noreferrer"
+                      aria-label="Get directions to Cottage Tandoori on Google Maps"
                       className="px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2"
                       style={{
                         background: 'rgba(255, 255, 255, 0.1)',
@@ -204,7 +206,7 @@ export default function Contact() {
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
-                      <FaMapMarkerAlt className="text-sm" />
+                      <FaMapMarkerAlt className="text-sm" aria-hidden="true" />
                       <span>Get Directions</span>
                     </a>
                   </div>
@@ -288,10 +290,11 @@ export default function Contact() {
                       <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
                     ))}
                   </p>
-                  <a 
+                  <a
                     href="https://www.google.com/maps/dir//25+West+St,+Storrington,+Pulborough+RH20+4DZ"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="Get directions to Cottage Tandoori on Google Maps"
                     className="mt-4 inline-block px-4 py-2 rounded-lg transition-all duration-300"
                     style={{
                       backgroundColor: PremiumTheme.colors.burgundy[500],

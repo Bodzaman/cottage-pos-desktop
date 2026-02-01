@@ -1,6 +1,6 @@
 import React, { memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MenuItem, ItemVariant, ProteinType } from 'utils/menuTypes';
+import { MenuItem, ItemVariant, ProteinType } from 'utils/types';
 import { OnlineMenuCard } from './OnlineMenuCard';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { Skeleton } from '@/components/ui/skeleton';

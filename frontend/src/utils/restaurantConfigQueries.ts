@@ -43,7 +43,7 @@ const DEFAULT_CONFIG: RestaurantConfig = {
   name: 'Cottage Tandoori',
   address: '25 West St, Storrington, Pulborough, West Sussex',
   postcode: 'RH20 4DZ',
-  phone: '01903 743343',
+  phone: '01903 743605',
   delivery_fee: 3.50,
   delivery_free_over: 30,
   delivery_min_order: 15,
@@ -61,11 +61,9 @@ async function fetchRestaurantConfig(): Promise<RestaurantConfig> {
   const data = await response.json();
 
   if (data.success && data.config) {
-    console.log('[restaurantConfigQueries] Config fetched successfully');
     return data.config;
   }
 
-  console.warn('[restaurantConfigQueries] No config received, using defaults');
   return DEFAULT_CONFIG;
 }
 

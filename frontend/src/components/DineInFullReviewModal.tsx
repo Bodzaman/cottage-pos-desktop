@@ -69,7 +69,7 @@ import { EnrichedOrderItemCard } from 'components/EnrichedOrderItemCard';
 import { CompactDineInItemRow } from 'components/CompactDineInItemRow';
 import { CustomerNotesDialog } from 'components/CustomerNotesDialog';
 import type { OrderItem } from 'types';
-import type { OrderItem as MenuOrderItem } from '../utils/menuTypes';
+import type { OrderItem as MenuOrderItem } from '../utils/types';
 import type { EnrichedDineInOrderItem, DineInOrder } from '../brain/data-contracts';
 
 /**

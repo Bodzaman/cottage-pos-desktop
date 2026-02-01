@@ -3,7 +3,7 @@
  * Replaces the multi-modal architecture with a single state machine
  */
 
-import { OrderItem } from './menuTypes';
+import { OrderItem } from './types';
 
 /**
  * Payment flow mode - determines the flow behavior

@@ -283,11 +283,14 @@ interface ThermalReceiptFormData {
 
   // QR Codes - NOW USING PROPER TYPE
   qrCodes: QRCodeConfig[];
+  headerQRCodes?: QRCodeConfig[];  // Separate header QR codes
+  footerQRCodes?: QRCodeConfig[];  // Separate footer QR codes
 
   orderType: 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'online_orders';
   receiptNumber?: string;
   tableNumber?: string;
   guestCount?: number;
+  linkedTables?: number[];  // Linked table numbers for merged tables
 
   // Enhanced Order Source Tracking for POS Integration
   orderSource?: 'POS' | 'ONLINE' | 'AI_VOICE';
@@ -371,9 +374,25 @@ interface ThermalReceiptFormData {
   showCustomFooter?: boolean;
   customFooterText?: string;
 
+  // Header Text
+  headerText?: string;  // Custom header text/welcome message
+
   // Kitchen Copy Options (for takeaway modes)
   showContainerQtyField?: boolean;
   showCheckedField?: boolean;
+
+  // Kitchen Section Visibility
+  kitchenShowHeader?: boolean;
+  kitchenShowBusinessInfo?: boolean;
+  kitchenShowLogo?: boolean;
+  kitchenShowQRCodes?: boolean;
+  kitchenShowOrderInfo?: boolean;
+  kitchenShowTableInfo?: boolean;
+  kitchenShowCustomerDetails?: boolean;
+  kitchenShowTiming?: boolean;
+  kitchenShowSpecialInstructions?: boolean;
+  kitchenShowTotals?: boolean;
+  kitchenShowFooter?: boolean;
 
   // Font System
   selectedFont?: string;
@@ -599,7 +618,22 @@ function renderFormBasedReceipt(
   const itemNameWeight = isKitchenReceipt ? 'font-bold text-lg' : 'font-semibold';
   const modifierWeight = isKitchenReceipt ? 'font-medium' : 'font-normal';
   const restaurantInfoWeight = 'font-normal'; // Always normal for restaurant info
-  
+
+  // Kitchen visibility helpers - FOH always shows, kitchen uses configurable settings
+  const shouldShowHeader = !isKitchenReceipt || data.kitchenShowHeader === true;
+  const shouldShowBusinessInfo = !isKitchenReceipt || data.kitchenShowBusinessInfo === true;
+  const shouldShowLogo = !isKitchenReceipt || data.kitchenShowLogo === true;
+  const shouldShowQRCodes = !isKitchenReceipt || data.kitchenShowQRCodes === true;
+  const shouldShowOrderInfo = !isKitchenReceipt || data.kitchenShowOrderInfo !== false;
+  const shouldShowTableInfo = !isKitchenReceipt || data.kitchenShowTableInfo !== false;
+  const shouldShowCustomerDetails = !isKitchenReceipt ||
+    (data.orderMode === 'DELIVERY' ? data.kitchenShowCustomerDetails !== false : data.kitchenShowCustomerDetails === true);
+  const shouldShowTiming = !isKitchenReceipt || data.kitchenShowTiming !== false;
+  const shouldShowSpecialInstructions = !isKitchenReceipt || data.kitchenShowSpecialInstructions !== false;
+  const shouldShowTotals = !isKitchenReceipt ||
+    (data.orderMode === 'DINE-IN' ? data.kitchenShowTotals === true : data.kitchenShowTotals !== false);
+  const shouldShowFooter = !isKitchenReceipt || data.kitchenShowFooter === true;
+
   // Helper function to align text
   const alignText = (text: string, align: 'left' | 'center' | 'right'): string => {
     const lines = text.split('\n');
@@ -713,61 +747,72 @@ function renderFormBasedReceipt(
       }}
     >
       {/* Header QR Codes - Place at very top of receipt */}
-      {data.headerQRCodes && data.headerQRCodes.length > 0 && (
+      {shouldShowQRCodes && data.headerQRCodes && data.headerQRCodes.length > 0 && (
         <div className="space-y-2 mb-4" style={{ fontFamily: receiptFont.cssFamily }}>
           {renderQRCodes(data.headerQRCodes)}
         </div>
       )}
 
-      {/* Business Header */}
-      <div className="text-center mb-1" style={{ fontFamily: receiptFont.cssFamily }}>
-        {/* Logo Image */}
-        {data.logoImage && (
-          <div className={`mb-1 flex ${
-            data.logoPosition === 'center' ? 'justify-center' : 
-            data.logoPosition === 'right' ? 'justify-end' : 
-            'justify-start'
-          }`}>
-            <img
-              src={data.logoImage}
-              alt="Restaurant Logo"
-              className="max-w-full"
-              style={{
-                maxWidth: paperWidth === 58 ? '150px' : '200px',
-                maxHeight: '80px',
-                objectFit: 'contain',
-                filter: 'contrast(1.2)' // Enhanced contrast without brightness reduction
-              }}
-            />
-          </div>
-        )}
-        
-        <h1
-          className="mb-1"
-          style={{
-            fontFamily: data.businessNameFont
-              ? getCmsFontFamily(data.businessNameFont)
-              : receiptFont.cssFamily,
-            fontSize: data.businessNameFontSize ? `${data.businessNameFontSize}px` : (isKitchenReceipt ? '18px' : '16px'),
-            fontWeight: isKitchenReceipt ? 900 : 700,
-            lineHeight: 1.1  // Tight line-height to prevent large fonts pushing content down
-          }}
-        >
-          {data.businessName || 'Restaurant Name'}
-        </h1>
-        <div className={`${restaurantInfoWeight} text-xs leading-tight`} style={{ fontFamily: receiptFont.cssFamily }}>
-          {data.address && (
-            <div className="space-y-0">
-              {parseAddressToMultiLine(data.address).map((line, index) => (
-                <div key={index}>{line}</div>
-              ))}
-            </div>
-          )}
-          {data.phone && data.showPhone && <div>Tel: {data.phone}</div>}
-          {data.email && data.showEmail && <div>{data.email}</div>}
-          {data.website && data.showWebsite && <div>{data.website}</div>}
+      {/* Logo Image - controlled independently by shouldShowLogo */}
+      {shouldShowLogo && data.logoImage && (
+        <div className={`mb-1 flex ${
+          data.logoPosition === 'center' ? 'justify-center' :
+          data.logoPosition === 'right' ? 'justify-end' :
+          'justify-start'
+        }`}>
+          <img
+            src={data.logoImage}
+            alt="Restaurant Logo"
+            className="max-w-full"
+            style={{
+              maxWidth: paperWidth === 58 ? '150px' : '200px',
+              maxHeight: '80px',
+              objectFit: 'contain',
+              filter: 'contrast(1.2)' // Enhanced contrast without brightness reduction
+            }}
+          />
         </div>
-      </div>
+      )}
+
+      {/* Custom Header Text - controlled by shouldShowHeader */}
+      {shouldShowHeader && data.headerText && (
+        <div className="text-center mb-2" style={{ fontFamily: receiptFont.cssFamily }}>
+          <div className={`${isKitchenReceipt ? 'text-base font-medium' : 'text-sm'}`}>
+            {data.headerText}
+          </div>
+        </div>
+      )}
+
+      {/* Business Header - conditionally shown based on kitchen visibility settings */}
+      {shouldShowBusinessInfo && (
+        <div className="text-center mb-1" style={{ fontFamily: receiptFont.cssFamily }}>
+          <h1
+            className="mb-1"
+            style={{
+              fontFamily: data.businessNameFont
+                ? getCmsFontFamily(data.businessNameFont)
+                : receiptFont.cssFamily,
+              fontSize: data.businessNameFontSize ? `${data.businessNameFontSize}px` : (isKitchenReceipt ? '18px' : '16px'),
+              fontWeight: isKitchenReceipt ? 900 : 700,
+              lineHeight: 1.1  // Tight line-height to prevent large fonts pushing content down
+            }}
+          >
+            {data.businessName || 'Restaurant Name'}
+          </h1>
+          <div className={`${restaurantInfoWeight} text-xs leading-tight`} style={{ fontFamily: receiptFont.cssFamily }}>
+            {data.address && (
+              <div className="space-y-0">
+                {parseAddressToMultiLine(data.address).map((line, index) => (
+                  <div key={index}>{line}</div>
+                ))}
+              </div>
+            )}
+            {data.phone && data.showPhone && <div>Tel: {data.phone}</div>}
+            {data.email && data.showEmail && <div>{data.email}</div>}
+            {data.website && data.showWebsite && <div>{data.website}</div>}
+          </div>
+        </div>
+      )}
 
       {/* Order Information */}
       <div className={`mb-1 text-sm`} style={{ marginBottom: isKitchenReceipt ? '8px' : '4px' }}>
@@ -842,7 +887,20 @@ function renderFormBasedReceipt(
                     fontSize: isKitchenReceipt ? '14px' : '10px'
                   }}
                 >
-                  {data.guestCount} PAX
+                  {data.guestCount} Covers
+                </span>
+              )}
+              {/* Linked Tables Display */}
+              {data.linkedTables && data.linkedTables.length > 0 && (
+                <span
+                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold"
+                  style={{
+                    backgroundColor: '#2563EB',
+                    color: 'white',
+                    fontSize: isKitchenReceipt ? '14px' : '10px'
+                  }}
+                >
+                  {data.linkedTables.map(t => `T${t}`).join(' + ')}
                 </span>
               )}
             </>
@@ -935,28 +993,30 @@ function renderFormBasedReceipt(
           )}
         </div>
         
-        {/* Merged Date + Time on one line */}
-        <div className="text-center text-xs" style={{ fontFamily: receiptFont.cssFamily, marginBottom: isKitchenReceipt ? '4px' : '2px' }}>
-          <span style={{ fontWeight: 'normal' }}>
-            {(() => {
-              // Use timestamp from data if available, otherwise use current time
-              const orderDate = data.timestamp ? new Date(data.timestamp) : new Date();
-              return `${orderDate.toLocaleDateString('en-GB')} • ${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-            })()}
-          </span>
-        </div>
+        {/* Merged Date + Time on one line - controlled by kitchen visibility */}
+        {shouldShowOrderInfo && (
+          <div className="text-center text-xs" style={{ fontFamily: receiptFont.cssFamily, marginBottom: isKitchenReceipt ? '4px' : '2px' }}>
+            <span style={{ fontWeight: 'normal' }}>
+              {(() => {
+                // Use timestamp from data if available, otherwise use current time
+                const orderDate = data.timestamp ? new Date(data.timestamp) : new Date();
+                return `${orderDate.toLocaleDateString('en-GB')} • ${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              })()}
+            </span>
+          </div>
+        )}
       </div>
-      
-      {/* Special Instructions (prominently displayed for kitchen) */}
-      {data.specialInstructions && (
+
+      {/* Special Instructions (prominently displayed for kitchen) - controlled by kitchen visibility */}
+      {shouldShowSpecialInstructions && data.specialInstructions && (
         <div className={`mb-2 p-2 border-2 border-dashed border-red-500 ${isKitchenReceipt ? 'text-base font-bold' : 'text-sm'}`}>
           <div className="text-center font-bold mb-1">SPECIAL INSTRUCTIONS</div>
           <div className="text-center">{data.specialInstructions}</div>
         </div>
       )}
 
-      {/* Customer Information */}
-      {(data.customerName || data.customerPhone) && (
+      {/* Customer Information - controlled by kitchen visibility */}
+      {shouldShowCustomerDetails && (data.customerName || data.customerPhone) && (
         <>
           <div className={`space-y-1 mb-1 ${isKitchenReceipt ? 'text-base font-bold' : 'text-sm'}`}>
             {data.customerName && (
@@ -975,8 +1035,8 @@ function renderFormBasedReceipt(
         </>
       )}
 
-      {/* Delivery Address - Only show for DELIVERY orders */}
-      {(data.orderMode === 'DELIVERY' || data.orderType === 'delivery') && data.deliveryAddress && (
+      {/* Delivery Address - Only show for DELIVERY orders - controlled by kitchen visibility */}
+      {shouldShowCustomerDetails && (data.orderMode === 'DELIVERY' || data.orderType === 'delivery') && data.deliveryAddress && (
         <>
           <div className={`mb-2 p-2 border-2 ${isKitchenReceipt ? 'border-black bg-gray-50' : 'border-gray-300'} ${isKitchenReceipt ? 'text-base font-bold' : 'text-sm'}`}>
             <div className={`font-bold mb-1 text-center ${isKitchenReceipt ? 'text-lg underline' : 'text-sm'}`}>
@@ -1436,10 +1496,10 @@ function renderFormBasedReceipt(
         </div>
       )}
 
-      {/* Footer - Use receiptFont for footer content */}
-      {(data.footerMessage || data.terms || (data.showCustomFooter && data.customFooterText)) && (
+      {/* Footer - Use receiptFont for footer content - controlled by kitchen visibility */}
+      {shouldShowFooter && (data.footerMessage || data.terms || (data.showCustomFooter && data.customFooterText)) && (
         <>
-          <div 
+          <div
             className={`text-center mt-1 ${isKitchenReceipt ? 'text-sm font-medium' : 'text-xs'}`}
             style={{ fontFamily: receiptFont.cssFamily }} // Apply receipt font to footer
           >
@@ -1463,10 +1523,9 @@ function renderFormBasedReceipt(
         </>
       )}
 
-      {/* Footer QR Codes - Read from footerQRCodes array (hide for DINE-IN kitchen copy) */}
-      {data.footerQRCodes &&
-       data.footerQRCodes.length > 0 &&
-       !(isKitchenReceipt && data.orderMode === 'DINE-IN') && (
+      {/* Footer QR Codes - Read from footerQRCodes array - controlled by kitchen visibility */}
+      {shouldShowQRCodes && data.footerQRCodes &&
+       data.footerQRCodes.length > 0 && (
         <>
           <div className="border-t border-black my-3" />
           <div className="space-y-2" style={{ fontFamily: receiptFont.cssFamily }}>

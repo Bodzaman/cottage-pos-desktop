@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Eye, Plus } from 'lucide-react';
-import { MenuItem } from '../utils/menuTypes';
+import { MenuItem } from '../utils/types';
 import { computeUnitPrice } from 'utils/priceUtils';
 import { useCartStore } from 'utils/cartStore';
 

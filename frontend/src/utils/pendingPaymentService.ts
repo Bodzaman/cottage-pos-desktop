@@ -1,4 +1,4 @@
-import { OrderItem } from './menuTypes';
+import { OrderItem } from './types';
 import { toast } from 'sonner';
 
 export interface PendingPaymentOrder {

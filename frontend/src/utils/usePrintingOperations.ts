@@ -2,7 +2,7 @@ import { useCallback, useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 import type { OrderType } from './customerTypes';
-import type { OrderItem } from './menuTypes';
+import type { OrderItem } from './types';
 import type { CustomerData } from './useCustomerFlow';
 import { useTemplateAssignments } from './useTemplateAssignments';
 import { getElectronHeaders } from './electronDetection';

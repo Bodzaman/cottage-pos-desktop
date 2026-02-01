@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
-import { ItemVariant } from 'utils/menuTypes';
+import { ItemVariant } from 'utils/types';
 
 interface Props {
   isOpen: boolean;

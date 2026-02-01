@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import brain from 'brain';
-import type { OrderItem } from './menuTypes';
+import type { OrderItem } from './types';
 import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
 import { useCustomerDataStore } from './customerDataStore';

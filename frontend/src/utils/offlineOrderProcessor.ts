@@ -5,7 +5,7 @@
  * Handles graceful degradation and local storage integration
  */
 
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { offlineStorage, OfflineOrder } from '../utils/offlineStorage';
 import { offlineSync } from '../utils/offlineSync';
 import { toast } from 'sonner';

@@ -1,4 +1,4 @@
-import { MenuItem } from './menuTypes';
+import { MenuItem } from './types';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
 
 /**

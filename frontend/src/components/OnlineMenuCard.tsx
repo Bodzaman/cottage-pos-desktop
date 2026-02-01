@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, ShoppingCart, Utensils, Minus, Plus, Check, MousePointer, Info, ChevronRight, Sparkles, Star, X, ChevronLeft, SlidersHorizontal } from 'lucide-react';
-import type { MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
+import type { MenuItem, ItemVariant, ProteinType } from '../utils/types';
 import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
 import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
 import { SimpleVariantPicker } from './SimpleVariantPicker';

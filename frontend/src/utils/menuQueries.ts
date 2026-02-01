@@ -8,9 +8,9 @@ import type {
   MenuItem,
   ProteinType,
   ItemVariant,
-  CustomizationBase,
+  Customization,
   SetMeal
-} from './menuTypes';
+} from './types';
 import {
   getMenuWithOrdering,
   getProteinTypes as fetchProteinTypesFromDB,
@@ -288,20 +288,27 @@ export function useItemVariants(options?: Partial<Omit<UseQueryOptions<ItemVaria
 /**
  * Fetch customizations with auto-refresh.
  * Replaces: fetchCustomizations() from useMenuData
+ *
+ * Uses direct Supabase SDK for reliable data fetching (same as useMenuBundle).
+ * The brain API backend was failing silently, so we bypass it.
  */
-export function useCustomizations(options?: Partial<Omit<UseQueryOptions<CustomizationBase[]>, 'queryKey' | 'queryFn'>>) {
+export function useCustomizations(options?: Partial<Omit<UseQueryOptions<Customization[]>, 'queryKey' | 'queryFn'>> & { context?: MenuContext }) {
+  const { context = 'admin', ...queryOptions } = options || {};
+  const publishedOnly = context !== 'admin';
+
   return useQuery({
-    queryKey: menuKeys.customizations(),
+    queryKey: menuKeys.customizations(context),
     queryFn: async () => {
-      const response = await (brain as any).get_customizations();
-      const data = await response.json();
+      await ensureSupabaseConfigured();
+      // Use direct Supabase SDK - same pattern as useMenuBundle
+      const data = await fetchCustomizationsFromDB(publishedOnly);
       return data || [];
     },
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
-    ...options,
+    ...queryOptions,
   });
 }
 
@@ -312,7 +319,7 @@ export function useUpsertCustomization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (customization: Partial<CustomizationBase> & { name: string }) => {
+    mutationFn: async (customization: Partial<Customization> & { name: string }) => {
       await ensureSupabaseConfigured();
 
       const { id, ...data } = customization;
@@ -382,7 +389,11 @@ export function useDeleteCustomization() {
 // SET MEALS HOOKS
 // ============================================================================
 
-export interface SetMeal {
+/**
+ * Simplified SetMeal type for queries that don't need full item details.
+ * Use SetMeal from menuTypes.ts for full set meal data including items.
+ */
+interface SetMealSummary {
   id: string;
   code: string;
   name: string;
@@ -399,7 +410,7 @@ export interface SetMeal {
 /**
  * Fetch set meals with auto-refresh.
  */
-export function useSetMeals(activeOnly: boolean = false, options?: UseQueryOptions<SetMeal[]>) {
+export function useSetMeals(activeOnly: boolean = false, options?: UseQueryOptions<SetMealSummary[]>) {
   return useQuery({
     queryKey: [...menuKeys.setMeals(), { activeOnly }],
     queryFn: async () => {
@@ -533,15 +544,16 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
   menuItems: MenuItem[];
   proteinTypes: ProteinType[];
   itemVariants: ItemVariant[];
-  customizations: CustomizationBase[];
+  customizations: Customization[];
 }>) {
   return useQuery({
     queryKey: menuKeys.completeMenu(),
     queryFn: async () => {
       await ensureSupabaseConfigured();
-      
+
       // Fetch all data in parallel, using helpers that handle fallbacks
-      const [categories, itemsRes, proteinTypes, variantsRes, customizationsRes] = await Promise.all([
+      // Note: Using direct Supabase SDK for customizations (brain API was failing silently)
+      const [categories, itemsRes, proteinTypes, variantsRes, customizations] = await Promise.all([
         fetchCategoriesOrdered(),
         brain.get_menu_items(),
         fetchProteinTypesOrdered(),
@@ -549,23 +561,22 @@ export function useCompleteMenuData(options?: UseQueryOptions<{
           *,
           protein_type:menu_protein_types(name)
         `),
-        brain.get_customizations(),
+        fetchCustomizationsFromDB(false), // false = show all (not just published)
       ]);
-      
+
       // Handle variant errors
       if (variantsRes.error) throw new Error(`Variants: ${variantsRes.error.message}`);
-      
+
       // Parse brain responses
       const menuItemsRaw = await itemsRes.json();
-      const customizations = await customizationsRes.json();
       const menuItems = normalizeMenuItemsResponse(menuItemsRaw);
-      
+
       // Map variants
       const itemVariants = variantsRes.data?.map(variant => ({
         ...variant,
         protein_type_name: variant.protein_type?.name || null,
       })) || [];
-      
+
       const result = {
         categories: categories || [],
         menuItems: menuItems || [],
@@ -782,7 +793,7 @@ export interface MenuBundle {
   menuItems: MenuItem[];
   itemVariants: ItemVariant[];
   proteinTypes: ProteinType[];
-  customizations: CustomizationBase[];
+  customizations: Customization[];
   setMeals: SetMeal[];
   // Computed lookups for O(1) access
   variantsByMenuItem: Record<string, ItemVariant[]>;

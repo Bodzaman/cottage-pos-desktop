@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { MenuItem, OrderItem, SetMeal } from 'utils/menuTypes';
+import { MenuItem, OrderItem, SetMeal } from 'utils/types';
 import { globalColors } from 'utils/QSAIDesign';
 import { toast } from 'sonner';
 

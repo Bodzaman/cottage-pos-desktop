@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Category } from './menuTypes';
+import { Category } from './types';
 import { FIXED_SECTIONS, mapCategoryToSection } from './sectionMapping';
 
 /**

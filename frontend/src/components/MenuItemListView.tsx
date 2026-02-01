@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
-import { MenuItem, OrderItem } from 'utils/menuTypes';
+import { MenuItem, OrderItem } from 'utils/types';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 import { formatCurrency } from 'utils/formatters';
 

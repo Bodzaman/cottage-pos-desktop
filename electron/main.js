@@ -1055,46 +1055,38 @@ Powered by QuickServe AI`
 
         autoUpdater.on('checking-for-update', () => {
             log.info('Checking for updates...');
+
+            // Emit to renderer for React UI
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-checking');
+            }
         });
 
         autoUpdater.on('update-available', (info) => {
             log.info('Update available:', info.version);
-            const wasManual = manualCheckTriggered;
             manualCheckTriggered = false;
 
-            if (wasManual) {
-                // Manual check - show dialog asking if user wants to download
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'Update Available',
-                    message: `A new version (${info.version}) is available.`,
-                    detail: 'Would you like to download it now?',
-                    buttons: ['Download', 'Later'],
-                    defaultId: 0,
-                    cancelId: 1
-                }).then(result => {
-                    if (result.response === 0) {
-                        autoUpdater.downloadUpdate();
-                    }
+            // Emit to renderer for React UI
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-available', {
+                    version: info.version,
+                    releaseDate: info.releaseDate,
+                    releaseNotes: info.releaseNotes
                 });
-            } else {
-                // Automatic startup check - download silently in background
-                autoUpdater.downloadUpdate();
             }
+
+            // Auto-download the update (progress will be sent to renderer)
+            autoUpdater.downloadUpdate();
         });
 
         autoUpdater.on('update-not-available', (info) => {
             log.info('Update not available:', info.version);
-            const wasManual = manualCheckTriggered;
             manualCheckTriggered = false;
 
-            if (wasManual) {
-                // Only show dialog if user manually checked
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'info',
-                    title: 'No Updates',
-                    message: 'You are running the latest version.',
-                    buttons: ['OK']
+            // Emit to renderer
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-not-available', {
+                    version: info.version
                 });
             }
         });
@@ -1103,14 +1095,10 @@ Powered by QuickServe AI`
             log.error('Error in auto-updater:', err);
             manualCheckTriggered = false;
 
-            // Show error dialog if it was a manual check
-            if (this.mainWindow) {
-                dialog.showMessageBox(this.mainWindow, {
-                    type: 'error',
-                    title: 'Update Error',
-                    message: 'Failed to check for updates.',
-                    detail: err.message || 'Please try again later.',
-                    buttons: ['OK']
+            // Emit to renderer for React UI
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-error', {
+                    message: err.message || 'Failed to check for updates'
                 });
             }
         });
@@ -1120,24 +1108,50 @@ Powered by QuickServe AI`
             log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
             log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
             log.info(log_message);
+
+            // Emit to renderer for React UI progress display
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-download-progress', {
+                    percent: progressObj.percent,
+                    bytesPerSecond: progressObj.bytesPerSecond,
+                    transferred: progressObj.transferred,
+                    total: progressObj.total
+                });
+            }
         });
 
         autoUpdater.on('update-downloaded', (info) => {
             log.info('Update downloaded:', info.version);
-            // Always show dialog to confirm restart
-            dialog.showMessageBox(this.mainWindow, {
-                type: 'info',
-                title: 'Update Ready',
-                message: `Version ${info.version} has been downloaded.`,
-                detail: 'The update will be installed when you restart the app. Would you like to restart now?',
-                buttons: ['Restart Now', 'Later'],
-                defaultId: 0,
-                cancelId: 1
-            }).then(result => {
-                if (result.response === 0) {
-                    autoUpdater.quitAndInstall();
-                }
-            });
+
+            // Emit to renderer for React UI
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('update-downloaded', {
+                    version: info.version
+                });
+            }
+        });
+
+        // IPC handlers for update control from renderer
+        ipcMain.handle('check-for-updates', async () => {
+            log.info('Manual update check triggered from renderer');
+            manualCheckTriggered = true;
+            try {
+                const result = await autoUpdater.checkForUpdates();
+                return { success: true, result };
+            } catch (error) {
+                log.error('Check for updates error:', error);
+                return { success: false, error: error.message };
+            }
+        });
+
+        ipcMain.handle('install-update', () => {
+            log.info('Install update triggered from renderer');
+            autoUpdater.quitAndInstall();
+        });
+
+        ipcMain.handle('download-update', () => {
+            log.info('Download update triggered from renderer');
+            autoUpdater.downloadUpdate();
         });
     }
 

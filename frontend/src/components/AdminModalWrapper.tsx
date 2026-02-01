@@ -7,7 +7,7 @@ import { colors, gridBackgroundStyle } from '../utils/designSystem';
 import { globalColors, styles } from '../utils/QSAIDesign';
 import { useSimpleAuth } from '../utils/simple-auth-context';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 
 // Import admin components directly
 import AdminPortalMedia from '../components/AdminPortalMedia';

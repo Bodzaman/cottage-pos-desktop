@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 import { QSAITheme } from '../utils/QSAIDesign';
 
 interface SubcategoryTabsProps {

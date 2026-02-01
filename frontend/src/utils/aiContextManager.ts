@@ -6,7 +6,7 @@
  */
 
 import brain from 'brain';
-import { MenuItem, Category, ItemVariant } from './menuTypes';
+import { MenuItem, Category, ItemVariant } from './types';
 
 // AI Context Types
 export interface AIMenuContext {

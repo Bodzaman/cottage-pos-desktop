@@ -18,7 +18,7 @@ import {
   X,
   Package
 } from 'lucide-react';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 

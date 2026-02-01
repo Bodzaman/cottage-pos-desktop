@@ -22,8 +22,8 @@ import { ChefHat, Printer, Save, Clock, Loader2 } from 'lucide-react';
 import { POSButton } from './POSButton';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
-import { generateDisplayNameForReceipt } from '../utils/menuHelpers';
+import { OrderItem } from '../utils/types';
+import { resolveItemDisplayName } from '../utils/menuHelpers';
 import { Badge } from '@/components/ui/badge';
 import {
   isRasterPrintAvailable,
@@ -95,12 +95,9 @@ export function DineInKitchenPreviewModal({
         : tableNumber?.toString(),
       guestCount: guestCount,
       items: pendingItems.map(item => {
-        // Use generateDisplayNameForReceipt to avoid duplicate variation names
-        const displayName = generateDisplayNameForReceipt(
-          item.name,
-          item.variantName,
-          item.protein_type
-        );
+        // Use resolveItemDisplayName for intelligent variant handling
+        // useKitchenName=true uses abbreviated kitchen_display_name when available
+        const displayName = resolveItemDisplayName(item, { useKitchenName: true });
 
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,

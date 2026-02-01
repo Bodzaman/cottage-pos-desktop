@@ -21,8 +21,8 @@ import { POSButton } from './POSButton';
 import { useState, useEffect, useRef } from 'react';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
-import { generateDisplayNameForReceipt } from '../utils/menuHelpers';
+import { OrderItem } from '../utils/types';
+import { resolveItemDisplayName } from '../utils/menuHelpers';
 import { useTemplateAssignments } from '../utils/useTemplateAssignments';
 import {
   isRasterPrintAvailable,
@@ -92,13 +92,13 @@ export function DineInBillPreviewModal({
       tableNumber: tableNumber?.toString(),
       guestCount: guestCount,
       items: orderItems.map(item => {
-        // Use generateDisplayNameForReceipt to avoid duplicate variation names
-        // Note: EnrichedDineInOrderItem uses item_name, variant_name, unit_price, customizations
-        const displayName = generateDisplayNameForReceipt(
-          item.item_name || item.name,           // EnrichedDineInOrderItem: item_name
-          item.variant_name || item.variantName, // EnrichedDineInOrderItem: variant_name
-          item.protein_type
-        );
+        // Use resolveItemDisplayName for intelligent variant handling
+        // Handles both modern format (variant in name) and legacy format (separate fields)
+        const displayName = resolveItemDisplayName({
+          name: item.item_name || item.name,
+          variant_name: item.variant_name || item.variantName,
+          protein_type: item.protein_type
+        });
 
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,
@@ -132,7 +132,7 @@ export function DineInBillPreviewModal({
   const handlePrint = async () => {
     setIsPrinting(true);
 
-    console.log('🖨️ [DineInBillPreviewModal] Starting WYSIWYG raster print...', {
+    console.log('🖨️ [DineInBillPreviewModal] Starting WYSIWYG print...', {
       tableNumber,
       itemCount: orderItems.length,
       orderTotal,
@@ -141,46 +141,43 @@ export function DineInBillPreviewModal({
     });
 
     try {
-      // ✅ STEP 1: Capture receipt image BEFORE any state changes
-      let capturedImageData: string | null = null;
+      // PRIMARY: Raster print (WYSIWYG with template styling)
       if (isRasterPrintAvailable() && receiptRef.current) {
-        console.log('🖨️ [DineInBillPreviewModal] Capturing receipt...');
-        capturedImageData = await captureReceiptAsImage(receiptRef.current, 80);
-        console.log('🖨️ [DineInBillPreviewModal] Image captured:', capturedImageData ? `${capturedImageData.length} bytes` : 'null');
-      }
+        console.log('🖨️ [DineInBillPreviewModal] Capturing receipt for raster print...');
+        const capturedImageData = await captureReceiptAsImage(receiptRef.current, 80);
 
-      // STEP 2: Call parent's print handler (handles Supabase queue fallback)
-      const success = await onPrintBill(orderTotal);
+        if (capturedImageData && window.electronAPI?.printReceiptRaster) {
+          console.log('🖨️ [DineInBillPreviewModal] Sending to thermal printer...');
 
-      // STEP 3: If Electron is available, also print via raster (direct print)
-      if (capturedImageData && window.electronAPI?.printReceiptRaster) {
-        console.log('🖨️ [DineInBillPreviewModal] Sending captured image to thermal printer...');
-
-        const printResult = await window.electronAPI.printReceiptRaster({
-          imageData: capturedImageData,
-          paperWidth: 80
-        });
-
-        if (printResult.success) {
-          console.log('✅ Bill printed successfully via raster on', printResult.printer);
-          toast.success('Bill printed', {
-            description: `Sent to ${printResult.printer || 'thermal printer'}`
+          const printResult = await window.electronAPI.printReceiptRaster({
+            imageData: capturedImageData,
+            paperWidth: 80
           });
-        } else {
-          console.warn('⚠️ Raster print failed:', printResult.error);
-          // Don't show error toast if Supabase queue succeeded
-          if (!success) {
-            toast.warning('Print may have failed', {
-              description: printResult.error || 'Check printer connection'
+
+          if (printResult.success) {
+            console.log('✅ Bill printed successfully via raster on', printResult.printer);
+            toast.success('Bill printed', {
+              description: `Sent to ${printResult.printer || 'thermal printer'}`
             });
+            onClose();
+            return; // Success - exit without calling fallback
+          } else {
+            console.warn('⚠️ Raster print failed, trying fallback:', printResult.error);
           }
         }
-      } else {
-        console.log('ℹ️ [DineInBillPreviewModal] Raster printing not available, using queue fallback');
       }
 
+      // FALLBACK: ESC/POS via parent handler (non-Electron or raster failed)
+      console.log('ℹ️ [DineInBillPreviewModal] Using ESC/POS fallback');
+      const success = await onPrintBill(orderTotal);
+
       if (success) {
+        toast.success('Bill printed');
         onClose();
+      } else {
+        toast.warning('Print may have failed', {
+          description: 'Check printer connection'
+        });
       }
     } catch (error) {
       console.error('❌ [DineInBillPreviewModal] Error in handlePrint:', error);

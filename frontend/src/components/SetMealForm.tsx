@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ImagePlus, X, Save, Loader2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
-import { SetMeal, SetMealItem } from '../utils/menuTypes';
+import { SetMeal, SetMealItem } from '../utils/types';
 import { globalColors } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatUtils';
 import MediaSelector from './MediaSelector';

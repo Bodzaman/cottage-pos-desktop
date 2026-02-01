@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,51 +17,29 @@ import {
 import { colors } from "../utils/designSystem";
 import brain from "brain";
 import { useQueryClient } from '@tanstack/react-query';
-import { menuKeys } from '../utils/menuQueries';
+import { menuKeys, useCustomizations } from '../utils/menuQueries';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-// Types
-interface CustomizationBase {
-  id: string;
-  name: string;
-  price?: number;
-  price_adjustment?: number; // Alias for price (API uses this name)
-  customization_group?: string;
-  display_order: number;
-  is_exclusive: boolean;
-  is_active: boolean;
-  show_on_pos: boolean;
-  show_on_website: boolean;
-  ai_voice_agent: boolean;
-  is_global: boolean;
-  item_ids?: string[];
-}
-
-// CustomizationItem for API responses
-interface CustomizationItem extends CustomizationBase {
-  price_adjustment?: number;
-}
+import type { Customization } from '../utils/types';
 
 interface CustomizationsTabProps {
   // No props needed - manages its own state
 }
 
 const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
-  // All the customization state from the original component
-  const [customizations, setCustomizations] = useState<CustomizationBase[]>([]);
+  // Fetch customizations using React Query - uses direct Supabase SDK (working path)
+  const {
+    data: customizations = [],
+    isLoading: loadingCustomizations,
+    refetch: refreshCustomizations
+  } = useCustomizations({ context: 'admin' });
+
+  // UI state
   const [customizationSearchQuery, setCustomizationSearchQuery] = useState('');
   const [customizationFilter, setCustomizationFilter] = useState<'all' | 'pos' | 'website' | 'ai-voice'>('all');
   const [customizationGroupFilter, setCustomizationGroupFilter] = useState<string>('all');
-  const [loadingCustomizations, setLoadingCustomizations] = useState(false);
-  const [customizationsInitialized, setCustomizationsInitialized] = useState(false);
   const [selectedCustomizationId, setSelectedCustomizationId] = useState<string | null>(null);
-  
-  // Add computed state variables for filtered and grouped customizations
-  const [filteredCustomizations, setFilteredCustomizations] = useState<CustomizationBase[]>([]);
-  const [groupedCustomizations, setGroupedCustomizations] = useState<Record<string, CustomizationBase[]>>({});
-  
-  // Add missing customization state variables
-  const [selectedCustomizations, setSelectedCustomizations] = useState<string[]>([]);
+
+  // Form state
   const [customizationForm, setCustomizationForm] = useState({
     id: "",
     name: "",
@@ -77,90 +55,57 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
     is_global: false,
     item_ids: [] as string[]
   });
-  const [customizationGroups, setCustomizationGroups] = useState<string[]>([]);
-  const [customizationViewMode, setCustomizationViewMode] = useState<'grid' | 'list'>('grid');
 
   const queryClient = useQueryClient();
 
-  // Load customizations when component mounts
-  useEffect(() => {
-    if (!customizationsInitialized) {
-      loadCustomizationsSimple();
-    }
-  }, [customizationsInitialized]);
+  // Compute sorted customizations (sorted by group then display_order)
+  const sortedCustomizations = useMemo(() => {
+    if (!customizations || !Array.isArray(customizations)) return [];
+    return [...customizations].sort((a, b) => {
+      if (a.customization_group !== b.customization_group) {
+        return (a.customization_group || '').localeCompare(b.customization_group || '');
+      }
+      return (a.display_order || 0) - (b.display_order || 0);
+    });
+  }, [customizations]);
 
-  // Compute filtered and grouped customizations whenever dependencies change
-  useEffect(() => {
-    // Add null check to prevent undefined.filter() errors
-    if (!customizations || !Array.isArray(customizations)) {
-      setFilteredCustomizations([]);
-      setGroupedCustomizations({});
-      return;
+  // Compute unique groups from customizations
+  const customizationGroups = useMemo(() => {
+    return [...new Set(
+      sortedCustomizations
+        .map(c => c.customization_group)
+        .filter((g): g is string => !!g && g.trim() !== '')
+    )];
+  }, [sortedCustomizations]);
+
+  // Compute filtered and grouped customizations
+  const { filteredCustomizations, groupedCustomizations } = useMemo(() => {
+    if (!sortedCustomizations.length) {
+      return { filteredCustomizations: [], groupedCustomizations: {} };
     }
-    
-    const filtered = customizations.filter(customization => {
+
+    const filtered = sortedCustomizations.filter(customization => {
       const matchesSearch = customization.name.toLowerCase().includes(customizationSearchQuery.toLowerCase());
-      const matchesVisibilityFilter = 
+      const matchesVisibilityFilter =
         customizationFilter === 'all' ||
         (customizationFilter === 'pos' && customization.show_on_pos) ||
         (customizationFilter === 'website' && customization.show_on_website);
-      const matchesGroupFilter = 
+      const matchesGroupFilter =
         customizationGroupFilter === 'all' ||
         (customization.customization_group || 'general').toLowerCase() === customizationGroupFilter.toLowerCase();
-      
+
       return matchesSearch && matchesVisibilityFilter && matchesGroupFilter;
     });
-    
+
     const grouped = filtered.reduce((acc, customization) => {
       const group = customization.customization_group || 'General';
       if (!acc[group]) acc[group] = [];
       acc[group].push(customization);
       return acc;
-    }, {} as Record<string, CustomizationBase[]>);
-    
-    setFilteredCustomizations(filtered);
-    setGroupedCustomizations(grouped);
-  }, [customizations, customizationSearchQuery, customizationFilter, customizationGroupFilter]);
+    }, {} as Record<string, Customization[]>);
 
-  const loadCustomizationsSimple = async () => {
-    if (loadingCustomizations) return;
-    
-    setLoadingCustomizations(true);
-    try {
-      const customizationsResponse = await brain.get_customizations({});
-      const customizationsData = await customizationsResponse.json();
-      
-      if (customizationsData && customizationsData.customizations) {
-        const sortedCustomizations = [...customizationsData.customizations];
-        sortedCustomizations.sort((a, b) => {
-          if (a.customization_group !== b.customization_group) {
-            return (a.customization_group || '').localeCompare(b.customization_group || '');
-          }
-          return (a.display_order || 0) - (b.display_order || 0);
-        });
-        
-        setCustomizations(sortedCustomizations);
-        
-        const groups = [...new Set(
-          sortedCustomizations
-            .map(c => c.customization_group)
-            .filter(g => g && g.trim())
-        )];
-        setCustomizationGroups(groups);
-        
-        setCustomizationsInitialized(true);
-      } else {
-        setCustomizations([]);
-        setCustomizationGroups([]);
-      }
-    } catch (error) {
-      console.error('Error loading customizations:', error);
-      setCustomizations([]);
-      setCustomizationGroups([]);
-    } finally {
-      setLoadingCustomizations(false);
-    }
-  };
+    return { filteredCustomizations: filtered, groupedCustomizations: grouped };
+  }, [sortedCustomizations, customizationSearchQuery, customizationFilter, customizationGroupFilter]);
 
   const resetCustomizationForm = () => {
     setCustomizationForm({
@@ -215,32 +160,33 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
 
   const handleSelectCustomization = (id: string) => {
     setSelectedCustomizationId(id);
-    
+
     // Add null check to prevent undefined.find() errors
     if (!customizations || !Array.isArray(customizations)) {
       return;
     }
-    
+
     const customization = customizations.find(c => c.id === id);
-    
+
     if (customization) {
       let itemIds = customization.item_ids || [];
       if (customization.is_global) {
         itemIds = ['ALL'];
       }
-      
+
       setCustomizationForm({
         id: customization.id,
         name: customization.name,
-        price_adjustment: customization.price || 0,
-        customization_group: customization.customization_group === null ? '_none_' : (customization.customization_group || '_none_'),
+        price: customization.price || 0,
+        price_adjustment: customization.price || 0, // Keep for backward compat
+        customization_group: customization.customization_group == null ? '_none_' : (customization.customization_group || '_none_'),
         display_order: customization.display_order || 0,
-        is_exclusive: customization.is_exclusive || false,
-        is_active: customization.is_active,
-        show_on_pos: customization.show_on_pos,
-        show_on_website: customization.show_on_website,
-        ai_voice_agent: customization.ai_voice_agent,
-        is_global: customization.is_global,
+        is_exclusive: customization.is_exclusive ?? false,
+        is_active: customization.is_active ?? true,
+        show_on_pos: customization.show_on_pos ?? true,
+        show_on_website: customization.show_on_website ?? false,
+        ai_voice_agent: customization.ai_voice_agent ?? false,
+        is_global: customization.is_global ?? false,
         item_ids: itemIds
       });
     }
@@ -299,9 +245,11 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
       }
       
       toast.success(`Customization ${isUpdate ? 'updated' : 'created'} successfully`);
-      
+
+      // Invalidate all customization queries to ensure sidebar count updates too
       queryClient.invalidateQueries({ queryKey: menuKeys.customizations() });
-      loadCustomizationsSimple();
+      queryClient.invalidateQueries({ queryKey: menuKeys.posBundle() });
+      refreshCustomizations();
       
     } catch (error: any) {
       console.error('Error saving customization:', error.message);
@@ -326,11 +274,13 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
       }
       
       toast.success('Customization deleted successfully');
-      
+
+      // Invalidate all customization queries to ensure sidebar count updates too
       queryClient.invalidateQueries({ queryKey: menuKeys.customizations() });
+      queryClient.invalidateQueries({ queryKey: menuKeys.posBundle() });
       setSelectedCustomizationId(null);
       resetCustomizationForm();
-      loadCustomizationsSimple();
+      refreshCustomizations();
       
     } catch (error: any) {
       console.error('Error deleting customization:', error.message);
@@ -701,7 +651,7 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
                               </h5>
                               <div className="flex items-center gap-4 mt-1">
                                 <span className="text-sm" style={{ color: colors.text.secondary }}>
-                                  {customization.price_adjustment ? `£ ${customization.price_adjustment.toFixed(2)}` : 'Free'}
+                                  {customization.price ? `£${customization.price.toFixed(2)}` : 'Free'}
                                 </span>
                                 <div className="flex gap-1">
                                   {customization.show_on_pos && (
@@ -724,10 +674,9 @@ const CustomizationsTab: React.FC<CustomizationsTabProps> = () => {
                             </div>
                             
                             <div className="flex items-center gap-2">
-                              <Switch 
+                              <Switch
                                 checked={customization.is_active}
-                                size="sm"
-                                className="data-[state=checked]:bg-[#7C5DFA]"
+                                className="data-[state=checked]:bg-[#7C5DFA] scale-75"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>

@@ -5,7 +5,7 @@
  * what guidance should be shown to users for optimal setup flow.
  */
 
-import { Category, ProteinType } from './menuTypes';
+import { Category, ProteinType } from './types';
 
 /**
  * Analysis result for menu setup status

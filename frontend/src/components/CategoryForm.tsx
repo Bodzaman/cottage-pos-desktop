@@ -15,7 +15,7 @@ import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import brain from 'brain';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 import { Info, AlertTriangle, Printer, HelpCircle } from "lucide-react";
 import { useMountedRef, useSafeTimeout } from 'utils/safeHooks';
 import { OrderNumberInput } from 'components/OrderNumberInput';

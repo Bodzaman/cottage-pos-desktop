@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 import { QSAITheme } from '../utils/QSAIDesign';
 import { FIXED_SECTIONS, SECTION_UUID_MAP } from 'utils/sectionMapping';
 import {

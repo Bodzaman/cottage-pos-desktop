@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { OrderTabSection } from 'components/OrderTabSection';
 import { FormData, OrderMode, OrderSource, OrderType } from 'utils/receiptDesignerTypes';
@@ -182,6 +183,21 @@ export function OrderInfoSection({ formData, updateField }: Props) {
         <p className="text-xs mt-2" style={{ color: QSAITheme.text.muted }}>
           Toggle to preview how the payment status badge appears on receipts
         </p>
+      </div>
+
+      {/* Kitchen Visibility Toggle */}
+      <div className="pt-3 border-t" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs block" style={{ color: QSAITheme.text.muted }}>Show on Kitchen</span>
+            <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display order info (date/time) on kitchen tickets</span>
+          </div>
+          <Switch
+            checked={formData.kitchenShowOrderInfo !== false}
+            onCheckedChange={(checked) => updateField('kitchenShowOrderInfo', checked)}
+            className="scale-90"
+          />
+        </div>
       </div>
     </OrderTabSection>
   );

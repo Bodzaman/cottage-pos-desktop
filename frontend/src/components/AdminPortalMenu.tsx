@@ -29,7 +29,7 @@ import BatchPriceUpdate from "../components/BatchPriceUpdate";
 import FloatingActionBar from "../components/FloatingActionBar";
 import { SortableItem } from "../components/SortableItem";
 import brain from "../brain";
-import { Category, MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
+import { Category, MenuItem, ItemVariant, ProteinType } from '../utils/types';
 import { MenuCategory, ProteinType as MasterProteinType } from '../utils/masterTypes'; // Import MenuCategory and ProteinType for type conversion
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { supabase } from '../utils/supabaseClient';

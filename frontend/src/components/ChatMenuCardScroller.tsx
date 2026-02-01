@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { ChatMenuCard } from './ChatMenuCard';
 import { ItemInfoModal } from './ItemInfoModal';
-import { MenuItem } from '../utils/menuTypes';
+import { MenuItem } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { useCartStore } from 'utils/cartStore';
 import { useCartProposalActions } from 'utils/chat-store';

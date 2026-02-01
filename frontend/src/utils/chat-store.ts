@@ -6,7 +6,7 @@ import { API_PREFIX_PATH, API_PATH, API_URL } from '../constants';
 import { useCartStore } from './cartStore';
 import { useRealtimeMenuStore } from './realtimeMenuStore';
 import { detectDishMentionsFast } from './dishMentionDetector';
-import { MenuItem } from './menuTypes';
+import { MenuItem } from './types';
 import { toast } from 'sonner';
 import { validateChatMessage, cleanupCorruptedMessages } from './messageValidation';
 import { supabase } from './supabaseClient';

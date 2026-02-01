@@ -9,22 +9,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { 
-  Save, 
-  Building, 
-  Phone, 
-  Mail, 
-  Globe, 
-  Image, 
-  UploadCloud, 
-  ImagePlus, 
-  Clock, 
-  Truck, 
-  Settings as SettingsIcon, 
-  CreditCard, 
-  ShieldCheck, 
-  KeyRound, 
-  Eye, 
+import {
+  Save,
+  Building,
+  Phone,
+  PhoneCall,
+  Mail,
+  Globe,
+  Image,
+  UploadCloud,
+  ImagePlus,
+  Clock,
+  Truck,
+  Settings as SettingsIcon,
+  CreditCard,
+  ShieldCheck,
+  KeyRound,
+  Eye,
   EyeOff,
   Plus,
   Trash2,
@@ -37,6 +38,7 @@ import { useRestaurantSettings, BusinessProfile } from "../utils/useRestaurantSe
 import MediaSelector from "./MediaSelector";
 import DeliverySettings from "./DeliverySettings";
 import { POSUrgencySettings } from "./POSUrgencySettings";
+import { CallerIdSetupWizard } from "./pos/CallerIdSetupWizard";
 import { MediaItem, uploadMedia } from "../utils/mediaLibraryUtils";
 import brain from "brain";
 import type { POSSettings as BrainPOSSettings, PosTableResponse, CreateTableRequest, UpdateTableRequest } from "../brain/data-contracts";
@@ -90,7 +92,10 @@ interface RestaurantSettingsManagerProps {
 
 const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () => {
   // Main navigation state
-  const [activeSection, setActiveSection] = useState<"profile" | "admin" | "pos">("profile");
+  const [activeSection, setActiveSection] = useState<"profile" | "admin" | "pos" | "callerid">("profile");
+
+  // Caller ID wizard state
+  const [showCallerIdWizard, setShowCallerIdWizard] = useState(false);
   
   // Restaurant settings hook
   const { 
@@ -712,6 +717,7 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
               {[
                 { id: "profile", label: "Restaurant Profile", icon: Building },
                 { id: "pos", label: "POS Settings", icon: CreditCard },
+                { id: "callerid", label: "Caller ID", icon: PhoneCall },
                 { id: "admin", label: "Admin Settings", icon: SettingsIcon },
               ].map((section) => {
                 const IconComponent = section.icon;
@@ -1460,6 +1466,84 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
               </div>
             )}
 
+            {activeSection === "callerid" && (
+              <div className="space-y-6">
+                <div
+                  className={`p-6 ${InternalTheme.classes.surfaceCard}`}
+                >
+                  <div className="flex items-center mb-4">
+                    <PhoneCall className="h-5 w-5 mr-2" style={{ color: colors.purple.primary }} />
+                    <h2 className="text-xl font-semibold" style={{ color: colors.text.primary }}>
+                      Caller ID Setup
+                    </h2>
+                  </div>
+                  <p className="text-sm mb-6" style={{ color: colors.text.muted }}>
+                    Connect Yealink phones to display caller information on your POS when customers call
+                  </p>
+
+                  {/* Feature overview */}
+                  <div
+                    className="p-4 rounded-lg mb-6"
+                    style={{ backgroundColor: colors.background.secondary }}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: 'rgba(124, 93, 250, 0.15)' }}
+                      >
+                        <PhoneCall className="h-6 w-6" style={{ color: colors.purple.primary }} />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1" style={{ color: colors.text.primary }}>
+                          How it works
+                        </h3>
+                        <p className="text-sm" style={{ color: colors.text.muted }}>
+                          When a customer calls, their phone number is automatically matched to your customer database.
+                          A popup appears on all POS terminals showing the caller's name and order history.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Benefits list */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    {[
+                      { title: 'Instant Recognition', desc: 'See who\'s calling before you answer' },
+                      { title: 'Order History', desc: 'View past orders and preferences' },
+                      { title: 'Faster Service', desc: 'Start taking orders immediately' }
+                    ].map((benefit, i) => (
+                      <div
+                        key={i}
+                        className="p-3 rounded-lg"
+                        style={{ backgroundColor: colors.background.secondary }}
+                      >
+                        <h4 className="font-medium text-sm mb-1" style={{ color: colors.text.primary }}>
+                          {benefit.title}
+                        </h4>
+                        <p className="text-xs" style={{ color: colors.text.muted }}>
+                          {benefit.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={() => setShowCallerIdWizard(true)}
+                      className="flex items-center gap-2"
+                      style={{
+                        backgroundColor: colors.purple.primary,
+                        color: colors.text.primary
+                      }}
+                    >
+                      <Phone className="h-4 w-4" />
+                      Setup Caller ID
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeSection === "admin" && (
               <div className="space-y-6">
                 {/* Password Management */}
@@ -1650,6 +1734,12 @@ const RestaurantSettingsManager: React.FC<RestaurantSettingsManagerProps> = () =
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Caller ID Setup Wizard */}
+            <CallerIdSetupWizard
+              isOpen={showCallerIdWizard}
+              onClose={() => setShowCallerIdWizard(false)}
+            />
           </div>
         </div>
       </div>

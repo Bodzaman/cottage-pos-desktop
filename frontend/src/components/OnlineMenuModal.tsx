@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MenuItemCard } from 'components/MenuItemCard';
 import { SetMealsSection } from 'components/SetMealsSection';
-import { Category, MenuItem, ItemVariant, ProteinType } from '../utils/menuTypes';
+import { Category, MenuItem, ItemVariant, ProteinType } from '../utils/types';
 import { SetMealListResponse } from '../brain/data-contracts';
 import { useCompleteMenuData, menuKeys } from '../utils/menuQueries';
 import { useQueryClient } from '@tanstack/react-query';

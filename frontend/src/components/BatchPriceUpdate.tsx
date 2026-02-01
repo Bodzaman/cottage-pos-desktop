@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { supabase } from '../utils/supabaseClient';
 import { menuKeys } from '../utils/menuQueries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 
 interface Props {
   categories: Category[];

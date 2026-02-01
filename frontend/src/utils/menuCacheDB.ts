@@ -14,7 +14,7 @@
  * - Offline capability: 100% (all menu operations work offline)
  */
 
-import { MenuCategory, MenuItem, ProteinType, Customization, ItemVariant } from './menuTypes';
+import { Category, MenuItem, ProteinType, Customization, ItemVariant } from './types';
 
 const DB_NAME = 'cottage_tandoori_pos';
 const DB_VERSION = 1;
@@ -22,7 +22,7 @@ const MENU_STORE = 'menu_cache';
 const METADATA_STORE = 'cache_metadata';
 
 export interface MenuCacheData {
-  categories: MenuCategory[];
+  categories: Category[];
   menuItems: MenuItem[];
   proteinTypes: ProteinType[];
   customizations: Customization[];

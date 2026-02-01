@@ -7,6 +7,7 @@ import React from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { OrderTabSection } from 'components/OrderTabSection';
 import { FormData } from 'utils/receiptDesignerTypes';
@@ -32,6 +33,21 @@ export function SpecialInstructionsSection({ formData, updateField }: Props) {
             color: QSAITheme.text.primary
           }}
         />
+      </div>
+
+      {/* Kitchen Visibility Toggle */}
+      <div className="pt-3 border-t mt-3" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs block" style={{ color: QSAITheme.text.muted }}>Show on Kitchen</span>
+            <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Always recommended ON for kitchen</span>
+          </div>
+          <Switch
+            checked={formData.kitchenShowSpecialInstructions !== false}
+            onCheckedChange={(checked) => updateField('kitchenShowSpecialInstructions', checked)}
+            className="scale-90"
+          />
+        </div>
       </div>
     </OrderTabSection>
   );

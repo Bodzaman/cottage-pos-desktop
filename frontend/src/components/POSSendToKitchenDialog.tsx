@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { ChefHat, CreditCard, Receipt, Clock, Package, Truck, User, Phone, MapPin, Utensils, ImageIcon, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import POSTipSelector, { TipSelection } from './POSTipSelector';
 import POSUnifiedPaymentModal from './POSUnifiedPaymentModal';
-import { PaymentResult } from '../utils/menuTypes';
+import { PaymentResult } from '../utils/types';
 import { safeCurrency, safeTotalWithTip } from '../utils/numberUtils';
 import { OptimizedImage } from './OptimizedImage';
 

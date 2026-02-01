@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, CustomizationBase, OrderItem } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, Customization, OrderItem } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { FIXED_SECTIONS, findRootSection } from '../utils/sectionMapping';
 import { cn } from '../utils/cn';
@@ -208,7 +208,7 @@ export function StaffUnifiedCustomizationModal({
 
   // Group customizations
   const groupedCustomizations = useMemo(() => {
-    const groups: Record<string, CustomizationBase[]> = {};
+    const groups: Record<string, Customization[]> = {};
     filteredCustomizations.forEach(customization => {
       const groupName = customization.customization_group || 'Other';
       if (!groups[groupName]) {
@@ -254,7 +254,7 @@ export function StaffUnifiedCustomizationModal({
   };
 
   // Handle customization toggle
-  const handleCustomizationToggle = (customization: CustomizationBase, checked: boolean) => {
+  const handleCustomizationToggle = (customization: Customization, checked: boolean) => {
     if (checked) {
       setSelectedCustomizations(prev => [
         ...prev,

@@ -452,9 +452,9 @@ export const useDineInOrder = (tableId: string | null) => {
       return;
     }
 
-    // Check both order.items and enrichedItems for content
-    const hasItems = (order.items && order.items.length > 0) || enrichedItems.length > 0;
-    if (!hasItems) {
+    // Check enrichedItems for content (source of truth for dine-in items)
+    // Note: order.items is always empty for dine-in - use enrichedItems instead
+    if (enrichedItems.length === 0) {
       toast.error('Cannot send empty order to kitchen');
       return;
     }

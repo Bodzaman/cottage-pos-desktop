@@ -38,9 +38,9 @@ import { motion } from 'framer-motion';
 import { OrderConfirmationViewProps, CapturedReceiptImages } from '../utils/paymentFlowTypes';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { safeCurrency } from '../utils/numberUtils';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import ThermalReceiptDisplay from './ThermalReceiptDisplay';
-import { generateDisplayNameForReceipt } from '../utils/menuHelpers';
+import { resolveItemDisplayName } from '../utils/menuHelpers';
 import {
   isRasterPrintAvailable,
   captureReceiptAsImage
@@ -217,13 +217,9 @@ export function OrderConfirmationView({
       orderNumber: `${getOrderPrefix(orderType, 'POS')}-${Math.floor(Math.random() * 9000) + 1000}`,
       orderType: orderType,
       items: orderItems.map(item => {
-        // ✅ FIX: Use generateDisplayNameForReceipt to avoid duplicate variation names
-        // This will show "LAMB TIKKA MASALA" instead of "TIKKA MASALA (LAMB TIKKA MASALA)"
-        const displayName = generateDisplayNameForReceipt(
-          item.name,
-          item.variantName,
-          item.protein_type
-        );
+        // Use resolveItemDisplayName for intelligent variant handling
+        // Handles both modern format (variant in name) and legacy format (separate fields)
+        const displayName = resolveItemDisplayName(item);
         
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,

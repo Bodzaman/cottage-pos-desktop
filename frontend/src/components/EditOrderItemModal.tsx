@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { Plus, Minus, X, DollarSign, Info } from 'lucide-react';
-import { OrderItem, CustomizationSelection } from '../utils/menuTypes';
+import { OrderItem, CustomizationSelection } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors } from '../utils/QSAIDesign';
 import { toast } from 'sonner';

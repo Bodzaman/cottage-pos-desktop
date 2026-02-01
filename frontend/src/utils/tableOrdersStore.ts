@@ -22,6 +22,8 @@ import {
   resetTableToAvailable as resetTableQuery,
   getCustomerTabsForTable,
   getCustomerTabsForOrder,
+  getCustomerTabsWithItems,
+  getItemsForCustomerTabs,
   createCustomerTab as createCustomerTabQuery,
   updateCustomerTab as updateCustomerTabQuery,
   addItemsToCustomerTab as addItemsToCustomerTabQuery,
@@ -82,13 +84,20 @@ interface CustomerTab {
 }
 
 // Helper to map Supabase CustomerTab to local CustomerTab
-function mapSupabaseCustomerTab(tab: SupabaseCustomerTab): CustomerTab {
+// Now accepts optional items from FK relationship (dine_in_order_items.customer_tab_id)
+function mapSupabaseCustomerTab(tab: SupabaseCustomerTab, fkItems?: SupabaseOrderItem[]): CustomerTab {
+  // Use FK items if provided, otherwise fall back to JSONB (for backwards compatibility)
+  // Priority: FK relationship items > JSONB order_items
+  const orderItems = fkItems
+    ? fkItems.map(mapSupabaseOrderItemToOrderItem)
+    : (tab.order_items || []).map(mapSupabaseOrderItemToOrderItem);
+
   return {
     id: tab.id,
     table_number: tab.table_number,
     order_id: (tab as any).order_id,  // New field for order-scoped tabs
     tab_name: tab.tab_name,
-    order_items: (tab.order_items || []).map(mapSupabaseOrderItemToOrderItem),
+    order_items: orderItems,
     status: tab.status,
     guest_id: tab.guest_id,
     created_at: tab.created_at,
@@ -394,9 +403,26 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   // @deprecated Use loadCustomerTabsForOrder instead - tabs should be scoped to orders
   loadCustomerTabsForTable: async (tableNumber: number) => {
     try {
-      // Direct Supabase query - no backend needed
+      // 1. Get tabs from customer_tabs table
       const supabaseTabs = await getCustomerTabsForTable(tableNumber);
-      const mappedTabs: CustomerTab[] = supabaseTabs.map(mapSupabaseCustomerTab);
+      if (!supabaseTabs.length) {
+        set(state => ({
+          customerTabs: { ...state.customerTabs, [tableNumber]: [] },
+          optimisticCustomerTabs: { ...state.optimisticCustomerTabs, [tableNumber]: [] }
+        }));
+        return;
+      }
+
+      // 2. Get items for all tabs from dine_in_order_items (FK relationship - source of truth)
+      const tabIds = supabaseTabs.map(t => t.id);
+      const itemsByTab = await getItemsForCustomerTabs(tabIds);
+
+      // 3. Map tabs with items from FK relationship
+      const mappedTabs: CustomerTab[] = supabaseTabs.map(tab => {
+        const fkItems = itemsByTab[tab.id] || [];
+        return mapSupabaseCustomerTab(tab, fkItems as SupabaseOrderItem[]);
+      });
+
       set(state => ({
         customerTabs: {
           ...state.customerTabs,
@@ -422,11 +448,29 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   },
 
   // NEW: Load customer tabs for specific order (preferred - scoped to order lifecycle)
+  // Uses FK relationship from dine_in_order_items.customer_tab_id as source of truth
   loadCustomerTabsForOrder: async (orderId: string, tableNumber: number) => {
     try {
-      // Direct Supabase query - scoped to order
+      // 1. Get tabs from customer_tabs table, scoped to order
       const supabaseTabs = await getCustomerTabsForOrder(orderId);
-      const mappedTabs: CustomerTab[] = supabaseTabs.map(mapSupabaseCustomerTab);
+      if (!supabaseTabs.length) {
+        set(state => ({
+          customerTabs: { ...state.customerTabs, [tableNumber]: [] },
+          optimisticCustomerTabs: { ...state.optimisticCustomerTabs, [tableNumber]: [] }
+        }));
+        return;
+      }
+
+      // 2. Get items for all tabs from dine_in_order_items (FK relationship - source of truth)
+      const tabIds = supabaseTabs.map(t => t.id);
+      const itemsByTab = await getItemsForCustomerTabs(tabIds);
+
+      // 3. Map tabs with items from FK relationship
+      const mappedTabs: CustomerTab[] = supabaseTabs.map(tab => {
+        const fkItems = itemsByTab[tab.id] || [];
+        return mapSupabaseCustomerTab(tab, fkItems as SupabaseOrderItem[]);
+      });
+
       set(state => ({
         customerTabs: {
           ...state.customerTabs,
@@ -1666,13 +1710,30 @@ export const useTableOrdersStore = create<TableOrdersState>((set, get) => ({
   },
 
   // NEW: State synchronization utilities - Direct Supabase
+  // Uses FK relationship from dine_in_order_items.customer_tab_id as source of truth
   syncCustomerTabsFromServer: async (tableNumber: number) => {
     try {
       set({ syncInProgress: true });
 
-      // Direct Supabase query - no backend needed
+      // 1. Get tabs from customer_tabs table
       const supabaseTabs = await getCustomerTabsForTable(tableNumber);
-      const mappedTabs: CustomerTab[] = supabaseTabs.map(mapSupabaseCustomerTab);
+      if (!supabaseTabs.length) {
+        set(state => ({
+          customerTabs: { ...state.customerTabs, [tableNumber]: [] },
+          optimisticCustomerTabs: { ...state.optimisticCustomerTabs, [tableNumber]: [] }
+        }));
+        return;
+      }
+
+      // 2. Get items for all tabs from dine_in_order_items (FK relationship - source of truth)
+      const tabIds = supabaseTabs.map(t => t.id);
+      const itemsByTab = await getItemsForCustomerTabs(tabIds);
+
+      // 3. Map tabs with items from FK relationship
+      const mappedTabs: CustomerTab[] = supabaseTabs.map(tab => {
+        const fkItems = itemsByTab[tab.id] || [];
+        return mapSupabaseCustomerTab(tab, fkItems as SupabaseOrderItem[]);
+      });
 
       set(state => ({
         customerTabs: {

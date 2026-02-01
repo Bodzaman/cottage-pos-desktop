@@ -9,7 +9,7 @@ import { DineInMenuGrid } from './DineInMenuGrid';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { OrderItem } from '../utils/receiptDesignerTypes';
-import { OrderItem as MenuOrderItem } from '../utils/menuTypes';
+import { OrderItem as MenuOrderItem } from '../utils/types';
 import { v4 as uuidv4 } from 'uuid';
 import { CustomizeOrchestratorProvider } from './CustomizeOrchestrator';
 import { ModalShell3Col } from 'components/ModalShell3Col';

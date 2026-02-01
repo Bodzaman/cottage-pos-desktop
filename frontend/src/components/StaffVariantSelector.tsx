@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { MenuItem, ItemVariant, OrderItem } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, OrderItem } from '../utils/types';
 import { Minus, Plus, Sliders } from 'lucide-react';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { cn } from '../utils/cn';

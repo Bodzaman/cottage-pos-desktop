@@ -23,9 +23,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { globalColors as QSAITheme, styles, effects } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import POSTipSelector, { TipSelection } from './POSTipSelector';
-import { PaymentResult } from '../utils/menuTypes';
+import { PaymentResult } from '../utils/types';
 import { toast } from 'sonner';
 import { safeCurrency, safeTotalWithTip } from '../utils/numberUtils';
 import { Card, CardContent } from '@/components/ui/card';

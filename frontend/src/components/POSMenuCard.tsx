@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { OrderItem, MenuItem, ItemVariant, ModifierSelection } from 'utils/menuTypes';
+import { OrderItem, MenuItem, ItemVariant, ModifierSelection } from 'utils/types';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { FloatingDropdown } from 'components/FloatingDropdown';
 import { MultiCustomModal } from 'components/MultiCustomModal';
@@ -367,8 +367,26 @@ export function POSMenuCard({
           {/* Variants/Price section */}
           <div className="flex items-center gap-3">
             {variants.length > 0 ? (
-              <div className="text-xs text-[#BBC3E1]">
-                {variants.length} option{variants.length > 1 ? 's' : ''}
+              <div
+                className="flex items-center gap-1.5 overflow-x-auto max-w-[350px] pb-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {variants.map((variant) => {
+                  const variantPrice = getVariantPrice(variant);
+                  const variantName = getVariantDisplayName(variant);
+                  return (
+                    <button
+                      key={variant.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToOrder(variant);
+                      }}
+                      className="flex-shrink-0 px-2 py-1 text-xs rounded-full bg-[#7C5DFA]/20 text-[#BBC3E1] hover:bg-[#7C5DFA]/40 hover:text-white transition-colors border border-[#7C5DFA]/30"
+                    >
+                      {variantName} • £{variantPrice.toFixed(2)}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-sm text-white font-semibold">

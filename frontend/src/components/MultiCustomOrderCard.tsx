@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { colors, globalColors } from '../utils/QSAIDesign';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { MultiCustomGroup } from '../utils/multiCustomGrouping';
 import { OptimizedImage } from 'components/OptimizedImage';
 

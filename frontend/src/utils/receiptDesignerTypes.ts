@@ -172,6 +172,19 @@ export interface FormData {
   showContainerQtyField?: boolean;      // Show Container/Item QTY checkbox box
   showCheckedField?: boolean;           // Show Checked verification box
 
+  // Kitchen Section Visibility (true = show on kitchen ticket, undefined = use default)
+  kitchenShowHeader?: boolean;          // Default: false - Hide header text on kitchen
+  kitchenShowBusinessInfo?: boolean;    // Default: false - Hide business name/address on kitchen
+  kitchenShowLogo?: boolean;            // Default: false - Hide logo on kitchen
+  kitchenShowQRCodes?: boolean;         // Default: false - Hide QR codes on kitchen
+  kitchenShowOrderInfo?: boolean;       // Default: true - Show order #/date/time on kitchen
+  kitchenShowTableInfo?: boolean;       // Default: true - Show table #/covers/linked tables
+  kitchenShowCustomerDetails?: boolean; // Default: false (true for delivery)
+  kitchenShowTiming?: boolean;          // Default: true - Show collection/delivery time
+  kitchenShowSpecialInstructions?: boolean; // Default: true - Always show special instructions
+  kitchenShowTotals?: boolean;          // Default: depends on order mode (false for dine-in)
+  kitchenShowFooter?: boolean;          // Default: false - Hide footer on kitchen
+
   // Header Text
   headerText?: string;  // Custom header text/welcome message
 
@@ -340,6 +353,9 @@ export const DEFAULT_FORM_DATA: FormData = {
   headerQRCodes: [],
   footerQRCodes: [],
 
+  // Header Text
+  headerText: 'Welcome to Cottage Tandoori',
+
   // Receipt Format
   receiptFormat: 'front_of_house',
 
@@ -398,6 +414,19 @@ export const DEFAULT_FORM_DATA: FormData = {
   showKitchenTotals: true,           // Drivers need bill amount for cash collection
   showContainerQtyField: true,       // Staff writes item count after packing
   showCheckedField: true,            // Second staff confirms items checked
+
+  // Kitchen Section Visibility (sensible defaults for simplified kitchen tickets)
+  kitchenShowHeader: false,          // Kitchen doesn't need header text
+  kitchenShowBusinessInfo: false,    // Kitchen doesn't need business details
+  kitchenShowLogo: false,            // Kitchen doesn't need logo
+  kitchenShowQRCodes: false,         // Kitchen doesn't need QR codes
+  kitchenShowOrderInfo: true,        // Show order #/date/time for tracking
+  kitchenShowTableInfo: true,        // Show table #/covers/linked tables
+  kitchenShowCustomerDetails: false, // Default off, but delivery should show address
+  kitchenShowTiming: true,           // Show collection/delivery time
+  kitchenShowSpecialInstructions: true, // Always show special instructions
+  kitchenShowTotals: false,          // Default off for dine-in (FOH handles billing)
+  kitchenShowFooter: false,          // Kitchen doesn't need footer
 
   // Footer
   footerMessage: 'Thank you for your order!',

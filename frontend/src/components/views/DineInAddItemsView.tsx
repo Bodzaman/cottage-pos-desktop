@@ -3,7 +3,7 @@
  *
  * Works on STAGING CART (ephemeral):
  * - Two-panel layout: Menu browser (left) | Order summary (right)
- * - Uses useRealtimeMenuStore() directly for menu data
+ * - Uses useRealtimeMenuStoreCompat() for menu data (React Query)
  * - Receives staging cart via props from POSDesktop
  * - CTA: "Review & Send" opens kitchen preview modal for save/print
  */
@@ -15,14 +15,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Send } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
 import { POSMenuSelector } from 'components/POSMenuSelector';
 import { POSSectionPills } from 'components/POSSectionPills';
 import { POSCategoryPills } from 'components/POSCategoryPills';
 import { OrderItemCard } from 'components/OrderItemCard';
 import { DineInKitchenPreviewModal } from 'components/DineInKitchenPreviewModal';
 import { toast } from 'sonner';
-import type { OrderItem, MenuItem } from 'utils/menuTypes';
+import type { OrderItem, MenuItem } from 'utils/types';
 import type { OrderItem as TypesOrderItem } from 'types';
 
 interface DineInAddItemsViewProps {
@@ -62,7 +61,11 @@ export function DineInAddItemsView({
   onCustomizeItem,
 }: DineInAddItemsViewProps) {
   // Menu store - uses hook directly (same as Takeaway mode)
-  const { categories } = useRealtimeMenuStoreCompat({ context: 'pos' });
+  const {
+    categories,
+    setSelectedMenuCategory,
+    setSelectedParentCategory
+  } = useRealtimeMenuStoreCompat({ context: 'pos' });
 
   // Kitchen preview modal state
   const [showKitchenPreviewModal, setShowKitchenPreviewModal] = useState(false);
@@ -100,23 +103,20 @@ export function DineInAddItemsView({
     setSelectedSectionId(sectionId);
     setSelectedCategoryId(null);
 
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(sectionId);
-    menuStore.setSelectedParentCategory(null);
-  }, []);
+    setSelectedMenuCategory(sectionId);
+    setSelectedParentCategory(null);
+  }, [setSelectedMenuCategory, setSelectedParentCategory]);
 
   // Handle category selection
   const handleCategorySelect = useCallback((categoryId: string | null) => {
     setSelectedCategoryId(categoryId);
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(categoryId);
-  }, []);
+    setSelectedMenuCategory(categoryId);
+  }, [setSelectedMenuCategory]);
 
   // Handle category change from POSMenuSelector
   const handleCategoryChange = useCallback((categoryId: string | null) => {
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(categoryId);
-  }, []);
+    setSelectedMenuCategory(categoryId);
+  }, [setSelectedMenuCategory]);
 
   // Handle adding item to staging
   const handleAddToOrder = useCallback((orderItem: OrderItem) => {

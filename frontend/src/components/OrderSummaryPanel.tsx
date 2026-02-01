@@ -29,11 +29,12 @@ import {
   Package,
   Truck
 } from 'lucide-react';
-import { OrderItem, ModifierSelection, CustomizationSelection, MenuItem, PaymentResult, ItemVariant } from '../utils/menuTypes';
+import { OrderItem, ModifierSelection, CustomizationSelection, MenuItem, PaymentResult, ItemVariant } from '../utils/types';
 import { OrderConfirmationModal } from './OrderConfirmationModal';
 import { TableSelectionModal } from './TableSelectionModal';
 import { colors, globalColors as QSAITheme, effects } from '../utils/QSAIDesign';
 import { formatCurrency } from '../utils/formatters';
+import { resolveItemDisplayName } from '../utils/menuHelpers';
 import { usePOSSettingsQuery } from '../utils/posSettingsQueries';
 import { useCustomerDataStore } from '../utils/customerDataStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
@@ -699,7 +700,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                 {/* Item details */}
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-sm mb-1" style={{ color: QSAITheme.text.primary }}>
-                    {item.name}
+                    {resolveItemDisplayName(item)}
                   </h4>
                   
                   {/* Variant and protein info */}

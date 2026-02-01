@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePOSStore } from 'utils/posStore';
-import type { MenuItem, ItemVariant, ProteinType, OrderItem } from '../utils/menuTypes';
+import type { MenuItem, ItemVariant, ProteinType, OrderItem } from '../utils/types';
 import type { SelectedCustomization } from 'types';
 import { useCartStore } from 'utils/cartStore';
 import { PremiumTheme, getSpiceColor, getSpiceEmoji } from 'utils/premiumTheme';
@@ -860,7 +860,6 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
               proteinTypes={proteinTypes}
               themeColor={themeColors.primary}
               orderType={orderType}
-              maxVisible={3}
               onVariantClick={handleVariantChipClick}
               selectedVariantId={selectedVariant?.id}
               currentQuantity={quantity}

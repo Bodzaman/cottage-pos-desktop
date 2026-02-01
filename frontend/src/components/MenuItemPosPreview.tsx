@@ -1,7 +1,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { FileVideo, AudioLines, BrainCircuit } from 'lucide-react';
-import { Category, ProteinType } from '../utils/menuTypes';
+import { Category, ProteinType } from '../utils/types';
 import { OptimizedImage } from 'components/OptimizedImage';
 
 interface Media {

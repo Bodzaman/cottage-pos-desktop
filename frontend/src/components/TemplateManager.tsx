@@ -16,7 +16,7 @@ import {
   suggestCategoryMappings,
   applyTemplateStructure
 } from '../utils/menuTemplates';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 import { 
   Layout, 
   ListTree, 

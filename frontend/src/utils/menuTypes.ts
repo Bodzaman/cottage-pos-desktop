@@ -1,10 +1,37 @@
 /**
+ * @deprecated This file is deprecated. Use 'utils/types/menu.types' instead.
+ *
+ * MIGRATION GUIDE:
+ * ================
+ * 1. Replace imports from 'utils/menuTypes' with 'utils/types'
+ *    Before: import { MenuItem, Category } from 'utils/menuTypes';
+ *    After:  import { MenuItem, Category } from 'utils/types';
+ *
+ * 2. Types now use snake_case only (matches database schema)
+ *    Before: item.categoryId, variant.priceDelivery
+ *    After:  item.category_id, variant.price_delivery
+ *
+ * 3. For legacy code needing camelCase, use transformers:
+ *    import { toMenuItemCamelCase } from 'utils/types';
+ *    const legacyItem = toMenuItemCamelCase(item);
+ *
+ * 4. All camelCase aliases in this file will be removed in a future version.
+ *
  * Standardized menu data model types for use across all components
  * in both the public website menu and POS system
  */
 
+// Re-export from new location for gradual migration
+export type {
+  Category as CategoryNew,
+  ProteinType as ProteinTypeNew,
+  MenuItem as MenuItemNew,
+  ItemVariant as ItemVariantNew,
+} from './types/menu.types';
+
 /**
  * Menu category definition
+ * @deprecated Use Category from 'utils/types' instead
  */
 export interface Category {
   id: string;
@@ -21,6 +48,7 @@ export interface Category {
 
 /**
  * Protein type definition (e.g., Chicken, Lamb, Prawn)
+ * @deprecated Use ProteinType from 'utils/types' instead
  */
 export interface ProteinType {
   id: string;
@@ -45,6 +73,7 @@ export interface SetMealItem {
 
 /**
  * Set Meal definition
+ * @deprecated Use SetMeal from 'utils/types' instead
  */
 export interface SetMeal {
   id: string;
@@ -69,6 +98,8 @@ export interface SetMeal {
 
 /**
  * MenuItem variant (different protein types, sizes, or preparations of a menu item)
+ * @deprecated Use ItemVariant from 'utils/types' instead. This interface contains
+ * many camelCase aliases that will be removed. Use snake_case properties only.
  */
 export interface ItemVariant {
   id?: string;
@@ -140,6 +171,8 @@ export interface ItemVariant {
 
 /**
  * Menu item definition
+ * @deprecated Use MenuItem from 'utils/types' instead. This interface contains
+ * many camelCase aliases that will be removed. Use snake_case properties only.
  */
 export interface MenuItem {
   id: string;
@@ -313,6 +346,7 @@ export interface CustomizationBase {
   active?: boolean; // Alias for is_active
   show_on_pos?: boolean;
   show_on_website?: boolean;
+  ai_voice_agent?: boolean; // Whether this customization is available for AI voice ordering
   is_global?: boolean;
   item_ids?: string[];
   menu_item_ids?: string[]; // Alias for item_ids
@@ -320,6 +354,7 @@ export interface CustomizationBase {
 
 /**
  * Order item definition (a menu item added to an order)
+ * @deprecated Use OrderItem from 'utils/types' instead
  */
 export interface OrderItem {
   id: string;
@@ -355,6 +390,15 @@ export interface OrderItem {
   // When set, item prints/displays in this section instead of natural category section
   serveWithSectionId?: string | null;
   serve_with_section_id?: string | null; // snake_case alias for database compatibility
+  // Nested variant object for backend compatibility (dine_in_commands expects this structure)
+  variant?: {
+    id: string;
+    name: string;
+    price?: number;
+    protein_type?: string;
+    protein_type_name?: string;
+    price_adjustment?: number;
+  };
 }
 
 /**

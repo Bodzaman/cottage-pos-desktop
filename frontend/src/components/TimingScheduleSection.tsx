@@ -7,6 +7,7 @@ import React from 'react';
 import { Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { OrderTabSection } from 'components/OrderTabSection';
 import { FormData } from 'utils/receiptDesignerTypes';
@@ -58,6 +59,21 @@ export function TimingScheduleSection({ formData, updateField }: Props) {
               border: `1px solid ${QSAITheme.border.light}`,
               color: QSAITheme.text.primary
             }}
+          />
+        </div>
+      </div>
+
+      {/* Kitchen Visibility Toggle */}
+      <div className="pt-3 border-t mt-3" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs block" style={{ color: QSAITheme.text.muted }}>Show on Kitchen</span>
+            <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display timing info on kitchen tickets</span>
+          </div>
+          <Switch
+            checked={formData.kitchenShowTiming !== false}
+            onCheckedChange={(checked) => updateField('kitchenShowTiming', checked)}
+            className="scale-90"
           />
         </div>
       </div>

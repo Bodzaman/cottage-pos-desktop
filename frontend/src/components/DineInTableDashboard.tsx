@@ -12,13 +12,14 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { Loader2, Users, Clock, Armchair } from 'lucide-react';
+import { Loader2, Users, Armchair, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { QSAITheme, posGlassPanel } from '../utils/QSAIDesign';
 import { TableDashboardCard } from './TableDashboardCard';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { useActiveOrders } from '../utils/useActiveOrders';
+import { useDashboardItemCounts } from '../utils/useDashboardItemCounts';
 import {
   deriveTableCardData,
   deriveTableCardStatus,
@@ -105,27 +106,18 @@ function FloorSummaryHeader({ enrichedTables }: FloorSummaryProps) {
     // Sum all guests
     const totalGuests = seatedTables.reduce((sum, t) => sum + (t.guestCount || 0), 0);
 
-    // Calculate average time (parse durationText like "45m" or "1h 23m")
-    const durations = seatedTables
-      .map(t => {
-        if (!t.durationText) return 0;
-        const hourMatch = t.durationText.match(/(\d+)h/);
-        const minMatch = t.durationText.match(/(\d+)m/);
-        const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
-        const mins = minMatch ? parseInt(minMatch[1]) : 0;
-        return hours * 60 + mins;
-      })
-      .filter(d => d > 0);
-
-    const avgMinutes = durations.length > 0
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-      : 0;
+    // Count tables needing attention (unsent items OR critical/high urgency)
+    const tablesNeedingAttention = seatedTables.filter(t =>
+      t.hasUnsentItems ||
+      t.urgency?.level === 'critical' ||
+      t.urgency?.level === 'high'
+    ).length;
 
     return {
       seatedCount,
       totalTables,
       totalGuests,
-      avgTime: avgMinutes > 0 ? `${avgMinutes}m` : '-'
+      tablesNeedingAttention
     };
   }, [enrichedTables]);
 
@@ -165,14 +157,24 @@ function FloorSummaryHeader({ enrichedTables }: FloorSummaryProps) {
 
       <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
 
-      {/* Average Time */}
+      {/* Tables Needing Attention */}
       <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4" style={{ color: '#F59E0B' }} />
+        <AlertTriangle
+          className="h-4 w-4"
+          style={{
+            color: metrics.tablesNeedingAttention > 0 ? '#F59E0B' : '#22C55E'
+          }}
+        />
         <span className="text-sm" style={{ color: QSAITheme.text?.secondary || '#A0A0A0' }}>
-          Avg:{' '}
-          <span className="font-semibold" style={{ color: '#FFFFFF' }}>
-            {metrics.avgTime}
+          <span
+            className="font-semibold"
+            style={{
+              color: metrics.tablesNeedingAttention > 0 ? '#F59E0B' : '#22C55E'
+            }}
+          >
+            {metrics.tablesNeedingAttention}
           </span>
+          {' '}Need Attention
         </span>
       </div>
     </div>
@@ -200,6 +202,10 @@ export function DineInTableDashboard({
   // NEW: Get active orders for linking data (orders are source of truth)
   const { orders: activeOrders } = useActiveOrders();
 
+  // Fetch item counts from dine_in_order_items table (source of truth for items)
+  const orderIds = useMemo(() => activeOrders.map(o => o.id), [activeOrders]);
+  const { data: itemCounts } = useDashboardItemCounts(orderIds);
+
   // Get POS settings for urgency thresholds (React Query)
   const { data: posSettings } = usePOSSettingsQuery();
   const urgencySettings = posSettings?.urgency_settings || DEFAULT_URGENCY_SETTINGS;
@@ -224,8 +230,11 @@ export function DineInTableDashboard({
           const seatedAt = order.createdAt ? new Date(order.createdAt) : null;
           const durationText = seatedAt ? getTimeOccupied(seatedAt) : '';
 
-          // Check if order has unsent items
-          const hasUnsentItems = order.items?.some(item => !item.sentToKitchenAt) ?? false;
+          // Check if order has unsent items using item counts from dine_in_order_items table
+          // (order.items is always empty - backend never updates it)
+          const orderItemCounts = itemCounts?.[order.id];
+          const hasUnsentItems = (orderItemCounts?.unsent || 0) > 0;
+          const totalItemCount = orderItemCounts?.total || 0;
 
           // Derive status using unified function (SINGLE SOURCE OF TRUTH)
           const derivedStatus = deriveTableCardStatus(order.status, hasUnsentItems);
@@ -254,8 +263,12 @@ export function DineInTableDashboard({
             statusLabel: STATUS_LABELS[derivedStatus],
             statusColor: STATUS_COLORS[derivedStatus],
             urgency, // ADD urgency data
-            // Financial data from order
-            billTotal: order.total || order.totalAmount || null,
+            // Item counts from dine_in_order_items (source of truth)
+            itemCount: totalItemCount,
+            hasUnsentItems,
+            // Financial data from dine_in_order_items (source of truth)
+            // Computed from sum of line_total - always accurate
+            billTotal: orderItemCounts?.billTotal ?? null,
             // Linked table overrides (conditional on linked status)
             isLinked: isLinkedGroup || baseData.isLinked,
             isPrimary: isLinkedGroup ? order.tableNumber === tableNumber : baseData.isPrimary,
@@ -270,7 +283,7 @@ export function DineInTableDashboard({
         return baseData;
       })
       .sort((a, b) => a.tableNumber - b.tableNumber);
-  }, [tables, persistedTableOrders, customerTabs, activeOrders, urgencySettings]);
+  }, [tables, persistedTableOrders, customerTabs, activeOrders, urgencySettings, itemCounts]);
 
   // Build color map for linked table groups from orders (source of truth)
   const linkedGroupColorMap = useMemo(() => {

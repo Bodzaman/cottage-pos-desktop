@@ -8,7 +8,7 @@ import { POSMenuCardSkeleton } from './POSMenuCardSkeleton';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { groupItemsByHierarchy, getSectionDisplayName, getDisplayMode, groupItemsBySection } from 'utils/menuHelpers';
 import { QSAITheme } from '../utils/QSAIDesign';
-import type { MenuItem, ItemVariant, OrderItem as MenuOrderItem } from 'utils/menuTypes';
+import type { MenuItem, ItemVariant, OrderItem as MenuOrderItem } from 'utils/types';
 import type { OrderItem } from 'types';
 
 interface Props {

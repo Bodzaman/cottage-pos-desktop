@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand';
-import { OrderItem } from './menuTypes';
+import { OrderItem } from './types';
 
 // ============================================================================
 // ORDER STORE TYPE

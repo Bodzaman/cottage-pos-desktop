@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { MenuCategory as Category } from '../utils/menuTypes';
+import { MenuCategory as Category } from '../utils/types';
 import { QSAITheme } from 'utils/QSAIDesign';
 
 interface Props {

@@ -8,6 +8,7 @@ import { User, MapPin, Truck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { OrderTabSection } from 'components/OrderTabSection';
 import { FormData } from 'utils/receiptDesignerTypes';
@@ -148,6 +149,23 @@ export function CustomerDetailsSection({ formData, updateField }: Props) {
           </div>
         </>
       )}
+
+      {/* Kitchen Visibility Toggle */}
+      <div className="pt-3 border-t mt-3" style={{ borderColor: QSAITheme.border.light }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs block" style={{ color: QSAITheme.text.muted }}>Show on Kitchen</span>
+            <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>
+              {isDelivery ? 'Recommended ON for delivery orders (driver handoff)' : 'Display customer details on kitchen tickets'}
+            </span>
+          </div>
+          <Switch
+            checked={isDelivery ? formData.kitchenShowCustomerDetails !== false : formData.kitchenShowCustomerDetails === true}
+            onCheckedChange={(checked) => updateField('kitchenShowCustomerDetails', checked)}
+            className="scale-90"
+          />
+        </div>
+      </div>
     </OrderTabSection>
   );
 }

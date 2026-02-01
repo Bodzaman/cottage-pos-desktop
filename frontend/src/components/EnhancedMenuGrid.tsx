@@ -17,7 +17,7 @@ import {
   ShoppingCart,
   Package
 } from 'lucide-react';
-import { MenuItem, OrderItem, ItemVariant } from '../utils/menuTypes';
+import { MenuItem, OrderItem, ItemVariant } from '../utils/types';
 import { QSAITheme, styles } from '../utils/QSAIDesign';
 import { POSMenuCard } from './POSMenuCard';
 import { POSSetMealCard } from './POSSetMealCard';

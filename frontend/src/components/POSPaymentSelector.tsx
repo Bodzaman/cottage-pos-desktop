@@ -14,7 +14,7 @@ import { CreditCard, Banknote, Smartphone, CheckCircle, Calculator, Minus, Plus,
 import { styles } from "../utils/QSAIDesign";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { OrderItem } from "../utils/menuTypes";
+import { OrderItem } from "../utils/types";
 import brain from 'brain';
 
 // Payment method types

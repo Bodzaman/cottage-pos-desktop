@@ -561,12 +561,13 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
 
     if (orderError) throw orderError;
 
-    // Step 5: Mark orders as COMPLETED in the orders table (source of truth)
+    // Step 5: Mark orders as CLOSED in the orders table (source of truth)
     if (orderIds.length > 0) {
       const { error: ordersUpdateError } = await supabase
         .from('orders')
         .update({
-          status: 'COMPLETED',
+          status: 'CLOSED',
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .in('id', orderIds);
@@ -576,15 +577,17 @@ export async function completeTableOrder(tableNumber: number): Promise<boolean> 
       }
     }
 
-    // Step 6: Clear linked flags AND reset status for ALL tables
+    // Step 6: Clear linked flags, current_order_id, AND reset status for ALL tables
     const { error: tableError } = await supabase
       .from('pos_tables')
       .update({
+        current_order_id: null,
         status: 'AVAILABLE',
         is_linked_table: false,
         is_linked_primary: false,
         linked_table_group_id: null,
-        linked_with_tables: []
+        linked_with_tables: [],
+        updated_at: new Date().toISOString()
       })
       .in('table_number', allTableNumbers);
 
@@ -742,6 +745,85 @@ export async function getCustomerTabsForOrder(orderId: string): Promise<Customer
     return data || [];
   } catch (error) {
     console.error('[supabaseQueries] getCustomerTabsForOrder failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get items for customer tabs from dine_in_order_items table
+ * SOURCE OF TRUTH: Uses FK relationship (customer_tab_id) instead of JSONB
+ * @param tabIds - Array of customer tab IDs
+ * @returns Map of tabId to OrderItem[]
+ */
+export async function getItemsForCustomerTabs(tabIds: string[]): Promise<Record<string, OrderItem[]>> {
+  if (!tabIds.length) return {};
+
+  try {
+    const { data, error } = await supabase
+      .from('dine_in_order_items')
+      .select('*')
+      .in('customer_tab_id', tabIds)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Group items by customer_tab_id
+    const itemsByTab: Record<string, OrderItem[]> = {};
+
+    for (const item of (data || [])) {
+      const tabId = item.customer_tab_id;
+      if (!tabId) continue;
+
+      if (!itemsByTab[tabId]) {
+        itemsByTab[tabId] = [];
+      }
+
+      // Map dine_in_order_items fields to OrderItem format
+      itemsByTab[tabId].push({
+        id: item.id,
+        menu_item_id: item.menu_item_id,
+        variant_id: item.variant_id || null,
+        name: item.item_name,
+        quantity: item.quantity,
+        price: item.unit_price,
+        variant_name: item.variant_name || null,
+        notes: item.notes || null,
+        protein_type: item.protein_type || null,
+        image_url: item.image_url || null,
+        customizations: item.customizations || [],
+        category: item.category_id
+      });
+    }
+
+    return itemsByTab;
+  } catch (error) {
+    console.error('[supabaseQueries] getItemsForCustomerTabs failed:', error);
+    return {};
+  }
+}
+
+/**
+ * Get customer tabs with items populated from dine_in_order_items (FK relationship)
+ * This is the preferred method - uses source of truth for items
+ */
+export async function getCustomerTabsWithItems(orderId: string): Promise<CustomerTab[]> {
+  try {
+    // 1. Get tabs from customer_tabs table
+    const tabs = await getCustomerTabsForOrder(orderId);
+    if (!tabs.length) return [];
+
+    // 2. Get items for all tabs from dine_in_order_items (source of truth)
+    const tabIds = tabs.map(t => t.id);
+    const itemsByTab = await getItemsForCustomerTabs(tabIds);
+
+    // 3. Populate order_items from FK relationship
+    return tabs.map(tab => ({
+      ...tab,
+      order_items: itemsByTab[tab.id] || []
+    }));
+  } catch (error) {
+    console.error('[supabaseQueries] getCustomerTabsWithItems failed:', error);
     throw error;
   }
 }
@@ -1096,6 +1178,19 @@ export async function getMenuWithOrdering(options: GetMenuOptions | boolean = fa
     const variants = variantsResult.data || [];
     const proteinTypes = proteinTypesResult.data || [];
     const mediaAssets = mediaAssetsResult.data || [];
+
+    // Debug: Verify variant_name is present in raw data
+    if (isDev && variants.length > 0) {
+      const sampleVariant = variants.find((v: any) => v.variant_name !== v.name);
+      if (sampleVariant) {
+        console.log('🔍 [getMenuWithOrdering] Sample variant with different names:', {
+          id: sampleVariant.id,
+          variant_name: sampleVariant.variant_name,
+          name: sampleVariant.name,
+          hasVariantName: !!sampleVariant.variant_name
+        });
+      }
+    }
 
     // Create media asset lookup map: asset_id → { url, variants }
     const mediaLookup: Record<string, {

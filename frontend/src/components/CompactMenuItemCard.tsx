@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import brain from 'brain';
-import type { MenuItem, MenuItemVariant, ProteinType } from 'utils/menuTypes';
+import type { MenuItem, MenuItemVariant, ProteinType } from 'utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, getVariantSummary } from '../utils/variantPricing';
 import { getSpiceEmoji } from 'utils/premiumTheme';

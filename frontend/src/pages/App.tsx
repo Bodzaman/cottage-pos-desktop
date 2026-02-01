@@ -164,19 +164,21 @@ function MobileStickyCallBar() {
           borderColor: PremiumTheme.colors.border.light
         }}
       >
-        <a 
+        <a
           href="tel:01903743605"
+          aria-label="Call primary phone number 01903 743605"
           className="flex-1 py-3 px-4 rounded-lg text-center font-medium transition-all duration-300 active:scale-95"
           style={{
             background: PremiumTheme.colors.burgundy[500],
             color: PremiumTheme.colors.text.primary
           }}
         >
-          <Phone className="w-4 h-4 inline mr-2" />
+          <Phone className="w-4 h-4 inline mr-2" aria-hidden="true" />
           Call 01903 743605
         </a>
-        <a 
+        <a
           href="tel:01903745974"
+          aria-label="Call secondary phone number 01903 745974"
           className="flex-1 py-3 px-4 rounded-lg text-center font-medium transition-all duration-300 active:scale-95"
           style={{
             background: PremiumTheme.colors.background.secondary,
@@ -184,7 +186,7 @@ function MobileStickyCallBar() {
             border: `1px solid ${PremiumTheme.colors.border.medium}`
           }}
         >
-          <Phone className="w-4 h-4 inline mr-2" />
+          <Phone className="w-4 h-4 inline mr-2" aria-hidden="true" />
           Call 01903 745974
         </a>
       </div>
@@ -327,6 +329,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <Button
                     onClick={() => navigate("/online-orders")}
+                    aria-label="Start ordering from menu"
                     className="px-8 py-4 text-lg font-medium rounded-full transition-all duration-300 transform hover:scale-105 border backdrop-blur-sm group"
                     style={{
                       background: PremiumTheme.colors.burgundy[500],
@@ -335,9 +338,9 @@ export default function App() {
                       boxShadow: PremiumTheme.shadows.glow.burgundy
                     }}
                   >
-                    <Utensils className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                    <Utensils className="mr-2 h-5 w-5 group-hover:animate-pulse" aria-hidden="true" />
                     Start Ordering
-                    <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform" aria-hidden="true" />
                   </Button>
                   
                   <Button
@@ -364,6 +367,7 @@ export default function App() {
                   {/* Primary CTA - Sign Up */}
                   <Button
                     onClick={() => navigate("/sign-up")}
+                    aria-label="Create a new account to start ordering"
                     className="px-8 py-4 text-lg font-medium rounded-full transition-all duration-300 transform hover:scale-105 border backdrop-blur-sm group"
                     style={{
                       background: PremiumTheme.colors.burgundy[500],
@@ -372,9 +376,9 @@ export default function App() {
                       boxShadow: PremiumTheme.shadows.glow.burgundy
                     }}
                   >
-                    <Users className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                    <Users className="mr-2 h-5 w-5 group-hover:animate-pulse" aria-hidden="true" />
                     Create Account & Order
-                    <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform" aria-hidden="true" />
                   </Button>
                   
                   {/* Secondary CTA - Sign In */}
@@ -699,8 +703,9 @@ export default function App() {
                   
                   {/* Call buttons */}
                   <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
-                    <a 
-                      href="tel:01903743605" 
+                    <a
+                      href="tel:01903743605"
+                      aria-label="Call primary reservation line 01903 743605"
                       className="inline-flex items-center px-8 py-4 rounded-lg transition-all duration-300 font-medium text-lg transform hover:scale-105"
                       style={{
                         background: PremiumTheme.colors.burgundy[500],
@@ -708,12 +713,13 @@ export default function App() {
                         boxShadow: PremiumTheme.shadows.glow.burgundy
                       }}
                     >
-                      <Phone className="w-5 h-5 mr-2" />
+                      <Phone className="w-5 h-5 mr-2" aria-hidden="true" />
                       Call 01903 743605
                     </a>
-                    
-                    <a 
-                      href="tel:01903745974" 
+
+                    <a
+                      href="tel:01903745974"
+                      aria-label="Call secondary reservation line 01903 745974"
                       className="inline-flex items-center px-6 py-3 rounded-lg transition-all duration-300 font-medium border transform hover:scale-105"
                       style={{
                         background: 'transparent',
@@ -721,7 +727,7 @@ export default function App() {
                         color: PremiumTheme.colors.text.primary
                       }}
                     >
-                      <Phone className="w-5 h-5 mr-2" />
+                      <Phone className="w-5 h-5 mr-2" aria-hidden="true" />
                       Call 01903 745974
                     </a>
                   </div>
@@ -885,13 +891,14 @@ export default function App() {
                 boxShadow: PremiumTheme.shadows.elevation.lg
               }}
             >
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2511.771893966142!2d-0.4572387236394928!3d50.91851135465146!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4875a48c0cb3d01f%3A0xb9f6ef6c45ab9899!2s25%20West%20St%2C%20Storrington%2C%20Pulborough%20RH20%204DZ!5e0!3m2!1sen!2suk!4v1710700856412!5m2!1sen!2suk" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0 }} 
-                allowFullScreen 
-                loading="lazy" 
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2511.771893966142!2d-0.4572387236394928!3d50.91851135465146!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4875a48c0cb3d01f%3A0xb9f6ef6c45ab9899!2s25%20West%20St%2C%20Storrington%2C%20Pulborough%20RH20%204DZ!5e0!3m2!1sen!2suk!4v1710700856412!5m2!1sen!2suk"
+                title="Cottage Tandoori location map - 25 West Street, Storrington"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade">
               </iframe>
             </div>

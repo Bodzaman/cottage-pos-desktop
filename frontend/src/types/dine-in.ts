@@ -37,17 +37,22 @@ export interface TablePosition {
 
 /**
  * Order status progression
+ *
+ * Primary flow: CREATED → SENT_TO_KITCHEN → PENDING_PAYMENT → CLOSED
+ * Legacy statuses (IN_PREP, READY, SERVED, PAID, COMPLETED) kept for backward compatibility
  */
 export type OrderStatus =
   | 'CREATED'           // Order created, no items sent
   | 'SENT_TO_KITCHEN'   // Items sent to kitchen
-  | 'IN_PREP'           // Kitchen preparing
-  | 'READY'             // Ready for service
-  | 'SERVED'            // Food served to table
   | 'PENDING_PAYMENT'   // Bill requested
-  | 'PAID'              // Payment received
-  | 'COMPLETED'         // Order finalized
-  | 'CANCELLED';        // Order cancelled
+  | 'CLOSED'            // Order finalized, table reset (preferred)
+  | 'CANCELLED'         // Order cancelled
+  // Legacy statuses (kept for backward compatibility)
+  | 'IN_PREP'           // Kitchen preparing (legacy)
+  | 'READY'             // Ready for service (legacy)
+  | 'SERVED'            // Food served to table (legacy)
+  | 'PAID'              // Payment received (legacy - use CLOSED)
+  | 'COMPLETED';        // Order finalized (legacy - use CLOSED)
 
 /**
  * Dine-in order - the source of truth for table runtime state
@@ -309,6 +314,7 @@ export function deriveTableDisplayStatus(order?: DineInOrder): TableDisplayStatu
       return 'FOOD_SENT';
     case 'PENDING_PAYMENT':
       return 'REQUESTING_CHECK';
+    case 'CLOSED':
     case 'PAID':
     case 'COMPLETED':
       return 'AVAILABLE';
@@ -324,6 +330,7 @@ export function deriveTableDisplayStatus(order?: DineInOrder): TableDisplayStatu
  */
 export function isOrderActive(status: OrderStatus): boolean {
   return ![
+    'CLOSED',
     'PAID',
     'COMPLETED',
     'CANCELLED'
@@ -332,18 +339,43 @@ export function isOrderActive(status: OrderStatus): boolean {
 
 /**
  * Calculate time duration from timestamp
+ * Formats: minutes → hours → days → months → years
  */
 export function calculateDuration(startTime: string): string {
   const start = new Date(startTime);
   const now = new Date();
   const diffMs = now.getTime() - start.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 60) {
-    return `${diffMins}m`;
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  // Years: "1y 3mo" for orders > 365 days
+  if (years > 0) {
+    const remainingMonths = Math.floor((days % 365) / 30);
+    return remainingMonths > 0 ? `${years}y ${remainingMonths}mo` : `${years}y`;
   }
 
-  const hours = Math.floor(diffMins / 60);
-  const mins = diffMins % 60;
-  return `${hours}h ${mins}m`;
+  // Months: "2mo 5d" for orders > 30 days
+  if (months > 0) {
+    const remainingDays = days % 30;
+    return remainingDays > 0 ? `${months}mo ${remainingDays}d` : `${months}mo`;
+  }
+
+  // Days: "1d 5h" for orders 1-30 days
+  if (days > 0) {
+    const remainingHours = hours % 24;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  }
+
+  // Hours: "2h 30m" for orders < 24 hours
+  if (hours > 0) {
+    const remainingMins = minutes % 60;
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+  }
+
+  // Minutes: "45m" for orders < 1 hour
+  return `${minutes}m`;
 }

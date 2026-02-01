@@ -1,4 +1,4 @@
-import type { MenuItem, ItemVariant } from './menuTypes';
+import type { MenuItem, ItemVariant } from './types';
 
 /**
  * Order modes for pricing

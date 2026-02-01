@@ -1,7 +1,7 @@
 // Shared price computation utilities for Online Orders (Gallery and List)
 // Keep logic minimal and consistent with PremiumMenuCard and CustomerCustomizationModal
 
-import { MenuItem, ItemVariant } from './menuTypes';
+import { MenuItem, ItemVariant } from './types';
 
 export type OrderMode = 'delivery' | 'collection';
 

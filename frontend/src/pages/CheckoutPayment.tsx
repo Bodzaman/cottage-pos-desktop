@@ -662,7 +662,7 @@ export default function CheckoutPayment() {
                           </div>
                           <div className="flex items-center gap-2 text-xs">
                             <FaPhone className="text-[#8B1538]" />
-                            <span>Questions? Call {restaurantConfig?.phone || '01903 743343'}</span>
+                            <span>Questions? Call {restaurantConfig?.phone || '01903 743605'}</span>
                           </div>
                         </div>
                       ) : (

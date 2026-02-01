@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Category, MenuItem } from '../utils/menuTypes';
+import { Category, MenuItem } from '../utils/types';
 import { EnhancedMenuCategories } from './EnhancedMenuCategories';
 import { SubcategoryTabs } from './SubcategoryTabs';
 import { MenuBreadcrumb } from './MenuBreadcrumb';

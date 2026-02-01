@@ -130,7 +130,7 @@ const PALETTE_ELEMENTS: PaletteElement[] = [
     description: 'Restaurant name, address, phone, VAT',
     icon: 'Building',
     default_data: {
-      text: 'Cottage Tandoori Restaurant\n25 West St, Storrington\nPhone: 01903 741 777\nVAT: GB123456789',
+      text: 'Cottage Tandoori Restaurant\n25 West St, Storrington\nPhone: 01903 743605\nVAT: GB123456789',
       placeholder: 'Edit restaurant details'
     },
     default_style: {

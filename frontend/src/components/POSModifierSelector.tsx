@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '../utils/supabaseClient';
-import { ModifierSelection } from '../utils/menuTypes';
+import { ModifierSelection } from '../utils/types';
 
 interface ModifierGroup {
   id: string;

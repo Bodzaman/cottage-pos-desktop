@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { MenuItem, OrderItem } from '../utils/menuTypes';
+import { MenuItem, OrderItem } from '../utils/types';
 import { EditOrderItemModal } from './EditOrderItemModal';
 import { SetMealCustomizeModal } from './SetMealCustomizeModal';
 import { toast } from 'sonner';

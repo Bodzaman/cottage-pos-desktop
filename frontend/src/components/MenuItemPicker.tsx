@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Search, Minus, Trash2, Settings, ImageIcon } from 'lucide-react';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import brain from 'brain';
-import { OrderItem } from 'utils/menuTypes';
+import { OrderItem } from 'utils/types';
 
 // 7 Hardcoded Category Sections for Restaurant Organization
 const CATEGORY_SECTIONS = [

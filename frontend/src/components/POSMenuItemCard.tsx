@@ -7,7 +7,7 @@ import { colors } from 'utils/designSystem';
 import { getSpiceEmoji } from 'utils/premiumTheme';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, type OrderMode } from 'utils/variantPricing';
-import type { MenuItem, ItemVariant } from '../utils/menuTypes';
+import type { MenuItem, ItemVariant } from '../utils/types';
 import type { OrderItem } from 'types';
 import { StaffUnifiedCustomizationModal, type SelectedCustomization } from 'components/StaffUnifiedCustomizationModal';
 import { useMenuItemImage } from 'utils/useMenuItemImage';
@@ -206,8 +206,22 @@ export function POSMenuItemCard({
 
   // Get variant display name - prioritize full variant_name from database
   // This respects user's chosen naming pattern (PREFIX, SUFFIX, INFIX, CUSTOM)
+  // ✅ FIX: Check both snake_case and camelCase versions for robustness
   const getVariantName = (variant: ItemVariant): string => {
-    return variant.variant_name || variant.name || 'Standard';
+    // Priority: variant_name (snake_case) > variantName (camelCase) > name > fallback
+    const displayName = variant.variant_name || variant.variantName || variant.name || 'Standard';
+
+    // Debug: Log if variant_name is missing but name exists (data pipeline issue)
+    if (import.meta.env?.DEV && !variant.variant_name && !variant.variantName && variant.name) {
+      console.warn('[POSMenuItemCard] variant_name missing, using name fallback:', {
+        id: variant.id,
+        name: variant.name,
+        variant_name: variant.variant_name,
+        variantName: variant.variantName
+      });
+    }
+
+    return displayName;
   };
 
   // Short variant label — prioritizes protein_type_name for clean button display
@@ -265,6 +279,14 @@ export function POSMenuItemCard({
       kitchen_display_name: item.kitchen_display_name || null,
       displayOrder: item.display_order || 0,
       display_order: item.display_order || 0,
+      // Include variant object for backend compatibility (dine_in_commands expects nested variant)
+      variant: variant.id ? {
+        id: variant.id,
+        name: variantDisplayName,
+        price: price,
+        protein_type: variant.protein_type_name,
+        protein_type_name: variant.protein_type_name,
+      } : undefined,
     };
 
     onAddToOrder(orderItem);

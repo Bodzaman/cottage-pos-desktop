@@ -43,6 +43,7 @@ import { useOnDemandPrinter } from 'utils/onDemandPrinterService';
 import posPerf, { POSPerfMarks } from 'utils/posPerformance';
 import { generateDisplayName } from 'utils/menuHelpers';
 import { getOrderItems } from 'utils/posSupabaseHelpers';
+import { completeTableOrder } from 'utils/supabaseQueries';
 
 // Component imports
 import { ManagementHeader } from '../components/ManagementHeader';
@@ -71,6 +72,7 @@ import { AvatarDropdown } from 'components/AvatarDropdown';
 import { PaymentFlowOrchestrator } from 'components/PaymentFlowOrchestrator';
 import { ReprintDialog } from 'components/pos/ReprintDialog';
 import { PrinterSettings } from 'components/pos/PrinterSettings';
+import { UpdateProgressModal, useAutoUpdate } from 'components/pos/UpdateProgressModal';
 import { CommandPalette } from 'components/pos/CommandPalette';
 import { WorkspaceSetupWizard } from 'components/pos/WorkspaceSetupWizard';
 import { EightySixBoard } from 'components/pos/EightySixBoard';
@@ -86,10 +88,11 @@ import {
   RejectOrderModal,
 } from 'components/online-orders';
 import { useOnlineOrdersRealtimeStore } from 'utils/stores/onlineOrdersRealtimeStore';
+import { useCallerIdStore } from 'utils/callerIdStore';
 import { ReservationsPlaceholder } from 'components/ReservationsPlaceholder';
 
 // Utility imports
-import { MenuItem, OrderItem, ModifierSelection, PaymentResult } from '../utils/menuTypes';
+import { MenuItem, OrderItem, ModifierSelection, PaymentResult } from '../utils/types';
 import { TipSelection } from '../components/POSTipSelector';
 import { usePOSSettingsQuery } from '@/utils/posSettingsQueries';
 
@@ -187,6 +190,18 @@ export default function POSDesktop() {
     return stopHeartbeat;
   }, []);
 
+  // 📞 CALLER ID: Initialize Supabase Realtime subscription for incoming calls
+  const [callerIdModalOpen, setCallerIdModalOpen] = useState(false); // Tracks if CustomerDetailsModal was opened from caller ID flow
+
+  useEffect(() => {
+    if (user?.id) {
+      useCallerIdStore.getState().initialize(user.id);
+    }
+    return () => {
+      useCallerIdStore.getState().cleanup();
+    };
+  }, [user?.id]);
+
   // Dynamic window title from restaurant settings
   const { getBusinessProfile } = useRestaurantSettings();
   const restaurantName = getBusinessProfile().name;
@@ -249,6 +264,9 @@ export default function POSDesktop() {
 
   // Customer intelligence for order history
   const { customerProfile, clearCustomer: clearIntelligenceCustomer } = usePOSCustomerIntelligence();
+
+  // Auto-update hook for Electron app updates with progress UI
+  const autoUpdate = useAutoUpdate();
 
   // Native Windows notifications for critical events (online orders, printer status)
   const { notify } = useNativeNotifications({
@@ -716,6 +734,34 @@ export default function POSDesktop() {
   const handleLogout = useCallback(async () => { await logout(); navigate('/pos-login', { replace: true }); }, [logout, navigate]);
   const handleManagementAuthSuccess = useCallback(() => { setManagerOverrideGranted(true); if (managerApprovalResolverRef.current) managerApprovalResolverRef.current(true); setIsManagementDialogOpen(false); setShowAdminPanel(true); }, []);
 
+  // Caller ID: Start order from incoming call
+  const handleCallerIdStartOrder = useCallback(async (customerId: string | null, phone: string) => {
+    // Switch to takeaway mode
+    setPosViewMode('TAKE_AWAY');
+    usePOSOrderStore.getState().setOrderType('COLLECTION');
+
+    if (customerId) {
+      // Known customer - load their profile
+      try {
+        const profile = await usePOSCustomerIntelligence.getState().loadCustomerById(customerId);
+        if (profile) {
+          usePOSCustomerIntelligence.getState().selectCustomer(profile);
+          toast.success('Customer loaded', {
+            description: `Ready to take order for ${profile.first_name || 'customer'}`
+          });
+        }
+      } catch (err) {
+        console.error('[CallerID] Failed to load customer:', err);
+        toast.error('Failed to load customer details');
+      }
+    } else {
+      // Unknown caller - open customer modal with phone prefilled
+      usePOSCustomerStore.getState().updateCustomer({ phone });
+      setCallerIdModalOpen(true); // Track that modal was opened from caller ID
+      setModal('showCustomerModal', true);
+    }
+  }, []);
+
   const handleViewModeChange = useCallback((mode: 'DINE_IN' | 'TAKE_AWAY' | 'ONLINE' | 'RESERVATIONS') => {
     setPosViewMode(mode);
     switch (mode) {
@@ -817,7 +863,20 @@ export default function POSDesktop() {
     }, 0);
   }, [orderItems]);
 
-  const handleCustomerSave = useCallback((data: any) => { updateCustomer(data); setCustomerData(data); }, [setCustomerData]);
+  const handleCustomerSave = useCallback((data: any) => {
+    updateCustomer(data);
+    setCustomerData(data);
+    setCallerIdModalOpen(false); // Reset caller ID modal tracking
+  }, [setCustomerData]);
+
+  // Handle cancel from CustomerDetailsModal - clears prefilled data if opened from caller ID
+  const handleCustomerModalCancel = useCallback(() => {
+    if (callerIdModalOpen) {
+      // Clear the prefilled phone number from caller ID flow
+      usePOSCustomerStore.getState().clearCustomer();
+      setCallerIdModalOpen(false);
+    }
+  }, [callerIdModalOpen]);
 
   const orderManagement = useOrderManagement(orderItems, setOrderItems);
   const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
@@ -1339,6 +1398,7 @@ export default function POSDesktop() {
           onCustomerSelect={(customer) => usePOSCustomerIntelligence.getState().selectCustomer(customer)}
           onSelectOnlineOrder={(id) => setSelectedOnlineOrderId(id)}
           onReorder={handleLoadPastOrder}
+          onCallerIdStartOrder={handleCallerIdStartOrder}
         />
         <POSNavigation currentViewMode={posViewMode} onViewModeChange={handleViewModeChange} onlineOrdersCount={unseenCount()} />
         <div className="h-full overflow-hidden">{renderMainPOSView()}</div>
@@ -1406,11 +1466,13 @@ export default function POSDesktop() {
           onPersistStaging={persistStagingCart}
           onPrintBill={handleDineInPrintBill}
           onCompleteOrder={async () => {
-            // Mark order as COMPLETED and reset table to AVAILABLE
-            if (dineInOrder?.id) {
+            // Mark order as CLOSED and reset table to AVAILABLE
+            if (selectedTableNumber) {
               try {
-                await brain.apiClient.complete_order({ order_id: dineInOrder.id });
-                // Table session completed - table status updates in UI
+                await completeTableOrder(selectedTableNumber);
+                toast.success('Order completed', {
+                  description: 'Table is now available'
+                });
               } catch (error) {
                 console.error('Failed to complete order:', error);
                 toast.error('Failed to complete table session');
@@ -1421,7 +1483,22 @@ export default function POSDesktop() {
           }}
         />
         <POSGuestCountModal isOpen={showGuestCountModal} onClose={() => setModal('showGuestCountModal', false)} onSave={handleGuestCountSave} tableNumber={selectedTableNumber || 0} tableCapacity={selectedTableCapacity} initialGuestCount={1} />
-        <CustomerDetailsModal isOpen={showCustomerModal} onClose={() => setModal('showCustomerModal', false)} onSave={handleCustomerSave} orderType={orderType as any} initialData={customerData as any} orderValue={orderTotal} onOrderTypeSwitch={(newMode) => setOrderType(newMode)} onManagerOverride={() => {}} requestManagerApproval={async () => true} managerOverrideGranted={true} />
+        <CustomerDetailsModal
+          isOpen={showCustomerModal}
+          onClose={() => {
+            setModal('showCustomerModal', false);
+            setCallerIdModalOpen(false); // Reset caller ID tracking on any close
+          }}
+          onSave={handleCustomerSave}
+          onCancel={handleCustomerModalCancel}
+          orderType={orderType as any}
+          initialData={customerData as any}
+          orderValue={orderTotal}
+          onOrderTypeSwitch={(newMode) => setOrderType(newMode)}
+          onManagerOverride={() => {}}
+          requestManagerApproval={async () => true}
+          managerOverrideGranted={true}
+        />
         <AdminSidePanel isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={customerProfile} orders={customerProfile?.recent_orders || []} onReorder={handleLoadPastOrder} />
         <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
@@ -1543,6 +1620,19 @@ export default function POSDesktop() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Auto-Update Progress Modal (Electron only) */}
+        <UpdateProgressModal
+          open={autoUpdate.isModalOpen}
+          state={autoUpdate.state}
+          info={autoUpdate.info}
+          progress={autoUpdate.progress}
+          error={autoUpdate.error}
+          onInstall={autoUpdate.installUpdate}
+          onDismiss={autoUpdate.dismissModal}
+          onRetry={autoUpdate.retryUpdate}
+        />
+
         {/* Lock Screen Overlay */}
         <AnimatePresence>
           {isLocked && <POSLockScreen onUnlock={handleUnlock} />}

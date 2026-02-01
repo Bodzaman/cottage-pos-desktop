@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Plus, ImageIcon } from 'lucide-react';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { MenuItem, OrderItem, ItemVariant } from 'utils/menuTypes';
+import { MenuItem, OrderItem, ItemVariant } from 'utils/types';
 import { globalColors as QSAITheme, styles } from 'utils/QSAIDesign';
 import { formatCurrency } from 'utils/formatters';
 

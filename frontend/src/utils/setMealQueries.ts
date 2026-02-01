@@ -8,7 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSetMeals } from './supabaseQueries';
 import { supabase } from './supabaseClient';
-import type { SetMeal } from './menuTypes';
+import type { SetMeal } from './types';
 
 // ==============================================================================
 // QUERY KEYS

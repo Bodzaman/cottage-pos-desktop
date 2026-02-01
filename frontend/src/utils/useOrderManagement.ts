@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { OrderItem } from './menuTypes';
+import type { OrderItem } from './types';
 
 /**
  * Hook: useOrderManagement

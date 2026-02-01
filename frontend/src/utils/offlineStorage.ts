@@ -5,7 +5,7 @@
  * Handles local order storage, menu caching, and sync queue management
  */
 
-import { OrderItem, MenuItem } from './menuTypes';
+import { OrderItem, MenuItem } from './types';
 
 // Types for offline storage
 export interface OfflineOrder {

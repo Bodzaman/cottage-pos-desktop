@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { colors } from "../utils/InternalDesignSystem";
 
 // Lazy load module components (same chunks as AdminTabsContent)
-const AdminPortalMenuContent = lazy(() => import("../components/AdminPortalMenuContent"));
+const MenuManagementLanding = lazy(() => import("../components/menu/MenuManagementLanding"));
 const MediaLibraryContent = lazy(() => import("../components/MediaLibraryContent").then(m => ({ default: m.MediaLibraryContent })));
 const AIStaffManagementHub = lazy(() => import("../pages/AIStaffManagementHub"));
 const ThermalReceiptDesignerV2 = lazy(() => import("../pages/ThermalReceiptDesignerV2"));
@@ -86,7 +86,7 @@ export function AdminAppShell({ activeApp, onBack, userEmail, onLogout, onBackTo
       case "website":
         return <WebsiteCMSContent />;
       case "menu":
-        return <AdminPortalMenuContent />;
+        return <MenuManagementLanding />;
       case "media":
         return <MediaLibraryContent />;
       case "ai-management":

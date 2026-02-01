@@ -1,20 +1,21 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { globalColors } from '../utils/QSAIDesign';
 import { colors as designColors } from '../utils/designSystem';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Utensils, 
-  Settings, 
-  ChefHat, 
-  ShoppingBag, 
-  Calendar, 
-  Globe, 
-  BarChart3, 
-  Shield, 
-  TableProperties, 
-  Truck, 
+import {
+  Utensils,
+  Settings,
+  ChefHat,
+  ShoppingBag,
+  Calendar,
+  Globe,
+  BarChart3,
+  Shield,
+  TableProperties,
+  Truck,
   FileText,
   Monitor,
   Search,
@@ -34,6 +35,8 @@ import { AvatarDropdown } from "./AvatarDropdown";
 import { APP_BASE_PATH } from '../utils/environment';
 import { POSOnlineStatusControl } from "./POSOnlineStatusControl";
 import { useBrandFont } from "../utils/useBrandFont";
+import { CallerIdPanel } from "./pos/CallerIdPanel";
+import { useCallerIdStore } from "../utils/callerIdStore";
 
 
 export interface Props {
@@ -48,9 +51,12 @@ export interface Props {
   onCustomerSelect?: (profile: any) => void;
   onSelectOnlineOrder?: (orderId: string) => void;
   onReorder?: (order: any) => void;
+  // Caller ID callbacks
+  onCallerIdStartOrder?: (customerId: string | null, phone: string) => void;
+  onCallerIdDismiss?: () => void;
 }
 
-export const ManagementHeader: React.FC<Props> = ({ 
+export const ManagementHeader: React.FC<Props> = ({
   title,
   selectedStore,
   currentSection,
@@ -60,7 +66,9 @@ export const ManagementHeader: React.FC<Props> = ({
   onLogout,
   onCustomerSelect,
   onSelectOnlineOrder,
-  onReorder
+  onReorder,
+  onCallerIdStartOrder,
+  onCallerIdDismiss
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,6 +80,12 @@ export const ManagementHeader: React.FC<Props> = ({
 
   // Get auth info for dropdown
   const { user, isAuthenticated } = usePOSAuth();
+
+  // Caller ID state
+  const activeIncomingCall = useCallerIdStore(s => s.activeIncomingCall());
+  const hasActiveCall = useCallerIdStore(s => s.hasActiveCall());
+  const dismissEvent = useCallerIdStore(s => s.dismissEvent);
+  const startOrderFromCall = useCallerIdStore(s => s.startOrderFromCall);
   
   // Context-aware search hook
   const contextSearch = usePOSContextSearch({
@@ -170,7 +184,28 @@ export const ManagementHeader: React.FC<Props> = ({
       navigate('/pos-login');
     }
   };
-  
+
+  // Caller ID handlers
+  const handleCallerIdStartOrder = useCallback(async () => {
+    if (!activeIncomingCall) return;
+
+    const { customerId, phone } = await startOrderFromCall(activeIncomingCall.id);
+
+    if (onCallerIdStartOrder) {
+      onCallerIdStartOrder(customerId, phone);
+    }
+  }, [activeIncomingCall, startOrderFromCall, onCallerIdStartOrder]);
+
+  const handleCallerIdDismiss = useCallback(async () => {
+    if (!activeIncomingCall) return;
+
+    await dismissEvent(activeIncomingCall.id);
+
+    if (onCallerIdDismiss) {
+      onCallerIdDismiss();
+    }
+  }, [activeIncomingCall, dismissEvent, onCallerIdDismiss]);
+
   return (
     <header 
       className={`relative p-4 pb-3 ${className}`}
@@ -207,70 +242,86 @@ export const ManagementHeader: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Center: Enhanced Search Bar - Prominent & Centered */}
-        {showSearch ? (
-          <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
-            <div className="relative search-container">
-              <Search 
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5" 
-                style={{ color: globalColors.text.tertiary }} 
-              />
-              <Input
-                type="text"
-                placeholder={contextSearch.placeholder}
-                value={contextSearch.query}
-                onChange={(e) => contextSearch.setQuery(e.target.value)}
-                className="pl-12 pr-12 py-3 text-base font-medium"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  borderColor: 'rgba(124, 93, 250, 0.3)',
-                  color: globalColors.text.primary,
-                  borderRadius: '0.75rem',
-                  border: '2px solid',
-                  boxShadow: '0 4px 20px rgba(124, 93, 250, 0.1)',
-                  transition: 'all 0.3s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(124, 93, 250, 0.6)';
-                  e.target.style.boxShadow = '0 6px 25px rgba(124, 93, 250, 0.2)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'rgba(124, 93, 250, 0.3)';
-                  e.target.style.boxShadow = '0 4px 20px rgba(124, 93, 250, 0.1)';
-                }}
-              />
-              {contextSearch.query && (
-                <button
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 transition-all duration-200 hover:scale-110"
+        {/* Center: Caller ID Panel OR Search Bar */}
+        <AnimatePresence mode="wait">
+          {hasActiveCall && activeIncomingCall ? (
+            <CallerIdPanel
+              key="caller-panel"
+              event={activeIncomingCall}
+              onStartOrder={handleCallerIdStartOrder}
+              onDismiss={handleCallerIdDismiss}
+            />
+          ) : showSearch ? (
+            <motion.div
+              key="search-bar"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 max-w-2xl mx-4 sm:mx-8"
+            >
+              <div className="relative search-container">
+                <Search
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5"
                   style={{ color: globalColors.text.tertiary }}
-                  onClick={contextSearch.clearSearch}
-                  onMouseEnter={(e) => e.currentTarget.style.color = globalColors.text.primary}
-                  onMouseLeave={(e) => e.currentTarget.style.color = globalColors.text.tertiary}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
+                />
+                <Input
+                  type="text"
+                  placeholder={contextSearch.placeholder}
+                  value={contextSearch.query}
+                  onChange={(e) => contextSearch.setQuery(e.target.value)}
+                  className="pl-12 pr-12 py-3 text-base font-medium"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    borderColor: 'rgba(124, 93, 250, 0.3)',
+                    color: globalColors.text.primary,
+                    borderRadius: '0.75rem',
+                    border: '2px solid',
+                    boxShadow: '0 4px 20px rgba(124, 93, 250, 0.1)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(124, 93, 250, 0.6)';
+                    e.target.style.boxShadow = '0 6px 25px rgba(124, 93, 250, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(124, 93, 250, 0.3)';
+                    e.target.style.boxShadow = '0 4px 20px rgba(124, 93, 250, 0.1)';
+                  }}
+                />
+                {contextSearch.query && (
+                  <button
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 transition-all duration-200 hover:scale-110"
+                    style={{ color: globalColors.text.tertiary }}
+                    onClick={contextSearch.clearSearch}
+                    onMouseEnter={(e) => e.currentTarget.style.color = globalColors.text.primary}
+                    onMouseLeave={(e) => e.currentTarget.style.color = globalColors.text.tertiary}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
 
-              {/* Context-Aware Search Results Dropdown */}
-              <ContextSearchResultsDropdown
-                customerResults={contextSearch.customerResults}
-                activeResults={contextSearch.activeResults}
-                pastResults={contextSearch.pastResults}
-                isVisible={contextSearch.showDropdown}
-                isLoading={contextSearch.isSearching}
-                searchQuery={contextSearch.query}
-                posViewMode={contextSearch.posViewMode}
-                onSelect={handleResultSelect}
-                onReprint={undefined}
-                onReorder={contextSearch.handleReorder}
-                onShowAllResults={handleShowAllResults}
-              />
-            </div>
-          </div>
-        ) : (
-          /* Spacer when search is not shown */
-          <div className="flex-1" />
-        )}
+                {/* Context-Aware Search Results Dropdown */}
+                <ContextSearchResultsDropdown
+                  customerResults={contextSearch.customerResults}
+                  activeResults={contextSearch.activeResults}
+                  pastResults={contextSearch.pastResults}
+                  isVisible={contextSearch.showDropdown}
+                  isLoading={contextSearch.isSearching}
+                  searchQuery={contextSearch.query}
+                  posViewMode={contextSearch.posViewMode}
+                  onSelect={handleResultSelect}
+                  onReprint={undefined}
+                  onReorder={contextSearch.handleReorder}
+                  onShowAllResults={handleShowAllResults}
+                />
+              </div>
+            </motion.div>
+          ) : (
+            /* Spacer when search is not shown */
+            <div className="flex-1" />
+          )}
+        </AnimatePresence>
 
         {/* Right: Settings & Tools Group - Anchored Right */}
         <div className="flex items-center gap-3 flex-shrink-0">

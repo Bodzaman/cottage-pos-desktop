@@ -1,4 +1,4 @@
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { TableStatus, TableOrderItem, TableOrder, TableData } from '../utils/tableTypes';
 
 /**

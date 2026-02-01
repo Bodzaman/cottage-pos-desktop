@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Receipt, Loader2, ArrowLeft, CheckCircle2, Users } from 'lucide-react';
+import { Receipt, Loader2, ArrowLeft, CheckCircle2, Users, CreditCard } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import ThermalReceiptDisplay from 'components/ThermalReceiptDisplay';
 import { useTemplateAssignments } from 'utils/useTemplateAssignments';
@@ -20,9 +20,9 @@ import {
   isRasterPrintAvailable,
   captureReceiptAsImage,
 } from 'utils/electronPrintService';
-import { generateDisplayNameForReceipt } from 'utils/menuHelpers';
+import { resolveItemDisplayName } from 'utils/menuHelpers';
 import { toast } from 'sonner';
-import type { OrderItem } from 'utils/menuTypes';
+import type { OrderItem } from 'utils/types';
 
 /**
  * EnrichedDineInOrderItem - Local interface matching backend response
@@ -85,6 +85,7 @@ interface DineInBillViewProps {
   // Actions
   onPrintBill: (orderTotal: number) => Promise<boolean>;
   onCompleteOrder: () => Promise<void>;
+  onPayTab?: (tabId: string) => Promise<boolean>; // Pay individual tab
 
   // Navigation
   onNavigateToReview: () => void;
@@ -98,6 +99,7 @@ export function DineInBillView({
   customerTabs,
   onPrintBill,
   onCompleteOrder,
+  onPayTab,
   onNavigateToReview,
 }: DineInBillViewProps) {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -157,11 +159,8 @@ export function DineInBillView({
       tableNumber: tableNumber?.toString(),
       guestCount: guestCount,
       items: displayItems.map(item => {
-        const displayName = generateDisplayNameForReceipt(
-          item.name,
-          item.variantName,
-          item.protein_type
-        );
+        // Use resolveItemDisplayName for intelligent variant handling
+        const displayName = resolveItemDisplayName(item);
 
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,
@@ -194,35 +193,43 @@ export function DineInBillView({
     setIsPrinting(true);
 
     try {
-      // Step 1: Capture receipt image for WYSIWYG printing
-      let capturedImageData: string | null = null;
+      let printSuccess = false;
+
+      // PRIMARY: Raster print (WYSIWYG with template styling)
       if (isRasterPrintAvailable() && receiptRef.current) {
-        capturedImageData = await captureReceiptAsImage(receiptRef.current, 80);
+        const capturedImageData = await captureReceiptAsImage(receiptRef.current, 80);
+
+        if (capturedImageData && window.electronAPI?.printReceiptRaster) {
+          const printResult = await window.electronAPI.printReceiptRaster({
+            imageData: capturedImageData,
+            paperWidth: 80
+          });
+
+          if (printResult.success) {
+            toast.success('Bill printed', {
+              description: `Sent to ${printResult.printer || 'thermal printer'}`
+            });
+            printSuccess = true;
+          } else {
+            console.warn('Raster print failed, trying fallback:', printResult.error);
+          }
+        }
       }
 
-      // Step 2: Call parent's print handler
-      const success = await onPrintBill(orderTotal);
-
-      // Step 3: If Electron is available, also print via raster
-      if (capturedImageData && window.electronAPI?.printReceiptRaster) {
-        const printResult = await window.electronAPI.printReceiptRaster({
-          imageData: capturedImageData,
-          paperWidth: 80
-        });
-
-        if (printResult.success) {
-          toast.success('Bill printed', {
-            description: `Sent to ${printResult.printer || 'thermal printer'}`
-          });
-        } else if (!success) {
+      // FALLBACK: ESC/POS via parent handler (non-Electron or raster failed)
+      if (!printSuccess) {
+        printSuccess = await onPrintBill(orderTotal);
+        if (printSuccess) {
+          toast.success('Bill printed');
+        } else {
           toast.warning('Print may have failed', {
-            description: printResult.error || 'Check printer connection'
+            description: 'Check printer connection'
           });
         }
       }
 
-      // Step 4: Complete the order
-      if (success) {
+      // Complete the order after successful print
+      if (printSuccess) {
         await onCompleteOrder();
         toast.success('Order completed', {
           description: 'Table is now available'
@@ -231,6 +238,79 @@ export function DineInBillView({
     } catch (error) {
       console.error('Error in handlePrintAndComplete:', error);
       toast.error('Failed to complete order');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  // Handle pay single tab - prints bill for this tab only and marks it paid
+  const handlePayTabOnly = async () => {
+    if (!selectedTab || !onPayTab) return;
+
+    setIsPrinting(true);
+
+    try {
+      let printSuccess = false;
+
+      // PRIMARY: Raster print (WYSIWYG with template styling)
+      if (isRasterPrintAvailable() && receiptRef.current) {
+        const capturedImageData = await captureReceiptAsImage(receiptRef.current, 80);
+
+        if (capturedImageData && window.electronAPI?.printReceiptRaster) {
+          const printResult = await window.electronAPI.printReceiptRaster({
+            imageData: capturedImageData,
+            paperWidth: 80
+          });
+
+          if (printResult.success) {
+            toast.success('Tab bill printed', {
+              description: `Sent to ${printResult.printer || 'thermal printer'}`
+            });
+            printSuccess = true;
+          } else {
+            console.warn('Raster print failed, trying fallback:', printResult.error);
+          }
+        }
+      }
+
+      // FALLBACK: ESC/POS via parent handler (non-Electron or raster failed)
+      if (!printSuccess) {
+        printSuccess = await onPrintBill(orderTotal);
+        if (printSuccess) {
+          toast.success('Tab bill printed');
+        } else {
+          toast.warning('Print may have failed', {
+            description: 'Check printer connection'
+          });
+        }
+      }
+
+      // Mark tab as paid
+      if (printSuccess) {
+        const success = await onPayTab(selectedTab);
+        if (success) {
+          // Check if there are remaining active tabs
+          const remainingTabs = customerTabs.filter(
+            t => t.status === 'active' && t.id !== selectedTab
+          );
+
+          if (remainingTabs.length === 0) {
+            // All tabs paid - complete the order
+            await onCompleteOrder();
+            toast.success('Order completed', {
+              description: 'All tabs paid - table is now available'
+            });
+          } else {
+            toast.success('Tab paid', {
+              description: `${remainingTabs.length} tab(s) remaining`
+            });
+            setSelectedTab(null); // Reset to "All" view
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in handlePayTabOnly:', error);
+      toast.error('Failed to process tab payment');
     } finally {
       setIsPrinting(false);
     }
@@ -352,28 +432,58 @@ export function DineInBillView({
           Back to Review
         </Button>
 
-        <Button
-          onClick={handlePrintAndComplete}
-          disabled={isPrinting || displayItems.length === 0}
-          className="min-w-[200px]"
-          style={{
-            backgroundColor: isPrinting ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
-            color: 'white',
-            boxShadow: isPrinting ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
-          }}
-        >
-          {isPrinting ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Printing...
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Print Final Bill
-            </>
+        <div className="flex items-center gap-3">
+          {/* Pay This Tab Only - shown when a specific tab is selected */}
+          {selectedTab && onPayTab && (
+            <Button
+              onClick={handlePayTabOnly}
+              disabled={isPrinting || displayItems.length === 0}
+              variant="outline"
+              className="min-w-[180px]"
+              style={{
+                borderColor: QSAITheme.purple.primary,
+                color: QSAITheme.purple.primary,
+                backgroundColor: 'transparent',
+              }}
+            >
+              {isPrinting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Pay This Tab (£{orderTotal.toFixed(2)})
+                </>
+              )}
+            </Button>
           )}
-        </Button>
+
+          {/* Print Final Bill - completes entire order */}
+          <Button
+            onClick={handlePrintAndComplete}
+            disabled={isPrinting || displayItems.length === 0}
+            className="min-w-[200px]"
+            style={{
+              backgroundColor: isPrinting ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
+              color: 'white',
+              boxShadow: isPrinting ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
+            }}
+          >
+            {isPrinting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Printing...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Print Final Bill
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

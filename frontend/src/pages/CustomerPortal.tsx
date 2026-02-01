@@ -508,8 +508,6 @@ export default function CustomerPortal() {
   useEffect(() => {
     if (!profile?.id || !isOnline) return;
 
-    console.log('🔔 Setting up real-time order subscription for customer:', profile.id);
-
     const subscription = subscribeToCustomerOrders(
       profile.id,
       (updatedOrder) => {
@@ -557,7 +555,6 @@ export default function CustomerPortal() {
     );
 
     return () => {
-      console.log('🔕 Cleaning up real-time order subscription');
       unsubscribeFromOrderTracking(subscription);
     };
   }, [profile?.id, isOnline]);

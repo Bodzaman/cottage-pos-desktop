@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 import { PremiumTheme } from '../utils/premiumTheme';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown, ChevronRight, Grid3X3, Utensils, Coffee, Wine, Leaf } from 'lucide-react';

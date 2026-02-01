@@ -1,5 +1,5 @@
 import React from 'react';
-import { ItemVariant, ProteinType } from '../utils/menuTypes';
+import { ItemVariant, ProteinType } from '../utils/types';
 import { cn } from '../utils/cn';
 
 interface CompactProteinChipsProps {

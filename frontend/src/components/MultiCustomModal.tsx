@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { EditOrderItemModal } from './EditOrderItemModal';
 
 // Utils and Types
-import { MenuItem, OrderItem, ItemVariant } from '../utils/menuTypes';
+import { MenuItem, OrderItem, ItemVariant } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { cn } from '@/lib/utils';

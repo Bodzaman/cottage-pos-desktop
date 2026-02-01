@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { OrderItem } from '../utils/menuTypes';
+import { OrderItem } from '../utils/types';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { SetMealListResponse } from '../brain/data-contracts';
 import { OptimizedImage } from 'components/OptimizedImage';

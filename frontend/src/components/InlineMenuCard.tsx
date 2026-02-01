@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { PremiumTheme } from 'utils/premiumTheme';
 import { cn } from 'utils/cn';
 import { CustomerUnifiedCustomizationModal, SelectedCustomization } from './CustomerUnifiedCustomizationModal';
-import { MenuItem, ItemVariant } from '../utils/menuTypes';
+import { MenuItem, ItemVariant } from '../utils/types';
 import { useVariantImageCarousel } from 'utils/useVariantImageCarousel';
 import { computeUnitPrice } from 'utils/priceUtils';
 

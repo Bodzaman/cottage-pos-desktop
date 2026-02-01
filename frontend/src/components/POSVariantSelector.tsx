@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '../utils/supabaseClient';
-import { MenuItem, ItemVariant, ProteinType, OrderItem } from '../utils/menuTypes';
+import { MenuItem, ItemVariant, ProteinType, OrderItem } from '../utils/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { convertSpiceIndicatorsToEmoji, getSpiceLevelDisplay } from '../utils/spiceLevelUtils';

@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { MenuCategory } from '../utils/menuTypes';
+import { MenuCategory } from '../utils/types';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { FIXED_SECTIONS } from 'utils/sectionMapping';
-import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { useRealtimeMenuStore } from 'utils/realtimeMenuStore';
+import { useMenuUIStore } from 'utils/menuUIStore';
 
 interface Props {
   categories: MenuCategory[];
@@ -80,9 +79,8 @@ export function DineInCategoryPillsHorizontal({
 
   // ✅ Handle category selection with menu store integration
   const handleCategoryClick = (categoryId: string | null) => {
-    // Update menu store to filter items
-    const menuStore = useRealtimeMenuStore.getState();
-    menuStore.setSelectedMenuCategory(categoryId);
+    // Update menu UI store to filter items (React Query handles data)
+    useMenuUIStore.getState().setSelectedMenuCategory(categoryId);
     
     // Update local UI state
     onCategorySelect(categoryId);

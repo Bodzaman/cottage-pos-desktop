@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { CategorySidebar } from 'components/CategorySidebar';
 import { MenuItemListView } from 'components/MenuItemListView';
 import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
-import { OrderItem } from 'utils/menuTypes';
+import { OrderItem } from 'utils/types';
 import { globalColors as QSAITheme } from 'utils/QSAIDesign';
 import brain from 'brain';
 

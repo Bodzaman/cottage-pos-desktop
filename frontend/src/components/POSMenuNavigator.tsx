@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Utensils, ChefHat, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 import { QSAITheme } from '../utils/QSAIDesign';
 
 interface Props {

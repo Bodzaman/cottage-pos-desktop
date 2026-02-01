@@ -43,10 +43,10 @@ import type {
   MenuItem,
   ItemVariant,
   ProteinType,
-  CustomizationBase,
+  Customization,
   SetMeal,
   OrderItem
-} from './menuTypes';
+} from './types';
 import type { TableData } from './tableTypes';
 
 /**
@@ -58,7 +58,7 @@ export interface MenuStoreCompatState {
   menuItems: MenuItem[];
   setMeals: SetMeal[];
   proteinTypes: ProteinType[];
-  customizations: CustomizationBase[];
+  customizations: Customization[];
   itemVariants: ItemVariant[];
 
   // Pre-computed lookup tables
@@ -114,8 +114,8 @@ export interface MenuStoreCompatState {
   updateFlexibleBillingItems: (items: OrderItem[]) => void;
 
   // Customization helpers
-  getWebsiteCustomizations: () => CustomizationBase[];
-  getCustomizationsByGroup: () => Record<string, CustomizationBase[]>;
+  getWebsiteCustomizations: () => Customization[];
+  getCustomizationsByGroup: () => Record<string, Customization[]>;
 }
 
 /**
@@ -199,7 +199,7 @@ export function useRealtimeMenuStoreCompat(options: {
 
   const getCustomizationsByGroup = useCallback(() => {
     if (!bundle) return {};
-    const customizationsByGroup: Record<string, CustomizationBase[]> = {};
+    const customizationsByGroup: Record<string, Customization[]> = {};
 
     bundle.customizations.forEach(customization => {
       if (customization.is_active && customization.show_on_website) {

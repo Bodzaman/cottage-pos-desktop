@@ -12,7 +12,7 @@ import { MenuGrid } from '../components/MenuGrid';
 import { CustomerUnifiedCustomizationModal, SelectedCustomization } from '../components/CustomerUnifiedCustomizationModal';
 import { useCartStore } from '../utils/cartStore';
 import { PremiumTheme } from '../utils/premiumTheme';
-import { MenuItem, ItemVariant } from '../utils/menuTypes';
+import { MenuItem, ItemVariant } from '../utils/types';
 
 export function MenuOrderingView() {
   // Menu data and filtering - using reactive store (exactly like OnlineOrders)

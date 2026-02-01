@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PortalTooltip } from './PortalTooltip';
-import { MenuItem } from 'utils/menuTypes';
+import { MenuItem } from 'utils/types';
 
 interface InfoButtonProps {
   item: MenuItem;

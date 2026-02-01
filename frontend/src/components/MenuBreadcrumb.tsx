@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
-import { Category } from '../utils/menuTypes';
+import { Category } from '../utils/types';
 
 interface MenuBreadcrumbProps {
   parentCategory: Category | null;
