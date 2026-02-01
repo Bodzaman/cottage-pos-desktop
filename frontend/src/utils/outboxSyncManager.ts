@@ -81,17 +81,23 @@ class OutboxSyncManager {
       if (this.useElectronPersistence) {
         // Electron mode: SQLite is the SOLE source of truth
         // No IndexedDB initialization needed
-        if (isDev) console.log('📦 [OutboxSync] Using Electron SQLite persistence (IndexedDB bypassed)');
+        console.log('📦 [OutboxSync] Using Electron SQLite persistence (IndexedDB bypassed)');
 
         // Log current queue stats
-        const response = await getElectronAPI()?.offlineOrderGetStats();
-        if (response?.success && response.stats) {
-          if (isDev) console.log('📦 [OutboxSync] SQLite queue stats:', response.stats);
+        try {
+          const response = await getElectronAPI()?.offlineOrderGetStats();
+          if (response?.success && response.stats) {
+            console.log('📦 [OutboxSync] SQLite queue stats:', response.stats);
+          } else if (response?.error) {
+            console.warn('📦 [OutboxSync] SQLite stats error:', response.error);
+          }
+        } catch (err) {
+          console.warn('📦 [OutboxSync] Failed to get SQLite stats:', err);
         }
       } else {
         // Web mode: use IndexedDB
         await offlineStorage.initialize();
-        if (isDev) console.log('📦 [OutboxSync] Using IndexedDB persistence');
+        console.log('📦 [OutboxSync] Using IndexedDB persistence');
       }
 
       // Set up offline status monitoring
