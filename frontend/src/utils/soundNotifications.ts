@@ -9,8 +9,14 @@ interface NotificationSettings {
   urgentAlerts: boolean;
 }
 
+// Detect Electron mode for path resolution
+const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
+
 // MP3 sound file path for online order notifications
-const ONLINE_ORDER_MP3_PATH = '/audio-sounds/online_order_notification_sound_pos.mp3';
+// Use relative path in Electron (file:// protocol), absolute path in browser
+const ONLINE_ORDER_MP3_PATH = isElectron
+  ? './audio-sounds/online_order_notification_sound_pos.mp3'
+  : '/audio-sounds/online_order_notification_sound_pos.mp3';
 
 // Preloaded MP3 audio element (singleton)
 let preloadedMp3Audio: HTMLAudioElement | null = null;

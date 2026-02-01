@@ -275,7 +275,12 @@ export function OnlineOrdersSettingsTab() {
 
   // Test sound
   const testSound = () => {
-    const audio = new Audio('/audio-sounds/online_order_notification_sound_pos.mp3');
+    // Use relative path in Electron (file:// protocol), absolute in browser
+    const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
+    const soundPath = isElectron
+      ? './audio-sounds/online_order_notification_sound_pos.mp3'
+      : '/audio-sounds/online_order_notification_sound_pos.mp3';
+    const audio = new Audio(soundPath);
     audio.volume = localSettings.notifications.soundVolume / 100;
     audio.play().catch(err => {
       console.warn('Failed to play test sound:', err);
