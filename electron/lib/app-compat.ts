@@ -1700,16 +1700,165 @@ export const apiClient = {
     return mockResponse(data || []);
   },
 
-  create_customization: async (data: any) => mockResponse({ success: true }),
+  create_customization: async (data: any) => {
+    console.log('📝 [app-compat] create_customization called:', data);
+    try {
+      const insertData = {
+        name: data.name,
+        price_adjustment: data.price_adjustment || data.price || 0,
+        customization_group: data.customization_group === '_none_' ? null : data.customization_group,
+        menu_order: data.display_order || 0,
+        is_exclusive: data.is_exclusive || false,
+        is_active: data.is_active !== false,
+        show_on_pos: data.show_on_pos !== false,
+        show_on_website: data.show_on_website || false,
+        ai_voice_agent: data.ai_voice_agent || false,
+        is_global: data.is_global || false,
+        item_ids: data.item_ids || [],
+      };
 
-  update_customization: async (id: string, data: any) => mockResponse({ success: true }),
+      const { data: newCustomization, error } = await supabase
+        .from('menu_customizations')
+        .insert(insertData)
+        .select()
+        .single();
 
-  delete_customization: async (params: any) => mockResponse({ success: true }),
+      if (error) {
+        console.error('❌ [app-compat] create_customization error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customization created:', newCustomization.id);
+      return mockResponse({ success: true, customization: newCustomization });
+    } catch (error) {
+      console.error('❌ [app-compat] create_customization exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  update_customization: async (params: any, data?: any) => {
+    // Handle both call signatures: (id, data) or ({customizationId}, data)
+    const customizationId = typeof params === 'string' ? params : params?.customizationId;
+    const updateData = data || params;
+
+    console.log('📝 [app-compat] update_customization called:', customizationId, updateData);
+    try {
+      const updatePayload: Record<string, any> = {};
+
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.price_adjustment !== undefined) updatePayload.price_adjustment = updateData.price_adjustment;
+      if (updateData.price !== undefined) updatePayload.price_adjustment = updateData.price;
+      if (updateData.customization_group !== undefined) {
+        updatePayload.customization_group = updateData.customization_group === '_none_' ? null : updateData.customization_group;
+      }
+      if (updateData.display_order !== undefined) updatePayload.menu_order = updateData.display_order;
+      if (updateData.is_exclusive !== undefined) updatePayload.is_exclusive = updateData.is_exclusive;
+      if (updateData.is_active !== undefined) updatePayload.is_active = updateData.is_active;
+      if (updateData.show_on_pos !== undefined) updatePayload.show_on_pos = updateData.show_on_pos;
+      if (updateData.show_on_website !== undefined) updatePayload.show_on_website = updateData.show_on_website;
+      if (updateData.ai_voice_agent !== undefined) updatePayload.ai_voice_agent = updateData.ai_voice_agent;
+      if (updateData.is_global !== undefined) updatePayload.is_global = updateData.is_global;
+      if (updateData.item_ids !== undefined) updatePayload.item_ids = updateData.item_ids;
+
+      const { data: updated, error } = await supabase
+        .from('menu_customizations')
+        .update(updatePayload)
+        .eq('id', customizationId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] update_customization error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customization updated:', updated.id);
+      return mockResponse({ success: true, customization: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] update_customization exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
+
+  delete_customization: async (params: any) => {
+    const customizationId = params?.customizationId || params?.id;
+    console.log('📝 [app-compat] delete_customization called:', customizationId);
+    try {
+      const { error } = await supabase
+        .from('menu_customizations')
+        .delete()
+        .eq('id', customizationId);
+
+      if (error) {
+        console.error('❌ [app-compat] delete_customization error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Customization deleted:', customizationId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] delete_customization exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // CATEGORIES
   // ============================================================================
-  save_category: async (data: any) => mockResponse({ success: true }),
+  save_category: async (data: any) => {
+    console.log('📝 [app-compat] save_category called:', data);
+    try {
+      const isUpdate = !!data.id;
+
+      const categoryData: Record<string, any> = {
+        name: data.name,
+        description: data.description || null,
+        sort_order: data.display_order ?? data.menu_order ?? 0,
+        print_order: data.print_order ?? 0,
+        print_to_kitchen: data.print_to_kitchen ?? false,
+        active: data.active !== false,
+        parent_category_id: data.parent_category_id || null,
+        is_protein_type: data.is_protein_type ?? false,
+        section_id: data.section_id || null,
+      };
+
+      if (isUpdate) {
+        // Update existing category
+        const { data: updated, error } = await supabase
+          .from('menu_categories')
+          .update(categoryData)
+          .eq('id', data.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ [app-compat] save_category update error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+
+        console.log('✅ [app-compat] Category updated:', updated.id);
+        return mockResponse({ success: true, category: updated });
+      } else {
+        // Insert new category
+        const { data: created, error } = await supabase
+          .from('menu_categories')
+          .insert(categoryData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ [app-compat] save_category insert error:', error);
+          return mockResponse({ success: false, error: error.message }, false);
+        }
+
+        console.log('✅ [app-compat] Category created:', created.id);
+        return mockResponse({ success: true, category: created });
+      }
+    } catch (error) {
+      console.error('❌ [app-compat] save_category exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   get_menu_categories: async (_params?: any) => {
     console.log('🔄 [app-compat] get_menu_categories - querying Supabase directly');
@@ -1727,9 +1876,78 @@ export const apiClient = {
     return mockResponse({ categories: data || [] });
   },
 
-  check_category_delete: async (params: any) => mockResponse({ can_delete: true }),
+  check_category_delete: async (params: any) => {
+    const categoryId = params?.categoryId || params?.category_id || params?.id;
+    console.log('📝 [app-compat] check_category_delete called:', categoryId);
+    try {
+      // Check if category has menu items
+      const { count: itemCount, error: itemError } = await supabase
+        .from('menu_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', categoryId);
 
-  safe_delete_category: async (params: any) => mockResponse({ success: true }),
+      if (itemError) {
+        console.error('❌ [app-compat] check_category_delete error:', itemError);
+        return mockResponse({ can_delete: false, error: itemError.message }, false);
+      }
+
+      // Check if category has subcategories
+      const { count: subCount, error: subError } = await supabase
+        .from('menu_categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_category_id', categoryId);
+
+      if (subError) {
+        console.error('❌ [app-compat] check_category_delete subcategory error:', subError);
+        return mockResponse({ can_delete: false, error: subError.message }, false);
+      }
+
+      const canDelete = (itemCount || 0) === 0 && (subCount || 0) === 0;
+      console.log(`✅ [app-compat] check_category_delete: items=${itemCount}, subcategories=${subCount}, can_delete=${canDelete}`);
+
+      return mockResponse({
+        can_delete: canDelete,
+        item_count: itemCount || 0,
+        subcategory_count: subCount || 0,
+        message: canDelete ? 'Category can be deleted' : `Category has ${itemCount || 0} items and ${subCount || 0} subcategories`
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] check_category_delete exception:', error);
+      return mockResponse({ can_delete: false, error: (error as Error).message }, false);
+    }
+  },
+
+  safe_delete_category: async (params: any) => {
+    const categoryId = params?.categoryId || params?.category_id || params?.id;
+    console.log('📝 [app-compat] safe_delete_category called:', categoryId);
+    try {
+      // First verify it can be deleted
+      const { count: itemCount } = await supabase
+        .from('menu_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', categoryId);
+
+      if ((itemCount || 0) > 0) {
+        return mockResponse({ success: false, error: 'Cannot delete category with menu items' }, false);
+      }
+
+      const { error } = await supabase
+        .from('menu_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) {
+        console.error('❌ [app-compat] safe_delete_category error:', error);
+        return mockResponse({ success: false, error: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Category deleted:', categoryId);
+      return mockResponse({ success: true });
+    } catch (error) {
+      console.error('❌ [app-compat] safe_delete_category exception:', error);
+      return mockResponse({ success: false, error: (error as Error).message }, false);
+    }
+  },
 
   analyze_section_change_impact: async (params: any) => mockResponse({ impact: [] }),
 
@@ -4521,11 +4739,86 @@ export const apiClient = {
   // ============================================================================
   // PROTEINS
   // ============================================================================
-  create_protein_type2: async (data: any) => mockResponse({ success: true }),
+  create_protein_type2: async (data: any) => {
+    console.log('📝 [app-compat] create_protein_type2 called:', data);
+    try {
+      const insertData = {
+        name: data.name,
+        description: data.description || null,
+      };
 
-  update_protein_type2: async (params: any, data?: any) => mockResponse({ success: true }),
+      const { data: newProtein, error } = await supabase
+        .from('menu_protein_types')
+        .insert(insertData)
+        .select()
+        .single();
 
-  delete_protein_type2: async (params: any) => mockResponse({ success: true }),
+      if (error) {
+        console.error('❌ [app-compat] create_protein_type2 error:', error);
+        return mockResponse({ success: false, message: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Protein type created:', newProtein.id);
+      return mockResponse({ success: true, message: 'Protein type created', protein_type: newProtein });
+    } catch (error) {
+      console.error('❌ [app-compat] create_protein_type2 exception:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  update_protein_type2: async (params: any, data?: any) => {
+    // Handle call signature: ({proteinId}, data)
+    const proteinId = params?.proteinId || params?.protein_id || params?.id;
+    const updateData = data || params;
+
+    console.log('📝 [app-compat] update_protein_type2 called:', proteinId, updateData);
+    try {
+      const updatePayload: Record<string, any> = {};
+
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
+
+      const { data: updated, error } = await supabase
+        .from('menu_protein_types')
+        .update(updatePayload)
+        .eq('id', proteinId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [app-compat] update_protein_type2 error:', error);
+        return mockResponse({ success: false, message: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Protein type updated:', updated.id);
+      return mockResponse({ success: true, message: 'Protein type updated', protein_type: updated });
+    } catch (error) {
+      console.error('❌ [app-compat] update_protein_type2 exception:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
+
+  delete_protein_type2: async (params: any) => {
+    const proteinId = params?.proteinId || params?.protein_id || params?.id;
+    console.log('📝 [app-compat] delete_protein_type2 called:', proteinId);
+    try {
+      const { error } = await supabase
+        .from('menu_protein_types')
+        .delete()
+        .eq('id', proteinId);
+
+      if (error) {
+        console.error('❌ [app-compat] delete_protein_type2 error:', error);
+        return mockResponse({ success: false, message: error.message }, false);
+      }
+
+      console.log('✅ [app-compat] Protein type deleted:', proteinId);
+      return mockResponse({ success: true, message: 'Protein type deleted' });
+    } catch (error) {
+      console.error('❌ [app-compat] delete_protein_type2 exception:', error);
+      return mockResponse({ success: false, message: (error as Error).message }, false);
+    }
+  },
 
   // ============================================================================
   // CUSTOM SERVING SIZES
@@ -6212,9 +6505,52 @@ export const apiClient = {
 
   get_profile_image: async (params: any) => mockResponse({ profileimage: null }),
 
-  get_protein_type: async (params: any) => mockResponse({ proteintype: null }),
+  get_protein_type: async (params: any) => {
+    const proteinId = params?.id || params?.proteinId;
+    console.log('🔄 [app-compat] get_protein_type - querying Supabase directly:', proteinId);
+    try {
+      const { data, error } = await supabase
+        .from('menu_protein_types')
+        .select('*')
+        .eq('id', proteinId)
+        .single();
 
-  get_protein_types: async (params: any) => mockResponse({ proteintypes: [], total: 0 }),
+      if (error) {
+        console.error('❌ [app-compat] get_protein_type error:', error);
+        return mockResponse({ proteintype: null });
+      }
+
+      return mockResponse({ proteintype: data, protein_type: data });
+    } catch (error) {
+      console.error('❌ [app-compat] get_protein_type exception:', error);
+      return mockResponse({ proteintype: null });
+    }
+  },
+
+  get_protein_types: async (_params?: any) => {
+    console.log('🔄 [app-compat] get_protein_types - querying Supabase directly');
+    try {
+      const { data, error } = await supabase
+        .from('menu_protein_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('❌ [app-compat] get_protein_types error:', error);
+        return mockResponse({ proteintypes: [], protein_types: [], total: 0 });
+      }
+
+      console.log('✅ [app-compat] get_protein_types loaded:', data?.length || 0, 'types');
+      return mockResponse({
+        proteintypes: data || [],
+        protein_types: data || [],
+        total: data?.length || 0
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] get_protein_types exception:', error);
+      return mockResponse({ proteintypes: [], protein_types: [], total: 0 });
+    }
+  },
 
   get_public_restaurant_info: async (params: any) => mockResponse({ publicrestaurantinfo: null }),
 
@@ -6491,7 +6827,30 @@ export const apiClient = {
 
   list_promo_codes: async (params: any) => mockResponse({ promo_codes: [], total: 0 }),
 
-  list_protein_types: async (params: any) => mockResponse({ protein_types: [], total: 0 }),
+  list_protein_types: async (_params?: any) => {
+    console.log('🔄 [app-compat] list_protein_types - querying Supabase directly');
+    try {
+      const { data, error } = await supabase
+        .from('menu_protein_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('❌ [app-compat] list_protein_types error:', error);
+        return mockResponse({ success: false, protein_types: [], message: error.message });
+      }
+
+      console.log('✅ [app-compat] list_protein_types loaded:', data?.length || 0, 'types');
+      return mockResponse({
+        success: true,
+        protein_types: data || [],
+        message: `Found ${data?.length || 0} protein types`
+      });
+    } catch (error) {
+      console.error('❌ [app-compat] list_protein_types exception:', error);
+      return mockResponse({ success: false, protein_types: [], message: (error as Error).message });
+    }
+  },
 
   list_recent_events: async (params: any) => mockResponse({ recent_events: [], total: 0 }),
 
