@@ -3,8 +3,16 @@
  * Utilities for the Caller ID phone setup wizard
  */
 
-// API base path (uses Vite proxy in dev)
-const API_BASE = '/routes/callerid';
+// Detect Electron environment
+// In Electron, there's no Vite proxy, so we need the full backend URL
+const isElectron = typeof window !== 'undefined' &&
+  (window as any).electronAPI !== undefined;
+
+// Backend URL - in Electron use full URL, in web browser use relative (Vite proxies to backend)
+const BACKEND_URL = isElectron ? 'http://127.0.0.1:8000' : '';
+
+// API base path
+const API_BASE = `${BACKEND_URL}/routes/callerid`;
 
 // =============================================================================
 // Types
