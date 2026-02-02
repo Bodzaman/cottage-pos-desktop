@@ -34,7 +34,9 @@ import { useNavigate } from 'react-router-dom';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { POSViewType } from './POSViewContainer';
 
-export type OrderType = "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
+// OrderType uses underscore format to match database ENUM
+// WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
+export type OrderType = "DINE_IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
 
 interface POSSidebarProps {
   activeView: POSViewType;

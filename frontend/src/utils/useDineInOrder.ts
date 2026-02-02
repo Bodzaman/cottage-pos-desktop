@@ -1,9 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import brain from 'brain';
 import { toast } from 'sonner';
 import { EnrichedDineInOrderItem } from '../brain/data-contracts';
 import { getOfflineStatus } from './serviceWorkerManager';
+
+// Debounce delay for subscription refetch (ms)
+const REFETCH_DEBOUNCE_MS = 300;
 
 interface OrderItem {
   id: string;
@@ -47,8 +50,19 @@ export const useDineInOrder = (tableId: string | null) => {
   const [enrichedLoading, setEnrichedLoading] = useState(false);
   const [enrichedError, setEnrichedError] = useState<string | null>(null);
 
+  // Debounce ref for subscription refetch
+  const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // AbortController ref for canceling stale fetch requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Fetch enriched items from dine_in_order_items table
   const fetchEnrichedItems = useCallback(async (orderId: string) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setEnrichedLoading(true);
     setEnrichedError(null);
 
@@ -74,7 +88,8 @@ export const useDineInOrder = (tableId: string | null) => {
           )
         `)
         .eq('order_id', orderId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .abortSignal(abortControllerRef.current.signal);
 
       if (fetchError) throw fetchError;
 
@@ -117,12 +132,29 @@ export const useDineInOrder = (tableId: string | null) => {
       setEnrichedItems(enriched);
       console.log('[useDineInOrder] Loaded enriched items:', enriched.length);
     } catch (err: any) {
+      // Ignore abort errors
+      if (err.name === 'AbortError') {
+        console.log('[useDineInOrder] Fetch aborted (superseded by newer request)');
+        return;
+      }
       console.error('[useDineInOrder] Fetch enriched items error:', err);
       setEnrichedError(err.message);
     } finally {
       setEnrichedLoading(false);
     }
   }, []);
+
+  // Debounced refetch function - prevents rapid successive fetches
+  const debouncedFetchEnrichedItems = useCallback((orderId: string) => {
+    // Clear any pending debounced fetch
+    if (refetchTimeoutRef.current) {
+      clearTimeout(refetchTimeoutRef.current);
+    }
+    // Schedule new fetch after debounce delay
+    refetchTimeoutRef.current = setTimeout(() => {
+      fetchEnrichedItems(orderId);
+    }, REFETCH_DEBOUNCE_MS);
+  }, [fetchEnrichedItems]);
 
   // Fetch current order for table
   useEffect(() => {
@@ -187,8 +219,7 @@ export const useDineInOrder = (tableId: string | null) => {
             const newOrder = payload.new as Order;
             if (['CREATED', 'SENT_TO_KITCHEN', 'IN_PREP', 'READY', 'SERVED', 'PENDING_PAYMENT'].includes(newOrder.status)) {
               setOrder(newOrder);
-              // Re-fetch enriched items when order updates
-              fetchEnrichedItems(newOrder.id);
+              // Note: Items will be fetched by the items subscription (separate useEffect)
             } else {
               setOrder(null);
               setEnrichedItems([]);
@@ -198,48 +229,59 @@ export const useDineInOrder = (tableId: string | null) => {
       )
       .subscribe();
 
-    // Subscribe to real-time dine_in_order_items updates
-    // Note: dine_in_order_items has order_id and table_number, not table_id
-    // We remove the filter and rely on the handler's order.id check
+    console.log(`[useDineInOrder] Subscribed to orders for table ${tableId}`);
+
+    return () => {
+      console.log(`[useDineInOrder] Unsubscribing from orders for table ${tableId}`);
+      orderSubscription.unsubscribe();
+      // Clear debounce timeout on cleanup
+      if (refetchTimeoutRef.current) {
+        clearTimeout(refetchTimeoutRef.current);
+      }
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [tableId]);
+
+  // Separate subscription for items - depends on order.id for proper filtering
+  // This subscription only activates once we have an order, enabling the filter
+  useEffect(() => {
+    if (!order?.id) {
+      return;
+    }
+
+    // Initial fetch when order is first loaded
+    fetchEnrichedItems(order.id);
+
+    // Subscribe to real-time dine_in_order_items updates WITH filter
+    // This reduces subscription events by ~95% (only our order, not all orders)
     const itemsSubscription = supabase
-      .channel(`table-order-items-${tableId}`)
+      .channel(`order-items-${order.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'dine_in_order_items',
-          // No filter - handler checks order.id to avoid processing unrelated changes
+          filter: `order_id=eq.${order.id}`,
         },
         (payload) => {
-          console.log('[useDineInOrder] Real-time items update:', payload);
-          // Re-fetch all enriched items on any change for this order
-          if (order?.id) {
-            // Only refetch if the change is for our order
-            const changedOrderId = (payload.new as any)?.order_id || (payload.old as any)?.order_id;
-            if (changedOrderId === order.id) {
-              fetchEnrichedItems(order.id);
-            }
-          }
+          console.log('[useDineInOrder] Real-time items update for order:', order.id, payload.eventType);
+          // Use debounced fetch to prevent race conditions from rapid changes
+          debouncedFetchEnrichedItems(order.id);
         }
       )
       .subscribe();
 
-    console.log(`[useDineInOrder] Subscribed to table ${tableId}`);
+    console.log(`[useDineInOrder] Subscribed to items for order ${order.id} (filtered)`);
 
     return () => {
-      console.log(`[useDineInOrder] Unsubscribing from table ${tableId}`);
-      orderSubscription.unsubscribe();
+      console.log(`[useDineInOrder] Unsubscribing from items for order ${order.id}`);
       itemsSubscription.unsubscribe();
     };
-  }, [tableId, fetchEnrichedItems]);
-
-  // Re-fetch enriched items when order changes
-  useEffect(() => {
-    if (order?.id) {
-      fetchEnrichedItems(order.id);
-    }
-  }, [order?.id, fetchEnrichedItems]);
+  }, [order?.id, fetchEnrichedItems, debouncedFetchEnrichedItems]);
 
   // Command: Create Order
   // Now accepts full order creation params including linking data
@@ -324,11 +366,32 @@ export const useDineInOrder = (tableId: string | null) => {
       return;
     }
 
+    // VALIDATION: Prevent variant name corruption
+    // If variant_id is provided, variant_name must also be provided
+    const variantId = item.variant_id || item.variantId;
+    const variantName = item.variantName || (item as any).variant_name;
+
+    if (variantId && !variantName) {
+      console.error('[useDineInOrder] Variant validation failed: variant_id provided without variant_name', {
+        menu_item_id: item.menu_item_id,
+        variant_id: variantId,
+        item_name: item.name
+      });
+      toast.error('Item configuration error - please select variant again');
+      return;
+    }
+
+    // Ensure variant_name is included in the item payload (snake_case for backend)
+    const validatedItem = {
+      ...item,
+      variant_name: variantName || null
+    };
+
     setLoading(true);
     try {
       const response = await brain.add_item_to_order({
         order_id: order.id,
-        item,
+        item: validatedItem,
       });
       await response.json();
       console.log('[useDineInOrder] Item added:', item.name);

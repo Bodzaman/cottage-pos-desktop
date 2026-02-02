@@ -25,7 +25,7 @@ interface PosTable {
   table_number: number;
   capacity: number;
   status: 'available' | 'occupied' | 'reserved' | 'unavailable';
-  last_updated: string;
+  updated_at: string;
 }
 
 // Mapped table interface for POS system
@@ -33,10 +33,35 @@ interface MappedTable {
   table_number: number;
   capacity: number;
   status: TableStatus;
-  last_updated: string;
+  updated_at: string;
   isLinkedTable: boolean;
   isLinkedPrimary: boolean;
 }
+
+/**
+ * Map API status to POS system TableStatus
+ */
+const mapApiStatusToPosStatus = (apiStatus: string, _tableNumber: number): TableStatus => {
+  switch (apiStatus.toLowerCase()) {
+    case 'available':
+    case 'vacant':
+      return 'AVAILABLE';
+    case 'occupied':
+    case 'seated':
+    case 'dining':
+      return 'SEATED';
+    case 'reserved':
+      return 'SEATED';
+    case 'requesting_check':
+      return 'BILL_REQUESTED';
+    case 'paying':
+      return 'PAYMENT_PROCESSING';
+    case 'cleaning':
+    case 'unavailable':
+    default:
+      return 'AVAILABLE';
+  }
+};
 
 export function POSTableSelector({ selectedTable, onTableSelect, tableOrders = {}, className = '' }: Props) {
   const [tables, setTables] = useState<MappedTable[]>([]);
@@ -63,7 +88,7 @@ export function POSTableSelector({ selectedTable, onTableSelect, tableOrders = {
         table_number: table.table_number,
         capacity: table.capacity,
         status: mapApiStatusToPosStatus(table.status, table.table_number),
-        last_updated: table.last_updated || table.updated_at,
+        updated_at: table.updated_at,
         isLinkedTable: table.is_linked_table || false,
         isLinkedPrimary: table.is_linked_primary || false
       }));

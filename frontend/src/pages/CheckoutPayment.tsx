@@ -209,7 +209,15 @@ export default function CheckoutPayment() {
         const customerEmail = formCustomer?.email || user?.email;
         const customerPhone = formCustomer?.phone || user?.phone || undefined;
 
-        // Log the exact payload being sent
+        // Generate idempotency key to prevent duplicate orders
+        // Check if we already have one from a previous attempt
+        let idempotencyKey = sessionStorage.getItem('order_idempotency_key');
+        if (!idempotencyKey) {
+          idempotencyKey = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          sessionStorage.setItem('order_idempotency_key', idempotencyKey);
+        }
+
+        // Build order payload with idempotency key
         const orderPayload = {
           items: checkoutData.items.map(item => ({
             ...item,
@@ -224,7 +232,8 @@ export default function CheckoutPayment() {
           customer_id: user?.id || undefined, // Link order to authenticated user (undefined for guests)
           customer_email: customerEmail,
           customer_name: customerName,
-          customer_phone: customerPhone
+          customer_phone: customerPhone,
+          idempotency_key: idempotencyKey // Prevent duplicate orders
         };
         
 
@@ -274,13 +283,63 @@ export default function CheckoutPayment() {
     createOrder();
   }, [checkoutData, orderCreated, user]);
 
+  // Poll payment status to ensure webhook has processed
+  const pollPaymentStatus = async (orderId: string, maxAttempts: number = 15): Promise<boolean> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('payment_status, status')
+          .eq('id', orderId)
+          .single();
+
+        if (error) {
+          console.warn(`[CheckoutPayment] Poll attempt ${attempt + 1} failed:`, error);
+        } else if (data) {
+          // Payment confirmed by webhook
+          if (data.payment_status === 'PAID') {
+            console.log(`[CheckoutPayment] Payment confirmed after ${attempt + 1} attempts`);
+            return true;
+          }
+          // Payment failed
+          if (data.payment_status === 'FAILED' || data.status === 'CANCELLED') {
+            console.error('[CheckoutPayment] Payment failed according to database');
+            return false;
+          }
+        }
+      } catch (pollError) {
+        console.warn(`[CheckoutPayment] Poll error on attempt ${attempt + 1}:`, pollError);
+      }
+
+      // Wait before next poll (1 second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Timeout - but payment may still be processing
+    console.warn('[CheckoutPayment] Payment status polling timeout - proceeding anyway');
+    return true; // Assume success since Stripe confirmed
+  };
+
   const handlePaymentSuccess = async (paymentIntentId: string) => {
-    
+
     try {
+      // ============================================================================
+      // POLL PAYMENT STATUS TO ENSURE WEBHOOK HAS PROCESSED
+      // ============================================================================
+      if (createdOrderId) {
+        const paymentConfirmed = await pollPaymentStatus(createdOrderId);
+        if (!paymentConfirmed) {
+          toast.error('Payment verification failed', {
+            description: 'Please contact support if you were charged.'
+          });
+          return;
+        }
+      }
+
       // ============================================================================
       // CREATE PRINT JOBS IN SUPABASE PRINT QUEUE
       // ============================================================================
-      
+
       if (checkoutData && createdOrderId) {
         
         // Determine order type from checkout data
@@ -397,6 +456,7 @@ export default function CheckoutPayment() {
     // Clear cart and checkout session data
     clearCart();
     sessionStorage.removeItem('checkoutData');
+    sessionStorage.removeItem('order_idempotency_key'); // Clear idempotency key after success
 
     toast.success('Order placed successfully!', {
       description: 'Your payment has been processed',

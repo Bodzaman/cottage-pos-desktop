@@ -335,13 +335,13 @@ export const styles = {
     position: 'relative' as const
   },
   vignette: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     background: 'radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.5) 100%)',
-    pointerEvents: 'none',
+    pointerEvents: 'none' as const,
     zIndex: 1
   },
   // Button styles for backward compatibility

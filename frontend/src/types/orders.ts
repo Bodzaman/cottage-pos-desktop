@@ -3,9 +3,24 @@
  *
  * This file contains the canonical type definitions for order-related entities.
  * All field names use camelCase for TypeScript consistency.
+ *
+ * IMPORTANT: Snake_case aliases have been removed. Use the mapper functions
+ * (mapApiOrderItemToOrderItem, mapOrderItemToApi) for API conversion.
  */
 
-import type { OrderMode, OrderType, OrderStatus, PaymentMethodType, PaymentStatus, ISOTimestamp } from './common';
+import type {
+  OrderMode,
+  OrderType,
+  LegacyOrderType,
+  OrderSubtype,
+  OrderSource,
+  PricingMode,
+  OrderStatus,
+  PaymentMethodType,
+  PaymentStatus,
+  ISOTimestamp,
+} from './common';
+import { normalizeOrderType } from './common';
 import type { ModifierSelection, CustomizationSelection } from './menu';
 
 // ================================
@@ -15,58 +30,51 @@ import type { ModifierSelection, CustomizationSelection } from './menu';
 /**
  * Order item definition
  * Represents a single item in an order
+ *
+ * NOTE: Snake_case aliases removed - use mapper functions for API conversion
  */
 export interface OrderItem {
+  // Core fields - REQUIRED
   id: string;
   menuItemId: string;
-  menu_item_id?: string; // Snake_case alias
   variantId?: string | null;
-  variant_id?: string | null; // Snake_case alias
   name: string;
   quantity: number;
   price: number;
+
+  // Variant info
   variantName?: string;
-  variant_name?: string; // Snake_case alias
+
+  // Notes and customizations
   notes?: string;
   proteinType?: string;
-  protein_type?: string; // Snake_case alias
   imageUrl?: string;
-  image_url?: string; // Snake_case alias
   modifiers: ModifierSelection[];
   customizations?: CustomizationSelection[];
 
-  // Category tracking for receipt organization
+  // Category tracking for receipt organization - important for printing
   categoryId?: string;
-  category_id?: string; // Snake_case alias
   categoryName?: string;
-  category_name?: string; // Snake_case alias
 
   // Set meal fields
   itemType?: 'menu_item' | 'set_meal';
-  item_type?: 'menu_item' | 'set_meal'; // Snake_case alias
   setMealCode?: string;
-  set_meal_code?: string; // Snake_case alias
   setMealItems?: Array<{
     menuItemName: string;
     quantity: number;
     categoryName?: string;
   }>;
 
-  // Customer identification for kitchen tickets
+  // Customer identification for kitchen tickets (dine-in split billing)
   customerName?: string;
-  customer_name?: string; // Snake_case alias
   customerNumber?: number;
-  customer_number?: number; // Snake_case alias
   customerTabId?: string;
-  customer_tab_id?: string; // Snake_case alias
 
   // Kitchen display
   kitchenDisplayName?: string | null;
-  kitchen_display_name?: string | null; // Snake_case alias
 
   // Display order
   displayOrder?: number;
-  display_order?: number; // Snake_case alias
 
   // Kitchen status tracking
   status?: 'NEW' | 'PREPARING' | 'READY' | 'SERVED';
@@ -74,7 +82,15 @@ export interface OrderItem {
   // Section override for "Serve With" feature
   // When set, item prints/displays in this section instead of natural category section
   serveWithSectionId?: string | null;
-  serve_with_section_id?: string | null; // Snake_case alias
+}
+
+/**
+ * Normalized order item with required category fields
+ * Use this type when category info is guaranteed to be present (e.g., for printing)
+ */
+export interface NormalizedOrderItem extends OrderItem {
+  categoryId: string;
+  categoryName: string;
 }
 
 /**
@@ -122,8 +138,10 @@ export interface Order {
 export interface CompletedOrder {
   id: string;
   orderNumber?: string;
-  orderType: OrderType;
+  orderType: OrderType | LegacyOrderType;  // Accepts both new and legacy formats
+  orderSubtype?: OrderSubtype;  // NEW: WAITING, SEATED, etc.
   orderMode?: OrderMode;
+  orderSource?: OrderSource;  // NEW: POS, ONLINE, VOICE, PHONE
 
   // Customer info
   customer?: {
@@ -136,10 +154,12 @@ export interface CompletedOrder {
   customerPhone?: string;
   customerEmail?: string;
   customerAddress?: string;
+  customerId?: string;  // NEW: CRM customer ID
 
   // Table info (for dine-in)
   tableNumber?: number;
   tableId?: string;
+  guestCount?: number;  // NEW: Number of guests
 
   // Order details
   items: OrderItem[];
@@ -147,33 +167,43 @@ export interface CompletedOrder {
   discount?: number;
   discountCode?: string;
   deliveryFee?: number;
-  delivery_fee?: number; // Snake_case alias for compatibility
   serviceFee?: number;
+  tax?: number;  // NEW: Calculated tax amount
   tip?: number;
   total: number;
+
+  // Pricing metadata - NEW
+  pricingMode?: PricingMode;  // Which pricing tier was used
+  taxRate?: number;  // Tax rate at time of order (e.g., 0.20 for 20%)
+  serviceFeeRate?: number;  // Service charge rate (e.g., 10 for 10%)
 
   // Status
   status: OrderStatus;
   paymentStatus?: PaymentStatus;
   paymentMethod?: PaymentMethodType;
 
+  // Payment tracking - NEW
+  stripePaymentIntentId?: string;
+  idempotencyKey?: string;
+
   // AI Voice order fields
   isVoiceOrder?: boolean;
   voiceTranscript?: string;
   voiceAgentId?: string;
   voiceConfidence?: number;
-  voice_confidence?: number; // Snake_case alias for compatibility
 
   // Timestamps
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
   scheduledFor?: string;
+  acceptedAt?: string;  // NEW: When order was accepted
 
   // Notes
   specialInstructions?: string;
   kitchenNotes?: string;
   driverNotes?: string;
+  cancellationReason?: string;  // NEW: If cancelled, why
 
   // Source tracking
   source?: 'pos' | 'online' | 'voice' | 'phone';
@@ -297,11 +327,12 @@ export interface TipSelection {
 
 /**
  * Map API order data to Order (snake_case to camelCase)
+ * Handles both legacy (DINE-IN) and new (DINE_IN) order type formats
  */
 export function mapApiOrderToOrder(apiOrder: any): Order {
   return {
     id: apiOrder.id,
-    orderType: apiOrder.order_type,
+    orderType: normalizeOrderType(apiOrder.order_type),
     tableNumber: apiOrder.table_number,
     customerName: apiOrder.customer_name,
     customerPhone: apiOrder.customer_phone,
@@ -316,33 +347,90 @@ export function mapApiOrderToOrder(apiOrder: any): Order {
 }
 
 /**
+ * Map API order data to CompletedOrder with full details
+ */
+export function mapApiOrderToCompletedOrder(apiOrder: any): CompletedOrder {
+  return {
+    id: apiOrder.id,
+    orderNumber: apiOrder.order_number,
+    orderType: normalizeOrderType(apiOrder.order_type),
+    orderSubtype: apiOrder.order_subtype,
+    orderMode: apiOrder.order_mode,
+    orderSource: apiOrder.order_source?.toUpperCase(),
+    customer: apiOrder.customer,
+    customerName: apiOrder.customer_name,
+    customerPhone: apiOrder.customer_phone,
+    customerEmail: apiOrder.customer_email,
+    customerAddress: apiOrder.customer_address ?? apiOrder.delivery_address,
+    customerId: apiOrder.customer_id,
+    tableNumber: apiOrder.table_number,
+    tableId: apiOrder.table_id,
+    guestCount: apiOrder.guest_count,
+    items: (apiOrder.items || []).map(mapApiOrderItemToOrderItem),
+    subtotal: apiOrder.subtotal ?? 0,
+    discount: apiOrder.discount ?? apiOrder.discount_amount,
+    discountCode: apiOrder.discount_code ?? apiOrder.promo_code,
+    deliveryFee: apiOrder.delivery_fee ?? 0,
+    serviceFee: apiOrder.service_fee ?? apiOrder.service_charge ?? 0,
+    tax: apiOrder.tax ?? apiOrder.tax_amount ?? 0,
+    tip: apiOrder.tip ?? apiOrder.tip_amount ?? 0,
+    total: apiOrder.total ?? apiOrder.total_amount ?? 0,
+    pricingMode: apiOrder.pricing_mode,
+    taxRate: apiOrder.tax_rate,
+    serviceFeeRate: apiOrder.service_charge_rate ?? apiOrder.service_fee_rate,
+    status: apiOrder.status,
+    paymentStatus: apiOrder.payment_status,
+    paymentMethod: apiOrder.payment_method,
+    stripePaymentIntentId: apiOrder.stripe_payment_intent_id,
+    idempotencyKey: apiOrder.idempotency_key,
+    isVoiceOrder: apiOrder.is_voice_order,
+    voiceTranscript: apiOrder.voice_transcript,
+    voiceAgentId: apiOrder.voice_agent_id,
+    voiceConfidence: apiOrder.voice_confidence,
+    createdAt: apiOrder.created_at,
+    updatedAt: apiOrder.updated_at,
+    completedAt: apiOrder.completed_at,
+    scheduledFor: apiOrder.scheduled_for ?? apiOrder.pickup_time,
+    acceptedAt: apiOrder.accepted_at,
+    specialInstructions: apiOrder.special_instructions ?? apiOrder.notes,
+    kitchenNotes: apiOrder.kitchen_notes,
+    driverNotes: apiOrder.driver_notes ?? apiOrder.delivery_notes,
+    cancellationReason: apiOrder.cancellation_reason,
+    source: apiOrder.order_source?.toLowerCase(),
+    staffId: apiOrder.staff_id,
+    staffName: apiOrder.staff_name,
+  };
+}
+
+/**
  * Map API order item to OrderItem (snake_case to camelCase)
  */
 export function mapApiOrderItemToOrderItem(apiItem: any): OrderItem {
   return {
     id: apiItem.id,
-    menuItemId: apiItem.menu_item_id,
-    variantId: apiItem.variant_id,
-    name: apiItem.name,
+    menuItemId: apiItem.menu_item_id ?? apiItem.menuItemId ?? apiItem.item_id,
+    variantId: apiItem.variant_id ?? apiItem.variantId,
+    name: apiItem.name ?? apiItem.menu_item_name ?? apiItem.item_name,
     quantity: apiItem.quantity ?? 1,
-    price: apiItem.price ?? 0,
-    variantName: apiItem.variant_name,
-    notes: apiItem.notes,
-    proteinType: apiItem.protein_type,
-    imageUrl: apiItem.image_url,
+    price: apiItem.price ?? apiItem.unit_price ?? 0,
+    variantName: apiItem.variant_name ?? apiItem.variantName,
+    notes: apiItem.notes ?? apiItem.special_instructions,
+    proteinType: apiItem.protein_type ?? apiItem.proteinType,
+    imageUrl: apiItem.image_url ?? apiItem.imageUrl,
     modifiers: apiItem.modifiers || [],
     customizations: apiItem.customizations || [],
-    categoryId: apiItem.category_id,
-    categoryName: apiItem.category_name,
-    itemType: apiItem.item_type,
-    setMealCode: apiItem.set_meal_code,
-    setMealItems: apiItem.set_meal_items,
-    customerName: apiItem.customer_name,
-    customerNumber: apiItem.customer_number,
-    customerTabId: apiItem.customer_tab_id,
-    kitchenDisplayName: apiItem.kitchen_display_name,
-    status: apiItem.status,
-    serveWithSectionId: apiItem.serve_with_section_id,
+    categoryId: apiItem.category_id ?? apiItem.categoryId,
+    categoryName: apiItem.category_name ?? apiItem.categoryName,
+    itemType: apiItem.item_type ?? apiItem.itemType,
+    setMealCode: apiItem.set_meal_code ?? apiItem.setMealCode,
+    setMealItems: apiItem.set_meal_items ?? apiItem.setMealItems,
+    customerName: apiItem.customer_name ?? apiItem.customerName,
+    customerNumber: apiItem.customer_number ?? apiItem.customerNumber,
+    customerTabId: apiItem.customer_tab_id ?? apiItem.customerTabId,
+    kitchenDisplayName: apiItem.kitchen_display_name ?? apiItem.kitchenDisplayName,
+    displayOrder: apiItem.display_order ?? apiItem.displayOrder,
+    status: apiItem.status ?? apiItem.preparation_status,
+    serveWithSectionId: apiItem.serve_with_section_id ?? apiItem.serveWithSectionId,
   };
 }
 
@@ -363,6 +451,50 @@ export function mapOrderToApi(order: Order): any {
     total: order.total,
     created_at: order.createdAt,
     updated_at: order.updatedAt,
+  };
+}
+
+/**
+ * Map CompletedOrder to API format (camelCase to snake_case)
+ */
+export function mapCompletedOrderToApi(order: CompletedOrder): any {
+  return {
+    id: order.id,
+    order_number: order.orderNumber,
+    order_type: order.orderType,
+    order_subtype: order.orderSubtype,
+    order_source: order.orderSource,
+    customer_id: order.customerId,
+    customer_name: order.customerName,
+    customer_phone: order.customerPhone,
+    customer_email: order.customerEmail,
+    delivery_address: order.customerAddress,
+    table_number: order.tableNumber,
+    table_id: order.tableId,
+    guest_count: order.guestCount,
+    items: order.items.map(mapOrderItemToApi),
+    subtotal: order.subtotal,
+    discount_amount: order.discount,
+    discount_code: order.discountCode,
+    delivery_fee: order.deliveryFee,
+    service_charge: order.serviceFee,
+    tax_amount: order.tax,
+    tip_amount: order.tip,
+    total_amount: order.total,
+    pricing_mode: order.pricingMode,
+    tax_rate: order.taxRate,
+    service_charge_rate: order.serviceFeeRate,
+    status: order.status,
+    payment_status: order.paymentStatus,
+    payment_method: order.paymentMethod,
+    stripe_payment_intent_id: order.stripePaymentIntentId,
+    idempotency_key: order.idempotencyKey,
+    special_instructions: order.specialInstructions,
+    kitchen_notes: order.kitchenNotes,
+    delivery_notes: order.driverNotes,
+    cancellation_reason: order.cancellationReason,
+    staff_id: order.staffId,
+    staff_name: order.staffName,
   };
 }
 
@@ -392,6 +524,7 @@ export function mapOrderItemToApi(item: OrderItem): any {
     customer_number: item.customerNumber,
     customer_tab_id: item.customerTabId,
     kitchen_display_name: item.kitchenDisplayName,
+    display_order: item.displayOrder,
     status: item.status,
     serve_with_section_id: item.serveWithSectionId,
   };

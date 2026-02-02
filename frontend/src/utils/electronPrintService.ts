@@ -92,10 +92,12 @@ export interface CustomerReceiptData {
   items: ReceiptItem[];
   subtotal?: number;
   tax?: number;
+  serviceCharge?: number;  // Service charge amount for dine-in bills
   total: number;
   orderNumber?: string;
   orderType?: string;
   tableNumber?: number | string;
+  guestCount?: number;  // Number of guests for dine-in orders
   timestamp?: string;
   paymentMethod?: string;
   customerName?: string;

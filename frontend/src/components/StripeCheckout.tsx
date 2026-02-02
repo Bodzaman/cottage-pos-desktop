@@ -10,6 +10,12 @@ import { Button } from '@/components/ui/button';
 import { FaLock } from 'react-icons/fa';
 import brain from 'brain';
 import { toast } from 'sonner';
+import {
+  confirmPaymentWithRetry,
+  confirmPaymentWithBackendRetry,
+  getPaymentErrorMessage,
+  DEFAULT_RETRY_CONFIG,
+} from '../utils/paymentRetry';
 
 interface StripeCheckoutProps {
   orderId: string;
@@ -48,51 +54,58 @@ function CheckoutForm({
     setErrorMessage(null);
 
     try {
-
-      // Confirm the payment
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      // Confirm the payment with automatic retry for transient errors
+      const paymentResult = await confirmPaymentWithRetry(
+        stripe,
         elements,
-        confirmParams: {
+        {
           return_url: `${window.location.origin}/customer-portal?tab=orders`,
         },
-        redirect: 'if_required', // Only redirect if 3DS is required
-      });
+        { ...DEFAULT_RETRY_CONFIG, maxRetries: 2 } // Max 3 attempts total
+      );
 
-      if (error) {
-        console.error(' [Stripe] Payment error:', error);
-        const errorMsg = error.message || 'Payment failed';
+      if (!paymentResult.success) {
+        const errorMsg = paymentResult.error
+          ? getPaymentErrorMessage(paymentResult.error)
+          : 'Payment failed';
+
+        console.error('[Stripe] Payment failed after retries:', paymentResult.error);
         setErrorMessage(errorMsg);
         toast.error('Payment failed', {
           description: errorMsg,
         });
         onPaymentError(errorMsg);
-      } else if (paymentIntent) {
+        return;
+      }
 
-        // Confirm with backend
-        try {
+      const { paymentIntent } = paymentResult.data!;
+      console.log(`[Stripe] Payment confirmed after ${paymentResult.attempts} attempt(s)`);
+
+      // Confirm with backend (with retry)
+      const backendResult = await confirmPaymentWithBackendRetry(
+        async () => {
           const confirmResponse = await brain.confirm_payment({
             payment_intent_id: paymentIntent.id,
             order_id: orderId,
           });
+          return confirmResponse.json();
+        },
+        { ...DEFAULT_RETRY_CONFIG, maxRetries: 2 }
+      );
 
-          const confirmData = await confirmResponse.json();
-
-          if (confirmData.success) {
-            toast.success('Payment successful!', {
-              description: 'Your order has been placed',
-            });
-            onPaymentSuccess(paymentIntent.id);
-          } else {
-            throw new Error(confirmData.message || 'Failed to confirm payment');
-          }
-        } catch (confirmError: any) {
-          console.error(' [Stripe] Error confirming payment:', confirmError);
-          // Payment succeeded but confirmation failed - still call success
-          toast.success('Payment successful!', {
-            description: 'Your order has been placed',
-          });
-          onPaymentSuccess(paymentIntent.id);
-        }
+      if (backendResult.success) {
+        toast.success('Payment successful!', {
+          description: 'Your order has been placed',
+        });
+        onPaymentSuccess(paymentIntent.id);
+      } else {
+        // Backend confirmation failed but payment succeeded
+        // Still consider this a success since Stripe has the payment
+        console.warn('[Stripe] Backend confirmation failed, but payment succeeded:', backendResult.error);
+        toast.success('Payment successful!', {
+          description: 'Your order has been placed',
+        });
+        onPaymentSuccess(paymentIntent.id);
       }
     } catch (err: any) {
       const errorMsg = err.message || 'An unexpected error occurred';

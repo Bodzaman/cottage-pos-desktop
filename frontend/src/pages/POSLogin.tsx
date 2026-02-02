@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Eye, EyeOff, CheckCircle, Building2, Shield, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePOSAuth, UserRole } from 'utils/usePOSAuth';
+import { useConnectionStatus } from 'utils/connectionStatus';
 import { colors } from 'utils/InternalDesignSystem';
 import { AnimatedNucleus } from 'components/AnimatedNucleus';
 import { PINPad } from 'components/PINPad';
@@ -135,6 +136,8 @@ export default function POSLogin() {
   const navigate = useNavigate();
   const { login, loginWithPin, setPin, isAuthenticated, isLoading, pinEnabled, lastUserId, lastUserName, lastUserRole, user } = usePOSAuth();
   const greeting = useMemo(() => getGreeting(), []);
+  const isOnline = useConnectionStatus();
+  const isOffline = !isOnline;
 
   // Determine initial view: PIN login if previously configured, otherwise password
   const [view, setView] = useState<LoginView>(
@@ -223,6 +226,11 @@ export default function POSLogin() {
 
     setShakeError(false);
 
+    if (isOffline) {
+      toast.error('No internet connection. Reconnect or use PIN login.');
+      return;
+    }
+
     // CRITICAL: Block redirect BEFORE login() because Zustand triggers synchronous re-renders.
     // When login() calls set({ isAuthenticated: true }), the redirect effect runs immediately
     // before this function can continue. We must set the ref first to prevent premature redirect.
@@ -254,14 +262,18 @@ export default function POSLogin() {
       // Reset ref on error so user can retry
       pinSetupActiveRef.current = false;
       console.error('Login failed:', err);
-      toast.error(err instanceof Error ? err.message : 'Invalid username or password');
+      if (!navigator.onLine) {
+        toast.error('No internet connection. Reconnect or use PIN login.');
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Invalid username or password');
+      }
       setShakeError(true);
       setTimeout(() => setShakeError(false), 500);
       setPassword(''); // Clear password on error
     }
   };
 
-  const isDisabled = isLoading || !username || !password || loginSuccess;
+  const isDisabled = isLoading || !username || !password || loginSuccess || (view === 'password' && isOffline);
 
   return (
     <motion.div
@@ -519,10 +531,18 @@ export default function POSLogin() {
                   <span
                     className="w-2 h-2 rounded-full ml-0.5"
                     style={{
-                      backgroundColor: '#10B981',
-                      boxShadow: '0 0 6px rgba(16, 185, 129, 0.5)',
+                      backgroundColor: isOnline ? '#10B981' : '#EF4444',
+                      boxShadow: isOnline
+                        ? '0 0 6px rgba(16, 185, 129, 0.5)'
+                        : '0 0 6px rgba(239, 68, 68, 0.45)',
                     }}
                   />
+                  <span
+                    className="text-[10px] ml-1"
+                    style={{ color: isOnline ? '#34D399' : '#F87171' }}
+                  >
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 </span>
               </motion.div>
 
@@ -583,6 +603,32 @@ export default function POSLogin() {
                   ? 'Access restaurant settings & management'
                   : 'Access POS terminal & order management'}
               </motion.p>
+
+              {/* Offline banner */}
+              {isOffline && (
+                <div
+                  className="mb-5 rounded-lg px-3 py-2 text-xs"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#FCA5A5',
+                  }}
+                >
+                  No internet connection. Password login requires internet.{' '}
+                  {pinEnabled && lastUserId ? (
+                    <button
+                      type="button"
+                      className="underline underline-offset-2"
+                      onClick={() => setView('pin-login')}
+                      style={{ color: '#FCA5A5' }}
+                    >
+                      Use PIN login
+                    </button>
+                  ) : (
+                    'Reconnect to continue.'
+                  )}
+                </div>
+              )}
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-5">

@@ -22,6 +22,7 @@ import {
 } from 'utils/electronPrintService';
 import { resolveItemDisplayName } from 'utils/menuHelpers';
 import { toast } from 'sonner';
+import { supabase } from 'utils/supabaseClient';
 import type { OrderItem } from 'utils/types';
 
 /**
@@ -188,8 +189,57 @@ export function DineInBillView({
     };
   };
 
+  // Check if all items have been sent to kitchen
+  const hasUnsentItems = useMemo(() => {
+    return enrichedItems.some(item => !item.sent_to_kitchen_at);
+  }, [enrichedItems]);
+
+  // Get order ID from first enriched item (all items belong to same order)
+  const orderId = enrichedItems[0]?.order_id || null;
+
+  // Record bill print event to database for audit trail
+  const recordBillPrint = async (printedTotal: number) => {
+    if (!orderId) {
+      console.warn('[BillView] Cannot record bill print: no order ID');
+      return;
+    }
+
+    try {
+      // Increment bill_print_count and update bill_printed_at and printed_bill_total
+      const { error } = await supabase.rpc('increment_bill_print_count', {
+        p_order_id: orderId,
+        p_printed_total: printedTotal
+      });
+
+      // Fallback to direct update if RPC doesn't exist
+      if (error && error.message.includes('does not exist')) {
+        await supabase
+          .from('orders')
+          .update({
+            bill_printed_at: new Date().toISOString(),
+            bill_print_count: 1, // Will be incremented on subsequent prints
+            printed_bill_total: printedTotal
+          })
+          .eq('id', orderId);
+      } else if (error) {
+        console.error('[BillView] Error recording bill print:', error);
+      }
+    } catch (err) {
+      console.error('[BillView] Failed to record bill print:', err);
+      // Don't throw - this is a non-critical audit operation
+    }
+  };
+
   // Handle print and complete
   const handlePrintAndComplete = async () => {
+    // Validation: Check all items have been sent to kitchen
+    if (hasUnsentItems) {
+      toast.error('Cannot print bill', {
+        description: 'Some items have not been sent to the kitchen yet. Please send all items before printing the bill.'
+      });
+      return;
+    }
+
     setIsPrinting(true);
 
     try {
@@ -230,6 +280,9 @@ export function DineInBillView({
 
       // Complete the order after successful print
       if (printSuccess) {
+        // Record bill print event for audit trail
+        await recordBillPrint(orderTotal);
+
         await onCompleteOrder();
         toast.success('Order completed', {
           description: 'Table is now available'
@@ -246,6 +299,17 @@ export function DineInBillView({
   // Handle pay single tab - prints bill for this tab only and marks it paid
   const handlePayTabOnly = async () => {
     if (!selectedTab || !onPayTab) return;
+
+    // Validation: Check all items in selected tab have been sent to kitchen
+    const tabItems = enrichedItems.filter(item => item.customer_tab_id === selectedTab);
+    const hasUnsentTabItems = tabItems.some(item => !item.sent_to_kitchen_at);
+
+    if (hasUnsentTabItems) {
+      toast.error('Cannot print tab bill', {
+        description: 'Some items in this tab have not been sent to the kitchen yet.'
+      });
+      return;
+    }
 
     setIsPrinting(true);
 
@@ -287,6 +351,9 @@ export function DineInBillView({
 
       // Mark tab as paid
       if (printSuccess) {
+        // Record bill print event for audit trail
+        await recordBillPrint(orderTotal);
+
         const success = await onPayTab(selectedTab);
         if (success) {
           // Check if there are remaining active tabs
@@ -466,15 +533,22 @@ export function DineInBillView({
             disabled={isPrinting || displayItems.length === 0}
             className="min-w-[200px]"
             style={{
-              backgroundColor: isPrinting ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
+              backgroundColor: isPrinting ? QSAITheme.background.tertiary :
+                hasUnsentItems ? '#f59e0b' : QSAITheme.purple.primary,
               color: 'white',
-              boxShadow: isPrinting ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
+              boxShadow: isPrinting ? 'none' : hasUnsentItems ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
             }}
+            title={hasUnsentItems ? 'Some items have not been sent to kitchen' : undefined}
           >
             {isPrinting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Printing...
+              </>
+            ) : hasUnsentItems ? (
+              <>
+                <Receipt className="w-4 h-4 mr-2" />
+                Send Items First
               </>
             ) : (
               <>

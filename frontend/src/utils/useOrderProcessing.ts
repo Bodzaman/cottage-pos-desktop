@@ -6,6 +6,7 @@ import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
 import { useCustomerDataStore } from './customerDataStore';
 import { usePOSCustomerStore } from './posCustomerStore';
+import { usePOSAuth } from './usePOSAuth';
 
 /**
  * Hook: useOrderProcessing
@@ -23,13 +24,13 @@ import { usePOSCustomerStore } from './posCustomerStore';
  * 5. On success → triggers callbacks to reset UI state
  * 
  * VALIDATION BY ORDER TYPE:
- * - DINE-IN: Requires orderItems + selectedTableNumber + guestCount
+ * - DINE_IN: Requires orderItems + selectedTableNumber + guestCount
  * - COLLECTION/WAITING: Requires orderItems + customer (firstName, lastName, phone)
  * - DELIVERY: Requires orderItems + customer + delivery address
- * 
+ *
  * ORDER PAYLOAD STRUCTURE:
  * Common: order_type, items[], total, status, payment_status, created_at
- * DINE-IN: + table_number, guest_count
+ * DINE_IN: + table_number, guest_count
  * COLLECTION/WAITING/DELIVERY: + customer_data {firstName, lastName, phone, email, notes}
  * DELIVERY: + delivery_address {address, street, city, postcode, deliveryNotes}
  * 
@@ -45,15 +46,15 @@ import { usePOSCustomerStore } from './posCustomerStore';
  * - useCustomerFlow: Provides customerData structure
  * 
  * CALLBACKS:
- * - onDineInConfirm: Opens guest count modal for DINE-IN orders
+ * - onDineInConfirm: Opens guest count modal for DINE_IN orders
  * - onCustomerDetailsRequired: Opens customer modal for COLLECTION/DELIVERY
  * - onOrderComplete: Resets POSDesktop state after successful submission
- * 
- * @param orderType - Current order type
+ *
+ * @param orderType - Current order type (DINE_IN, COLLECTION, DELIVERY, or WAITING)
  * @param orderItems - Items in the current order
  * @param customerData - Customer information from useCustomerFlow
- * @param selectedTableNumber - Selected table for DINE-IN
- * @param guestCount - Guest count for DINE-IN
+ * @param selectedTableNumber - Selected table for DINE_IN
+ * @param guestCount - Guest count for DINE_IN
  * @param onOrderComplete - Optional callback after successful order submission
  * @returns Order processing handlers and validation utilities
  */
@@ -89,14 +90,36 @@ export function useOrderProcessing(
   // VALIDATE ORDER DATA
   // ============================================================================
   const validateOrder = useCallback((): { valid: boolean; message?: string } => {
+    // Validate order type is a known value
+    const validOrderTypes = ['DINE_IN', 'COLLECTION', 'DELIVERY', 'WAITING'];
+    if (!validOrderTypes.includes(orderType)) {
+      return { valid: false, message: `Invalid order type: ${orderType}` };
+    }
+
     // Check if there are items in the order
     if (orderItems.length === 0) {
       return { valid: false, message: 'Please add items to the order' };
     }
 
-    // Validate based on order type
+    // Validate all items have valid prices
+    const invalidPriceItem = orderItems.find(item =>
+      typeof item.price !== 'number' || item.price < 0 || isNaN(item.price)
+    );
+    if (invalidPriceItem) {
+      return { valid: false, message: `Invalid price for item: ${invalidPriceItem.name}` };
+    }
+
+    // Validate all items have valid quantities
+    const invalidQuantityItem = orderItems.find(item =>
+      typeof item.quantity !== 'number' || item.quantity <= 0 || !Number.isInteger(item.quantity)
+    );
+    if (invalidQuantityItem) {
+      return { valid: false, message: `Invalid quantity for item: ${invalidQuantityItem.name}` };
+    }
+
+    // Validate based on order type (using underscore format to match database ENUM)
     switch (orderType) {
-      case 'DINE-IN':
+      case 'DINE_IN':
         if (selectedTableNumber === null) {
           return { valid: false, message: 'Please select a table' };
         }
@@ -139,10 +162,32 @@ export function useOrderProcessing(
     }
 
     try {
+      // Generate idempotency key to prevent duplicate orders
+      const idempotencyKey = `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Determine pricing mode based on order type
+      const pricingMode = orderType === 'DINE_IN' ? 'DINE_IN' :
+                         orderType === 'DELIVERY' ? 'DELIVERY' : 'COLLECTION';
+
+      // Handle WAITING as order_subtype of COLLECTION
+      let normalizedOrderType = orderType;
+      let orderSubtype = null;
+      if (orderType === 'WAITING') {
+        normalizedOrderType = 'COLLECTION';
+        orderSubtype = 'WAITING';
+      }
+
+      // Get authenticated staff user for accountability
+      const staffUser = usePOSAuth.getState().user;
+
       // Build order payload based on order type
       const orderPayload: any = {
         order_id: `POS-${Date.now()}`, // Generate unique order ID
-        order_type: orderType,
+        idempotency_key: idempotencyKey, // Prevent duplicate orders
+        order_type: normalizedOrderType, // DINE_IN, COLLECTION, or DELIVERY (no WAITING)
+        order_subtype: orderSubtype, // WAITING or null
+        pricing_mode: pricingMode, // Track which pricing tier was used
+        staff_id: staffUser?.userId || null, // Track which staff member created the order
         items: orderItems.map(item => ({
           item_id: item.menu_item_id,
           menu_item_id: item.menu_item_id, // For ThermalPreview section divider resolution
@@ -156,11 +201,11 @@ export function useOrderProcessing(
         subtotal: calculateTotal(),
         total_amount: calculateTotal(),
         payment_method: 'cash', // Default for POS
-        payment_status: 'paid',
+        payment_status: 'PAID', // Uppercase to match database enum
       };
 
       // Add order type specific data
-      if (orderType === 'DINE-IN') {
+      if (orderType === 'DINE_IN') {
         orderPayload.table_number = selectedTableNumber?.toString();
         orderPayload.guest_count = guestCount;
         orderPayload.customer_name = 'Dine-In Guest';

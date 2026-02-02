@@ -440,9 +440,10 @@ export interface DeliverySettings {
 // ============================================================================
 
 /**
- * Order type enum
+ * Order type enum - Uses underscore format to match database ENUM
+ * WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
  */
-export type OrderType = 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
+export type OrderType = 'DINE_IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 
 /**
  * Order status enum

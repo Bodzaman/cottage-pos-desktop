@@ -2,16 +2,20 @@
 
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock, CheckCircle2, Link2, Utensils } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTables } from '../utils/supabaseQueries';
+import { supabase } from '../utils/supabaseClient';
 import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { TableStatus, getTableStatusLabel } from '../utils/tableTypes';
 import { useTableOrdersStore } from '../utils/tableOrdersStore';
 import { PosTableResponse } from 'types';
+
+// Debounce delay for real-time updates (ms)
+const REFETCH_DEBOUNCE_MS = 300;
 
 /**
  * Enhanced table interface for card view
@@ -56,7 +60,10 @@ export function DineInTableSelectorCards({
   const [tables, setTables] = useState<DineInTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Debounce ref for subscription updates
+  const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Access table orders store for persistent status
   const { persistedTableOrders, loadTableOrders } = useTableOrdersStore();
   
@@ -124,7 +131,7 @@ export function DineInTableSelectorCards({
           table_number: t.table_number,
           capacity: t.capacity,
           status: t.status,
-          last_updated: t.last_updated,
+          last_updated: t.updated_at,  // Database column renamed to updated_at
           is_linked_table: t.is_linked_table,
           is_linked_primary: t.is_linked_primary,
           guest_count: null
@@ -188,16 +195,55 @@ export function DineInTableSelectorCards({
     }
   }, []);
   
-  // Effect to load data on mount
-  useEffect(() => {
-    const loadData = async () => {
-      await fetchTables();
-    };
-    
-    loadData();
+  // Debounced refetch function - prevents rapid successive fetches
+  const debouncedFetchTables = useCallback(() => {
+    // Clear any pending debounced fetch
+    if (refetchTimeoutRef.current) {
+      clearTimeout(refetchTimeoutRef.current);
+    }
+    // Schedule new fetch after debounce delay
+    refetchTimeoutRef.current = setTimeout(() => {
+      fetchTables();
+    }, REFETCH_DEBOUNCE_MS);
   }, [fetchTables]);
-  
-  // Re-transform tables when dependencies change
+
+  // Effect to load data on mount and set up real-time subscription
+  useEffect(() => {
+    // Initial fetch
+    fetchTables();
+
+    // Subscribe to real-time pos_tables updates
+    // This ensures status changes from other terminals are reflected immediately
+    const tablesSubscription = supabase
+      .channel('pos-tables-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pos_tables',
+        },
+        (payload) => {
+          console.log('[DineInTableSelectorCards] Real-time pos_tables update:', payload.eventType);
+          // Use debounced fetch to prevent rapid refetches
+          debouncedFetchTables();
+        }
+      )
+      .subscribe();
+
+    console.log('[DineInTableSelectorCards] Subscribed to pos_tables changes');
+
+    return () => {
+      console.log('[DineInTableSelectorCards] Unsubscribing from pos_tables');
+      tablesSubscription.unsubscribe();
+      // Clear debounce timeout on cleanup
+      if (refetchTimeoutRef.current) {
+        clearTimeout(refetchTimeoutRef.current);
+      }
+    };
+  }, [fetchTables, debouncedFetchTables]);
+
+  // Re-transform tables when local dependencies change
   useEffect(() => {
     if (tables.length > 0) {
       fetchTables();

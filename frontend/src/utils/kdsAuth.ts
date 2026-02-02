@@ -14,7 +14,7 @@ interface KDSAuthState {
   lock: () => void;
   unlock: () => void;
   updateActivity: () => void;
-  checkAutoLock: () => void;
+  checkAutoLock: () => boolean;
   setAutoLockMinutes: (minutes: number) => void;
 }
 

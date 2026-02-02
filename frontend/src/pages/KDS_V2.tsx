@@ -7,7 +7,9 @@ import { ChefHat, Clock, Package, Utensils, Truck, AlertTriangle, CheckCircle, R
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useUnifiedKitchenStore } from 'utils/unifiedKitchenStore';
-import { UnifiedKitchenOrder, OrderStatus, OrderType } from 'utils/unifiedKitchenTypes';
+import { UnifiedKitchenOrder, KitchenOrderStatus } from 'utils/kitchenTypes';
+
+type OrderType = UnifiedKitchenOrder['orderType'];
 import { ManagementHeader } from 'components/ManagementHeader';
 import { useSimpleAuth } from 'utils/simple-auth-context';
 import { QSAITheme, styles, indianPatterns } from 'utils/QSAIDesign';
@@ -46,7 +48,7 @@ function KDS_V2_Content() {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [time, setTime] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<OrderType | 'ALL'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<KitchenOrderStatus | 'ALL'>('ALL');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastOrderCount, setLastOrderCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);

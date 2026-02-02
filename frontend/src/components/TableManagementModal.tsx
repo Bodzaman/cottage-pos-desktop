@@ -37,7 +37,7 @@ interface Table {
   table_number: number;
   capacity: number;
   status: 'available' | 'occupied' | 'reserved' | 'unavailable';
-  last_updated?: string;
+  updated_at?: string;
 }
 
 interface TableManagementModalProps {
@@ -86,7 +86,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
         table_number: t.table_number,
         capacity: t.capacity,
         status: t.status.toLowerCase() as Table['status'],
-        last_updated: t.last_updated
+        updated_at: t.updated_at
       }));
       setTables(mappedTables.sort((a, b) => a.table_number - b.table_number));
     } catch (error) {

@@ -30,9 +30,8 @@ export interface PosTable {
   linked_with_tables?: number[];
   current_order_id?: string | null;
   seated_at?: string | null;
-  last_updated: string;
+  updated_at: string;  // Renamed from last_updated
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface TableOrder {

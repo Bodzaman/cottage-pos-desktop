@@ -21,22 +21,33 @@ export function KDSLockScreen({ onUnlock, restaurantName = 'Cottage Tandoori' }:
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<'checking' | 'setup' | 'verify'>('checking');
   const [isSettingPin, setIsSettingPin] = useState(false); // Track if entering first or second PIN
+  const [checkTimeout, setCheckTimeout] = useState(false); // Track if backend connection timed out
 
   // Check if PIN is already set on mount
   useEffect(() => {
     checkSetupStatus();
+
+    // Timeout after 5 seconds if still checking
+    const timeout = setTimeout(() => {
+      if (mode === 'checking') {
+        setCheckTimeout(true);
+        setMode('setup'); // Default to setup mode
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
   }, []);
 
   const checkSetupStatus = async () => {
     try {
       const response = await brain.check_kds_schema();
       const result = await response.json();
-      
+
       if (!result.schema_ready) {
         // Initialize schema first
         await brain.setup_kds_schema();
       }
-      
+
       if (result.has_pin_set) {
         setMode('verify');
       } else {
@@ -44,6 +55,8 @@ export function KDSLockScreen({ onUnlock, restaurantName = 'Cottage Tandoori' }:
       }
     } catch (error) {
       console.error('Failed to check KDS setup:', error);
+      setCheckTimeout(true);
+      setError('Backend connection failed. Defaulting to setup mode.');
       setMode('setup'); // Default to setup mode if check fails
     }
   };
@@ -211,8 +224,37 @@ export function KDSLockScreen({ onUnlock, restaurantName = 'Cottage Tandoori' }:
           zIndex: 9999
         }}
       >
-        <div className="text-center">
-          <div className="animate-pulse text-gray-400">Initializing...</div>
+        <div className="text-center space-y-4 px-6 max-w-md">
+          <div className="animate-pulse text-gray-300 text-lg">
+            {checkTimeout ? 'Connection timeout...' : 'Initializing...'}
+          </div>
+          {checkTimeout && (
+            <div className="space-y-3">
+              <p className="text-sm text-amber-400 font-medium">
+                Cannot connect to backend server.
+              </p>
+              <p className="text-xs text-gray-500">
+                Make sure the backend is running on port 8000
+              </p>
+              <Button
+                onClick={() => {
+                  setCheckTimeout(false);
+                  setMode('checking');
+                  checkSetupStatus();
+                }}
+                className="mt-4"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.1) 100%)',
+                  border: '2px solid rgba(34, 197, 94, 0.5)',
+                  color: '#22C55E',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '0.5rem'
+                }}
+              >
+                Retry Connection
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -263,8 +305,8 @@ export function KDSLockScreen({ onUnlock, restaurantName = 'Cottage Tandoori' }:
           >
             {restaurantName}
           </h1>
-          <p className="text-xl text-gray-400 font-medium">Kitchen Display System</p>
-          <p className="text-sm text-gray-500">{promptText}</p>
+          <p className="text-xl text-gray-300 font-medium">Kitchen Display System</p>
+          <p className="text-sm text-gray-400">{promptText}</p>
           {mode === 'setup' && !isSettingPin && (
             <p className="text-xs text-amber-500 mt-2">First time setup - you'll need to confirm it</p>
           )}

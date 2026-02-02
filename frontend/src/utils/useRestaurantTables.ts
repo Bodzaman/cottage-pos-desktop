@@ -72,8 +72,8 @@ export const useRestaurantTables = () => {
             section: null,
             current_order_id: null,
             seated_at: null,
-            created_at: table.last_updated,
-            updated_at: table.last_updated
+            created_at: table.updated_at,
+            updated_at: table.updated_at
           }));
           
           setTables(transformedTables);
@@ -117,8 +117,8 @@ export const useRestaurantTables = () => {
                 section: null,
                 current_order_id: null,
                 seated_at: null,
-                created_at: newTable.last_updated,
-                updated_at: newTable.last_updated
+                created_at: newTable.updated_at,
+                updated_at: newTable.updated_at
               };
               return [...current, transformed];
             }
@@ -135,9 +135,9 @@ export const useRestaurantTables = () => {
                 linked_with_tables: updatedTable.linked_with_tables || [],
                 section: null,
                 current_order_id: null,
-                seated_at: null,
-                created_at: updatedTable.last_updated,
-                updated_at: updatedTable.last_updated
+                seated_at: updatedTable.updated_at,
+                created_at: updatedTable.updated_at,
+                updated_at: updatedTable.updated_at
               };
               return current.map((t) =>
                 t.id === transformed.id ? transformed : t
@@ -184,8 +184,8 @@ export const useRestaurantTables = () => {
           section: null,
           current_order_id: null,
           seated_at: null,
-          created_at: table.last_updated,
-          updated_at: table.last_updated
+          created_at: table.updated_at,
+          updated_at: table.updated_at
         }));
         setTables(transformedTables);
       }

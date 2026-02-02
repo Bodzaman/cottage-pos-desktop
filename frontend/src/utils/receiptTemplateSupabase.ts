@@ -21,16 +21,33 @@ interface ApiResponse<T> {
   warning?: string;  // For partial success scenarios (e.g., kitchen variant failed)
 }
 
-// Fields that should sync from parent to kitchen variant
+/**
+ * SYNC_FIELDS: Fields that propagate from parent template to kitchen variant
+ *
+ * Why these fields sync:
+ * - Business info: Shared across all receipts (name, address, phone, etc.)
+ * - Logo/QR codes: Same branding for customer and kitchen
+ * - Fonts: Kitchen uses same fonts as parent
+ * - Header/Footer: Consistent messaging across all receipts
+ * - Kitchen visibility: Parent controls what appears on kitchen tickets
+ */
 const SYNC_FIELDS: (keyof FormData)[] = [
+  // Business Information (6 fields)
   'businessName', 'vatNumber', 'address', 'phone', 'email', 'website',
+  // Visibility Toggles (5 fields)
   'showPhone', 'showEmail', 'showWebsite', 'showVatNumber', 'showCategorySubheadings',
+  // Logo (6 fields)
   'logoFile', 'logoUrl', 'logoImage', 'logoPosition', 'logoWidth', 'logoHeight',
+  // QR Codes (3 fields)
   'qrCodes', 'headerQRCodes', 'footerQRCodes',
-  'headerText',  // Custom header text/welcome message
+  // Header (1 field)
+  'headerText',
+  // Font System (7 fields) - includes new businessNameFont and businessNameFontSize
   'selectedFont', 'useItemsFont', 'useItemsThermalFont', 'receiptFont', 'itemsFont',
+  'businessNameFont', 'businessNameFontSize',
+  // Footer (5 fields)
   'footerMessage', 'terms', 'socialMedia', 'customFooterText', 'showCustomFooter',
-  // Kitchen visibility settings
+  // Kitchen visibility settings (11 fields)
   'kitchenShowHeader', 'kitchenShowBusinessInfo', 'kitchenShowLogo', 'kitchenShowQRCodes',
   'kitchenShowOrderInfo', 'kitchenShowTableInfo', 'kitchenShowCustomerDetails',
   'kitchenShowTiming', 'kitchenShowSpecialInstructions', 'kitchenShowTotals', 'kitchenShowFooter'
@@ -583,6 +600,7 @@ export const getTemplateAssignment = async (orderMode: string): Promise<ApiRespo
 
 /**
  * Set/update template assignment for an order mode (upsert)
+ * Validates that referenced templates exist before saving
  */
 export const setTemplateAssignment = async (
   orderMode: string,
@@ -593,6 +611,33 @@ export const setTemplateAssignment = async (
   try {
     if (!orderMode) {
       return { success: false, error: 'Order mode required' };
+    }
+
+    // Validate that referenced templates exist before saving
+    if (customerTemplateId) {
+      const { data: customerTemplate, error: customerError } = await supabase
+        .from('receipt_templates')
+        .select('id')
+        .eq('id', customerTemplateId)
+        .single();
+
+      if (customerError || !customerTemplate) {
+        console.error('❌ [Supabase Direct] Customer template not found:', customerTemplateId);
+        return { success: false, error: `Customer template ${customerTemplateId} not found. It may have been deleted.` };
+      }
+    }
+
+    if (kitchenTemplateId) {
+      const { data: kitchenTemplate, error: kitchenError } = await supabase
+        .from('receipt_templates')
+        .select('id')
+        .eq('id', kitchenTemplateId)
+        .single();
+
+      if (kitchenError || !kitchenTemplate) {
+        console.error('❌ [Supabase Direct] Kitchen template not found:', kitchenTemplateId);
+        return { success: false, error: `Kitchen template ${kitchenTemplateId} not found. It may have been deleted.` };
+      }
     }
 
     const { data, error } = await supabase

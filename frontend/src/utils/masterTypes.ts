@@ -485,7 +485,9 @@ export interface MenuItemFormData {
 // UTILITY TYPES
 // ================================
 
-export type OrderType = 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
+// OrderType uses underscore format to match database ENUM
+// WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
+export type OrderType = 'DINE_IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 export type PaymentMethodType = 'CARD' | 'CASH' | 'CUSTOMER_PAYS' | 'ALREADY_PAID' | 'SMS_PAYMENT_LINK' | 'QR_AT_DOOR';
 export type ItemType = 'food' | 'drinks_wine' | 'coffee_desserts';
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';

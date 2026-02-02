@@ -437,6 +437,9 @@ export function usePrintingOperations(
     }
   }, [orderType, orderItems, customerData, selectedTableNumber, getTemplateAssignment, queuePrintJob]);
 
+  // Duplicate print prevention cooldown (10 seconds)
+  const PRINT_COOLDOWN_MS = 10000;
+
   // ============================================================================
   // PRINT BILL (for dine-in) - HYBRID: Electron ESC/POS → Supabase Queue
   // ============================================================================
@@ -459,19 +462,25 @@ export function usePrintingOperations(
       return false;
     }
 
+    // Duplicate print prevention: warn if printed recently
+    if (lastPrintedAt) {
+      const timeSinceLastPrint = Date.now() - lastPrintedAt.getTime();
+      if (timeSinceLastPrint < PRINT_COOLDOWN_MS) {
+        const secondsAgo = Math.round(timeSinceLastPrint / 1000);
+        toast.warning(`Bill was printed ${secondsAgo}s ago`, {
+          description: 'Please wait before printing again or check the printer.'
+        });
+        return false;
+      }
+    }
+
     setIsPrinting(true);
 
     try {
       // Fetch validated customer template for dine-in bills
       const customerTemplateId = await templateAssignments.getCustomerTemplateId('DINE-IN');
 
-      // Calculate bill totals
-      const subtotal = orderTotal;
-      const serviceCharge = orderTotal * 0.125; // 12.5% service charge
-      const tax = (orderTotal + serviceCharge) * 0.20; // 20% VAT on subtotal + service
-      const total = subtotal + serviceCharge + tax;
-
-      // Build items for receipt
+      // Build items for receipt first (to include modifier prices in calculation)
       const receiptItems = orderItems.map(item => {
         let itemPrice = item.price;
         if (item.modifiers && item.modifiers.length > 0) {
@@ -488,6 +497,17 @@ export function usePrintingOperations(
           modifiers: item.modifiers?.map(m => m.name) || []
         };
       });
+
+      // Calculate bill totals from receipt items (ensures modifiers are included)
+      const subtotal = receiptItems.reduce((sum, item) => sum + item.total, 0);
+      // Get service charge from POS settings, fallback to 10%
+      const serviceChargePercentage = (typeof window !== 'undefined' && window.posSettings?.service_charge?.enabled)
+        ? (window.posSettings.service_charge.percentage / 100)
+        : 0.10;
+      const serviceCharge = subtotal * serviceChargePercentage;
+      // UK VAT: Apply 20% VAT to subtotal only (service charge is discretionary, not subject to VAT)
+      const tax = subtotal * 0.20;
+      const total = subtotal + serviceCharge + tax;
 
       // =====================================================================
       // PRIMARY PATH: Direct Electron ESC/POS printing (production)
@@ -509,13 +529,15 @@ export function usePrintingOperations(
           }),
           subtotal,
           tax,
+          serviceCharge,
           total,
           orderNumber: `TABLE-${selectedTableNumber}-${Date.now()}`,
           orderType: 'DINE-IN',
           tableNumber: selectedTableNumber,
+          guestCount,
           timestamp: new Date().toISOString(),
-          paymentMethod: 'Card',
-          paymentStatus
+          paymentMethod: 'Pending',
+          paymentStatus: paymentStatus || 'UNPAID'  // Default to UNPAID for final bill
         };
 
         const result = await printCustomerReceiptESCPOS(billData);
@@ -526,11 +548,14 @@ export function usePrintingOperations(
           console.log('✅ [HYBRID] Direct bill print successful:', result);
           // Save to receipt history for reprint functionality
           saveReceiptToHistory(billData, {
-            orderNumber: billData.orderNumber || `T${selectedTableNumber}`,
+            orderNumber: billData.orderNumber,  // Use consistent order number format
             orderType: 'DINE-IN',
             total: billData.total,
             tableNumber: selectedTableNumber,
-            itemCount: orderItems.length
+            guestCount,
+            itemCount: orderItems.length,
+            serviceCharge,
+            paymentStatus: paymentStatus || 'UNPAID'
           });
           return true;
         } else {
@@ -541,26 +566,34 @@ export function usePrintingOperations(
       }
 
       // =====================================================================
-      // FALLBACK PATH: Supabase queue
+      // FALLBACK PATH: Supabase queue (standardized format matching Electron)
       // =====================================================================
       const jobData = {
         job_type: 'BILL',
         order_data: {
           orderNumber: `TABLE-${selectedTableNumber}-${Date.now()}`,
           orderType: 'DINE-IN',
-          items: receiptItems,
+          items: receiptItems.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.unitPrice,  // Standardized field name
+            unitPrice: item.unitPrice,
+            total: item.total,
+            variantName: item.variant_name || undefined,
+            modifiers: item.modifiers
+          })),
+          subtotal,
           tax,
+          serviceCharge,
+          total,
           deliveryFee: 0,
           tableNumber: selectedTableNumber,
           guestCount,
-          subtotal,
-          serviceCharge,
-          total,
           timestamp: new Date().toISOString(),
           template_id: customerTemplateId || 'classic_restaurant',
           table: `Table ${selectedTableNumber}`,
-          paymentMethod: 'Card',
-          paymentStatus
+          paymentMethod: 'Pending',
+          paymentStatus: paymentStatus || 'UNPAID'  // Default to UNPAID
         },
         printer_id: null,
         priority: 5
@@ -577,13 +610,23 @@ export function usePrintingOperations(
         throw new Error('Failed to queue bill print job');
       }
     } catch (error) {
-      console.error('❌ Error printing bill:', error);
+      // Enhanced error logging with context for debugging
+      console.error('❌ Bill print failed', {
+        error,
+        context: {
+          tableNumber: selectedTableNumber,
+          itemCount: orderItems.length,
+          orderType,
+          timestamp: new Date().toISOString(),
+          printMethod: isESCPOSPrintAvailable() ? 'ESC/POS' : 'Supabase Queue'
+        }
+      });
       toast.error('Failed to print bill');
       return false;
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, selectedTableNumber, guestCount, templateAssignments, queuePrintJob]);
+  }, [orderType, orderItems, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, lastPrintedAt]);
 
   // ============================================================================
   // PRINT BILL (DINE-IN) - Explicit items variant (uses provided items)
@@ -611,16 +654,24 @@ export function usePrintingOperations(
       return false;
     }
 
+    // Duplicate print prevention: warn if printed recently
+    if (lastPrintedAt) {
+      const timeSinceLastPrint = Date.now() - lastPrintedAt.getTime();
+      if (timeSinceLastPrint < PRINT_COOLDOWN_MS) {
+        const secondsAgo = Math.round(timeSinceLastPrint / 1000);
+        toast.warning(`Bill was printed ${secondsAgo}s ago`, {
+          description: 'Please wait before printing again or check the printer.'
+        });
+        return false;
+      }
+    }
+
     setIsPrinting(true);
 
     try {
       const customerTemplateId = await templateAssignments.getCustomerTemplateId('DINE-IN');
 
-      const subtotal = orderTotal;
-      const serviceCharge = orderTotal * 0.125;
-      const tax = (orderTotal + serviceCharge) * 0.20;
-      const total = subtotal + serviceCharge + tax;
-
+      // Build items for receipt first (to include modifier prices in calculation)
       const receiptItems = items.map(item => {
         let itemPrice = item.price;
         if (item.modifiers && item.modifiers.length > 0) {
@@ -638,9 +689,21 @@ export function usePrintingOperations(
         };
       });
 
+      // Calculate bill totals from receipt items (ensures modifiers are included)
+      const subtotal = receiptItems.reduce((sum, item) => sum + item.total, 0);
+      // Get service charge from POS settings, fallback to 10%
+      const serviceChargePercentage = (typeof window !== 'undefined' && window.posSettings?.service_charge?.enabled)
+        ? (window.posSettings.service_charge.percentage / 100)
+        : 0.10;
+      const serviceCharge = subtotal * serviceChargePercentage;
+      // UK VAT: Apply 20% VAT to subtotal only (service charge is discretionary, not subject to VAT)
+      const tax = subtotal * 0.20;
+      const total = subtotal + serviceCharge + tax;
+
       if (isESCPOSPrintAvailable()) {
         console.log('🖨️ [HYBRID] Electron ESC/POS available, printing bill directly...');
 
+        const guestCountToUse = guestCountOverride ?? guestCount;
         const billData: CustomerReceiptData = {
           items: receiptItems.map((item, idx) => {
             const sectionInfo = getSectionInfo(items[idx]);
@@ -655,13 +718,15 @@ export function usePrintingOperations(
           }),
           subtotal,
           tax,
+          serviceCharge,
           total,
           orderNumber: `TABLE-${tableNumberToUse}-${Date.now()}`,
           orderType: 'DINE-IN',
           tableNumber: tableNumberToUse,
+          guestCount: guestCountToUse,
           timestamp: new Date().toISOString(),
-          paymentMethod: 'Card',
-          paymentStatus
+          paymentMethod: 'Pending',
+          paymentStatus: paymentStatus || 'UNPAID'  // Default to UNPAID for final bill
         };
 
         const result = await printCustomerReceiptESCPOS(billData);
@@ -670,11 +735,14 @@ export function usePrintingOperations(
           setLastPrintedAt(new Date());
           console.log('✅ [HYBRID] Direct bill print successful:', result);
           saveReceiptToHistory(billData, {
-            orderNumber: billData.orderNumber || `T${tableNumberToUse}`,
+            orderNumber: billData.orderNumber,  // Use consistent order number format
             orderType: 'DINE-IN',
             total: billData.total,
             tableNumber: tableNumberToUse,
-            itemCount: items.length
+            guestCount: guestCountToUse,
+            itemCount: items.length,
+            serviceCharge,
+            paymentStatus: paymentStatus || 'UNPAID'
           });
           return true;
         } else {
@@ -684,24 +752,33 @@ export function usePrintingOperations(
         console.log('ℹ️ [HYBRID] Electron not available for bill, using Supabase queue');
       }
 
+      // Standardized format matching Electron path
       const jobData = {
         job_type: 'BILL',
         order_data: {
           orderNumber: `TABLE-${tableNumberToUse}-${Date.now()}`,
           orderType: 'DINE-IN',
-          items: receiptItems,
+          items: receiptItems.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.unitPrice,  // Standardized field name
+            unitPrice: item.unitPrice,
+            total: item.total,
+            variantName: item.variant_name || undefined,
+            modifiers: item.modifiers
+          })),
+          subtotal,
           tax,
+          serviceCharge,
+          total,
           deliveryFee: 0,
           tableNumber: tableNumberToUse,
           guestCount: guestCountOverride ?? guestCount,
-          subtotal,
-          serviceCharge,
-          total,
           timestamp: new Date().toISOString(),
           template_id: customerTemplateId || 'classic_restaurant',
           table: `Table ${tableNumberToUse}`,
-          paymentMethod: 'Card',
-          paymentStatus
+          paymentMethod: 'Pending',
+          paymentStatus: paymentStatus || 'UNPAID'  // Default to UNPAID
         },
         printer_id: null,
         priority: 5
@@ -716,13 +793,26 @@ export function usePrintingOperations(
       }
       throw new Error('Failed to queue bill print job');
     } catch (error) {
-      console.error('❌ Error printing bill:', error);
+      // Enhanced error logging with context for debugging
+      const tableNumberToLog = tableNumberOverride ?? selectedTableNumber;
+      console.error('❌ Bill print failed (explicit items)', {
+        error,
+        context: {
+          tableNumber: tableNumberToLog,
+          itemCount: items.length,
+          orderTotal,
+          paymentStatus,
+          guestCount: guestCountOverride ?? guestCount,
+          timestamp: new Date().toISOString(),
+          printMethod: isESCPOSPrintAvailable() ? 'ESC/POS' : 'Supabase Queue'
+        }
+      });
       toast.error('Failed to print bill');
       return false;
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, getSectionInfo]);
+  }, [orderType, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, getSectionInfo, lastPrintedAt]);
 
   // ============================================================================
   // SEND TO KITCHEN (HYBRID: Electron ESC/POS → Supabase Queue)

@@ -19,7 +19,9 @@ export interface CustomerData {
   deliveryFee?: number; // Calculated delivery fee from postcode validation
 }
 
-export type OrderType = 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
+// OrderType now uses underscore format to match database ENUM
+// WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
+export type OrderType = 'DINE_IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 
 // Helper function to get customer display name
 export const getCustomerDisplayName = (customerData: CustomerData): string => {
@@ -40,7 +42,7 @@ export const validateCustomerData = (customerData: CustomerData, orderType: Orde
   const errors: string[] = [];
   
   switch (orderType) {
-    case 'DINE-IN':
+    case 'DINE_IN':
       if (!customerData.tableNumber) {
         errors.push('Table number is required');
       }

@@ -72,7 +72,8 @@ export interface CustomerTabInfo {
 // ==================== Receipt Format Types ====================
 
 export type ReceiptFormat = 'front_of_house' | 'kitchen_customer';
-export type OrderMode = 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
+// OrderMode must match database order_type_enum (uppercase underscore format)
+export type OrderMode = 'DINE_IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
 export type OrderSource = 'POS' | 'ONLINE' | 'AI_VOICE';
 export type OrderType = 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'online_orders';
 export type DineInTemplateType = 'kitchen_copy' | 'final_bill';
@@ -371,7 +372,7 @@ export const DEFAULT_FORM_DATA: FormData = {
   orderDate: new Date().toISOString().split('T')[0],
   orderTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
   orderSource: 'POS',
-  orderMode: 'DINE-IN',
+  orderMode: 'DINE_IN',
 
   // Dine-In
   tableNumber: '',
