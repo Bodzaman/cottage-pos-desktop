@@ -59,8 +59,7 @@
     "asarUnpack": [
       "node_modules/sharp/**/*",
       "node_modules/@img/**/*",
-      "node_modules/better-sqlite3/**/*",
-      "dist/fonts/**/*"
+      "node_modules/better-sqlite3/**/*"
     ],
     "npmRebuild": true,
     "win": {
