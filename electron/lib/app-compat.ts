@@ -4728,13 +4728,17 @@ export const apiClient = {
 
   check_dining_tables_schema: async () => mockResponse({ exists: true }),
 
-  setup_kds_schema: async () => mockResponse({ success: true }),
+  setup_kds_schema: async () => mockResponse({ success: true, message: 'KDS schema ready (Electron mode)' }),
 
-  check_kds_schema: async () => mockResponse({ exists: true }),
+  check_kds_schema: async () => mockResponse({
+    schema_ready: true,
+    has_pin_set: true,
+    message: 'KDS ready (Electron mode)'
+  }),
 
-  set_kds_pin: async (params: any) => mockResponse({ success: true }),
+  set_kds_pin: async (params: any) => mockResponse({ success: true, message: 'PIN set successfully' }),
 
-  verify_kds_pin: async (params: any) => mockResponse({ valid: true }),
+  verify_kds_pin: async (params: any) => mockResponse({ valid: true, message: 'PIN verified' }),
 
   // ============================================================================
   // PROTEINS

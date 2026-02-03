@@ -186,6 +186,13 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
               console.error(' [Auth] Cart migration failed:', error);
               // Don't block login flow if migration fails
             }
+
+            // Load chat history from Supabase for cross-device sync
+            try {
+              await useChatStore.getState().loadChatHistory();
+            } catch (error) {
+              console.error(' [Auth] Chat history load failed:', error);
+            }
           }
           
           // ✅ NEW (MYA-1525): Clear userId from cart on logout (keep items as guest cart)

@@ -394,6 +394,14 @@ interface ThermalReceiptFormData {
   kitchenShowTotals?: boolean;
   kitchenShowFooter?: boolean;
 
+  // Kitchen Order Label
+  showKitchenOrderLabel?: boolean;
+  kitchenOrderLabelText?: string;
+
+  // Receipt Number Visibility
+  showReceiptNumber?: boolean;
+  kitchenShowReceiptNumber?: boolean;
+
   // Font System
   selectedFont?: string;
   receiptFont: string;
@@ -816,32 +824,54 @@ function renderFormBasedReceipt(
 
       {/* Order Information */}
       <div className={`mb-1 text-sm`} style={{ marginBottom: isKitchenReceipt ? '8px' : '4px' }}>
-        {/* Receipt Number at the top */}
-        <div className="text-center mb-2" style={{ fontFamily: receiptFont.cssFamily }}>
-          <span 
-            className="font-bold text-lg"
-            style={{ 
-              fontSize: isKitchenReceipt ? '18px' : '16px',
-              fontWeight: '700'
-            }}
-          >
-            {data.receiptNumber || 'CT000000'}
-          </span>
-        </div>
-        
+        {/* ORDER TYPE HEADER - Kitchen only, large & prominent */}
+        {isKitchenReceipt && (
+          <div className="text-center mb-3" style={{ fontFamily: receiptFont.cssFamily }}>
+            <div style={{
+              fontSize: '18px',
+              letterSpacing: '0.2em',
+              borderTop: '2px solid black',
+              borderBottom: '2px solid black',
+              padding: '8px 0',
+              fontWeight: '900',
+              textTransform: 'uppercase'
+            }}>
+              {(data.orderMode || data.orderType?.replace('_', '-').toUpperCase() || 'DINE-IN')
+                .split('').join(' ')}
+            </div>
+          </div>
+        )}
+
+        {/* Receipt Number - respects visibility toggle */}
+        {(isKitchenReceipt ? data.kitchenShowReceiptNumber !== false : data.showReceiptNumber !== false) && (
+          <div className="text-center mb-2" style={{ fontFamily: receiptFont.cssFamily }}>
+            <span
+              className="font-bold text-lg"
+              style={{
+                fontSize: isKitchenReceipt ? '16px' : '18px',
+                fontWeight: '700'
+              }}
+            >
+              {data.receiptNumber || 'CT000000'}
+            </span>
+          </div>
+        )}
+
         {/* Badges Row: Order Mode + Channel + Contextual chips */}
         <div className="flex flex-wrap justify-center gap-1 mb-2">
-          {/* Canonical Order Mode Badge */}
-          <span 
-            className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
-            style={{
-              backgroundColor: '#7C3AED',
-              color: 'white',
-              fontSize: isKitchenReceipt ? '12px' : '10px'
-            }}
-          >
-            {data.orderMode || data.orderType?.replace('_', '-').toUpperCase() || 'DINE-IN'}
-          </span>
+          {/* Canonical Order Mode Badge - only for customer receipts (kitchen uses header above) */}
+          {!isKitchenReceipt && (
+            <span
+              className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
+              style={{
+                backgroundColor: '#7C3AED',
+                color: 'white',
+                fontSize: '10px'
+              }}
+            >
+              {data.orderMode || data.orderType?.replace('_', '-').toUpperCase() || 'DINE-IN'}
+            </span>
+          )}
           
           {/* Channel Badge */}
           {/* Hide 'POS' badge for dine-in orders since all dine-in orders are POS orders (redundant) */}
@@ -864,7 +894,8 @@ function renderFormBasedReceipt(
           
           {/* Conditional contextual chips based on Order Mode */}
           {/* Dine-In → [Table 12] [4 pax] - Prominent styling for kitchen visibility */}
-          {(data.orderMode === 'DINE-IN' || (!data.orderMode && data.orderType === 'dine_in')) && (
+          {/* Controlled by shouldShowTableInfo toggle for kitchen receipts */}
+          {shouldShowTableInfo && (data.orderMode === 'DINE-IN' || (!data.orderMode && data.orderType === 'dine_in')) && (
             <>
               {data.tableNumber && (
                 <span
@@ -907,10 +938,11 @@ function renderFormBasedReceipt(
           )}
           
           {/* Delivery → [ETA 30–45m] [+ Address if present] */}
-          {(data.orderMode === 'DELIVERY' || data.orderType === 'delivery') && (
+          {/* Controlled by shouldShowTiming toggle for kitchen receipts */}
+          {shouldShowTiming && (data.orderMode === 'DELIVERY' || data.orderType === 'delivery') && (
             <>
               {data.estimatedDeliveryTime && (
-                <span 
+                <span
                   className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
                   style={{
                     backgroundColor: '#FEF3C7',
@@ -923,13 +955,14 @@ function renderFormBasedReceipt(
               )}
             </>
           )}
-          
+
           {/* Collection → [ASAP/Slot] */}
-          {(data.orderMode === 'COLLECTION' || data.orderType === 'collection') && (
+          {/* Controlled by shouldShowTiming toggle for kitchen receipts */}
+          {shouldShowTiming && (data.orderMode === 'COLLECTION' || data.orderType === 'collection') && (
             <>
               {/* Only show collection time if it's NOT 'ASAP' (hide default ASAP values) */}
               {data.collectionTime && data.collectionTime.toUpperCase() !== 'ASAP' && (
-                <span 
+                <span
                   className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
                   style={{
                     backgroundColor: '#DBEAFE',
@@ -1051,7 +1084,7 @@ function renderFormBasedReceipt(
             {/* Postcode - Emphasized display for drivers */}
             {data.deliveryPostcode && (
               <div
-                className={`mt-2 text-center font-black ${isKitchenReceipt ? 'text-xl bg-yellow-200 p-1 border-2 border-yellow-400' : 'text-base font-bold'}`}
+                className={`mt-2 text-center font-black ${isKitchenReceipt ? 'text-lg bg-yellow-200 p-1 border-2 border-yellow-400' : 'text-base font-bold'}`}
               >
                 {data.deliveryPostcode}
               </div>
@@ -1086,9 +1119,14 @@ function renderFormBasedReceipt(
         className={`space-y-1 mb-1 ${isKitchenReceipt ? 'text-base' : 'text-sm'}`}
         style={{ fontFamily: itemsFont.cssFamily }} // Apply items font to the entire order items section
       >
-        <div className={`${headerSize} text-left mb-1`} style={{ fontFamily: receiptFont.cssFamily }}>
-          {isKitchenReceipt ? 'KITCHEN ORDER' : 'ORDER ITEMS'}
-        </div>
+        {/* Show label if: customer receipt OR kitchen with showKitchenOrderLabel enabled */}
+        {(!isKitchenReceipt || data.showKitchenOrderLabel !== false) && (
+          <div className={`${headerSize} text-left mb-1`} style={{ fontFamily: receiptFont.cssFamily }}>
+            {isKitchenReceipt
+              ? (data.kitchenOrderLabelText || 'KITCHEN ORDER')
+              : 'ORDER ITEMS'}
+          </div>
+        )}
         
         {data.orderItems && data.orderItems.length > 0 ? (
           (() => {
@@ -1399,9 +1437,9 @@ function renderFormBasedReceipt(
         )}
       </div>
 
-      {/* Totals - Show for FOH receipts AND Kitchen Copy for takeaway orders (not DINE-IN) */}
-      {/* Kitchen Copy for takeaway doubles as customer receipt for delivery drivers collecting cash */}
-      {!(isKitchenReceipt && data.orderMode === 'DINE-IN') && (() => {
+      {/* Totals - Controlled by shouldShowTotals toggle */}
+      {/* FOH always shows, Kitchen shows based on kitchenShowTotals setting (default OFF for dine-in) */}
+      {shouldShowTotals && (() => {
         // Calculate subtotal from orderItems (don't trust formData.subtotal as it may be 0)
         // Use item.total which already includes quantity × base price + customizations
         const calculatedSubtotal = (data.orderItems || []).reduce((sum, item) => {

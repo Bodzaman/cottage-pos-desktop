@@ -207,12 +207,15 @@ export function OrderItemCard({
           <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               variant="outline"
-              size="icon"
-              className="h-6 w-6"
+              size="sm"
+              className="h-6 w-6 p-0"
               onClick={() => onQuantityChange(index, Math.max(1, item.quantity - 1))}
               style={{
                 borderColor: QSAITheme.border.medium,
                 color: QSAITheme.text.secondary,
+                backgroundColor: 'transparent',
+                minWidth: '24px',
+                minHeight: '24px',
               }}
             >
               <Minus className="h-3 w-3" />
@@ -225,12 +228,15 @@ export function OrderItemCard({
             </span>
             <Button
               variant="outline"
-              size="icon"
-              className="h-6 w-6"
+              size="sm"
+              className="h-6 w-6 p-0"
               onClick={() => onQuantityChange(index, item.quantity + 1)}
               style={{
                 borderColor: QSAITheme.border.medium,
                 color: QSAITheme.text.secondary,
+                backgroundColor: 'transparent',
+                minWidth: '24px',
+                minHeight: '24px',
               }}
             >
               <Plus className="h-3 w-3" />

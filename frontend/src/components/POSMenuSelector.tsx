@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { List, Grid3x3, SearchX } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { POSMenuSearch } from './POSMenuSearch';
@@ -11,8 +11,15 @@ import { QSAITheme } from '../utils/QSAIDesign';
 import type { MenuItem, ItemVariant, OrderItem as MenuOrderItem } from 'utils/types';
 import type { OrderItem } from 'types';
 
+// Scroll state callback type for parent-managed scroll preservation
+interface ScrollState {
+  savedPosition: number;
+  shouldRestore: boolean;
+  clearRestore: () => void;
+}
+
 interface Props {
-  onAddToOrder: (orderItem: OrderItem) => void;
+  onAddToOrder: (orderItem: OrderItem, scrollPosition?: number) => void;
   onCustomizeItem?: (item: MenuItem, variant?: ItemVariant) => void;
   onCategoryChange: (categoryId: string | null) => void;
   className?: string;
@@ -24,9 +31,11 @@ interface Props {
   selectedCategoryId?: string | null;
   onCategorySelect?: (categoryId: string | null) => void;
   variantCarouselEnabled?: boolean; // NEW: POS Settings toggle
+  // 🔧 FIX: Parent-managed scroll state - survives component remounts
+  getScrollState?: () => ScrollState;
 }
 
-export function POSMenuSelector({
+export const POSMenuSelector = React.memo(function POSMenuSelector({
   onAddToOrder,
   onCustomizeItem,
   onCategoryChange,
@@ -38,7 +47,8 @@ export function POSMenuSelector({
   childCategories,
   selectedCategoryId,
   onCategorySelect,
-  variantCarouselEnabled = true // NEW: POS Settings toggle
+  variantCarouselEnabled = true, // NEW: POS Settings toggle
+  getScrollState // 🔧 FIX: Parent-managed scroll state
 }: Props) {
   // 🚀 SELECTIVE SUBSCRIPTIONS: Subscribe to specific fields only to prevent unnecessary re-renders
   const {
@@ -48,19 +58,39 @@ export function POSMenuSelector({
     isLoading,
     selectedMenuCategory,
     itemVariants,
+    variantsByMenuItem,
     proteinTypes
   } = useRealtimeMenuStoreCompat({ context: 'pos' });
-  
+
   // View mode state (persisted to localStorage)
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     return (localStorage.getItem('posMenuViewMode') as 'card' | 'list') || 'card';
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // ✅ Section visibility tracking for header updates
   const [currentVisibleSection, setCurrentVisibleSection] = useState<string | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // 🔧 SCROLL POSITION PRESERVATION: Uses parent-managed state to survive remounts
+  // When adding an item, pass current scroll position to parent (POSDesktop)
+  // When component remounts, restore scroll from parent's state
+  const handleAddToOrderWithScrollPreserve = useCallback((orderItem: OrderItem) => {
+    // Get current scroll position and pass to parent
+    const currentScroll = viewportRef.current?.scrollTop ?? 0;
+    onAddToOrder(orderItem, currentScroll);
+  }, [onAddToOrder]);
+
+  // 🔧 FIX: Restore scroll position from parent state on mount
+  // This runs BEFORE paint (useLayoutEffect) so user doesn't see the jump
+  useLayoutEffect(() => {
+    const scrollState = getScrollState?.();
+    if (scrollState?.shouldRestore && viewportRef.current && scrollState.savedPosition > 0) {
+      viewportRef.current.scrollTop = scrollState.savedPosition;
+      scrollState.clearRestore();
+    }
+  });
 
   // Callback ref to capture the ScrollArea viewport element
   const captureViewport = useCallback((node: HTMLDivElement | null) => {
@@ -312,17 +342,19 @@ export function POSMenuSelector({
                         <POSMenuItemCard
                           key={menuItem.id}
                           item={menuItem}
-                          onAddToOrder={onAddToOrder}
+                          onAddToOrder={handleAddToOrderWithScrollPreserve}
                           orderType={orderType}
                           variantCarouselEnabled={variantCarouselEnabled}
                           isAboveFold={aboveFoldItemIds.has(menuItem.id)}
+                          variantsByMenuItem={variantsByMenuItem}
+                          proteinTypes={proteinTypes}
                         />
                       ) : (
                         <PremiumMenuCard
                           key={menuItem.id}
                           item={menuItem}
                           onSelect={() => {}}
-                          onAddToOrder={onAddToOrder}
+                          onAddToOrder={handleAddToOrderWithScrollPreserve}
                           onCustomizeItem={onCustomizeItem}
                           itemVariants={itemVariants}
                           proteinTypes={proteinTypes}
@@ -388,17 +420,19 @@ export function POSMenuSelector({
                     <POSMenuItemCard
                       key={menuItem.id}
                       item={menuItem}
-                      onAddToOrder={onAddToOrder}
+                      onAddToOrder={handleAddToOrderWithScrollPreserve}
                       orderType={orderType}
                       variantCarouselEnabled={variantCarouselEnabled}
                       isAboveFold={aboveFoldItemIds.has(menuItem.id)}
+                      variantsByMenuItem={variantsByMenuItem}
+                      proteinTypes={proteinTypes}
                     />
                   ) : (
                     <PremiumMenuCard
                       key={menuItem.id}
                       item={menuItem}
                       onSelect={() => {}}
-                      onAddToOrder={onAddToOrder}
+                      onAddToOrder={handleAddToOrderWithScrollPreserve}
                       onCustomizeItem={onCustomizeItem}
                       itemVariants={itemVariants}
                       proteinTypes={proteinTypes}
@@ -447,17 +481,19 @@ export function POSMenuSelector({
                 <POSMenuItemCard
                   key={menuItem.id}
                   item={menuItem}
-                  onAddToOrder={onAddToOrder}
+                  onAddToOrder={handleAddToOrderWithScrollPreserve}
                   orderType={orderType}
                   variantCarouselEnabled={variantCarouselEnabled}
                   isAboveFold={index < 8}
+                  variantsByMenuItem={variantsByMenuItem}
+                  proteinTypes={proteinTypes}
                 />
               ) : (
                 <PremiumMenuCard
                   key={menuItem.id}
                   item={menuItem}
                   onSelect={() => {}}
-                  onAddToOrder={onAddToOrder}
+                  onAddToOrder={handleAddToOrderWithScrollPreserve}
                   onCustomizeItem={onCustomizeItem}
                   itemVariants={itemVariants}
                   proteinTypes={proteinTypes}
@@ -484,17 +520,19 @@ export function POSMenuSelector({
             <POSMenuItemCard
               key={menuItem.id}
               item={menuItem}
-              onAddToOrder={onAddToOrder}
+              onAddToOrder={handleAddToOrderWithScrollPreserve}
               orderType={orderType}
               variantCarouselEnabled={variantCarouselEnabled}
               isAboveFold={index < 8}
+              variantsByMenuItem={variantsByMenuItem}
+              proteinTypes={proteinTypes}
             />
           ) : (
             <PremiumMenuCard
               key={menuItem.id}
               item={menuItem}
               onSelect={() => {}}
-              onAddToOrder={onAddToOrder}
+              onAddToOrder={handleAddToOrderWithScrollPreserve}
               onCustomizeItem={onCustomizeItem}
               itemVariants={itemVariants}
               proteinTypes={proteinTypes}
@@ -589,6 +627,6 @@ export function POSMenuSelector({
       </div>
     </div>
   );
-}
+});
 
 export default POSMenuSelector;

@@ -1407,16 +1407,16 @@ export function DineInOrderModal({
     setIsCustomizationModalOpen(true);
   };
 
-  // ✅ NEW: Handle saving customization changes from StaffCustomizationModal (MYA-1700)
-  const handleCustomizationConfirm = async (
-    menuItem: MenuItem,
-    quantity: number,
-    variant?: ItemVariant | null,
-    customizations?: SelectedCustomization[],
-    notes?: string,
-    serveWithSectionId?: string | null
-  ) => {
+  // ✅ Handle saving customization changes from StaffUnifiedCustomizationModal
+  // StaffUnifiedCustomizationModal now passes a fully-formed OrderItem directly
+  const handleCustomizationConfirm = async (orderItem: OrderItem) => {
     if (!customizingItem) return;
+
+    // Extract fields from the OrderItem
+    const quantity = orderItem.quantity;
+    const customizations = orderItem.customizations;
+    const notes = orderItem.notes || '';
+    const serveWithSectionId = orderItem.serveWithSectionId || null;
 
     console.log('💾 [DineInOrderModal] Saving customization changes:', {
       itemId: customizingItem.id,
@@ -1438,13 +1438,13 @@ export function DineInOrderModal({
           .update({
             quantity,
             customizations: customizations?.map(c => ({
-              customization_id: c.id,
+              customization_id: c.id || c.customization_id,
               name: c.name,
-              price_adjustment: c.price_adjustment || 0,
+              price_adjustment: c.price_adjustment || c.price || 0,
               group: c.group || ''
             })) || [],
-            special_instructions: notes || '',
-            serve_with_section_id: serveWithSectionId || null,
+            special_instructions: notes,
+            serve_with_section_id: serveWithSectionId,
             updated_at: new Date().toISOString()
           })
           .eq('id', customizingItem.id)
@@ -1452,7 +1452,7 @@ export function DineInOrderModal({
           .single();
 
         if (!updateError && updatedItem) {
-          toast.success(`Updated ${menuItem.name}`, {
+          toast.success(`Updated ${orderItem.name}`, {
             description: 'Customizations saved successfully'
           });
 
@@ -1475,26 +1475,19 @@ export function DineInOrderModal({
         }
 
         const originalItem = stagingItems[itemIndex];
-        const updatedItem: OrderItem = {
+        const updatedStagingItem: OrderItem = {
           ...originalItem,
-          quantity,
-          customizations: customizations?.map(c => ({
-            id: c.id,
-            customization_id: c.id,
-            name: c.name,
-            price_adjustment: c.price_adjustment || 0,
-            group: c.group || ''
-          })) || [],
-          notes: notes || '',
-          serveWithSectionId: serveWithSectionId || null
+          ...orderItem,
+          // Preserve original item's ID
+          id: originalItem.id,
         };
 
         // Remove old item and add updated one via parent callbacks
         if (onRemoveFromStaging && onAddToStaging) {
           onRemoveFromStaging(originalItem.id);
-          onAddToStaging(updatedItem);
-          
-          toast.success(`Updated ${menuItem.name}`, {
+          onAddToStaging(updatedStagingItem);
+
+          toast.success(`Updated ${orderItem.name}`, {
             description: 'Customizations updated'
           });
 
@@ -2106,10 +2099,7 @@ export function DineInOrderModal({
           return null;
         }
 
-        // Note: StaffUnifiedCustomizationModal uses utils/menuTypes.MenuItem not types/menu.MenuItem
-        // The React Query compat layer also uses utils/menuTypes, so no conversion is needed
-        // handleCustomizationConfirm expects types/menu.MenuItem, but here we receive utils/menuTypes.MenuItem
-        // They are structurally similar enough for the usage
+        // StaffUnifiedCustomizationModal now passes a fully-formed OrderItem directly
         const menuItemVariants = itemVariants.filter(v => v.menu_item_id === fullMenuItem.id);
 
         return (
@@ -2121,17 +2111,7 @@ export function DineInOrderModal({
               setIsCustomizationModalOpen(false);
               setCustomizingItem(null);
             }}
-            onConfirm={(item: MenuTypesMenuItem, quantity: number, variant?: MenuTypesItemVariant | null, customizations?: SelectedCustomization[], notes?: string, serveWithSectionId?: string | null) => {
-              // Cast menuTypes.MenuItem to types/menu.MenuItem through unknown
-              handleCustomizationConfirm(
-                item as unknown as MenuItem,
-                quantity,
-                variant as unknown as ItemVariant | null,
-                customizations,
-                notes,
-                serveWithSectionId
-              );
-            }}
+            onAddToOrder={handleCustomizationConfirm}
             orderType="DINE-IN"
             initialVariant={selectedVariant}
             initialQuantity={customizingItem.quantity}

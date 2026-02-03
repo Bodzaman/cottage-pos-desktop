@@ -19,9 +19,25 @@ function transformPOSItem(item: TableOrderItem): KitchenOrderItem {
   };
 }
 
-// Map POS status (item/order based) to kitchen status (coarse)
-function mapPOSStatus(_status?: string): KitchenOrderStatus {
-  // POS order in active queue is considered PREPARING until all items ready, then READY, then COMPLETED
+// Map POS status based on item states
+function mapPOSStatus(items: TableOrderItem[]): KitchenOrderStatus {
+  if (!items || items.length === 0) return "PENDING";
+
+  const statuses = items.map(item => item.itemStatus || 'NEW');
+
+  // If all items are SERVED → COMPLETED
+  if (statuses.every(s => s === 'SERVED')) return "COMPLETED";
+
+  // If all items are READY or SERVED → READY
+  if (statuses.every(s => s === 'READY' || s === 'SERVED')) return "READY";
+
+  // If any item is PREPARING → PREPARING
+  if (statuses.some(s => s === 'PREPARING')) return "PREPARING";
+
+  // If all items are NEW → PENDING
+  if (statuses.every(s => s === 'NEW')) return "PENDING";
+
+  // Default to PREPARING for mixed states
   return "PREPARING";
 }
 
@@ -42,7 +58,7 @@ export function transformPOSOrder(tableOrder: TableOrder, tableNumber: number): 
     createdAt,
     estimatedPrepTime: 20,
     waitingTime: 0,
-    status: mapPOSStatus(),
+    status: mapPOSStatus(tableOrder.items),
     isPriority: false,
     statusColor: "",
     timeDisplay: "",

@@ -5,11 +5,10 @@ import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { colors } from 'utils/designSystem';
 import { getSpiceEmoji } from 'utils/premiumTheme';
-import { useRealtimeMenuStoreCompat } from 'utils/realtimeMenuStoreCompat';
 import { getItemDisplayPrice, type OrderMode } from 'utils/variantPricing';
 import type { MenuItem, ItemVariant } from '../utils/types';
 import type { OrderItem } from 'types';
-import { StaffUnifiedCustomizationModal, type SelectedCustomization } from 'components/StaffUnifiedCustomizationModal';
+import { StaffUnifiedCustomizationModal } from 'components/StaffUnifiedCustomizationModal';
 import { useMenuItemImage } from 'utils/useMenuItemImage';
 import { supabase } from 'utils/supabaseClient';
 
@@ -23,6 +22,9 @@ interface POSMenuItemCardProps {
   orderType?: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   variantCarouselEnabled?: boolean; // Toggle for variant image carousel
   isAboveFold?: boolean; // NEW: Prioritize image loading for above-fold items
+  // Props passed from parent to prevent per-card store subscriptions
+  variantsByMenuItem?: Record<string, ItemVariant[]>;
+  proteinTypes?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -33,16 +35,19 @@ interface POSMenuItemCardProps {
  * - Quantity controls affect add amount
  * - Purple theme with glow effects
  */
-export function POSMenuItemCard({
+// Wrap in React.memo to prevent re-renders when parent state changes but our props stay the same
+export const POSMenuItemCard = React.memo(function POSMenuItemCard({
   item,
   onAddToOrder,
   onCustomizeItem,
   orderType = 'COLLECTION',
   variantCarouselEnabled = true, // Default: enabled
-  isAboveFold = false // Default: lazy loading
+  isAboveFold = false, // Default: lazy loading
+  variantsByMenuItem = {}, // Passed from parent (POSMenuSelector)
+  proteinTypes = [] // Passed from parent (POSMenuSelector)
 }: POSMenuItemCardProps) {
-  // Subscribe to store data
-  const { variantsByMenuItem, proteinTypes } = useRealtimeMenuStoreCompat({ context: 'pos' });
+  // NOTE: variantsByMenuItem and proteinTypes are now passed as props from POSMenuSelector
+  // This prevents each card from subscribing to the store and re-rendering when cart changes
 
   // Local state
   const [quantity, setQuantity] = useState(1);
@@ -358,46 +363,29 @@ export function POSMenuItemCard({
   };
 
   // Handle customization confirmation from unified modal
-  const handleCustomizationConfirm = (
-    menuItem: MenuItem,
-    qty: number,
-    variant: ItemVariant,
-    customizations?: SelectedCustomization[],
-    notes?: string,
-    serveWithSectionId?: string | null
-  ) => {
-    const price = getVariantPrice(variant);
-    const variantName = getVariantName(variant);
-    // For multi-variant items, use variant name as display name (not concatenated)
-    const displayName = isMultiVariant ? variantName : menuItem.name;
-
-    const orderItem: OrderItem = {
-      id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      menu_item_id: menuItem.id,
-      variant_id: variant.id,
-      name: displayName,
-      variantName: variantName || undefined,
-      quantity: qty,
-      price: price,
-      protein_type: variant.protein_type_name,
-      image_url: variant?.display_image_url || variant?.image_url || menuItem.image_url || '',
-      notes: notes || '',
-      customizations: customizations?.map(c => ({
-        id: c.id,
-        name: c.name,
-        price_adjustment: c.price_adjustment
-      })) || [],
-      item_type: 'menu_item',
-      category_id: menuItem.category_id,
-      serveWithSectionId: serveWithSectionId || null
+  // StaffUnifiedCustomizationModal now passes a fully-formed OrderItem directly
+  const handleCustomizationConfirm = (orderItem: OrderItem) => {
+    // Enrich the OrderItem with additional fields from the current item context
+    const enrichedOrderItem: OrderItem = {
+      ...orderItem,
+      // Ensure unique ID
+      id: orderItem.id || `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      // Add fields that may not be set by the modal
+      menuItemId: orderItem.menu_item_id || item.id,
+      item_type: orderItem.item_type || 'menu_item',
+      // Kitchen display name for receipt printing
+      kitchenDisplayName: item.kitchen_display_name || null,
+      kitchen_display_name: item.kitchen_display_name || null,
+      displayOrder: item.display_order || 0,
+      display_order: item.display_order || 0,
     };
 
     // If parent provided onCustomizeItem callback, use it
     if (onCustomizeItem) {
-      onCustomizeItem(orderItem);
+      onCustomizeItem(enrichedOrderItem);
     } else {
       // Fallback: Use onAddToOrder directly
-      onAddToOrder(orderItem);
+      onAddToOrder(enrichedOrderItem);
     }
 
     // Close the modal
@@ -907,10 +895,10 @@ export function POSMenuItemCard({
         itemVariants={activeVariants}
         isOpen={isCustomizationModalOpen}
         onClose={() => setIsCustomizationModalOpen(false)}
-        onConfirm={handleCustomizationConfirm}
+        onAddToOrder={handleCustomizationConfirm}
         orderType={orderType}
         initialQuantity={quantity}
       />
     </motion.div>
   );
-}
+});

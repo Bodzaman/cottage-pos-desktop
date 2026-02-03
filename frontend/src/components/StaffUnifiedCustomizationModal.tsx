@@ -291,24 +291,31 @@ export function StaffUnifiedCustomizationModal({
     const variant = selectedVariant || (variants.length > 0 ? variants[0] : null);
     const price = variant ? getVariantPrice(variant) : getItemPrice();
 
-    // Guard against £0.00 price
-    if (price <= 0) {
+    // Calculate customizations total FIRST (before validation)
+    const customizationsTotal = selectedCustomizations.reduce((sum, c) => sum + c.price_adjustment, 0);
+    const totalWithCustomizations = price + customizationsTotal;
+
+    // Guard against £0.00 total (base price + customizations)
+    if (totalWithCustomizations <= 0) {
       toast.warning('Unable to add item', {
         description: 'Price not available. Please select a variant with valid pricing.',
       });
       return;
     }
 
-    const customizationsTotal = selectedCustomizations.reduce((sum, c) => sum + c.price_adjustment, 0);
-    const total = (price + customizationsTotal) * quantity;
+    const total = totalWithCustomizations * quantity;
 
     // Resolve image from variant/item hierarchy (variant.display_image_url → variant.image_url → item.image_url)
     const resolvedImageUrl = variant?.display_image_url || variant?.image_url || item.image_url || undefined;
 
+    // 🔧 FIX: Use full variant name for display (e.g., "LAMB TIKKA (st)" not "TIKKA (st)")
+    // This ensures Order Summary shows the correct formatted name
+    const displayName = variant ? getVariantDisplayName(variant) : item.name;
+
     const orderItem: OrderItem = {
       menu_item_id: item.id,
       category_id: item.category_id,
-      name: item.name,
+      name: displayName,
       quantity: quantity,
       price: price,
       total: total,

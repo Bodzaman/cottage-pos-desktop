@@ -1103,11 +1103,8 @@ export default function OnlineOrders() {
         }}
       >
         <SEO title={PAGE_SEO.onlineOrders.title} description={PAGE_SEO.onlineOrders.description} path="/online-orders" />
-        {/* Universal Header with PUBLIC_NAV context for full navigation - Z-INDEX: 50 */}
-        <div
-          ref={headerRef}
-          className="sticky top-0 z-50"
-        >
+        {/* Universal Header - FIXED positioning (inside), ref for height measurement */}
+        <div ref={headerRef}>
           <UniversalHeader
             context="ORDERING_NAV"
             overrideConfig={true}
@@ -1116,8 +1113,12 @@ export default function OnlineOrders() {
             showCart={true}
             onCartClick={openCart}
           />
-          {/* Restaurant Status Banner - Shows when POS is offline, sticky on mobile */}
-          <RestaurantStatusBanner sticky={true} />
+        </div>
+
+        {/* Content below fixed header - pt-20 (80px) clears the fixed header */}
+        <div className="pt-20">
+          {/* Restaurant Status Banner - shows immediately below header */}
+          <RestaurantStatusBanner sticky={false} />
         </div>
         
         {/* **UPDATED: Sticky Category Tabs Bar - Z-INDEX: 40 (Above AI panel) */}

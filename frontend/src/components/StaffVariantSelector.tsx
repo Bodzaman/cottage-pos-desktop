@@ -117,58 +117,14 @@ export function StaffVariantSelector({
   };
 
   // Handle adding item from customization modal
-  const handleAddToOrderFromModal = (
-    item: MenuItem,
-    quantity: number,
-    variant?: ItemVariant | null,
-    customizations?: Array<{id: string, name: string, price: number}>,
-    notes?: string
-  ) => {
-    const price = variant 
-      ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) : 
-         orderType === 'DINE-IN' ? (variant.price_dine_in ?? variant.price) : variant.price)
-      : (orderType === 'DELIVERY' ? (item.price_delivery || item.price_takeaway || item.price || 0) :
-         orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) : 
-         (item.price_takeaway || item.price || 0));
-    
-    const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price, 0) || 0;
-    const totalPrice = (price + customizationsTotal) * quantity;
-
-    // ✅ FIX: Guard against £0.00 price
-    if (price <= 0) {
-      toast.warning('Unable to add item', {
-        description: 'Price not available. Please select a variant with valid pricing.',
-      });
-      return;
-    }
-
-    // Field names must match what BuildSampleTakeawayModal.handleCustomizedItem() expects
-    // Use getDisplayImage to resolve the correct image from variant/item hierarchy
-    const resolvedImageUrl = getDisplayImage(variant || undefined);
-
-    const orderItem: OrderItem = {
-      menu_item_id: item.id,
-      category_id: item.category_id,  // Include category_id for backend storage
-      name: item.name,                // ✅ Fixed: was "item_name"
-      quantity: quantity,
-      price: price,                   // ✅ Fixed: was "unit_price"
-      total: totalPrice,              // ✅ Fixed: was "total_price"
-      variant_id: variant?.id || null,
-      variantName: variant?.name || null,  // ✅ Fixed: was "variant_name"
-      notes: notes || '',
-      image_url: resolvedImageUrl,
-      customizations: customizations?.map(c => ({
-        id: c.id,
-        name: c.name,
-        price: c.price
-      })) || []
-    };
-
+  // StaffUnifiedCustomizationModal now passes a fully-formed OrderItem directly
+  const handleAddToOrderFromModal = (orderItem: OrderItem) => {
+    // Pass the OrderItem directly to parent
     onAddToOrder(orderItem);
-    
+
     // Close customization modal first
     setIsCustomizationModalOpen(false);
-    
+
     // Then close the variant selector modal after a short delay to ensure smooth transition
     setTimeout(() => {
       onClose();
@@ -358,7 +314,7 @@ export function StaffVariantSelector({
           itemVariants={variants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
-          onConfirm={handleAddToOrderFromModal}
+          onAddToOrder={handleAddToOrderFromModal}
           orderType={orderType}
           initialVariant={selectedVariant}
           initialQuantity={variantQuantities[selectedVariant.id] || 1}

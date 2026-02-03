@@ -29,6 +29,7 @@ interface DineInAddItemsViewProps {
   stagingItems: OrderItem[];
   onAddToStaging: (item: OrderItem) => void;
   onRemoveFromStaging: (itemId: string) => void;
+  onUpdateStagingQuantity?: (itemId: string, quantity: number) => void;
   onClearStaging: () => void;
 
   // Kitchen preview modal callbacks
@@ -51,6 +52,7 @@ export function DineInAddItemsView({
   stagingItems,
   onAddToStaging,
   onRemoveFromStaging,
+  onUpdateStagingQuantity,
   onClearStaging,
   onPersistStaging,
   onSendToKitchen,
@@ -128,15 +130,15 @@ export function DineInAddItemsView({
 
   // Handle quantity update for staging items
   const handleQuantityUpdate = useCallback((index: number, quantity: number) => {
+    const item = stagingItems[index];
+    if (!item) return;
+
     if (quantity <= 0) {
-      const item = stagingItems[index];
-      if (item) {
-        onRemoveFromStaging(item.id);
-      }
+      onRemoveFromStaging(item.id);
+    } else if (onUpdateStagingQuantity) {
+      onUpdateStagingQuantity(item.id, quantity);
     }
-    // Note: For staging, we can't update quantity in place
-    // User must remove and re-add with new quantity
-  }, [stagingItems, onRemoveFromStaging]);
+  }, [stagingItems, onRemoveFromStaging, onUpdateStagingQuantity]);
 
   // Handle remove item
   const handleRemoveItem = useCallback((index: number) => {

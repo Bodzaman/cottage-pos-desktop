@@ -1,11 +1,29 @@
 import { Badge } from "@/components/ui/badge";
 
-export function OrderTypeBadge({ type }: { type: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" }) {
-  const map: Record<string, string> = {
-    "DINE-IN": "bg-purple-600/20 text-purple-400 border-purple-600/30",
-    COLLECTION: "bg-amber-600/20 text-amber-400 border-amber-600/30",
-    DELIVERY: "bg-indigo-600/20 text-indigo-400 border-indigo-600/30",
-    WAITING: "bg-orange-600/20 text-orange-400 border-orange-600/30",
+interface OrderTypeBadgeProps {
+  type: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
+  prominent?: boolean;
+}
+
+export function OrderTypeBadge({ type, prominent = false }: OrderTypeBadgeProps) {
+  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+    "DINE-IN": { bg: "bg-purple-600/20", text: "text-purple-400", border: "border-purple-600/30" },
+    COLLECTION: { bg: "bg-amber-600/20", text: "text-amber-400", border: "border-amber-600/30" },
+    DELIVERY: { bg: "bg-indigo-600/20", text: "text-indigo-400", border: "border-indigo-600/30" },
+    WAITING: { bg: "bg-orange-600/20", text: "text-orange-400", border: "border-orange-600/30" },
   };
-  return <Badge className={map[type] || "bg-gray-600/20 text-gray-300"}>{type}</Badge>;
+
+  const colors = colorMap[type] || { bg: "bg-gray-600/20", text: "text-gray-300", border: "" };
+
+  if (prominent) {
+    return (
+      <div className={`w-full text-center py-2 rounded-lg ${colors.bg} ${colors.border} border`}>
+        <span className={`text-xl font-black tracking-wider ${colors.text}`}>
+          {type}
+        </span>
+      </div>
+    );
+  }
+
+  return <Badge className={`${colors.bg} ${colors.text} ${colors.border}`}>{type}</Badge>;
 }

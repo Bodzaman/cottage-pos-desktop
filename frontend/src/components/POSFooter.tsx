@@ -46,11 +46,13 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onTogg
 
   // Map centralized system status to local printer status format
   // Prefer Electron's direct printer detection over legacy helper app polling
+  const isElectronEnv = typeof window !== 'undefined' && 'electronAPI' in window;
   const printerStatus = {
     connected: electronPrinter.isConnected !== null
       ? electronPrinter.isConnected
       : (centralizedSystemStatus.system_status === 'healthy' || centralizedSystemStatus.helper_app_running),
-    loading: false
+    // Show loading state while waiting for initial printer status in Electron
+    loading: isElectronEnv && electronPrinter.status === null
   };
 
   // NEW: Offline status monitoring

@@ -153,6 +153,7 @@ interface DineInOrderWorkspaceProps {
   stagingItems: OrderItem[];
   onAddToStaging: (item: OrderItem) => void;
   onRemoveFromStaging: (itemId: string) => void;
+  onUpdateStagingQuantity?: (itemId: string, quantity: number) => void;
   onClearStaging: () => void;
   onPersistStaging: () => Promise<boolean>;
 
@@ -199,6 +200,7 @@ export function DineInOrderWorkspace({
   stagingItems,
   onAddToStaging,
   onRemoveFromStaging,
+  onUpdateStagingQuantity,
   onClearStaging,
   onPersistStaging,
   onPrintBill,
@@ -510,6 +512,7 @@ export function DineInOrderWorkspace({
                   stagingItems={stagingItems}
                   onAddToStaging={onAddToStaging}
                   onRemoveFromStaging={onRemoveFromStaging}
+                  onUpdateStagingQuantity={onUpdateStagingQuantity}
                   onClearStaging={onClearStaging}
                   onPersistStaging={onPersistStaging}
                   onSendToKitchen={onSendToKitchen}

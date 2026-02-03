@@ -85,6 +85,92 @@ const flushStreamBuffer = (messageId: string, accumulatedContent: string, set: a
   return validatedContent;
 };
 
+// ============================================
+// SUPABASE SYNC HELPERS (for authenticated users)
+// ============================================
+
+/**
+ * Sync a message to Supabase for cross-device persistence
+ * Only syncs for authenticated users, silently skips for guests
+ */
+const syncMessageToSupabase = async (
+  message: ChatMessage,
+  userId: string,
+  chatSessionId: string
+) => {
+  // Skip typing/streaming indicators
+  if (message.isTyping || message.isStreaming) return;
+
+  try {
+    const { error } = await supabase.from('user_chat_history').insert({
+      user_id: userId,
+      message_id: message.id,
+      content: message.content,
+      sender: message.sender,
+      chat_session_id: chatSessionId,
+      metadata: message.metadata || {},
+      created_at: message.timestamp
+    });
+
+    if (error) {
+      console.error('[chat-store] Supabase sync error:', error);
+    }
+  } catch (err) {
+    console.error('[chat-store] Supabase sync exception:', err);
+  }
+};
+
+/**
+ * Load messages from Supabase for authenticated users
+ */
+const loadMessagesFromSupabase = async (userId: string): Promise<ChatMessage[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_chat_history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (error) {
+      console.error('[chat-store] Load messages error:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.message_id,
+      content: row.content,
+      sender: row.sender as 'user' | 'bot',
+      timestamp: new Date(row.created_at),
+      metadata: row.metadata
+    }));
+  } catch (err) {
+    console.error('[chat-store] Load messages exception:', err);
+    return [];
+  }
+};
+
+/**
+ * Delete all messages from Supabase for authenticated users
+ */
+const deleteMessagesFromSupabase = async (userId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('user_chat_history')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('[chat-store] Delete messages error:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[chat-store] Delete messages exception:', err);
+    return false;
+  }
+};
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -233,6 +319,9 @@ interface ChatState {
 
   // NEW: Load system prompt from primary agent
   loadSystemPrompt: () => Promise<void>;
+
+  // Chat history sync (for authenticated users)
+  loadChatHistory: () => Promise<void>;
 }
 
 const generateSessionId = () => {
@@ -335,6 +424,12 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           messages: [...state.messages, newMessage].slice(-state.config.maxMessages)
         }));
+
+        // Sync to Supabase for authenticated users (fire-and-forget)
+        const { userContext, sessionId } = get();
+        if (userContext.isAuthenticated && userContext.userId && !message.isTyping && !message.isStreaming) {
+          syncMessageToSupabase(newMessage, userContext.userId, sessionId);
+        }
       },
 
       // Phase 7 Fix: Implement addMessageWithDetection for dish mention detection
@@ -352,7 +447,22 @@ export const useChatStore = create<ChatState>()(
         get().addMessage(enrichedMessage);
       },
 
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: async () => {
+        const { userContext } = get();
+
+        // Clear localStorage immediately
+        set({ messages: [] });
+
+        // If authenticated, also delete from Supabase
+        if (userContext.isAuthenticated && userContext.userId) {
+          const success = await deleteMessagesFromSupabase(userContext.userId);
+          if (success) {
+            toast.success('Chat cleared');
+          } else {
+            toast.error('Failed to clear cloud history');
+          }
+        }
+      },
       setLoading: (loading) => set({ isLoading: loading }),
       setStreaming: (streaming) => set({ isStreaming: streaming }),
 
@@ -1165,6 +1275,35 @@ export const useChatStore = create<ChatState>()(
         } catch (error) {
           console.error('[chat-store] Failed to load system prompt:', error);
           set({ isLoadingPrompt: false });
+        }
+      },
+
+      // Load chat history from Supabase for authenticated users
+      loadChatHistory: async () => {
+        const { userContext, messages } = get();
+
+        // Only load for authenticated users
+        if (!userContext.isAuthenticated || !userContext.userId) {
+          return;
+        }
+
+        try {
+          const cloudMessages = await loadMessagesFromSupabase(userContext.userId);
+
+          if (cloudMessages.length > 0) {
+            // Merge cloud messages with local, avoiding duplicates
+            const localIds = new Set(messages.map(m => m.id));
+            const merged = [
+              ...messages,
+              ...cloudMessages.filter(m => !localIds.has(m.id))
+            ]
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+              .slice(-100);
+
+            set({ messages: merged });
+          }
+        } catch (error) {
+          console.error('[chat-store] Failed to load chat history:', error);
         }
       }
     }),

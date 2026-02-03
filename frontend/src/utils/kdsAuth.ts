@@ -140,3 +140,23 @@ export async function setKDSPin(pin: string): Promise<{ success: boolean; messag
     };
   }
 }
+
+/**
+ * Verify KDS PIN
+ */
+export async function verifyKDSPin(pin: string): Promise<{ valid: boolean; message: string }> {
+  try {
+    const response = await brain.verify_kds_pin({ pin });
+    const result = await response.json();
+    return {
+      valid: result.valid || result.success || false,
+      message: result.message || ''
+    };
+  } catch (error) {
+    console.error('Failed to verify KDS PIN:', error);
+    return {
+      valid: false,
+      message: 'Verification failed'
+    };
+  }
+}

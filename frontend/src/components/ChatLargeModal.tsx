@@ -1129,12 +1129,33 @@ export function ChatLargeModal({ onStartVoiceOrder }: ChatLargeModalProps) {
                   <CartBadge onClick={handleCartBadgeClick} />
                   
                   {/* First-time hint tooltip */}
-                  <CartHintTooltip 
-                    isVisible={showCartHint} 
+                  <CartHintTooltip
+                    isVisible={showCartHint}
                     onDismiss={handleDismissCartHint}
                   />
                 </div>
-                
+
+                {/* Clear Chat button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm('Clear chat history?')) {
+                      clearMessages();
+                    }
+                  }}
+                  disabled={messages.length === 0}
+                  className={cn(
+                    "hover:bg-red-500/10 hover:text-red-400 transition-all duration-200",
+                    "h-10 px-3",
+                    "sm:h-9 sm:w-9 sm:p-0"
+                  )}
+                  style={{ color: PremiumTheme.colors.text.muted }}
+                  title="Clear chat"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+
                 <Button
                   variant="ghost"
                   size="sm"

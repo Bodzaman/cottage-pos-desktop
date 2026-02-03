@@ -28,6 +28,8 @@ interface RestaurantStatusBannerProps {
   compact?: boolean;
   /** Sticky positioning for mobile scroll (default: false) */
   sticky?: boolean;
+  /** Sticky top offset class (default: 'top-0'). Use 'top-20' to position below 80px header */
+  stickyTop?: string;
   /** Custom className for styling */
   className?: string;
 }
@@ -40,6 +42,7 @@ export function RestaurantStatusBanner({
   show = true,
   compact = false,
   sticky = false,
+  stickyTop = 'top-0',
   className = '',
 }: RestaurantStatusBannerProps) {
   const {
@@ -142,7 +145,7 @@ export function RestaurantStatusBanner({
         className={`
           w-full px-4 py-3 border-b
           ${config.bgColor} ${config.borderColor}
-          ${sticky ? 'sticky top-0 z-30' : ''}
+          ${sticky ? `sticky ${stickyTop} z-40` : ''}
           ${className}
         `}
       >

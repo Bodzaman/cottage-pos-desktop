@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { globalColors } from '../utils/QSAIDesign';
 import { colors as designColors } from '../utils/designSystem';
 import { useNavigate } from 'react-router-dom';
-import { APP_BASE_PATH } from '../constants';
+import { isElectronMode } from '../utils/electronDetection';
 import ManagementPasswordDialog from './ManagementPasswordDialog';
 import { CRMModal } from './CRMModal';
 import { EndOfDayModal } from './EndOfDayModal';
@@ -105,11 +105,17 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
       label: '🍳 Kitchen Display',
       icon: <ChefHat className="h-6 w-6" />,
       action: () => {
-        window.open(
-          `${window.location.origin}${APP_BASE_PATH}/kds-v2?fullscreen=true`,
-          'kitchen-display',
-          'width=1920,height=1080'
-        );
+        if (isElectronMode()) {
+          // In Electron, navigate within the app (MemoryRouter doesn't support window.open)
+          navigate('/kds-v2');
+        } else {
+          // In browser, open in new window for dedicated fullscreen display
+          window.open(
+            `${window.location.origin}/kds-v2?fullscreen=true`,
+            'kitchen-display',
+            'width=1920,height=1080'
+          );
+        }
         handleClose();
       },
       description: 'View and manage kitchen orders in dedicated window'

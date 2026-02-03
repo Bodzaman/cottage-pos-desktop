@@ -24,7 +24,8 @@ import {
   MessageSquare,
   Settings,
   Plus,
-  Trash2
+  Trash2,
+  ChefHat
 } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
 import { useReceiptDesignerStoreV2 } from 'utils/receiptDesignerStoreV2';
@@ -324,7 +325,7 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                   </div>
                 </div>
 
-                {/* Kitchen Visibility Toggle */}
+                {/* Kitchen Visibility Toggle - Note: Also in Kitchen Copy Settings section */}
                 <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
                   <div className="flex items-center justify-between">
                     <div>
@@ -332,7 +333,7 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                       <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display business info on kitchen tickets</span>
                     </div>
                     <Switch
-                      checked={formData.kitchenShowBusinessInfo !== false}
+                      checked={formData.kitchenShowBusinessInfo === true}
                       onCheckedChange={(checked) => updateField('kitchenShowBusinessInfo', checked)}
                       className="scale-90"
                     />
@@ -450,6 +451,24 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
+              {/* Receipt Number Visibility - Customer Copy */}
+              <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: QSAITheme.border.light }}>
+                <div>
+                  <span className="text-xs block" style={mutedStyle}>
+                    Show Receipt Number
+                    <span className="ml-1 px-1.5 py-0.5 rounded text-[9px]" style={{ backgroundColor: QSAITheme.purple.primary + '30', color: QSAITheme.purple.light }}>
+                      Customer
+                    </span>
+                  </span>
+                  <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Only affects FOH/Customer receipt preview</span>
+                </div>
+                <Switch
+                  checked={formData.showReceiptNumber !== false}
+                  onCheckedChange={(checked) => updateField('showReceiptNumber', checked)}
+                  className="scale-90"
+                />
+              </div>
+
               <OrderInfoSection formData={formData} updateField={updateField} />
               <TableServiceSection formData={formData} updateField={updateField} />
               <CustomerDetailsSection formData={formData} updateField={updateField} />
@@ -528,14 +547,6 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
               {/* Item Display Options */}
               <div className="space-y-2 pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs" style={mutedStyle}>Thermal font for items</span>
-                  <Switch
-                    checked={formData.useItemsThermalFont || false}
-                    onCheckedChange={(checked) => updateField('useItemsThermalFont', checked)}
-                    className="scale-90"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-xs" style={mutedStyle}>Category subheadings</span>
                   <Switch
                     checked={formData.showCategorySubheadings || false}
@@ -548,7 +559,7 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
           </AccordionContent>
         </AccordionItem>
 
-        {/* ==================== FOOTER & OPTIONS ==================== */}
+        {/* ==================== FOOTER & MESSAGING ==================== */}
         <AccordionItem
           value="footer"
           className="border rounded-lg overflow-hidden"
@@ -560,7 +571,7 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
           >
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" style={{ color: QSAITheme.purple.primary }} />
-              <span className="font-medium">Footer & Options</span>
+              <span className="font-medium">Footer & Messaging</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
@@ -636,37 +647,112 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                   currentSection="footer"
                 />
               </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
-              {/* Kitchen Footer Visibility */}
-              <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs block" style={mutedStyle}>Show Footer on Kitchen</span>
-                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Display footer messages on kitchen tickets</span>
-                  </div>
-                  <Switch
-                    checked={formData.kitchenShowFooter === true}
-                    onCheckedChange={(checked) => updateField('kitchenShowFooter', checked)}
-                    className="scale-90"
-                  />
+        {/* ==================== KITCHEN COPY SETTINGS ==================== */}
+        <AccordionItem
+          value="kitchen"
+          className="border rounded-lg overflow-hidden"
+          style={{ borderColor: QSAITheme.border.light, backgroundColor: QSAITheme.background.panel }}
+        >
+          <AccordionTrigger
+            className="px-4 py-3 hover:no-underline"
+            style={{ color: QSAITheme.text.primary }}
+          >
+            <div className="flex items-center gap-2">
+              <ChefHat className="h-4 w-4" style={{ color: QSAITheme.purple.primary }} />
+              <span className="font-medium">Kitchen Copy Settings</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-3">
+              <p className="text-[10px]" style={{ color: QSAITheme.text.muted }}>
+                Configure what appears on kitchen tickets
+              </p>
+
+              {/* Receipt Number Visibility */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs block" style={mutedStyle}>Show Receipt Number</span>
+                  <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Order reference on kitchen copy</span>
                 </div>
+                <Switch
+                  checked={formData.kitchenShowReceiptNumber !== false}
+                  onCheckedChange={(checked) => updateField('kitchenShowReceiptNumber', checked)}
+                  className="scale-90"
+                />
               </div>
 
-              {/* Kitchen Copy Options */}
-              <div className="space-y-2 pt-3 border-t" style={{ borderColor: QSAITheme.border.light }}>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium" style={labelStyle}>Kitchen Copy Options</Label>
+              {/* Kitchen Order Label */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs block" style={mutedStyle}>Show Section Label</span>
+                  <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Header text above items</span>
+                </div>
+                <Switch
+                  checked={formData.showKitchenOrderLabel !== false}
+                  onCheckedChange={(checked) => updateField('showKitchenOrderLabel', checked)}
+                  className="scale-90"
+                />
+              </div>
+
+              {formData.showKitchenOrderLabel !== false && (
+                <div className="space-y-1 pl-4 border-l-2" style={{ borderColor: QSAITheme.purple.primary }}>
+                  <Label className="text-xs" style={labelStyle}>Label Text</Label>
+                  <Input
+                    value={formData.kitchenOrderLabelText || 'KITCHEN ORDER'}
+                    onChange={(e) => updateField('kitchenOrderLabelText', e.target.value)}
+                    placeholder="KITCHEN ORDER"
+                    className="h-9"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+
+              {/* Visibility Toggles */}
+              <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+                <Label className="text-xs font-medium block mb-2" style={labelStyle}>Show on Kitchen Tickets</Label>
+                {[
+                  { key: 'kitchenShowBusinessInfo', label: 'Business Info', desc: 'Name, address, contact', defaultOn: false },
+                  { key: 'kitchenShowOrderInfo', label: 'Order Info', desc: 'Date, time, source', defaultOn: true },
+                  { key: 'kitchenShowTableInfo', label: 'Table Info', desc: 'Table #, covers, linked tables', defaultOn: true },
+                  { key: 'kitchenShowCustomerDetails', label: 'Customer Details', desc: 'Name, phone (delivery: ON)', defaultOn: false },
+                  { key: 'kitchenShowTiming', label: 'Timing', desc: 'Collection/delivery times', defaultOn: true },
+                  { key: 'kitchenShowSpecialInstructions', label: 'Special Instructions', desc: 'Customer notes', defaultOn: true },
+                  { key: 'kitchenShowTotals', label: 'Totals', desc: 'For cash collection', defaultOn: false },
+                  { key: 'kitchenShowFooter', label: 'Footer', desc: 'Thank you message', defaultOn: false },
+                ].map(({ key, label, desc, defaultOn }) => (
+                  <div key={key} className="flex items-center justify-between py-1">
+                    <div>
+                      <span className="text-xs block" style={mutedStyle}>{label}</span>
+                      <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>{desc}</span>
+                    </div>
+                    <Switch
+                      checked={defaultOn
+                        ? (formData[key as keyof FormData] as boolean) !== false
+                        : (formData[key as keyof FormData] as boolean) === true}
+                      onCheckedChange={(checked) => updateField(key as keyof FormData, checked as any)}
+                      className="scale-90"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Takeaway-Only Options */}
+              <div className="pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label className="text-xs font-medium" style={labelStyle}>Takeaway Options</Label>
                   <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: QSAITheme.background.secondary, color: QSAITheme.text.muted }}>
                     Takeaway only
                   </span>
                 </div>
-
                 {[
-                  { key: 'showKitchenTotals', label: 'Show totals', desc: 'For cash collection' },
                   { key: 'showContainerQtyField', label: 'Container QTY box', desc: 'For packing count' },
                   { key: 'showCheckedField', label: 'Checked box', desc: 'For verification' },
                 ].map(({ key, label, desc }) => (
-                  <div key={key} className="flex items-center justify-between">
+                  <div key={key} className="flex items-center justify-between py-1">
                     <div>
                       <span className="text-xs block" style={mutedStyle}>{label}</span>
                       <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>{desc}</span>
@@ -678,6 +764,19 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                     />
                   </div>
                 ))}
+              </div>
+
+              {/* Thermal Font */}
+              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
+                <div>
+                  <span className="text-xs block" style={mutedStyle}>Thermal Font for Items</span>
+                  <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Monospace font for item list</span>
+                </div>
+                <Switch
+                  checked={formData.useItemsThermalFont || false}
+                  onCheckedChange={(checked) => updateField('useItemsThermalFont', checked)}
+                  className="scale-90"
+                />
               </div>
             </div>
           </AccordionContent>
@@ -736,49 +835,21 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
                 </Select>
               </div>
 
-              {/* Logo Dimensions */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs" style={labelStyle}>Logo Width (px)</Label>
-                  <Input
-                    type="number"
-                    value={formData.logoWidth || 100}
-                    onChange={(e) => updateField('logoWidth', Number(e.target.value))}
-                    min={50}
-                    max={300}
-                    className="h-9"
-                    style={inputStyle}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs" style={labelStyle}>Logo Position</Label>
-                  <Select
-                    value={formData.logoPosition || 'center'}
-                    onValueChange={(val) => updateField('logoPosition', val as any)}
-                  >
-                    <SelectTrigger className="h-9" style={inputStyle}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="left">Left</SelectItem>
-                      <SelectItem value="center">Center</SelectItem>
-                      <SelectItem value="right">Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Thermal Font Toggle */}
-              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: QSAITheme.border.light }}>
-                <div>
-                  <span className="text-xs block" style={mutedStyle}>Thermal font for items</span>
-                  <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Monospace for item list</span>
-                </div>
-                <Switch
-                  checked={formData.useItemsThermalFont || false}
-                  onCheckedChange={(checked) => updateField('useItemsThermalFont', checked)}
-                  className="scale-90"
+              {/* Logo Width */}
+              <div className="space-y-1">
+                <Label className="text-xs" style={labelStyle}>Logo Width (px)</Label>
+                <Input
+                  type="number"
+                  value={formData.logoWidth || 100}
+                  onChange={(e) => updateField('logoWidth', Number(e.target.value))}
+                  min={50}
+                  max={300}
+                  className="h-9"
+                  style={inputStyle}
                 />
+                <p className="text-[10px]" style={{ color: QSAITheme.text.muted }}>
+                  Logo position is set in Header & Logo section
+                </p>
               </div>
             </div>
           </AccordionContent>

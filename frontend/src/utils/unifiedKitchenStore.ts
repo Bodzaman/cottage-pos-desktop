@@ -79,7 +79,7 @@ export const useUnifiedKitchenStore = create<UnifiedKitchenState>((set, get) => 
           .from("orders")
           .update({ status: supabaseStatus, updated_at: new Date().toISOString() })
           .eq("id", orderId)
-          .eq("order_source", "CUSTOMER_ONLINE_ORDER");
+          .eq("order_source", "ONLINE");
         if (error) throw error;
       } else {
         // POS: update localStorage tables to reflect new status for the order's items
@@ -97,6 +97,32 @@ export const useUnifiedKitchenStore = create<UnifiedKitchenState>((set, get) => 
       supabase.removeChannel(realtimeChannel);
       realtimeChannel = null;
     }
+  },
+
+  initializeRealtimeSubscription: () => {
+    // Don't create duplicate subscriptions
+    if (realtimeChannel) {
+      return;
+    }
+
+    realtimeChannel = supabase
+      .channel("unified-kitchen-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        (payload) => {
+          // Refresh orders when online orders change
+          get().refreshOrders();
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[UnifiedKitchen] Realtime subscription active');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('[UnifiedKitchen] Realtime error:', err);
+        }
+      });
   },
 }));
 
@@ -122,7 +148,7 @@ async function fetchOnlineOrders(): Promise<UnifiedKitchenOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
-    .eq("order_source", "CUSTOMER_ONLINE_ORDER")
+    .eq("order_source", "ONLINE")
     .in("status", ["confirmed", "preparing", "ready"]) // active states
     .order("created_at", { ascending: true });
 

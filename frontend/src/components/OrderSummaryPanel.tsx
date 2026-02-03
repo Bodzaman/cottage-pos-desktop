@@ -178,34 +178,29 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
     setIsCustomizationModalOpen(true);
   };
   
-  // ✅ NEW: Handler to save customized item from StaffCustomizationModal
-  const handleCustomizationConfirm = (menuItem: MenuItem, quantity: number, variant?: ItemVariant | null, customizations?: SelectedCustomization[], notes?: string) => {
+  // ✅ Handler to save customized item from StaffUnifiedCustomizationModal
+  // StaffUnifiedCustomizationModal now passes a fully-formed OrderItem directly
+  const handleCustomizationConfirm = (orderItem: OrderItem) => {
     if (customizingItemIndex === -1 || !customizingOrderItem) return;
 
-    // Build updated OrderItem
+    // Merge the modal's OrderItem with the original item to preserve IDs
     const updatedItem: OrderItem = {
       ...customizingOrderItem,
-      quantity: quantity,
-      notes: notes || '',
-      customizations: customizations?.map(c => ({
-        id: c.id,
-        customization_id: c.id,
-        name: c.name,
-        price_adjustment: c.price_adjustment,
-        group: c.group
-      })) || customizingOrderItem.customizations || []
+      ...orderItem,
+      // Preserve the original item's ID
+      id: customizingOrderItem.id,
     };
-    
+
     // Call parent callback if it exists
     if (onCustomizeItem) {
       onCustomizeItem(customizingItemIndex, updatedItem);
     }
-    
+
     // Close modal
     setIsCustomizationModalOpen(false);
     setCustomizingOrderItem(null);
     setCustomizingItemIndex(-1);
-    
+
     toast.success('Item updated successfully');
   };
   
@@ -699,39 +694,52 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                 
                 {/* Item details */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-sm mb-1" style={{ color: QSAITheme.text.primary }}>
-                    {resolveItemDisplayName(item)}
-                  </h4>
-                  
-                  {/* Variant and protein info */}
-                  {/* ✅ FIX: Only show variant badge if it differs from item name (prevents duplication) */}
-                  {((item.variantName && item.variantName !== item.name && !item.name.includes(item.variantName)) || item.protein_type) && (
-                    <div className="flex items-center space-x-2 mb-2">
-                      {item.variantName && item.variantName !== item.name && !item.name.includes(item.variantName) && (
-                        <span
-                          className="text-xs px-2 py-1 rounded"
-                          style={{
-                            backgroundColor: QSAITheme.purple.primaryTransparent,
-                            color: QSAITheme.text.secondary
-                          }}
-                        >
-                          {item.variantName}
-                        </span>
-                      )}
-                      {item.protein_type && (
-                        <span 
-                          className="text-xs px-2 py-1 rounded" 
-                          style={{ 
-                            backgroundColor: QSAITheme.background.secondary,
-                            color: QSAITheme.text.muted
-                          }}
-                        >
-                          {item.protein_type}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  
+                  {/* Resolve display name once for both display AND duplicate check */}
+                  {(() => {
+                    const displayName = resolveItemDisplayName(item);
+                    // Check if variant badge would be a duplicate of the displayed name
+                    const shouldShowVariantBadge = item.variantName &&
+                      item.variantName !== displayName &&
+                      !displayName.includes(item.variantName);
+
+                    return (
+                      <>
+                        <h4 className="font-semibold text-sm mb-1" style={{ color: QSAITheme.text.primary }}>
+                          {displayName}
+                        </h4>
+
+                        {/* Variant and protein info */}
+                        {/* ✅ FIX: Compare against RESOLVED display name (not raw item.name) to prevent duplication */}
+                        {(shouldShowVariantBadge || item.protein_type) && (
+                          <div className="flex items-center space-x-2 mb-2">
+                            {shouldShowVariantBadge && (
+                              <span
+                                className="text-xs px-2 py-1 rounded"
+                                style={{
+                                  backgroundColor: QSAITheme.purple.primaryTransparent,
+                                  color: QSAITheme.text.secondary
+                                }}
+                              >
+                                {item.variantName}
+                              </span>
+                            )}
+                            {item.protein_type && (
+                              <span
+                                className="text-xs px-2 py-1 rounded"
+                                style={{
+                                  backgroundColor: QSAITheme.background.secondary,
+                                  color: QSAITheme.text.muted
+                                }}
+                              >
+                                {item.protein_type}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   {/* Rich customization details */}
                   {(item.modifiers && item.modifiers.length > 0) && (
                     <div className="space-y-1 mb-2">
@@ -1175,7 +1183,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
               setCustomizingOrderItem(null);
               setCustomizingItemIndex(-1);
             }}
-            onConfirm={handleCustomizationConfirm}
+            onAddToOrder={handleCustomizationConfirm}
             orderType={orderType}
             initialVariant={variant}
             initialQuantity={customizingOrderItem.quantity}

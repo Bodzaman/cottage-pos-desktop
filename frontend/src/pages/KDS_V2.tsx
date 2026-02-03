@@ -3,13 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChefHat, Clock, Package, Utensils, Truck, AlertTriangle, CheckCircle, RotateCw, Maximize, Minimize, X, Globe, Maximize2, Minimize2, Volume2, VolumeX, Lock } from 'lucide-react';
+import { ChefHat, Clock, Package, Utensils, Truck, AlertTriangle, CheckCircle, RotateCw, Maximize, Minimize, X, Globe, Maximize2, Minimize2, Volume2, VolumeX, Lock, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { isElectronMode } from 'utils/electronDetection';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useUnifiedKitchenStore } from 'utils/unifiedKitchenStore';
-import { UnifiedKitchenOrder, KitchenOrderStatus } from 'utils/kitchenTypes';
-
-type OrderType = UnifiedKitchenOrder['orderType'];
 import { ManagementHeader } from 'components/ManagementHeader';
 import { useSimpleAuth } from 'utils/simple-auth-context';
 import { QSAITheme, styles, indianPatterns } from 'utils/QSAIDesign';
@@ -33,6 +32,7 @@ export default function KDS_V2() {
 
 // Separate component for the main KDS content
 function KDS_V2_Content() {
+  const navigate = useNavigate();
   const { user } = useSimpleAuth();
   const { isLocked, lock, unlock, updateActivity, checkAutoLock } = useKDSAuth();
   // Note: Status updates are no longer driven from KDS. Kitchen is read-only.
@@ -46,9 +46,6 @@ function KDS_V2_Content() {
     cleanupSubscription
   } = useUnifiedKitchenStore();
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [time, setTime] = useState(new Date());
-  const [activeFilter, setActiveFilter] = useState<OrderType | 'ALL'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<KitchenOrderStatus | 'ALL'>('ALL');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastOrderCount, setLastOrderCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -196,11 +193,6 @@ function KDS_V2_Content() {
     return (now - createdTime) < 30 * 1000; // 30 seconds
   };
 
-  // Clock update
-  useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Load orders and start real-time listening
   useEffect(() => {
@@ -289,6 +281,24 @@ function KDS_V2_Content() {
 
             {/* Control Buttons - Match POSDesktop button styling */}
             <div className="flex items-center gap-3">
+              {/* Back to POS Button - Only shown in Electron mode */}
+              {isElectronMode() && (
+                <Button
+                  onClick={() => navigate('/pos-desktop')}
+                  variant="ghost"
+                  size="sm"
+                  className="transition-all duration-200"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(124, 93, 250, 0.15) 0%, rgba(124, 93, 250, 0.05) 100%)',
+                    border: '1px solid rgba(124, 93, 250, 0.3)',
+                    color: QSAITheme.purple.primary
+                  }}
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to POS
+                </Button>
+              )}
+
               {/* Lock Button */}
               <Button
                 onClick={() => {

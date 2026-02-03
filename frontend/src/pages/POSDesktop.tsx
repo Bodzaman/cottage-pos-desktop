@@ -502,6 +502,23 @@ export default function POSDesktop() {
   const dineInOrderRef = useRef(dineInOrder);
   useEffect(() => { dineInOrderRef.current = dineInOrder; }, [dineInOrder]);
 
+  // 🔧 FIX: Create stable ref for addItemToDineIn to prevent handleAddToOrder from changing
+  // This is the same pattern used for orderManagementRef - keeps the callback reference stable
+  const addItemToDineInRef = useRef(addItemToDineIn);
+  useEffect(() => { addItemToDineInRef.current = addItemToDineIn; }, [addItemToDineIn]);
+
+  // 🔧 FIX: Scroll state lives at POSDesktop level to survive menuZone rebuilds
+  // When POSMenuSelector remounts (due to menuZone rebuild), it reads this state on mount
+  const menuScrollPositionRef = useRef(0);
+  const shouldRestoreMenuScrollRef = useRef(false);
+
+  // Stable callback for POSMenuSelector to get scroll state on mount
+  const getMenuScrollState = useCallback(() => ({
+    savedPosition: menuScrollPositionRef.current,
+    shouldRestore: shouldRestoreMenuScrollRef.current,
+    clearRestore: () => { shouldRestoreMenuScrollRef.current = false; }
+  }), []);
+
   // Pass orderId to useCustomerTabs for proper tab scoping (tabs are cleaned up when order completes)
   const { customerTabs: customerTabsData, activeTabId, setActiveTabId, createTab, addItemsToTab, renameTab, closeTab, splitTab, mergeTabs, moveItemsBetweenTabs } = useCustomerTabs(orderType === 'DINE-IN' ? selectedTableNumber : null, dineInOrder?.id);
 
@@ -509,6 +526,11 @@ export default function POSDesktop() {
   const addToStagingCart = useCallback((item: OrderItem) => setDineInStagingItems(prev => [...prev, item]), []);
   const removeFromStagingCart = useCallback((itemId: string) => setDineInStagingItems(prev => prev.filter(item => item.id !== itemId)), []);
   const clearStagingCart = useCallback(() => setDineInStagingItems([]), []);
+  const updateStagingQuantity = useCallback((itemId: string, quantity: number) => {
+    setDineInStagingItems(prev => prev.map(item =>
+      item.id === itemId ? { ...item, quantity } : item
+    ));
+  }, []);
 
   // Guard ref to prevent concurrent execution of persistStagingCart (defense in depth)
   const isPersistingRef = useRef(false);
@@ -879,6 +901,11 @@ export default function POSDesktop() {
   }, [callerIdModalOpen]);
 
   const orderManagement = useOrderManagement(orderItems, setOrderItems);
+  // 🔧 FIX: Use ref to maintain stable function reference for handleAddToOrder
+  // This prevents POSMenuSelector re-renders when orderItems changes
+  const orderManagementRef = useRef(orderManagement);
+  orderManagementRef.current = orderManagement;
+
   const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
   const orderProcessing = useOrderProcessing(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
   const printing = usePrintingOperations(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
@@ -914,17 +941,50 @@ export default function POSDesktop() {
   }, [printing, dineInEnrichedItems, selectedTableNumber, guestCount]);
 
 
-  const handleAddToOrder = useCallback((item: OrderItem) => {
-    if (orderType === 'DINE-IN') addItemToDineIn(item);
-    else orderManagement.handleAddToOrder(item);
-  }, [orderType, addItemToDineIn, orderManagement]);
+  // 🔧 FIX: Use refs for both orderManagement and addItemToDineIn
+  // This ensures handleAddToOrder has a STABLE reference even when:
+  // - orderItems changes (orderManagementRef)
+  // - dineIn hook returns new function references (addItemToDineInRef)
+  // Second parameter scrollPosition allows POSMenuSelector to pass its current scroll
+  // position, which is saved BEFORE any state changes that might trigger a rebuild
+  const handleAddToOrder = useCallback((item: OrderItem, scrollPosition?: number) => {
+    // Save scroll position BEFORE any state changes that might trigger menuZone rebuild
+    if (scrollPosition !== undefined) {
+      menuScrollPositionRef.current = scrollPosition;
+      shouldRestoreMenuScrollRef.current = true;
+    }
+
+    if (orderType === 'DINE-IN') addItemToDineInRef.current(item);
+    else orderManagementRef.current.handleAddToOrder(item);
+  }, [orderType]);  // NOTE: No addItemToDineIn - using ref instead
 
   const handleClearOrder = useCallback(async () => {
-    orderManagement.handleClearOrder();
+    orderManagementRef.current.handleClearOrder();
     clearOrder();
     await OfflineFirst.clearAllSessions();
     localStorage.setItem('pos_clean_exit', 'true');
-  }, [orderManagement]);
+  }, [clearOrder]);
+
+  // ============================================================================
+  // STABLE CALLBACKS FOR ZONE MEMOIZATION
+  // These use orderManagementRef to maintain stable references across renders
+  // ============================================================================
+  const stableHandleRemoveItem = useCallback((itemId: string) => {
+    orderManagementRef.current.handleRemoveItem(itemId);
+  }, []);
+
+  const stableHandleUpdateQuantity = useCallback((itemId: string, quantity: number) => {
+    // Find the index by itemId for the underlying function
+    const items = usePOSOrderStore.getState().orderItems;
+    const index = items.findIndex(item => item.id === itemId);
+    if (index >= 0) {
+      orderManagementRef.current.handleUpdateQuantity(index, quantity);
+    }
+  }, []);
+
+  const stableHandleCustomizeItem = useCallback((index: number, item: OrderItem) => {
+    orderManagementRef.current.handleCustomizeItem(index, item);
+  }, []);
 
   const handlePaymentSuccess = useCallback(async (tipSelection: TipSelection, paymentResult?: PaymentResult) => {
     const subtotal = calculateOrderTotal();
@@ -1026,7 +1086,28 @@ export default function POSDesktop() {
 
   const handleSectionSelect = useCallback((id: string | null) => { setSelectedSectionId(id); setSelectedCategoryId(null); setSelectedMenuCategory(id); }, [setSelectedMenuCategory]);
   const handleCategorySelect = useCallback((id: string | null) => { setSelectedCategoryId(id); setSelectedMenuCategory(id); }, [setSelectedMenuCategory]);
-  const childCats = useMemo(() => selectedSectionId ? categories.filter(c => c.parent_category_id === selectedSectionId) : [], [categories, selectedSectionId]);
+
+  // 🔧 FIX: Stabilize childCats reference to prevent menuZone rebuild on cart changes
+  // React Query returns new categories array reference on each render even when data is same.
+  // This ref preserves the array reference when content is unchanged, breaking the cascade:
+  // categories changes → childCats stays same → menuZone stays same → scroll preserved
+  const childCatsRef = useRef<any[]>([]);
+  const childCats = useMemo(() => {
+    const newCats = selectedSectionId
+      ? categories.filter(c => c.parent_category_id === selectedSectionId)
+      : [];
+
+    // Compare actual content, not just reference
+    const contentSame = newCats.length === childCatsRef.current.length &&
+      newCats.every((cat, i) => cat.id === childCatsRef.current[i]?.id);
+
+    if (contentSame) {
+      return childCatsRef.current; // Return stable reference
+    }
+
+    childCatsRef.current = newCats;
+    return newCats;
+  }, [categories, selectedSectionId]);
 
   // ============================================================================
   // ONLINE ORDERS STATE & HANDLERS
@@ -1168,6 +1249,121 @@ export default function POSDesktop() {
     }
   }, [onlineOrders]);
 
+  // ============================================================================
+  // MEMOIZED ZONE ELEMENTS - Prevents unmount/remount when cart changes
+  // By memoizing JSX elements, React sees the same reference and doesn't
+  // destroy/recreate components, preserving internal state like scroll position
+  // ============================================================================
+
+  // Customer Zone - only changes when orderType or customer functions change
+  const customerZone = useMemo(() => (
+    <POSZoneErrorBoundary zoneName="Customer" onReset={() => {}} showHomeButton>
+      <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5 p-3">
+        <OrderCustomerCard
+          orderType={orderType as 'COLLECTION' | 'DELIVERY' | 'WAITING'}
+          onModeChange={(mode) => setOrderType(mode)}
+          onTakeOrder={() => setModal('showCustomerModal', true)}
+          onEdit={() => setModal('showCustomerModal', true)}
+          onViewOrders={() => setShowOrderHistoryModal(true)}
+          onClear={() => { clearCustomer(); clearCustomerData(); clearIntelligenceCustomer(); }}
+        />
+      </div>
+    </POSZoneErrorBoundary>
+  ), [orderType, clearCustomer, clearCustomerData, clearIntelligenceCustomer, setModal, setOrderType]);
+
+  // Menu Zone - CRITICAL: Does NOT include orderItems in dependencies
+  // This ensures menu stays mounted when cart changes, preserving scroll position
+  const menuZone = useMemo(() => (
+    <POSZoneErrorBoundary zoneName="Menu" onReset={() => {}} showHomeButton>
+      <div className="flex flex-col h-full overflow-hidden">
+        <div className="p-3 space-y-2 bg-[#121212] border-b border-white/5">
+          <POSSectionPills
+            selectedSectionId={selectedSectionId}
+            onSectionSelect={handleSectionSelect}
+          />
+          {selectedSectionId && (
+            <POSCategoryPills
+              categories={childCats as any}
+              selectedCategoryId={selectedCategoryId}
+              onCategorySelect={handleCategorySelect}
+            />
+          )}
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <POSMenuSelector
+            onAddToOrder={handleAddToOrder as any}
+            onCustomizeItem={undefined}
+            onCategoryChange={handleCategorySelect}
+            orderType={orderType}
+            selectedSectionId={selectedSectionId}
+            childCategories={childCats}
+            selectedCategoryId={selectedCategoryId}
+            onCategorySelect={handleCategorySelect}
+            variantCarouselEnabled={variantCarouselEnabled}
+            getScrollState={getMenuScrollState}
+          />
+        </div>
+      </div>
+    </POSZoneErrorBoundary>
+  ), [
+    selectedSectionId,
+    selectedCategoryId,
+    childCats,
+    orderType,
+    variantCarouselEnabled,
+    handleAddToOrder,
+    handleSectionSelect,
+    handleCategorySelect,
+    getMenuScrollState
+    // NOTE: orderItems is intentionally NOT included - menu doesn't need to re-render when cart changes
+  ]);
+
+  // Summary Zone - DOES include orderItems because it needs to show cart contents
+  const summaryZone = useMemo(() => (
+    <POSZoneErrorBoundary zoneName="Order" onReset={handleClearOrder} showHomeButton>
+      <OrderSummaryPanel
+        orderItems={orderItems}
+        orderType={orderType as any}
+        tableNumber={selectedTableNumber || 0}
+        guestCount={guestCount}
+        customerFirstName={customerData.firstName}
+        customerLastName={customerData.lastName}
+        customerPhone={customerData.phone}
+        customerAddress={customerData.address}
+        customerPostcode={customerData.postcode}
+        deliveryFee={deliveryFee}
+        onRemoveItem={stableHandleRemoveItem}
+        onUpdateQuantity={stableHandleUpdateQuantity}
+        onClearOrder={handleClearOrder}
+        onSendToKitchen={handleSendToKitchen}
+        onPrintBill={() => printing.handlePrintBill(orderTotal)}
+        onSaveUpdate={() => {}}
+        onTableSelect={(num: number) => setSelectedTableNumber(num)}
+        onTableSelectionClick={() => setModal('showGuestCountModal', true)}
+        onCustomizeItem={stableHandleCustomizeItem}
+        onCustomerDetailsClick={() => setModal('showCustomerModal', true)}
+        onShowPaymentModal={handleShowPaymentModal}
+      />
+    </POSZoneErrorBoundary>
+  ), [
+    orderItems,
+    orderType,
+    selectedTableNumber,
+    guestCount,
+    customerData,
+    deliveryFee,
+    orderTotal,
+    stableHandleRemoveItem,
+    stableHandleUpdateQuantity,
+    stableHandleCustomizeItem,
+    handleClearOrder,
+    handleSendToKitchen,
+    handleShowPaymentModal,
+    printing,
+    setModal,
+    setSelectedTableNumber
+  ]);
+
   const renderMainPOSView = () => {
     // Full-width table dashboard for DINE-IN mode
     if (posViewMode === 'DINE_IN') {
@@ -1235,34 +1431,13 @@ export default function POSDesktop() {
     }
 
     // Existing 3-panel layout for takeaway modes
+    // Using memoized zones to prevent unmount/remount when cart changes
     return (
       <ResponsivePOSShell zones={{
-        customer: (
-          <POSZoneErrorBoundary zoneName="Customer" onReset={() => {}} showHomeButton>
-            <div className="flex flex-col h-full bg-[#121212] rounded-lg overflow-hidden border border-white/5 p-3">
-              <OrderCustomerCard orderType={orderType as 'COLLECTION' | 'DELIVERY' | 'WAITING'} onModeChange={(mode) => setOrderType(mode)} onTakeOrder={() => setModal('showCustomerModal', true)} onEdit={() => setModal('showCustomerModal', true)} onViewOrders={() => setShowOrderHistoryModal(true)} onClear={() => { clearCustomer(); clearCustomerData(); clearIntelligenceCustomer(); }} />
-            </div>
-          </POSZoneErrorBoundary>
-        ),
+        customer: customerZone,
         categories: null,
-        menu: (
-          <POSZoneErrorBoundary zoneName="Menu" onReset={() => {}} showHomeButton>
-            <div className="flex flex-col h-full overflow-hidden">
-              <div className="p-3 space-y-2 bg-[#121212] border-b border-white/5">
-                <POSSectionPills selectedSectionId={selectedSectionId} onSectionSelect={handleSectionSelect} />
-                {selectedSectionId && <POSCategoryPills categories={childCats as any} selectedCategoryId={selectedCategoryId} onCategorySelect={handleCategorySelect} />}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <POSMenuSelector onAddToOrder={handleAddToOrder as any} onCustomizeItem={undefined} onCategoryChange={handleCategorySelect} orderType={orderType} selectedSectionId={selectedSectionId} childCategories={childCats} selectedCategoryId={selectedCategoryId} onCategorySelect={handleCategorySelect} variantCarouselEnabled={variantCarouselEnabled} />
-              </div>
-            </div>
-          </POSZoneErrorBoundary>
-        ),
-        summary: (
-          <POSZoneErrorBoundary zoneName="Order" onReset={handleClearOrder} showHomeButton>
-            <OrderSummaryPanel orderItems={orderItems} orderType={orderType as any} tableNumber={selectedTableNumber || 0} guestCount={guestCount} customerFirstName={customerData.firstName} customerLastName={customerData.lastName} customerPhone={customerData.phone} customerAddress={customerData.address} customerPostcode={customerData.postcode} deliveryFee={deliveryFee} onRemoveItem={orderManagement.handleRemoveItem} onUpdateQuantity={(itemId: string, quantity: number) => orderManagement.handleUpdateQuantity(0, quantity) /* dummy index */} onClearOrder={handleClearOrder} onSendToKitchen={handleSendToKitchen} onPrintBill={() => printing.handlePrintBill(orderTotal)} onSaveUpdate={() => {}} onTableSelect={(num: number) => setSelectedTableNumber(num)} onTableSelectionClick={() => setModal('showGuestCountModal', true)} onCustomizeItem={orderManagement.handleCustomizeItem} onCustomerDetailsClick={() => setModal('showCustomerModal', true)} onShowPaymentModal={handleShowPaymentModal} />
-          </POSZoneErrorBoundary>
-        )
+        menu: menuZone,
+        summary: summaryZone
       }} />
     );
   };
@@ -1462,6 +1637,7 @@ export default function POSDesktop() {
           stagingItems={dineInStagingItems}
           onAddToStaging={addToStagingCart}
           onRemoveFromStaging={removeFromStagingCart}
+          onUpdateStagingQuantity={updateStagingQuantity}
           onClearStaging={clearStagingCart}
           onPersistStaging={persistStagingCart}
           onPrintBill={handleDineInPrintBill}

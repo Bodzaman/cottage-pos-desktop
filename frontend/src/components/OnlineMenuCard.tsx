@@ -588,14 +588,14 @@ export function OnlineMenuCard({
       {/* Content Section - EXPANDS TO FILL SPACE */}
       <div className="flex flex-col flex-1 p-4 gap-3">
         {/* Title + Price + Info */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-baseline justify-between gap-2">
           <h3
             className="text-lg font-bold leading-tight flex-1 min-w-0"
             style={{ color: PremiumTheme.colors.text.primary }}
           >
             {item.name}
           </h3>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-baseline gap-1 shrink-0">
             <span className="text-lg font-bold tabular-nums text-white">
               £{displayPrice.toFixed(2)}
             </span>
@@ -704,7 +704,7 @@ export function OnlineMenuCard({
                       </div>
                     ) : (
                        <div
-                         className="flex flex-wrap gap-2 mt-1"
+                         className="grid grid-cols-2 gap-2 mt-1"
                          onMouseEnter={showTooltipOnce}
                          onFocusCapture={showTooltipOnce}
                          onMouseLeave={() => setTooltipOpen(false)}
@@ -731,7 +731,7 @@ export function OnlineMenuCard({
                                  }}
                                  variant={isSelected ? 'default' : 'outline'}
                                  className={cn(
-                                   'cursor-pointer transition-all px-3.5 py-2 text-sm border-2 min-h-[36px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1538] hover:-translate-y-0.5 active:scale-[0.98]',
+                                   'cursor-pointer transition-all px-3 py-2 text-sm border-2 min-h-[44px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1538] hover:-translate-y-0.5 active:scale-[0.98]',
                                    isSelected
                                      ? 'bg-[#8B1538] text-white hover:bg-[#6B1028] shadow-md'
                                      : 'hover:bg-[#8B1538]/10 hover:shadow md:backdrop-blur-sm'
@@ -741,9 +741,9 @@ export function OnlineMenuCard({
                                    handleVariantSelect(variant);
                                  }}
                                >
-                                 <span className="flex items-center gap-1.5">
-                                   {isSelected && <Check className="h-4 w-4" />}
-                                   <span>{variantLabel} • £{variantPrice.toFixed(2)}</span>
+                                 <span className="flex flex-col items-center gap-0.5 text-center w-full">
+                                   <span className="font-medium">{variantLabel}</span>
+                                   <span className="text-xs opacity-90">£{variantPrice.toFixed(2)}</span>
                                  </span>
                                </Badge>
                              </div>
@@ -805,7 +805,7 @@ export function OnlineMenuCard({
               <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen}>
                 <TooltipTrigger asChild>
                   <div
-                    className="flex flex-wrap gap-2"
+                    className="grid grid-cols-2 gap-2"
                     onMouseEnter={showTooltipOnce}
                     onFocusCapture={showTooltipOnce}
                     onMouseLeave={() => setTooltipOpen(false)}
@@ -832,7 +832,7 @@ export function OnlineMenuCard({
                             }}
                             variant={isSelected ? 'default' : 'outline'}
                             className={cn(
-                              'cursor-pointer transition-all px-3.5 py-2 text-sm border-2 min-h-[36px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1538] hover:-translate-y-0.5 active:scale-[0.98]',
+                              'cursor-pointer transition-all px-3 py-2 text-sm border-2 min-h-[44px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1538] hover:-translate-y-0.5 active:scale-[0.98]',
                               isSelected
                                 ? 'bg-[#8B1538] text-white hover:bg-[#6B1028] shadow-md'
                                 : 'hover:bg-[#8B1538]/10 hover:shadow md:backdrop-blur-sm'
@@ -842,9 +842,9 @@ export function OnlineMenuCard({
                               handleVariantSelect(variant);
                             }}
                           >
-                            <span className="flex items-center gap-1.5">
-                              {isSelected && <Check className="h-4 w-4" />}
-                              <span>{variantLabel} • £{variantPrice.toFixed(2)}</span>
+                            <span className="flex flex-col items-center gap-0.5 text-center w-full">
+                              <span className="font-medium">{variantLabel}</span>
+                              <span className="text-xs opacity-90">£{variantPrice.toFixed(2)}</span>
                             </span>
                           </Badge>
                         </div>

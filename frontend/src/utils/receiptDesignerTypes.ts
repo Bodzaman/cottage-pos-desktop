@@ -186,6 +186,14 @@ export interface FormData {
   kitchenShowTotals?: boolean;          // Default: depends on order mode (false for dine-in)
   kitchenShowFooter?: boolean;          // Default: false - Hide footer on kitchen
 
+  // Kitchen Order Label
+  showKitchenOrderLabel?: boolean;      // Default: true - Show "KITCHEN ORDER" label
+  kitchenOrderLabelText?: string;       // Default: "KITCHEN ORDER" - Customizable text
+
+  // Receipt Number Visibility
+  showReceiptNumber?: boolean;          // Default: true - Show receipt number on customer copy
+  kitchenShowReceiptNumber?: boolean;   // Default: true - Show receipt number on kitchen copy
+
   // Header Text
   headerText?: string;  // Custom header text/welcome message
 
@@ -428,6 +436,14 @@ export const DEFAULT_FORM_DATA: FormData = {
   kitchenShowSpecialInstructions: true, // Always show special instructions
   kitchenShowTotals: false,          // Default off for dine-in (FOH handles billing)
   kitchenShowFooter: false,          // Kitchen doesn't need footer
+
+  // Kitchen Order Label
+  showKitchenOrderLabel: true,       // Show "KITCHEN ORDER" label by default
+  kitchenOrderLabelText: 'KITCHEN ORDER', // Default label text
+
+  // Receipt Number Visibility
+  showReceiptNumber: true,           // Show receipt number on customer copy
+  kitchenShowReceiptNumber: true,    // Show receipt number on kitchen copy
 
   // Footer
   footerMessage: 'Thank you for your order!',

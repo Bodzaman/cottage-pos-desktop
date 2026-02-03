@@ -1531,20 +1531,26 @@ Powered by QuickServe AI`
                 const { stdout } = await execAsync('lpstat -p 2>/dev/null || echo ""');
                 const printers = [];
 
+                log.debug('[PrinterDiscovery] lpstat raw output:', stdout);
+
                 if (stdout.trim()) {
                     const lines = stdout.trim().split('\n');
                     for (const line of lines) {
                         // Parse: "printer EPSON_TM_T20III is idle..."
-                        const match = line.match(/^printer\s+(\S+)\s+(.*)$/);
+                        // FIX: Trim each line to handle leading whitespace
+                        const match = line.trim().match(/^printer\s+(\S+)\s+(.*)$/);
                         if (match) {
                             const name = match[1].replace(/_/g, ' '); // Replace underscores with spaces
-                            const status = match[2];
+                            const status = match[2].toLowerCase();
                             printers.push({
                                 name: match[1], // Keep original name for printing
                                 displayName: name,
                                 status: status.includes('idle') ? 'idle' : status,
-                                available: !status.includes('disabled')
+                                // FIX: Also check for 'stopped' and 'paused' states
+                                available: !status.includes('disabled') && !status.includes('stopped') && !status.includes('paused')
                             });
+                        } else {
+                            log.debug('[PrinterDiscovery] Line did not match regex:', line);
                         }
                     }
                 }
@@ -1563,7 +1569,7 @@ Powered by QuickServe AI`
                     // Ignore error getting default
                 }
 
-                log.info('Discovered macOS printers:', printers.map(p => p.name));
+                log.info('[PrinterDiscovery] Discovered macOS printers:', printers.map(p => `${p.name}(${p.available ? 'ok' : 'unavailable'})`));
                 return printers;
             } else {
                 // Windows: Use PowerShell
@@ -1873,6 +1879,25 @@ Powered by QuickServe AI`
         const pollPrinterStatus = async () => {
             try {
                 const printers = await this.discoverPrinters();
+
+                // Check if any discovered printer is thermal
+                const hasThermalFromDiscovery = printers.some(p => {
+                    const n = (p.name || '').toLowerCase();
+                    return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                });
+
+                // FALLBACK: If no printers discovered but we have a cached defaultPrinter,
+                // check if it's a known thermal printer
+                const hasThermalFromCache = !hasThermalFromDiscovery && this.defaultPrinter &&
+                    (() => {
+                        const n = this.defaultPrinter.toLowerCase();
+                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                    })();
+
+                if (printers.length === 0 && this.defaultPrinter) {
+                    log.warn('[PrinterMonitor] No printers discovered, but cached defaultPrinter exists:', this.defaultPrinter);
+                }
+
                 const status = {
                     timestamp: Date.now(),
                     printers: printers.map(p => ({
@@ -1883,10 +1908,7 @@ Powered by QuickServe AI`
                         isDefault: p.isDefault || false
                     })),
                     defaultPrinter: this.defaultPrinter || null,
-                    hasThermalPrinter: printers.some(p => {
-                        const n = (p.name || '').toLowerCase();
-                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
-                    })
+                    hasThermalPrinter: hasThermalFromDiscovery || hasThermalFromCache
                 };
 
                 // Check if status changed (printer connected/disconnected)
@@ -1920,6 +1942,20 @@ Powered by QuickServe AI`
         ipcMain.handle('get-printer-status', async () => {
             try {
                 const printers = await this.discoverPrinters();
+
+                // Check if any discovered printer is thermal
+                const hasThermalFromDiscovery = printers.some(p => {
+                    const n = (p.name || '').toLowerCase();
+                    return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                });
+
+                // FALLBACK: If no printers discovered but we have a cached defaultPrinter
+                const hasThermalFromCache = !hasThermalFromDiscovery && this.defaultPrinter &&
+                    (() => {
+                        const n = this.defaultPrinter.toLowerCase();
+                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                    })();
+
                 return {
                     success: true,
                     printers: printers.map(p => ({
@@ -1930,13 +1966,22 @@ Powered by QuickServe AI`
                         isDefault: p.isDefault || false
                     })),
                     defaultPrinter: this.defaultPrinter || null,
-                    hasThermalPrinter: printers.some(p => {
-                        const n = (p.name || '').toLowerCase();
-                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
-                    })
+                    hasThermalPrinter: hasThermalFromDiscovery || hasThermalFromCache
                 };
             } catch (error) {
-                return { success: false, printers: [], defaultPrinter: null, hasThermalPrinter: false };
+                // Even on error, check if we have a cached thermal printer
+                const hasCachedThermal = this.defaultPrinter &&
+                    (() => {
+                        const n = this.defaultPrinter.toLowerCase();
+                        return n.includes('epson') || n.includes('thermal') || n.includes('tm-t');
+                    })();
+
+                return {
+                    success: false,
+                    printers: [],
+                    defaultPrinter: this.defaultPrinter || null,
+                    hasThermalPrinter: hasCachedThermal || false
+                };
             }
         });
 

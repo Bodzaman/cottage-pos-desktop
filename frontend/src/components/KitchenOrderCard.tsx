@@ -52,11 +52,14 @@ export function KitchenOrderCard({ order }: Props) {
         )}
 
         <CardHeader style={{ paddingBottom: '0.75rem' }}>
-          {/* Order Number & Source */}
-          <div className="flex items-center justify-between mb-2">
-            <h3 
+          {/* ORDER TYPE - Prominent at top */}
+          <OrderTypeBadge type={order.orderType} prominent />
+
+          {/* Order Number & Source - now below order type */}
+          <div className="flex items-center justify-between mt-3 mb-2">
+            <h3
               className="font-bold text-2xl tracking-tight"
-              style={{ 
+              style={{
                 color: isPriority ? QSAITheme.purple.light : QSAITheme.text.primary,
                 textShadow: isPriority ? `0 0 10px ${QSAITheme.purple.glow}` : 'none'
               }}
@@ -66,19 +69,17 @@ export function KitchenOrderCard({ order }: Props) {
             <OrderSourceBadge source={order.orderSource} />
           </div>
 
-          {/* Order Type & Customer Info */}
+          {/* Customer Info & Table */}
           <div className="flex items-center gap-2 text-sm flex-wrap mb-2" style={{ color: QSAITheme.text.secondary }}>
-            <OrderTypeBadge type={order.orderType} />
             {order.customerName && (
               <>
-                <span>•</span>
                 <span className="font-medium">{order.customerName}</span>
               </>
             )}
             {order.tableNumber && (
               <>
-                <span>•</span>
-                <Badge 
+                {order.customerName && <span>•</span>}
+                <Badge
                   variant="outline"
                   style={{
                     background: `${QSAITheme.purple.primary}20`,

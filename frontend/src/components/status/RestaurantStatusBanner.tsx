@@ -35,6 +35,8 @@ interface RestaurantStatusBannerProps {
   variant?: BannerVariant;
   /** Sticky positioning (default: false) */
   sticky?: boolean;
+  /** Sticky top offset class (default: 'top-0'). Use 'top-20' to position below 80px header */
+  stickyTop?: string;
   /** Show countdown timer when closed */
   showCountdown?: boolean;
   /** Show today's hours */
@@ -53,6 +55,7 @@ export function RestaurantStatusBanner({
   show = true,
   variant = 'full',
   sticky = false,
+  stickyTop = 'top-0',
   showCountdown = true,
   showHours = false,
   dismissible = false,
@@ -211,7 +214,7 @@ export function RestaurantStatusBanner({
             'w-full py-2 px-4 border-b',
             config.bgColor,
             config.borderColor,
-            sticky && 'sticky top-0 z-30',
+            sticky && `sticky ${stickyTop} z-40`,
             className
           )}
         >
@@ -281,7 +284,7 @@ export function RestaurantStatusBanner({
           'w-full px-4 py-3 border-b',
           config.bgColor,
           config.borderColor,
-          sticky && 'sticky top-0 z-30',
+          sticky && `sticky ${stickyTop} z-40`,
           className
         )}
       >

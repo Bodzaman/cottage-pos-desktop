@@ -229,9 +229,10 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
       price = variant.price;
     }
 
-    // Get variant name (use variant.name which contains Generated Name)
+    // Get variant name - prioritize variant_name (full generated name like "LAMB TIKKA (st)")
+    // 🔧 FIX: Correct priority order - variant_name first, then fallbacks
     const proteinType = effectiveProteinTypes.find(pt => pt.id === variant.protein_type_id);
-    const variantName = variant.name || proteinType?.name || variant.variant_name || variant.protein_type_name || 'Standard';
+    const variantName = variant.variant_name || variant.name || proteinType?.name || variant.protein_type_name || 'Standard';
 
     // Construct order item
     // ✅ FIX: Use variantName directly (already contains the full generated name)
@@ -405,13 +406,12 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
     
     const price = getDisplayPrice();
     
-    // ✅ USE VARIANT.NAME FIRST (contains Generated Name: "CHICKEN test variant item")
+    // 🔧 FIX: Prioritize variant_name (full generated name like "LAMB TIKKA (st)")
     let variantName = 'Standard';
     if (selectedVariant) {
-      // Prioritize variant.name which has the Generated Name format
-      variantName = selectedVariant.name || (() => {
+      variantName = selectedVariant.variant_name || selectedVariant.name || (() => {
         const proteinType = effectiveProteinTypes.find(pt => pt.id === selectedVariant.protein_type_id);
-        return proteinType?.name || selectedVariant.variant_name || selectedVariant.protein_type_name || 'Standard';
+        return proteinType?.name || selectedVariant.protein_type_name || 'Standard';
       })();
     }
     
@@ -957,40 +957,14 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
         {/* Modals - Updated to use Unified Modals */}
         {orderType ? (
           // POS Context: Use StaffUnifiedCustomizationModal
+          // Modal now passes a fully-formed OrderItem directly
           <StaffUnifiedCustomizationModal
             item={item}
             itemVariants={activeVariants}
             isOpen={isCustomizationModalOpen}
             onClose={() => setIsCustomizationModalOpen(false)}
-            onConfirm={(item, quantity, variant, customizations, notes) => {
-              // Convert to POS order item format and call onAddToOrder
+            onAddToOrder={(orderItem) => {
               if (onAddToOrder) {
-                const price = variant
-                  ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) :
-                     orderType === 'DINE-IN' ? (variant.price_dine_in ?? variant.price) : variant.price)
-                  : (orderType === 'DELIVERY' ? (item.price_delivery || item.price_takeaway || item.price || 0) :
-                     orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) :
-                     (item.price_takeaway || item.price || 0));
-
-                const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
-                const totalPrice = (price + customizationsTotal) * quantity;
-
-                const orderItem = {
-                  menu_item_id: item.id,
-                  item_name: item.name,
-                  quantity: quantity,
-                  unit_price: price,
-                  total_price: totalPrice,
-                  variant_id: variant?.id || null,
-                  variant_name: variant?.name || null,
-                  notes: notes || '',
-                  customizations: customizations?.map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    price: c.price_adjustment
-                  })) || []
-                };
-
                 onAddToOrder(orderItem);
               }
               setIsCustomizationModalOpen(false);
@@ -1576,40 +1550,14 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
       {/* Customization Modal - Updated to use Unified Modals */}
       {orderType ? (
         // POS Context: Use StaffUnifiedCustomizationModal
+        // Modal now passes a fully-formed OrderItem directly
         <StaffUnifiedCustomizationModal
           item={item}
           itemVariants={activeVariants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
-          onConfirm={(item, quantity, variant, customizations, notes) => {
-            // Convert to POS order item format and call onAddToOrder
+          onAddToOrder={(orderItem) => {
             if (onAddToOrder) {
-              const price = variant
-                ? (orderType === 'DELIVERY' ? (variant.price_delivery ?? variant.price) :
-                   orderType === 'DINE-IN' ? (variant.price_dine_in ?? variant.price) : variant.price)
-                : (orderType === 'DELIVERY' ? (item.price_delivery || item.price_takeaway || item.price || 0) :
-                   orderType === 'DINE-IN' ? (item.price_dine_in || item.price_takeaway || item.price || 0) :
-                   (item.price_takeaway || item.price || 0));
-
-              const customizationsTotal = customizations?.reduce((sum, c) => sum + c.price_adjustment, 0) || 0;
-              const totalPrice = (price + customizationsTotal) * quantity;
-
-              const orderItem = {
-                menu_item_id: item.id,
-                item_name: item.name,
-                quantity: quantity,
-                unit_price: price,
-                total_price: totalPrice,
-                variant_id: variant?.id || null,
-                variant_name: variant?.name || null,
-                notes: notes || '',
-                customizations: customizations?.map(c => ({
-                  id: c.id,
-                  name: c.name,
-                  price: c.price_adjustment
-                })) || []
-              };
-
               onAddToOrder(orderItem);
             }
             setIsCustomizationModalOpen(false);
