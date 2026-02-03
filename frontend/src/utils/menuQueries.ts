@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import brain from 'brain';
 import { supabase, ensureSupabaseConfigured } from './supabaseClient';
 import { toast } from 'sonner';
@@ -972,8 +972,13 @@ export function useFilteredMenuItems(options: {
 
   const { data: bundle, isLoading, error } = useMenuBundle({ context });
 
+  // 🔧 FIX: Stabilize filteredItems reference to prevent unnecessary re-renders
+  // React Query returns new bundle reference on each access, causing filteredItems
+  // to be recalculated even when actual content is unchanged
+  const filteredItemsRef = useRef<MenuItem[]>([]);
+
   const filteredItems = useMemo(() => {
-    if (!bundle) return [];
+    if (!bundle) return filteredItemsRef.current.length === 0 ? [] : filteredItemsRef.current;
 
     const { menuItems, categories, setMeals } = bundle;
     let filtered = [...menuItems];
@@ -1074,7 +1079,19 @@ export function useFilteredMenuItems(options: {
         item_type: 'set_meal' as const
       } as unknown as MenuItem));
 
-    return [...filtered, ...setMealItems];
+    const result = [...filtered, ...setMealItems];
+
+    // 🔧 FIX: Compare by IDs to maintain stable reference when content is unchanged
+    // This prevents unnecessary re-renders of menu components
+    const idsMatch = result.length === filteredItemsRef.current.length &&
+      result.every((item, i) => item.id === filteredItemsRef.current[i]?.id);
+
+    if (idsMatch) {
+      return filteredItemsRef.current; // Return stable reference
+    }
+
+    filteredItemsRef.current = result;
+    return result;
   }, [bundle, searchQuery, selectedParentCategory, selectedMenuCategory]);
 
   return {

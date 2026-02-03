@@ -10,16 +10,19 @@ type POSNavigationProps = {
   onlineOrdersCount?: number;
 };
 
-export function POSNavigation({ className = "", currentViewMode, onViewModeChange, onlineOrdersCount = 0 }: POSNavigationProps) {
+export function POSNavigation({
+  className = "",
+  currentViewMode,
+  onViewModeChange,
+  onlineOrdersCount = 0,
+}: POSNavigationProps) {
   return (
     <div className={className} style={{ background: colors.background.primary, color: colors.text.primary }}>
-      <div className="flex items-center justify-between">
-        <OrderSelector
-          currentViewMode={currentViewMode}
-          onViewModeChange={onViewModeChange}
-          onlineOrdersCount={onlineOrdersCount}
-        />
-      </div>
+      <OrderSelector
+        currentViewMode={currentViewMode}
+        onViewModeChange={onViewModeChange}
+        onlineOrdersCount={onlineOrdersCount}
+      />
     </div>
   );
 }

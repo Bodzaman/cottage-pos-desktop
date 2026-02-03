@@ -37,6 +37,7 @@ import { formatCurrency } from '../utils/formatters';
 import { resolveItemDisplayName } from '../utils/menuHelpers';
 import { usePOSSettingsQuery } from '../utils/posSettingsQueries';
 import { useCustomerDataStore } from '../utils/customerDataStore';
+import { usePOSOrderStore } from '../utils/posOrderStore';
 import { useCustomizeOrchestrator } from './CustomizeOrchestrator';
 import brain from 'brain';
 import { createLogger } from 'utils/logger';
@@ -47,7 +48,9 @@ import { CustomerData } from '../utils/customerTypes';
 import { TipSelection } from '../types/orders';
 
 interface Props {
-  orderItems: OrderItem[];
+  // 🔧 FIX: Made optional - component now subscribes to usePOSOrderStore internally
+  // This prevents parent (POSDesktop) from re-rendering when cart changes
+  orderItems?: OrderItem[];
   orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
   tableNumber?: number;
   guestCount?: number;
@@ -143,6 +146,12 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 }: Props) {
   const logger = createLogger('OrderSummaryPanel');
 
+  // 🔧 FIX: Subscribe to orderItems internally instead of receiving as prop
+  // This prevents POSDesktop from re-rendering when cart changes
+  const storeOrderItems = usePOSOrderStore(state => state.orderItems);
+  // Use prop if provided (for backward compat), otherwise use store
+  const items = orderItems ?? storeOrderItems;
+
   // ✅ Get POS settings from React Query
   const { data: posSettings } = usePOSSettingsQuery();
   
@@ -219,7 +228,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // Unified Process Order handler with smart validation
   const handleProcessOrder = async () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       toast.error('No items to process');
       return;
     }
@@ -307,7 +316,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // DINE-IN workflow handlers
   const handleAddToOrder = async () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       console.error("No items to add");
       return;
     }
@@ -315,13 +324,13 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
     try {
       console.log('📝 Adding items to table order:', {
         tableNumber,
-        itemCount: orderItems.length,
+        itemCount: items.length,
         total
       });
       
       // Call onSaveUpdate if available (saves without printing)
       if (onSaveUpdate && tableNumber) {
-        await onSaveUpdate(tableNumber, orderItems);
+        await onSaveUpdate(tableNumber, items);
       }
       
       console.log(`✅ Items added to Table ${tableNumber} order`);
@@ -333,7 +342,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   };
 
   const handleSendToKitchen = async () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       console.error("No items to send to kitchen");
       toast.error("No items to send to kitchen");
       return;
@@ -342,12 +351,12 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
     try {
       console.log('👨‍🍳 Sending items to kitchen:', {
         tableNumber,
-        itemCount: orderItems.length
+        itemCount: items.length
       });
       
       // For DINE-IN orders, save to table first then send to kitchen
       if (orderType === "DINE-IN" && onSaveUpdate && tableNumber) {
-        await onSaveUpdate(tableNumber, orderItems);
+        await onSaveUpdate(tableNumber, items);
       }
       
       // Call the kitchen handler
@@ -366,7 +375,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   };
 
   const handlePrintFinalBill = () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       console.error("No items for final bill");
       return;
     }
@@ -401,7 +410,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // Process order without payment (for COLLECTION/DELIVERY/WAITING)
   const handleProcessOrderOnly = async () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       toast.error("No items to process");
       return;
     }
@@ -432,7 +441,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
 
   // Complete order with payment (for COLLECTION/DELIVERY/WAITING)
   const handleCompleteOrderWithPayment = () => {
-    if (orderItems.length === 0) {
+    if (items.length === 0) {
       toast.error("No items to process payment for");
       return;
     }
@@ -465,7 +474,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   };
 
   // Calculate totals - including customizations
-  const subtotal = orderItems.reduce((sum, item) => {
+  const subtotal = items.reduce((sum, item) => {
     // Base item price with null guard
     let itemTotal = (item.price || 0) * item.quantity;
     
@@ -483,13 +492,13 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
   // 🔍 DEBUG: Log order items and total calculation
   // Replace verbose console.log with structured logging that respects environment
   const orderDebugData = {
-    orderItemsCount: orderItems.length,
+    orderItemsCount: items.length,
     subtotal,
     orderType,
   };
   
   // Only log when order actually changes, not on every render
-  const orderStateKey = `${orderItems.length}-${subtotal}-${orderType}`;
+  const orderStateKey = `${items.length}-${subtotal}-${orderType}`;
   const prevOrderStateRef = useRef<string>('');
   
   // Service charge for dine-in orders - now uses dynamic POS settings and respects enabled toggle
@@ -528,7 +537,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
       case "COLLECTION":
       case "DELIVERY":
       case "WAITING":
-        return `${orderItems.length} item${orderItems.length !== 1 ? 's' : ''}`;
+        return `${items.length} item${items.length !== 1 ? 's' : ''}`;
       default:
         return '';
     }
@@ -610,7 +619,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
               </span>
             )}
             <div className="text-xs" style={{ color: QSAITheme.text.muted }}>
-              {orderItems.length} item{orderItems.length !== 1 ? 's' : ''}
+              {items.length} item{items.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -625,14 +634,14 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           overflowX: 'hidden' // ✅ Prevent horizontal scroll
         }}
       >
-        {orderItems.length === 0 ? (
+        {items.length === 0 ? (
           <div className="text-center py-12 px-4">
             <Utensils className="w-10 h-10 mx-auto mb-3 opacity-40" style={{ color: QSAITheme.text.muted }} />
             <p className="text-sm font-medium mb-1" style={{ color: QSAITheme.text.secondary }}>No items in order</p>
             <p className="text-xs" style={{ color: QSAITheme.text.muted }}>Select items from the menu to start building an order</p>
           </div>
         ) : (
-          orderItems.map((item, index) => (
+          items.map((item, index) => (
             <div
               key={item.id}
               className="bg-opacity-50 border rounded-lg p-4 space-y-3"
@@ -873,7 +882,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
           gridRow: '3 / 4'
         }}
       >
-        {orderItems.length > 0 ? (
+        {items.length > 0 ? (
           <>
             {/* Totals */}
             <div className="space-y-1">
@@ -917,15 +926,15 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                         onShowKitchenPreview();
                       }
                     }}
-                    disabled={orderItems.length === 0}
+                    disabled={items.length === 0}
                     className="w-full text-sm h-11 font-medium"
                     style={{
-                      backgroundColor: orderItems.length === 0 ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
+                      backgroundColor: items.length === 0 ? QSAITheme.background.tertiary : QSAITheme.purple.primary,
                       borderColor: QSAITheme.purple.primary,
                       color: 'white',
-                      boxShadow: orderItems.length === 0 ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
-                      opacity: orderItems.length === 0 ? 0.5 : 1,
-                      cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
+                      boxShadow: items.length === 0 ? 'none' : `0 4px 8px ${QSAITheme.purple.glow}`,
+                      opacity: items.length === 0 ? 0.5 : 1,
+                      cursor: items.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                   >
                     <Save className="w-4 h-4 mr-2" />
@@ -940,15 +949,15 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                         onPrintBill();
                       }
                     }}
-                    disabled={orderItems.length === 0}
+                    disabled={items.length === 0}
                     variant="outline"
                     className="w-full text-xs h-9 font-medium"
                     style={{
                       borderColor: QSAITheme.purple.primary,
-                      color: orderItems.length === 0 ? QSAITheme.text.disabled : QSAITheme.purple.primary,
+                      color: items.length === 0 ? QSAITheme.text.disabled : QSAITheme.purple.primary,
                       backgroundColor: 'transparent',
-                      opacity: orderItems.length === 0 ? 0.5 : 1,
-                      cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer'
+                      opacity: items.length === 0 ? 0.5 : 1,
+                      cursor: items.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                   >
                     <Receipt className="w-3 h-3 mr-2" />
@@ -1001,7 +1010,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
       <OrderConfirmationModal
         isOpen={!!showOrderConfirmation}
         onClose={handleOrderConfirmationClose}
-        orderItems={orderItems}
+        orderItems={items}
         orderType={orderType}
         tableNumber={tableNumber}
         guestCount={guestCount}
@@ -1081,11 +1090,11 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
                   border: `1px solid ${QSAITheme.border.medium}`
                 }}
               >
-                {orderItems.map((item, index) => (
+                {items.map((item, index) => (
                   <div 
                     key={index}
                     className="flex justify-between items-start pb-2"
-                    style={{ borderBottom: index < orderItems.length - 1 ? `1px solid ${QSAITheme.border.light}` : 'none' }}
+                    style={{ borderBottom: index < items.length - 1 ? `1px solid ${QSAITheme.border.light}` : 'none' }}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">

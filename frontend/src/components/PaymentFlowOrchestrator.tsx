@@ -27,11 +27,12 @@ import { OrderConfirmationView } from './OrderConfirmationView';
 import { PaymentProcessingView } from './PaymentProcessingView';
 import { PaymentResultView } from './PaymentResultView';
 import { styles } from '../utils/QSAIDesign';
+import { usePOSOrderStore } from '../utils/posOrderStore';
 
 export function PaymentFlowOrchestrator({
   isOpen,
   onClose,
-  orderItems,
+  orderItems: propOrderItems,
   orderTotal,
   orderType,
   tableNumber,
@@ -40,7 +41,13 @@ export function PaymentFlowOrchestrator({
   deliveryFee = 0,
   onPaymentComplete
 }: PaymentFlowOrchestratorProps) {
-  
+
+  // 🔧 FIX: Subscribe to orderItems internally instead of receiving as prop
+  // This prevents POSDesktop from re-rendering when cart changes
+  const storeOrderItems = usePOSOrderStore(state => state.orderItems);
+  // Use prop if provided (for backward compat), otherwise use store
+  const orderItems = propOrderItems ?? storeOrderItems;
+
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================

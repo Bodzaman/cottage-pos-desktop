@@ -63,6 +63,8 @@ export interface CartCustomization extends BaseCustomization {
 export interface SelectedCustomization extends BaseCustomization {
   price_adjustment: number;
   price?: number; // Alias for compatibility
+  is_adhoc?: boolean; // True for staff-created one-off customizations
+  is_free?: boolean; // True when price_adjustment is 0
 }
 
 /**

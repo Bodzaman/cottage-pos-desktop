@@ -16,6 +16,7 @@ import {
   type CustomerReceiptData,
 } from './electronPrintService';
 import { useRealtimeMenuStoreCompat } from './realtimeMenuStoreCompat';
+import { usePOSOrderStore } from './posOrderStore';
 import { findRootSection, FIXED_SECTIONS, SECTION_INDICATORS, SectionId } from './sectionMapping';
 import { saveReceiptToHistory } from 'components/pos/ReprintDialog';
 
@@ -58,19 +59,23 @@ import { saveReceiptToHistory } from 'components/pos/ReprintDialog';
  * - lastPrintedAt: Timestamp of last print (prevents accidental duplicates)
  *
  * @param orderType - Current order type
- * @param orderItems - Items to print on receipt
  * @param customerData - Customer info for receipt header
  * @param selectedTableNumber - Table number for dine-in orders
  * @param guestCount - Guest count for dine-in orders
  * @returns Printing handlers and operation state
+ *
+ * NOTE: orderItems is now obtained directly from usePOSOrderStore to prevent
+ * parent re-renders when cart changes (fixes menu flicker issue)
  */
 export function usePrintingOperations(
   orderType: OrderType,
-  orderItems: OrderItem[],
   customerData: CustomerData,
   selectedTableNumber: number | null,
   guestCount: number
 ) {
+  // 🔧 FIX: Do NOT subscribe reactively - use imperative access inside callbacks
+  // Reactive subscription caused printing object to get new references when cart changed,
+  // which invalidated summaryZone useMemo and caused menu flicker
   const [isPrinting, setIsPrinting] = useState(false);
   const [lastPrintedAt, setLastPrintedAt] = useState<Date | null>(null);
 
@@ -194,6 +199,9 @@ export function usePrintingOperations(
   const handlePrintKitchen = useCallback(async (
     paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'
   ) => {
+    // 🔧 FIX: Get orderItems imperatively, not reactively
+    const orderItems = usePOSOrderStore.getState().orderItems;
+
     if (orderItems.length === 0) {
       toast.error('No items to print');
       return false;
@@ -291,7 +299,8 @@ export function usePrintingOperations(
     } finally {
       setIsPrinting(false);
     }
-  }, [orderItems, orderType, selectedTableNumber, customerData, guestCount, getTemplateAssignment, queuePrintJob]);
+  }, [orderType, selectedTableNumber, customerData, guestCount, getTemplateAssignment, queuePrintJob, getSectionInfo]);
+  // ^ REMOVED orderItems from deps - using imperative access
 
   // ============================================================================
   // PRINT CUSTOMER RECEIPT (HYBRID: Electron ESC/POS → Supabase Queue)
@@ -300,6 +309,9 @@ export function usePrintingOperations(
     orderTotal: number,
     paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'
   ) => {
+    // 🔧 FIX: Get orderItems imperatively, not reactively
+    const orderItems = usePOSOrderStore.getState().orderItems;
+
     if (orderItems.length === 0) {
       toast.error('No items to print');
       return false;
@@ -435,7 +447,8 @@ export function usePrintingOperations(
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, customerData, selectedTableNumber, getTemplateAssignment, queuePrintJob]);
+  }, [orderType, customerData, selectedTableNumber, getTemplateAssignment, queuePrintJob, getSectionInfo]);
+  // ^ REMOVED orderItems from deps - using imperative access
 
   // Duplicate print prevention cooldown (10 seconds)
   const PRINT_COOLDOWN_MS = 10000;
@@ -447,6 +460,9 @@ export function usePrintingOperations(
     orderTotal: number,
     paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'
   ) => {
+    // 🔧 FIX: Get orderItems imperatively, not reactively
+    const orderItems = usePOSOrderStore.getState().orderItems;
+
     if (orderType !== 'DINE-IN') {
       toast.error('Bill printing is only for dine-in orders');
       return false;
@@ -626,7 +642,8 @@ export function usePrintingOperations(
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, lastPrintedAt]);
+  }, [orderType, selectedTableNumber, guestCount, templateAssignments, queuePrintJob, getSectionInfo, lastPrintedAt]);
+  // ^ REMOVED orderItems from deps - using imperative access
 
   // ============================================================================
   // PRINT BILL (DINE-IN) - Explicit items variant (uses provided items)
@@ -818,6 +835,9 @@ export function usePrintingOperations(
   // SEND TO KITCHEN (HYBRID: Electron ESC/POS → Supabase Queue)
   // ============================================================================
   const handleSendToKitchen = useCallback(async () => {
+    // 🔧 FIX: Get orderItems imperatively, not reactively
+    const orderItems = usePOSOrderStore.getState().orderItems;
+
     if (orderItems.length === 0) {
       toast.error('No items to send to kitchen');
       return false;
@@ -913,7 +933,8 @@ export function usePrintingOperations(
     } finally {
       setIsPrinting(false);
     }
-  }, [orderType, orderItems, selectedTableNumber, guestCount, getTemplateAssignment, queuePrintJob]);
+  }, [orderType, selectedTableNumber, guestCount, getTemplateAssignment, queuePrintJob, getSectionInfo]);
+  // ^ REMOVED orderItems from deps - using imperative access
 
   return {
     // State

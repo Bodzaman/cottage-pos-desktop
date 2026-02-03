@@ -5,6 +5,7 @@ import { getOfflineStatus, onOfflineStatusChange } from 'utils/serviceWorkerMana
 import { outboxSyncManager } from 'utils/outboxSyncManager';
 import type { OutboxSyncStatus } from 'utils/outboxSyncManager';
 import { useOfflineBannerStore } from 'utils/offlineBannerStore';
+import { useTranslation } from 'react-i18next';
 
 /**
  * POSOfflineBanner - Network status banner for POS Desktop
@@ -15,6 +16,7 @@ import { useOfflineBannerStore } from 'utils/offlineBannerStore';
  * Can be reopened from footer
  */
 export function POSOfflineBanner() {
+  const { t } = useTranslation('pos');
   // Network state
   const [isOffline, setIsOffline] = useState(getOfflineStatus());
   const [syncStatus, setSyncStatus] = useState<OutboxSyncStatus | null>(null);
@@ -109,7 +111,7 @@ export function POSOfflineBanner() {
   };
 
   // Marquee text for offline state
-  const offlineText = "OFFLINE MODE — Orders are saved locally and will sync when connection is restored";
+  const offlineText = t('offline.banner') + ' — ' + t('offline.message');
 
   return (
     <AnimatePresence>
@@ -157,7 +159,7 @@ export function POSOfflineBanner() {
                 {/* Queued count badge */}
                 {(syncStatus?.pendingOperations ?? 0) > 0 && (
                   <div className="flex-shrink-0 px-2 py-1 bg-orange-500/20 rounded text-xs font-bold text-orange-300">
-                    {syncStatus?.pendingOperations} queued
+                    {t('offline.pendingSync', { count: syncStatus?.pendingOperations })}
                   </div>
                 )}
 
@@ -193,7 +195,7 @@ export function POSOfflineBanner() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-green-300">
-                      Back online! Syncing {syncStatus?.pendingOperations ?? 0} order{(syncStatus?.pendingOperations ?? 0) !== 1 ? 's' : ''}...
+                      {t('offline.backOnline', 'Back online!')} {t('offline.syncing')} ({syncStatus?.pendingOperations ?? 0})
                     </span>
                     <span className="text-xs text-green-400/70">
                       {getProgress()}%
@@ -239,7 +241,7 @@ export function POSOfflineBanner() {
               <div className="flex items-center justify-center gap-3">
                 <Wifi className="h-5 w-5 text-green-400" />
                 <span className="text-sm font-medium text-green-300">
-                  Back online! All orders synced successfully.
+                  {t('offline.backOnline', 'Back online!')} {t('offline.syncComplete')}
                 </span>
               </div>
             </div>

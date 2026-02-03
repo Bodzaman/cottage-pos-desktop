@@ -315,7 +315,10 @@ export interface CustomizationSelection {
   customization_id?: string;
   name: string;
   price_adjustment: number;
+  price?: number;
   group?: string;
+  is_adhoc?: boolean;
+  is_free?: boolean;
 }
 
 /**
@@ -370,17 +373,21 @@ export interface OrderItemVariant {
  * Source: dine_in_order_items or order_items table
  */
 export interface OrderItem {
-  id: string;
+  id?: string;
   menu_item_id: string;
   variant_id: string | null;
+  menuItemId?: string;
+  variantId?: string | null;
   name: string;
   quantity: number;
   price: number;
+  total?: number;
   variant_name?: string;
+  variantName?: string | null;
   notes?: string;
   protein_type?: string;
   image_url?: string;
-  modifiers: ModifierSelection[];
+  modifiers?: ModifierSelection[];
   customizations?: CustomizationSelection[];
   category_id?: string;
   category_name?: string;
@@ -392,6 +399,7 @@ export interface OrderItem {
   customer_tab_id?: string;
   kitchen_display_name?: string | null;
   serve_with_section_id?: string | null;
+  serveWithSectionId?: string | null;
   variant?: OrderItemVariant;
 }
 

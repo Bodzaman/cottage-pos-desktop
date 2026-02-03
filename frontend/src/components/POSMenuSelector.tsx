@@ -73,14 +73,19 @@ export const POSMenuSelector = React.memo(function POSMenuSelector({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  // 🔧 FIX: Store callback in ref for stable handleAddToOrderWithScrollPreserve
+  // This prevents re-renders when onAddToOrder reference changes
+  const onAddToOrderRef = useRef(onAddToOrder);
+  onAddToOrderRef.current = onAddToOrder;
+
   // 🔧 SCROLL POSITION PRESERVATION: Uses parent-managed state to survive remounts
   // When adding an item, pass current scroll position to parent (POSDesktop)
   // When component remounts, restore scroll from parent's state
   const handleAddToOrderWithScrollPreserve = useCallback((orderItem: OrderItem) => {
     // Get current scroll position and pass to parent
     const currentScroll = viewportRef.current?.scrollTop ?? 0;
-    onAddToOrder(orderItem, currentScroll);
-  }, [onAddToOrder]);
+    onAddToOrderRef.current(orderItem, currentScroll);
+  }, []); // 🔧 FIX: Empty deps - uses ref for stable callback
 
   // 🔧 FIX: Restore scroll position from parent state on mount
   // This runs BEFORE paint (useLayoutEffect) so user doesn't see the jump
@@ -258,9 +263,22 @@ export const POSMenuSelector = React.memo(function POSMenuSelector({
 
   // ✅ ABOVE-FOLD OPTIMIZATION: First 8 items get eager image loading
   // This set allows O(1) lookup to check if an item should be prioritized
+  // 🔧 FIX: Use ref to stabilize Set - only update when item IDs actually change
+  const aboveFoldIdsRef = useRef<Set<string>>(new Set());
+  const prevAboveFoldIdsRef = useRef<string>('');
+
   const aboveFoldItemIds = useMemo(() => {
     const ABOVE_FOLD_COUNT = 8;
-    return new Set(filteredMenuItems.slice(0, ABOVE_FOLD_COUNT).map(item => item.id));
+    const newIds = filteredMenuItems.slice(0, ABOVE_FOLD_COUNT).map(item => item.id);
+    const idsKey = newIds.join(',');
+
+    // Only create new Set if the IDs actually changed
+    if (idsKey !== prevAboveFoldIdsRef.current) {
+      prevAboveFoldIdsRef.current = idsKey;
+      aboveFoldIdsRef.current = new Set(newIds);
+    }
+
+    return aboveFoldIdsRef.current;
   }, [filteredMenuItems]);
 
   // ✅ NEW: Render hierarchical structure based on display mode

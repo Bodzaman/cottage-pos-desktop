@@ -6,6 +6,7 @@ import type { OrderType } from './customerTypes';
 import type { CustomerData } from './useCustomerFlow';
 import { useCustomerDataStore } from './customerDataStore';
 import { usePOSCustomerStore } from './posCustomerStore';
+import { usePOSOrderStore } from './posOrderStore';
 import { usePOSAuth } from './usePOSAuth';
 
 /**
@@ -51,16 +52,17 @@ import { usePOSAuth } from './usePOSAuth';
  * - onOrderComplete: Resets POSDesktop state after successful submission
  *
  * @param orderType - Current order type (DINE_IN, COLLECTION, DELIVERY, or WAITING)
- * @param orderItems - Items in the current order
  * @param customerData - Customer information from useCustomerFlow
  * @param selectedTableNumber - Selected table for DINE_IN
  * @param guestCount - Guest count for DINE_IN
  * @param onOrderComplete - Optional callback after successful order submission
  * @returns Order processing handlers and validation utilities
+ *
+ * NOTE: orderItems is now obtained directly from usePOSOrderStore to prevent
+ * parent re-renders when cart changes (fixes menu flicker issue)
  */
 export function useOrderProcessing(
   orderType: OrderType,
-  orderItems: OrderItem[],
   customerData: CustomerData,
   selectedTableNumber: number | null,
   guestCount: number,
@@ -68,28 +70,38 @@ export function useOrderProcessing(
 ) {
   const customerDataStore = useCustomerDataStore();
 
+  // 🔧 FIX: Do NOT subscribe to orderItems reactively!
+  // Subscribing causes this hook to re-render when cart changes,
+  // which causes POSDesktop to re-render and flicker the menu.
+  // Instead, use usePOSOrderStore.getState().orderItems imperatively in callbacks.
+
   // ============================================================================
   // CALCULATE ORDER TOTAL
   // ============================================================================
   const calculateTotal = useCallback((): number => {
+    // 🔧 FIX: Use imperative access - no reactive subscription
+    const orderItems = usePOSOrderStore.getState().orderItems;
     return orderItems.reduce((total, item) => {
       let itemTotal = item.price * item.quantity;
-      
+
       // Add modifier prices if present
       if (item.modifiers && item.modifiers.length > 0) {
         item.modifiers.forEach(modifier => {
           itemTotal += (modifier.price_adjustment || 0) * item.quantity;
         });
       }
-      
+
       return total + itemTotal;
     }, 0);
-  }, [orderItems]);
+  }, []);  // Empty deps - stable callback
 
   // ============================================================================
   // VALIDATE ORDER DATA
   // ============================================================================
   const validateOrder = useCallback((): { valid: boolean; message?: string } => {
+    // 🔧 FIX: Use imperative access - no reactive subscription
+    const orderItems = usePOSOrderStore.getState().orderItems;
+
     // Validate order type is a known value
     const validOrderTypes = ['DINE_IN', 'COLLECTION', 'DELIVERY', 'WAITING'];
     if (!validOrderTypes.includes(orderType)) {
@@ -149,7 +161,7 @@ export function useOrderProcessing(
     }
 
     return { valid: true };
-  }, [orderType, orderItems, customerData, selectedTableNumber, guestCount]);
+  }, [orderType, customerData, selectedTableNumber, guestCount]);  // 🔧 FIX: REMOVED orderItems from deps
 
   // ============================================================================
   // SUBMIT ORDER
@@ -160,6 +172,9 @@ export function useOrderProcessing(
       toast.error(validation.message || 'Order validation failed');
       return;
     }
+
+    // 🔧 FIX: Use imperative access - no reactive subscription
+    const orderItems = usePOSOrderStore.getState().orderItems;
 
     try {
       // Generate idempotency key to prevent duplicate orders
@@ -279,7 +294,7 @@ export function useOrderProcessing(
         return { success: false };
       }
     }
-  }, [orderType, orderItems, customerData, selectedTableNumber, guestCount, calculateTotal, validateOrder, customerDataStore, onOrderComplete]);
+  }, [orderType, customerData, selectedTableNumber, guestCount, calculateTotal, validateOrder, customerDataStore, onOrderComplete]);  // 🔧 FIX: REMOVED orderItems from deps
 
   // ============================================================================
   // HANDLE PAYMENT

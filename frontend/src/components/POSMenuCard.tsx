@@ -12,6 +12,7 @@ import { globalColors as QSAITheme } from '../utils/QSAIDesign';
 import { cn } from '@/lib/utils';
 import { LazyImage } from 'components/LazyImage';
 import { OptimizedImage } from 'components/OptimizedImage';
+import { useTranslation } from 'react-i18next';
 
 interface POSMenuCardProps {
   item: MenuItem;
@@ -51,6 +52,7 @@ export function POSMenuCard({
   viewMode = 'card',
   orderType = 'COLLECTION'
 }: POSMenuCardProps) {
+  const { t } = useTranslation('pos');
   const isDev = import.meta.env.DEV;
   // Get variants from realtimeMenuStore with null safety
   const { itemVariants: storeVariants, proteinTypes, isLoading } = useRealtimeMenuStoreCompat({ context: 'pos' });
@@ -191,7 +193,7 @@ export function POSMenuCard({
   if (isLoading || !itemVariants) {
     return (
       <div className={`bg-[#1A1A1A] rounded-lg border border-[#2A2A2A] p-4 ${viewMode === 'card' ? 'h-[250px]' : 'h-20'} flex items-center justify-center`}>
-        <div className="text-gray-400 text-sm">Loading menu item...</div>
+        <div className="text-gray-400 text-sm">{t('menuCard.loading')}</div>
       </div>
     );
   }
@@ -404,7 +406,7 @@ export function POSMenuCard({
                   className="px-4 py-2 text-sm font-medium bg-[#7C5DFA] hover:bg-[#6B4DEA] text-white transition-all duration-200 rounded-md border border-[rgba(124,93,250,0.3)] hover:border-[rgba(124,93,250,0.5)] shadow-sm"
                   onClick={() => setShowDropdown(true)}
                 >
-                  Choose
+                  {t('menuCard.choose')}
                 </button>
                 <button
                   className="px-3 py-2 text-sm font-medium bg-black/25 backdrop-blur-sm border border-white/15 text-white hover:bg-black/35 hover:border-white/25 transition-all duration-300 rounded-md flex items-center gap-1"
@@ -421,14 +423,14 @@ export function POSMenuCard({
                 <button
                   className="px-4 py-2 text-sm font-medium bg-[#7C5DFA] hover:bg-[#6B4DEA] text-white transition-all duration-200 rounded-md border border-[rgba(124,93,250,0.3)] hover:border-[rgba(124,93,250,0.5)] shadow-sm"
                   onClick={() => handleAddToOrder()}
-                  title="Add item to order"
+                  title={t('menuCard.add')}
                 >
-                  Add
+                  {t('menuCard.add')}
                 </button>
                 <button
                   className="px-3 py-2 text-sm font-medium bg-black/25 backdrop-blur-sm border border-white/15 text-white hover:bg-black/35 hover:border-white/25 transition-all duration-300 rounded-md flex items-center gap-1"
                   onClick={() => handleCustomize()}
-                  title="Customise item"
+                  title={t('menuCard.customise')}
                 >
                   🔧
                 </button>
@@ -598,7 +600,7 @@ export function POSMenuCard({
                     // Set Meal component dishes display
                     <div className="space-y-1">
                       <div className="p-2 border-b border-gray-600/30 mb-2">
-                        <span className="text-gray-300 text-sm font-medium">Includes:</span>
+                        <span className="text-gray-300 text-sm font-medium">{t('menuCard.includes')}</span>
                       </div>
                       {(item as any).set_meal_data.items.map((setMealItem: any, index: number) => (
                         <div 
@@ -623,7 +625,7 @@ export function POSMenuCard({
                           onClick={() => handleAddToOrder()}
                         >
                           <span className="text-white font-semibold group-hover:text-purple-200 transition-colors duration-200">
-                            Complete Set Meal
+                            {t('menuCard.completeSetMeal')}
                           </span>
                           <span className="text-white font-bold text-right">
                             £{(item.price || 0).toFixed(2)}
@@ -747,8 +749,8 @@ export function POSMenuCard({
               {/* Add Button - Takes 70% width */}
               <button
                 className="flex-[7] hover:opacity-90 border-0 border-t transition-all duration-300 flex items-center justify-center gap-1 text-sm font-medium rounded-bl-lg"
-                style={{ 
-                  margin: 0, 
+                style={{
+                  margin: 0,
                   padding: 0,
                   lineHeight: '1',
                   background: 'linear-gradient(135deg, #7C5DFA 0%, #9580FF 100%)',
@@ -756,23 +758,23 @@ export function POSMenuCard({
                   color: 'white'
                 }}
                 onClick={() => handleAddToOrder()}
-                title="Add item to order"
+                title={t('menuCard.add')}
               >
-                Add
+                {t('menuCard.add')}
               </button>
-              
+
               {/* Customize Button - Takes 30% width */}
               <button
                 className="flex-[3] bg-black/25 backdrop-blur-sm border-0 border-t border-l border-white/15 text-white hover:bg-black/35 hover:border-white/25 transition-all duration-300 flex items-center justify-center gap-1 text-xs rounded-br-lg"
-                style={{ 
-                  margin: 0, 
+                style={{
+                  margin: 0,
                   padding: 0,
                   lineHeight: '1'
                 }}
                 onClick={() => handleCustomize()}
-                title="Customise item"
+                title={t('menuCard.customise')}
               >
-                🔧 Customise
+                🔧 {t('menuCard.customise')}
               </button>
             </div>
           )}

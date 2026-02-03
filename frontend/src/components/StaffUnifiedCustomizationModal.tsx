@@ -36,6 +36,8 @@ export interface SelectedCustomization {
   price_adjustment: number;
   price?: number;
   group?: string;
+  is_adhoc?: boolean;
+  is_free?: boolean;
 }
 
 interface StaffUnifiedCustomizationModalProps {
@@ -81,6 +83,12 @@ export function StaffUnifiedCustomizationModal({
   const [serveWithSectionId, setServeWithSectionId] = useState<string | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Ad-hoc customization form state
+  const [showAdhocForm, setShowAdhocForm] = useState(false);
+  const [adhocName, setAdhocName] = useState('');
+  const [adhocPrice, setAdhocPrice] = useState('');
+  const [adhocError, setAdhocError] = useState<string | null>(null);
+
   // Get item's natural section based on its category
   const naturalSection = useMemo(() => {
     if (!item?.category_id) return null;
@@ -114,6 +122,10 @@ export function StaffUnifiedCustomizationModal({
     setSelectedCustomizations([]);
     setSpecialInstructions('');
     setServeWithSectionId(null);
+    setShowAdhocForm(false);
+    setAdhocName('');
+    setAdhocPrice('');
+    setAdhocError(null);
 
     // Set initial variant
     if (initialVariant && variants.find(v => v.id === initialVariant.id)) {
@@ -284,6 +296,69 @@ export function StaffUnifiedCustomizationModal({
     setSelectedCustomizations(prev => prev.filter(c => c.id !== customizationId));
   };
 
+  // Generate unique ID for ad-hoc customizations
+  const generateAdhocId = () => `adhoc-${crypto.randomUUID()}`;
+
+  // Handle ad-hoc customization submission
+  const handleAddAdhocCustomization = () => {
+    // Validate name
+    const trimmedName = adhocName.trim();
+    if (!trimmedName) {
+      setAdhocError('Please enter a name');
+      return;
+    }
+
+    // Validate price (allow empty for £0.00)
+    let price = 0;
+    if (adhocPrice.trim()) {
+      // Remove currency symbols and parse
+      const cleanPrice = adhocPrice.replace(/[£$,]/g, '').trim();
+      const parsedPrice = parseFloat(cleanPrice);
+
+      if (isNaN(parsedPrice) || parsedPrice < 0) {
+        setAdhocError('Please enter a valid price (e.g., 1.50)');
+        return;
+      }
+      price = parsedPrice;
+    }
+
+    // Check for duplicate names in selected customizations
+    if (selectedCustomizations.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+      setAdhocError('A customization with this name is already selected');
+      return;
+    }
+
+    // Add to selected customizations
+    const newCustomization: SelectedCustomization = {
+      id: generateAdhocId(),
+      name: trimmedName,
+      price_adjustment: price,
+      price: price,
+      group: 'Custom',
+      is_adhoc: true,
+      is_free: price === 0
+    };
+
+    setSelectedCustomizations(prev => [...prev, newCustomization]);
+
+    // Reset form
+    setAdhocName('');
+    setAdhocPrice('');
+    setAdhocError(null);
+    setShowAdhocForm(false);
+
+    // Show success feedback
+    toast.success(`Added: ${trimmedName}${price > 0 ? ` (+£${price.toFixed(2)})` : ''}`);
+  };
+
+  // Cancel ad-hoc form
+  const handleCancelAdhoc = () => {
+    setShowAdhocForm(false);
+    setAdhocName('');
+    setAdhocPrice('');
+    setAdhocError(null);
+  };
+
   // Handle confirm/add to order
   const handleConfirm = () => {
     if (!item) return;
@@ -325,8 +400,13 @@ export function StaffUnifiedCustomizationModal({
       image_url: resolvedImageUrl,
       customizations: selectedCustomizations.map(c => ({
         id: c.id,
+        customization_id: c.id,
         name: c.name,
-        price: c.price_adjustment
+        price: c.price_adjustment,
+        price_adjustment: c.price_adjustment,
+        group: c.group || '',
+        is_free: c.is_free || c.price_adjustment === 0,
+        is_adhoc: c.is_adhoc || false
       })),
       serveWithSectionId: serveWithSectionId
     };
@@ -351,6 +431,10 @@ export function StaffUnifiedCustomizationModal({
     setSpecialInstructions('');
     setSearchQuery('');
     setServeWithSectionId(null);
+    setShowAdhocForm(false);
+    setAdhocName('');
+    setAdhocPrice('');
+    setAdhocError(null);
     onClose();
   };
 
@@ -779,6 +863,154 @@ export function StaffUnifiedCustomizationModal({
                 )}
               </div>
 
+              {/* STAFF-ONLY: Ad-Hoc Custom Modifier Section */}
+              <div className="space-y-2 pt-2 border-t" style={{ borderColor: POS_THEME.border }}>
+                {!showAdhocForm && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAdhocForm(true)}
+                      className="h-7 text-xs"
+                      style={{ color: POS_THEME.primary }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Custom
+                    </Button>
+                  </div>
+                )}
+
+                {/* Inline Form */}
+                <AnimatePresence>
+                  {showAdhocForm && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div
+                        className="p-3 rounded-lg space-y-3"
+                        style={{
+                          background: POS_THEME.backgroundLight,
+                          border: `1px solid ${POS_THEME.border}`
+                        }}
+                      >
+                        {/* Name Input */}
+                        <div className="space-y-1">
+                          <label className="text-xs" style={{ color: POS_THEME.textMuted }}>
+                            Name *
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder="e.g., Extra sauce, No tomatoes..."
+                            value={adhocName}
+                            onChange={(e) => {
+                              setAdhocName(e.target.value);
+                              setAdhocError(null);
+                            }}
+                            className="h-9"
+                            style={{
+                              background: POS_THEME.background,
+                              borderColor: adhocError ? '#EF4444' : POS_THEME.border,
+                              color: POS_THEME.text
+                            }}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAddAdhocCustomization();
+                              }
+                              if (e.key === 'Escape') {
+                                e.stopPropagation();
+                                handleCancelAdhoc();
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {/* Price Input */}
+                        <div className="space-y-1">
+                          <label className="text-xs" style={{ color: POS_THEME.textMuted }}>
+                            Price (leave empty for free)
+                          </label>
+                          <div className="relative">
+                            <span
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
+                              style={{ color: POS_THEME.textMuted }}
+                            >
+                              £
+                            </span>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={adhocPrice}
+                              onChange={(e) => {
+                                setAdhocPrice(e.target.value);
+                                setAdhocError(null);
+                              }}
+                              className="h-9 pl-7"
+                              style={{
+                                background: POS_THEME.background,
+                                borderColor: adhocError ? '#EF4444' : POS_THEME.border,
+                                color: POS_THEME.text
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAddAdhocCustomization();
+                                }
+                                if (e.key === 'Escape') {
+                                  e.stopPropagation();
+                                  handleCancelAdhoc();
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Error Message */}
+                        {adhocError && (
+                          <p className="text-xs text-red-400">{adhocError}</p>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelAdhoc}
+                            className="flex-1 h-8"
+                            style={{
+                              borderColor: POS_THEME.border,
+                              color: POS_THEME.textMuted
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleAddAdhocCustomization}
+                            className="flex-1 h-8"
+                            style={{
+                              background: POS_THEME.primary,
+                              color: POS_THEME.text
+                            }}
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               {/* STAFF-ONLY: Special Instructions with "Press M" badge */}
               <div className="space-y-2 pt-2 pb-4">
                 <h3
@@ -818,29 +1050,34 @@ export function StaffUnifiedCustomizationModal({
               >
                 <div className="flex flex-wrap gap-1.5">
                   <AnimatePresence>
-                    {selectedCustomizations.map(custom => (
-                      <motion.div
-                        key={custom.id}
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                      >
-                        <Badge
-                          className="flex items-center gap-1 py-0.5 px-2 cursor-pointer hover:opacity-80 transition-opacity text-xs"
-                          style={{
-                            background: POS_THEME.primary,
-                            color: POS_THEME.text
-                          }}
-                          onClick={() => handleRemoveChip(custom.id)}
+                    {selectedCustomizations.map(custom => {
+                      const isAdhoc = custom.is_adhoc;
+                      return (
+                        <motion.div
+                          key={custom.id}
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
                         >
-                          <span>{custom.name}</span>
-                          {custom.price_adjustment > 0 && (
-                            <span className="opacity-75">+£{custom.price_adjustment.toFixed(2)}</span>
-                          )}
-                          <X className="h-3 w-3" />
-                        </Badge>
-                      </motion.div>
-                    ))}
+                          <Badge
+                            className="flex items-center gap-1 py-0.5 px-2 cursor-pointer hover:opacity-80 transition-opacity text-xs"
+                            style={{
+                              background: isAdhoc ? POS_THEME.success : POS_THEME.primary,
+                              color: POS_THEME.text,
+                              border: isAdhoc ? `1px dashed ${POS_THEME.text}40` : 'none'
+                            }}
+                            onClick={() => handleRemoveChip(custom.id)}
+                          >
+                            {isAdhoc && <span className="opacity-75">*</span>}
+                            <span>{custom.name}</span>
+                            {custom.price_adjustment > 0 && (
+                              <span className="opacity-75">+£{custom.price_adjustment.toFixed(2)}</span>
+                            )}
+                            <X className="h-3 w-3" />
+                          </Badge>
+                        </motion.div>
+                      );
+                    })}
                   </AnimatePresence>
                 </div>
               </div>

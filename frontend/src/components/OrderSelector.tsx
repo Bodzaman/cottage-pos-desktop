@@ -4,6 +4,7 @@ import { Globe, Utensils, ShoppingBag, Calendar } from "lucide-react";
 import { QSAITheme } from "../utils/QSAIDesign";
 import { motion, AnimatePresence } from "framer-motion";
 import { POSViewMode } from "../utils/posUIStore";
+import { useTranslation } from "react-i18next";
 
 export interface OrderSelectorProps {
   currentViewMode: POSViewMode;
@@ -12,6 +13,7 @@ export interface OrderSelectorProps {
 }
 
 export function OrderSelector({ currentViewMode, onViewModeChange, onlineOrdersCount = 0 }: OrderSelectorProps) {
+  const { t } = useTranslation('pos');
   const unifiedGradient = `linear-gradient(135deg, #5B21B6 30%, #7C3AED 100%)`;
   const purpleGlow = `rgba(146, 119, 255, 0.4)`;
   const [rippleButton, setRippleButton] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function OrderSelector({ currentViewMode, onViewModeChange, onlineOrdersC
       <div className="relative z-10 grid grid-cols-4 gap-4 py-0 px-4 w-full justify-items-center">
         <OrderTypeButton
           icon={<Utensils className="h-4 w-4 flex-shrink-0" />}
-          label="DINE IN"
+          label={t('orderTypes.dineIn')}
           orderType="DINE_IN"
           isActive={currentViewMode === "DINE_IN"}
           onClick={() => {
@@ -48,7 +50,7 @@ export function OrderSelector({ currentViewMode, onViewModeChange, onlineOrdersC
         />
         <OrderTypeButton
           icon={<ShoppingBag className="h-4 w-4 flex-shrink-0" />}
-          label="TAKE AWAY"
+          label={t('orderTypes.takeAway')}
           orderType="TAKE_AWAY"
           isActive={currentViewMode === "TAKE_AWAY"}
           onClick={() => {
@@ -61,7 +63,7 @@ export function OrderSelector({ currentViewMode, onViewModeChange, onlineOrdersC
         />
         <OrderTypeButton
           icon={<Globe className="h-4 w-4 flex-shrink-0" />}
-          label="ONLINE"
+          label={t('orderTypes.online')}
           orderType="ONLINE"
           isActive={currentViewMode === "ONLINE"}
           onClick={() => {
@@ -75,7 +77,7 @@ export function OrderSelector({ currentViewMode, onViewModeChange, onlineOrdersC
         />
         <OrderTypeButton
           icon={<Calendar className="h-4 w-4 flex-shrink-0" />}
-          label="RESERVATIONS"
+          label={t('orderTypes.reservations')}
           orderType="RESERVATIONS"
           isActive={currentViewMode === "RESERVATIONS"}
           onClick={() => {

@@ -10,8 +10,10 @@ import { outboxSyncManager } from '../utils/outboxSyncManager';
 import type { OutboxSyncStatus } from '../utils/outboxSyncManager';
 import { useOfflineBannerStore } from '../utils/offlineBannerStore';
 import { usePrinterStatus, PrinterStatusBadge } from './pos/PrinterStatusBadge';
+import { LanguageSelector } from './LanguageSelector';
 import { Monitor, Lock, Signal, CreditCard } from 'lucide-react';
 import { ActivityTicker } from './pos/ActivityTicker';
+import { useTranslation } from 'react-i18next';
 
 interface POSFooterProps {
   className?: string;
@@ -27,6 +29,7 @@ interface POSFooterProps {
  * Four-section layout: System Status | Operational Status | Branding | Date & Time
  */
 export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onToggleCustomerDisplay, onToggleKioskMode, kioskMode = false, onPrinterSettingsClick }: POSFooterProps) {
+  const { t } = useTranslation('pos');
   const logger = createLogger('POSFooter');
   
   // Time state
@@ -183,27 +186,27 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onTogg
     // NEW: Check offline status first
     if (isOffline) {
       const hasPendingOps = (offlineSyncStatus?.pendingOperations || 0) > 0;
-      
+
       if (hasPendingOps) {
-        return { label: 'Offline • Queued', color: 'text-yellow-400' };
+        return { label: t('footer.offline') + ' • ' + t('footer.queued', 'Queued'), color: 'text-yellow-400' };
       }
-      return { label: 'Offline • Ready', color: 'text-orange-400' };
+      return { label: t('footer.offline') + ' • ' + t('footer.ready'), color: 'text-orange-400' };
     }
-    
+
     const allConnected = printerStatus.connected && internetStatus.online && stripeStatus.connected;
     const anyLoading = printerStatus.loading || internetStatus.loading || stripeStatus.loading;
     const isSyncing = offlineSyncStatus?.isSyncing;
-    
+
     if (isSyncing) {
-      return { label: 'Syncing', color: 'text-blue-400' };
+      return { label: t('footer.syncing'), color: 'text-blue-400' };
     }
     if (anyLoading) {
-      return { label: 'Checking', color: 'text-qsai-text-muted' };
+      return { label: t('footer.checking', 'Checking'), color: 'text-qsai-text-muted' };
     }
     if (allConnected) {
-      return { label: 'Ready', color: 'text-qsai-text-primary' };
+      return { label: t('footer.ready'), color: 'text-qsai-text-primary' };
     }
-    return { label: 'Issues', color: 'text-red-400' };
+    return { label: t('footer.issues', 'Issues'), color: 'text-red-400' };
   };
 
   const systemStatus = getSystemStatus();
@@ -359,15 +362,15 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onTogg
             connected={internetStatus.online}
             loading={internetStatus.loading}
             icon={<Signal size={14} className="text-gray-400" />}
-            label="Internet"
-            extraInfo={isOffline ? 'Offline Mode Active' : undefined}
+            label={t('footer.internet')}
+            extraInfo={isOffline ? t('offline.banner') : undefined}
           />
 
           <StatusIndicator
             connected={stripeStatus.connected && !isOffline}
             loading={stripeStatus.loading}
             icon={<CreditCard size={14} className="text-gray-400" />}
-            label="Payments"
+            label={t('footer.payments')}
           />
           
           {/* NEW: Sync status indicator when online */}
@@ -378,7 +381,12 @@ export function POSFooter({ className = '', currentOrderType = 'DINE-IN', onTogg
             </div>
           )}
         </div>
-        
+
+        {/* Language Selector - Always visible */}
+        <div className="border-l border-white/10 pl-3">
+          <LanguageSelector variant="compact" dropdownDirection="up" />
+        </div>
+
         {/* Electron Controls (Customer Display, Kiosk, Printer Badge) */}
         {typeof window !== 'undefined' && 'electronAPI' in window && (
           <div className="flex items-center gap-2 border-l border-white/10 pl-3">

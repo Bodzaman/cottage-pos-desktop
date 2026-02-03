@@ -223,7 +223,11 @@ export default function POSDesktop() {
   const { categories, menuItems, isLoading, isConnected, setSearchQuery, setSelectedMenuCategory, refreshData: refreshMenuData } = menuStore;
 
   const orderType = usePOSOrderStore(state => state.orderType);
-  const orderItems = usePOSOrderStore(state => state.orderItems, shallow);
+  // 🔧 FIX: NO reactive subscription to orderItems - this prevents menu re-renders on every cart change
+  // Use imperative getStoreOrderItems() for all access - components that need reactive updates subscribe directly
+  // 🔧 FIX: Renamed to avoid collision with getOrderItems from posSupabaseHelpers
+  const getStoreOrderItems = useCallback(() => usePOSOrderStore.getState().orderItems, []);
+  const getOrderItemsCount = useCallback(() => usePOSOrderStore.getState().orderItems.length, []);
   const selectedTableNumber = usePOSOrderStore(state => state.selectedTableNumber);
   const guestCount = usePOSOrderStore(state => state.guestCount);
   const setOrderType = usePOSOrderStore(state => state.setOrderType);
@@ -408,25 +412,39 @@ export default function POSDesktop() {
   }, [kioskMode]);
 
   // CUSTOMER DISPLAY: Push cart state to secondary monitor when items change
+  // 🔧 FIX: Use subscription pattern to avoid re-renders when cart changes
   useEffect(() => {
     const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
     if (!electronAPI?.sendToCustomerDisplay) return;
 
-    electronAPI.isCustomerDisplayOpen?.().then((result: any) => {
-      if (!result?.isOpen) return;
-      electronAPI.sendToCustomerDisplay({
-        items: orderItems.map(item => ({
-          name: item.name || 'Item',
-          quantity: item.quantity,
-          price: item.price,
-          modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
-        })),
-        total: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        orderType: orderType,
-        itemCount: orderItems.length
-      });
-    }).catch(() => {});
-  }, [orderItems, orderType]);
+    const pushToCustomerDisplay = () => {
+      electronAPI.isCustomerDisplayOpen?.().then((result: any) => {
+        if (!result?.isOpen) return;
+        const items = usePOSOrderStore.getState().orderItems;
+        const currentOrderType = usePOSOrderStore.getState().orderType;
+        electronAPI.sendToCustomerDisplay({
+          items: items.map(item => ({
+            name: item.name || 'Item',
+            quantity: item.quantity,
+            price: item.price,
+            modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
+          })),
+          total: items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          orderType: currentOrderType,
+          itemCount: items.length
+        });
+      }).catch(() => {});
+    };
+
+    // Push initial state
+    pushToCustomerDisplay();
+
+    // Subscribe to orderItems changes (doesn't cause re-renders)
+    return usePOSOrderStore.subscribe(
+      state => state.orderItems,
+      pushToCustomerDisplay
+    );
+  }, []);  // 🔧 FIX: Empty deps - subscription handles changes
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) navigate('/pos-login', { replace: true });
@@ -569,7 +587,30 @@ export default function POSDesktop() {
   const { data: posSettings } = usePOSSettingsQuery();
   const variantCarouselEnabled = posSettings?.variant_carousel_enabled ?? true;
   
-  const orderTotal = useMemo(() => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderItems]);
+  // 🔧 FIX: orderTotal is now calculated on-demand to avoid reactive subscription
+  // Components that need reactive total (OrderSummaryPanel) calculate internally
+  const calculateOrderTotalImperative = useCallback(() => {
+    const items = usePOSOrderStore.getState().orderItems;
+    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, []);
+
+  // For backward compatibility, orderTotal is accessed via ref updated by subscription
+  // This doesn't cause re-renders but keeps the value current
+  const orderTotalRef = useRef(0);
+  useEffect(() => {
+    const updateTotal = () => {
+      orderTotalRef.current = calculateOrderTotalImperative();
+    };
+    updateTotal(); // Initial calculation
+    // Subscribe to orderItems changes without causing re-render
+    return usePOSOrderStore.subscribe(
+      state => state.orderItems,
+      updateTotal
+    );
+  }, [calculateOrderTotalImperative]);
+
+  // Getter for orderTotal - always returns current value
+  const orderTotal = orderTotalRef.current;
   const deliveryFee = useMemo((): number => {
     if (orderType === "DELIVERY" && (customerData as any).deliveryFee !== undefined) return (customerData as any).deliveryFee;
     if (orderType === "DELIVERY" && posSettings?.delivery_charge?.enabled) return posSettings.delivery_charge.amount;
@@ -583,12 +624,22 @@ export default function POSDesktop() {
   // Only show session restore dialog after unexpected termination (crash)
   // ============================================================================
 
-  // Set crash marker when order becomes active
+  // Set crash marker when order becomes active - uses subscription to avoid re-renders
   useEffect(() => {
-    if (orderItems.length > 0 && orderType !== 'DINE-IN') {
-      localStorage.setItem('pos_clean_exit', 'false');
-    }
-  }, [orderItems.length, orderType]);
+    const checkAndSetCrashMarker = () => {
+      const count = usePOSOrderStore.getState().orderItems.length;
+      const currentOrderType = usePOSOrderStore.getState().orderType;
+      if (count > 0 && currentOrderType !== 'DINE-IN') {
+        localStorage.setItem('pos_clean_exit', 'false');
+      }
+    };
+    checkAndSetCrashMarker(); // Initial check
+    // Subscribe to orderItems changes without causing re-render
+    return usePOSOrderStore.subscribe(
+      state => state.orderItems.length,
+      checkAndSetCrashMarker
+    );
+  }, []);
 
   // Register beforeunload + unmount cleanup to mark clean exit
   useEffect(() => {
@@ -705,23 +756,29 @@ export default function POSDesktop() {
   }, [pendingSession, setOrderItems, setOrderType, updateCustomer, setSelectedTableNumber, setGuestCount]);
 
   // Auto-save session when order changes (only for non-DINE-IN orders with items)
+  // 🔧 FIX: Uses subscription to avoid POSDesktop re-renders on cart change
   useEffect(() => {
-    if (orderType === 'DINE-IN') return; // DINE-IN uses database persistence
-    if (orderItems.length === 0) return; // Nothing to save
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const saveCurrentSession = async () => {
+      const currentOrderType = usePOSOrderStore.getState().orderType;
+      const items = usePOSOrderStore.getState().orderItems;
+
+      if (currentOrderType === 'DINE-IN') return; // DINE-IN uses database persistence
+      if (items.length === 0) return; // Nothing to save
+
       try {
         const session: PersistedSession = {
           sessionId: `pos-session-${Date.now()}`,
-          orderItems,
-          orderType,
+          orderItems: items,
+          orderType: currentOrderType,
           customerData,
           selectedTableNumber,
           guestCount,
           timestamp: Date.now(),
-          subtotal: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-          tax: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.2,
-          total: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.2,
+          subtotal: items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          tax: items.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.2,
+          total: items.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.2,
         };
         await OfflineFirst.saveSession(session);
         if (isDev) console.log('💾 [POSDesktop] Session auto-saved:', session.orderItems.length, 'items');
@@ -730,28 +787,63 @@ export default function POSDesktop() {
       }
     };
 
-    // Debounce saves to avoid excessive writes
-    const timeoutId = setTimeout(saveCurrentSession, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [orderItems, orderType, customerData, selectedTableNumber, guestCount]);
+    const handleOrderItemsChange = () => {
+      // Debounce saves to avoid excessive writes
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(saveCurrentSession, 2000);
+    };
+
+    // Subscribe to orderItems changes without causing re-render
+    const unsubscribe = usePOSOrderStore.subscribe(
+      state => state.orderItems,
+      handleOrderItemsChange
+    );
+
+    return () => {
+      unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [customerData, selectedTableNumber, guestCount]);
 
   // Also save crash state to Electron main process (file-based, survives renderer crashes)
+  // 🔧 FIX: Use subscription pattern to avoid re-renders when cart changes
   useEffect(() => {
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI?.saveCrashState) return;
-    if (orderItems.length === 0) return;
+
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const saveCrashState = () => {
+      const items = usePOSOrderStore.getState().orderItems;
+      if (items.length === 0) return;  // Don't save empty state
+
       electronAPI.saveCrashState({
         tableNumber: selectedTableNumber,
-        orderType,
-        cartItems: orderItems,
+        orderType: usePOSOrderStore.getState().orderType,
+        cartItems: items,
       }).catch(() => { /* non-critical */ });
     };
 
-    const timeoutId = setTimeout(saveCrashState, 3000);
-    return () => clearTimeout(timeoutId);
-  }, [orderItems, orderType, selectedTableNumber]);
+    const handleOrderItemsChange = () => {
+      // Debounce saves
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(saveCrashState, 3000);
+    };
+
+    // Subscribe to orderItems changes (doesn't cause re-renders)
+    const unsubscribe = usePOSOrderStore.subscribe(
+      state => state.orderItems,
+      handleOrderItemsChange
+    );
+
+    // Initial save if there are items
+    handleOrderItemsChange();
+
+    return () => {
+      unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [selectedTableNumber]);  // 🔧 FIX: Only re-setup on table change, subscription handles item changes
 
   const handleLogout = useCallback(async () => { await logout(); navigate('/pos-login', { replace: true }); }, [logout, navigate]);
   const handleManagementAuthSuccess = useCallback(() => { setManagerOverrideGranted(true); if (managerApprovalResolverRef.current) managerApprovalResolverRef.current(true); setIsManagementDialogOpen(false); setShowAdminPanel(true); }, []);
@@ -872,18 +964,21 @@ export default function POSDesktop() {
         notes: i.notes || '',
         image_url: i.image_url || '',
       }));
-      setOrderItems([...orderItems, ...items]);
+      // 🔧 FIX: Use functional update to get current items
+      setOrderItems(prev => [...prev, ...items]);
       setShowOrderHistoryModal(false);
     }
-  }, []);
+  }, [setOrderItems]);
 
+  // 🔧 FIX: Use getStoreOrderItems() to access current items without reactive subscription
   const calculateOrderTotal = useCallback((): number => {
-    return orderItems.reduce((total: number, item: OrderItem) => {
+    const items = getStoreOrderItems();
+    return items.reduce((total: number, item: OrderItem) => {
       let it = item.price * item.quantity;
       if (item.modifiers) item.modifiers.forEach((m: any) => { it += (m.price_adjustment || 0) * item.quantity; });
       return total + it;
     }, 0);
-  }, [orderItems]);
+  }, [getOrderItems]);
 
   const handleCustomerSave = useCallback((data: any) => {
     updateCustomer(data);
@@ -900,15 +995,17 @@ export default function POSDesktop() {
     }
   }, [callerIdModalOpen]);
 
-  const orderManagement = useOrderManagement(orderItems, setOrderItems);
-  // 🔧 FIX: Use ref to maintain stable function reference for handleAddToOrder
+  // 🔧 FIX: Hooks now subscribe to orderItems internally - no need to pass it
+  const orderManagement = useOrderManagement();
+  // Use ref to maintain stable function reference for handleAddToOrder
   // This prevents POSMenuSelector re-renders when orderItems changes
   const orderManagementRef = useRef(orderManagement);
   orderManagementRef.current = orderManagement;
 
   const customerFlow = useCustomerFlow(orderType as any, customerData as any, (data: any) => updateCustomer(data), selectedTableNumber, guestCount);
-  const orderProcessing = useOrderProcessing(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
-  const printing = usePrintingOperations(orderType as any, orderItems, customerData as any, selectedTableNumber, guestCount);
+  // 🔧 FIX: Hooks now subscribe to orderItems internally - no need to pass it
+  const orderProcessing = useOrderProcessing(orderType as any, customerData as any, selectedTableNumber, guestCount);
+  const printing = usePrintingOperations(orderType as any, customerData as any, selectedTableNumber, guestCount);
 
   const handleDineInPrintBill = useCallback(async (orderTotal: number) => {
     const itemsToPrint = (dineInEnrichedItems || []).map(item => ({
@@ -999,10 +1096,13 @@ export default function POSDesktop() {
   }, [calculateOrderTotal, orderProcessing, printing]);
 
   const handleSendToKitchen = useCallback(async () => {
-    if (orderItems.length === 0) return;
+    // 🔧 FIX: Use imperative access instead of reactive orderItemsCount
+    const items = usePOSOrderStore.getState().orderItems;
+    if (items.length === 0) return;
     const subtotal = calculateOrderTotal();
-    await supabase.from('orders').insert({ order_type: orderType, table_number: selectedTableNumber, guest_count: guestCount || 1, items: orderItems as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
-  }, [calculateOrderTotal]);
+    const currentOrderType = usePOSOrderStore.getState().orderType;
+    await supabase.from('orders').insert({ order_type: currentOrderType, table_number: selectedTableNumber, guest_count: guestCount || 1, items: items as any, subtotal, tax_amount: subtotal * 0.2, total_amount: subtotal * 1.2, status: 'IN_PROGRESS', created_at: new Date().toISOString() });
+  }, [calculateOrderTotal, selectedTableNumber, guestCount]);
 
   const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
   const [showKitchenPreviewModal, setShowKitchenPreviewModal] = useState(false);
@@ -1318,11 +1418,12 @@ export default function POSDesktop() {
     // NOTE: orderItems is intentionally NOT included - menu doesn't need to re-render when cart changes
   ]);
 
-  // Summary Zone - DOES include orderItems because it needs to show cart contents
+  // Summary Zone - OrderSummaryPanel now subscribes to orderItems internally
+  // This prevents POSDesktop from re-rendering when cart changes (fixes menu flicker)
   const summaryZone = useMemo(() => (
     <POSZoneErrorBoundary zoneName="Order" onReset={handleClearOrder} showHomeButton>
       <OrderSummaryPanel
-        orderItems={orderItems}
+        // 🔧 FIX: orderItems removed - component subscribes internally
         orderType={orderType as any}
         tableNumber={selectedTableNumber || 0}
         guestCount={guestCount}
@@ -1346,7 +1447,7 @@ export default function POSDesktop() {
       />
     </POSZoneErrorBoundary>
   ), [
-    orderItems,
+    // 🔧 FIX: orderItems removed from deps - OrderSummaryPanel subscribes internally
     orderType,
     selectedTableNumber,
     guestCount,
@@ -1469,9 +1570,10 @@ export default function POSDesktop() {
             return;
           case 'z':
             e.preventDefault();
-            // Undo: remove last item from cart
-            if (orderItems.length > 0) {
-              setOrderItems(orderItems.slice(0, -1));
+            // Undo: remove last item from cart (use imperative access for latest state)
+            const currentItems = usePOSOrderStore.getState().orderItems;
+            if (currentItems.length > 0) {
+              setOrderItems(currentItems.slice(0, -1));
             }
             return;
         }
@@ -1484,7 +1586,8 @@ export default function POSDesktop() {
           break;
         case 'F2':
           e.preventDefault();
-          if (orderItems.length > 0) {
+          // Use imperative access for latest state
+          if (usePOSOrderStore.getState().orderItems.length > 0) {
             setModal('showPaymentFlow', true);
           } else {
             toast.warning('Add items before checkout');
@@ -1492,7 +1595,8 @@ export default function POSDesktop() {
           break;
         case 'F3':
           e.preventDefault();
-          if (orderItems.length > 0) {
+          // Use imperative access for latest state
+          if (usePOSOrderStore.getState().orderItems.length > 0) {
             printing.handlePrintReceipt(orderTotal);
           }
           break;
@@ -1520,29 +1624,32 @@ export default function POSDesktop() {
         }
 
         // Numpad quantity adjustment (operates on last item in cart)
+        // Uses functional update to get latest state
         case '+':
         case 'Add': {
           e.preventDefault();
-          if (orderItems.length > 0) {
-            const updated = [...orderItems];
+          setOrderItems(prev => {
+            if (prev.length === 0) return prev;
+            const updated = [...prev];
             updated[updated.length - 1] = { ...updated[updated.length - 1], quantity: updated[updated.length - 1].quantity + 1 };
-            setOrderItems(updated);
-          }
+            return updated;
+          });
           break;
         }
         case '-':
         case 'Subtract': {
           e.preventDefault();
-          if (orderItems.length > 0) {
-            const updated = [...orderItems];
+          setOrderItems(prev => {
+            if (prev.length === 0) return prev;
+            const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last.quantity > 1) {
               updated[updated.length - 1] = { ...last, quantity: last.quantity - 1 };
-              setOrderItems(updated);
+              return updated;
             } else {
-              setOrderItems(updated.slice(0, -1));
+              return updated.slice(0, -1);
             }
-          }
+          });
           break;
         }
       }
@@ -1550,7 +1657,8 @@ export default function POSDesktop() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLocked, orderItems, orderTotal, printing, handleClearOrder, handleLockScreen, setOrderItems, setSelectedSectionId, setSelectedCategoryId, setSelectedMenuCategory, refreshMenuData]);
+  // 🔧 FIX: Removed orderItems from deps - using imperative store access in callbacks
+  }, [isLocked, orderTotal, printing, handleClearOrder, handleLockScreen, setOrderItems, setSelectedSectionId, setSelectedCategoryId, setSelectedMenuCategory, refreshMenuData]);
 
   if (authLoading) return <div className="h-dvh w-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500" /></div>;
   if (!isAuthenticated) return null;
@@ -1589,16 +1697,18 @@ export default function POSDesktop() {
               } else {
                 await api.openCustomerDisplay?.();
                 setTimeout(() => {
+                  // 🔧 FIX: Use imperative store access for latest items
+                  const currentItems = usePOSOrderStore.getState().orderItems;
                   api.sendToCustomerDisplay?.({
-                    items: orderItems.map(item => ({
+                    items: currentItems.map(item => ({
                       name: item.name || 'Item',
                       quantity: item.quantity,
                       price: item.price,
                       modifiers: item.modifiers?.map((m: any) => m.name || m.modifier_name).filter(Boolean) || []
                     })),
-                    total: orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                    total: currentItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
                     orderType: orderType,
-                    itemCount: orderItems.length
+                    itemCount: currentItems.length
                   });
                 }, 1000);
               }
@@ -1677,7 +1787,8 @@ export default function POSDesktop() {
         />
         <AdminSidePanel isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} defaultTab="dashboard" />
         <CustomerOrderHistoryModal isOpen={showOrderHistoryModal} onClose={() => setShowOrderHistoryModal(false)} customer={customerProfile} orders={customerProfile?.recent_orders || []} onReorder={handleLoadPastOrder} />
-        <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderItems={orderItems} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
+        {/* 🔧 FIX: orderItems removed - component subscribes internally */}
+        <PaymentFlowOrchestrator isOpen={showPaymentFlow} onClose={() => setModal('showPaymentFlow', false)} orderTotal={orderTotal} orderType={orderType as any} customerData={customerData as any} deliveryFee={deliveryFee} onPaymentComplete={handlePaymentFlowComplete} />
         <ReprintDialog isOpen={showReprintDialog} onClose={() => setModal('showReprintDialog', false)} />
         <PrinterSettings isOpen={showPrinterSettings} onClose={() => setShowPrinterSettings(false)} />
         <CommandPalette
@@ -1685,8 +1796,9 @@ export default function POSDesktop() {
           onClose={() => setModal('showCommandPalette', false)}
           actions={{
             onNewOrder: () => { handleClearOrder(); },
-            onCheckout: () => { if (orderItems.length > 0) setModal('showPaymentFlow', true); else toast.warning('Add items before checkout'); },
-            onPrintReceipt: () => { if (orderItems.length > 0) printing.handlePrintReceipt(orderTotal); },
+            // 🔧 FIX: Use imperative access to avoid re-renders
+            onCheckout: () => { if (getOrderItemsCount() > 0) setModal('showPaymentFlow', true); else toast.warning('Add items before checkout'); },
+            onPrintReceipt: () => { if (getOrderItemsCount() > 0) printing.handlePrintReceipt(orderTotalRef.current); },
             onLockScreen: handleLockScreen,
             onRefreshMenu: () => { refreshMenuData(); },
             onOpenReprint: () => setModal('showReprintDialog', true),

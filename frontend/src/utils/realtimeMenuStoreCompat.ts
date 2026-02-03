@@ -27,7 +27,7 @@
  * ```
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useMenuBundle,
@@ -170,38 +170,87 @@ export function useRealtimeMenuStoreCompat(options: {
   // Realtime subscriptions (invalidate React Query cache on changes)
   useMenuRealtimeSync({ context, enabled: enableRealtime });
 
-  // Memoized actions
+  // 🔧 FIX: Store dataUpdatedAt in a ref to prevent unnecessary re-renders
+  // dataUpdatedAt changes on every React Query access, even when data is unchanged
+  // Using a ref allows us to access the latest value without triggering useMemo recalculation
+  const dataUpdatedAtRef = useRef(dataUpdatedAt);
+  dataUpdatedAtRef.current = dataUpdatedAt;
+
+  // 🔧 FIX: Store refetch in a ref to make callbacks stable
+  // refetch from React Query changes reference on every render, causing callbacks
+  // that depend on it to change, which causes compatState to be recreated
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+
+  // 🔧 FIX: Store bundle in a ref for customization helpers
+  // This allows getWebsiteCustomizations and getCustomizationsByGroup to be stable
+  const bundleRef = useRef(bundle);
+  bundleRef.current = bundle;
+
+  // 🔧 FIX: Stabilize bundle arrays - only update refs when content actually changes
+  // This prevents re-renders when React Query returns new references for identical data
+  const stableCategoriesRef = useRef(bundle?.categories || []);
+  const stableMenuItemsRef = useRef(bundle?.menuItems || []);
+  const stableParentCategoriesRef = useRef(bundle?.parentCategories || []);
+  const stableChildCategoriesRef = useRef(bundle?.childCategories || []);
+
+  // Helper to check if array content changed (by length and first/last id)
+  const arrayContentChanged = <T extends { id?: string }>(
+    newArr: T[] | undefined,
+    oldArr: T[]
+  ): boolean => {
+    const arr = newArr || [];
+    if (arr.length !== oldArr.length) return true;
+    if (arr.length === 0) return false;
+    return arr[0]?.id !== oldArr[0]?.id || arr[arr.length - 1]?.id !== oldArr[oldArr.length - 1]?.id;
+  };
+
+  // Update stable refs only when content changes
+  if (arrayContentChanged(bundle?.categories, stableCategoriesRef.current)) {
+    stableCategoriesRef.current = bundle?.categories || [];
+  }
+  if (arrayContentChanged(bundle?.menuItems, stableMenuItemsRef.current)) {
+    stableMenuItemsRef.current = bundle?.menuItems || [];
+  }
+  if (arrayContentChanged(bundle?.parentCategories, stableParentCategoriesRef.current)) {
+    stableParentCategoriesRef.current = bundle?.parentCategories || [];
+  }
+  if (arrayContentChanged(bundle?.childCategories, stableChildCategoriesRef.current)) {
+    stableChildCategoriesRef.current = bundle?.childCategories || [];
+  }
+
+  // Memoized actions - using refs for stable callbacks
   const initialize = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
+    await refetchRef.current();
+  }, []);  // 🔧 FIX: Empty deps - uses ref for stable callback
 
   const refreshData = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
+    await refetchRef.current();
+  }, []);  // 🔧 FIX: Empty deps - uses ref for stable callback
 
   const forceFullRefresh = useCallback(async () => {
     // Invalidate all menu queries to force fresh data
     queryClient.invalidateQueries({ queryKey: menuKeys.all });
-    await refetch();
-  }, [queryClient, refetch]);
+    await refetchRef.current();
+  }, [queryClient]);  // 🔧 FIX: queryClient is stable from React Query
 
   const invalidateCache = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: menuKeys.posBundle(context) });
   }, [queryClient, context]);
 
-  // Customization helpers
+  // Customization helpers - using refs for stable callbacks
   const getWebsiteCustomizations = useCallback(() => {
-    if (!bundle) return [];
-    return bundle.customizations.filter(
+    if (!bundleRef.current) return [];
+    return bundleRef.current.customizations.filter(
       customization => customization.is_active && customization.show_on_website
     );
-  }, [bundle]);
+  }, []);  // 🔧 FIX: Empty deps - uses ref for stable callback
 
   const getCustomizationsByGroup = useCallback(() => {
-    if (!bundle) return {};
+    if (!bundleRef.current) return {};
     const customizationsByGroup: Record<string, Customization[]> = {};
 
-    bundle.customizations.forEach(customization => {
+    bundleRef.current.customizations.forEach(customization => {
       if (customization.is_active && customization.show_on_website) {
         const group = customization.customization_group || 'Other';
         if (!customizationsByGroup[group]) {
@@ -212,13 +261,13 @@ export function useRealtimeMenuStoreCompat(options: {
     });
 
     return customizationsByGroup;
-  }, [bundle]);
+  }, []);  // 🔧 FIX: Empty deps - uses ref for stable callback
 
   // Build the compat state object
   const compatState = useMemo<MenuStoreCompatState>(() => ({
-    // Data state - from React Query
-    categories: bundle?.categories || [],
-    menuItems: bundle?.menuItems || [],
+    // Data state - using stable refs for frequently-accessed arrays
+    categories: stableCategoriesRef.current,
+    menuItems: stableMenuItemsRef.current,
     setMeals: bundle?.setMeals || [],
     proteinTypes: bundle?.proteinTypes || [],
     customizations: bundle?.customizations || [],
@@ -229,15 +278,15 @@ export function useRealtimeMenuStoreCompat(options: {
     proteinTypesById: bundle?.proteinTypesById || {},
     menuItemsByCategory: bundle?.menuItemsByCategory || {},
 
-    // Category hierarchy - from React Query bundle
-    parentCategories: bundle?.parentCategories || [],
-    childCategories: bundle?.childCategories || [],
+    // Category hierarchy - using stable refs
+    parentCategories: stableParentCategoriesRef.current,
+    childCategories: stableChildCategoriesRef.current,
     subcategories: bundle?.subcategories || {},
 
     // Loading states
     isLoading: isQueryLoading,
     isConnected: !queryError && !isQueryLoading,
-    lastUpdate: dataUpdatedAt || 0,
+    lastUpdate: dataUpdatedAtRef.current || 0,  // 🔧 FIX: Use ref to avoid dependency
     error: queryError?.message || null,
 
     // Filtering state - from Zustand UI store
@@ -250,7 +299,7 @@ export function useRealtimeMenuStoreCompat(options: {
     flexibleBillingModal,
 
     // AI Context state
-    aiContextLastUpdate: dataUpdatedAt || 0,
+    aiContextLastUpdate: dataUpdatedAtRef.current || 0,  // 🔧 FIX: Use ref to avoid dependency
     aiContextStatus,
 
     // Actions
@@ -277,26 +326,30 @@ export function useRealtimeMenuStoreCompat(options: {
     bundle,
     isQueryLoading,
     queryError,
-    dataUpdatedAt,
+    // 🔧 FIX: Removed dataUpdatedAt - it changes on every query access causing unnecessary re-renders
+    // The timestamp is accessed via dataUpdatedAtRef.current instead
     selectedParentCategory,
     selectedMenuCategory,
     searchQuery,
     filteredItems,
     flexibleBillingModal,
     aiContextStatus,
-    initialize,
-    refreshData,
-    forceFullRefresh,
-    invalidateCache,
+    // 🔧 FIX: Removed unstable callbacks from dependencies
+    // These callbacks now use refs internally, so they're stable and don't need to be deps:
+    // - initialize (uses refetchRef)
+    // - refreshData (uses refetchRef)
+    // - forceFullRefresh (uses refetchRef)
+    // - getWebsiteCustomizations (uses bundleRef)
+    // - getCustomizationsByGroup (uses bundleRef)
+    invalidateCache,  // Kept: depends on stable queryClient and context prop
+    // Zustand actions are stable by default
     setSelectedParentCategory,
     setSelectedMenuCategory,
     setSearchQuery,
     openFlexibleBillingModal,
     closeFlexibleBillingModal,
     setFlexibleBillingMode,
-    updateFlexibleBillingItems,
-    getWebsiteCustomizations,
-    getCustomizationsByGroup
+    updateFlexibleBillingItems
   ]);
 
   return compatState;

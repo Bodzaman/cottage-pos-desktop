@@ -438,8 +438,43 @@ export const apiClient = {
   store_order: async (order: any) => {
     console.log('📝 [app-compat] store_order called:', order);
     try {
-      // Generate order number
-      const orderNumber = order.order_number || `POS-${Date.now().toString(36).toUpperCase()}`;
+      // Generate order number via backend sequence API (hybrid mode) or fail explicitly
+      let orderNumber = order.order_number;
+
+      if (!orderNumber) {
+        if (isHybridMode) {
+          // Call backend sequence API to get proper order number
+          try {
+            const orderType = (order.order_type || order.orderType || 'COLLECTION').toUpperCase();
+            const sequenceType = orderType === 'DINE-IN' || orderType === 'DINE_IN' ? 'DINE_IN' :
+                                 orderType === 'DELIVERY' ? 'DELIVERY' : 'COLLECTION';
+
+            const sequenceResult = await callBackendAPI('/routes/order-sequence/generate', {
+              method: 'POST',
+              body: JSON.stringify({
+                order_source: 'POS',
+                order_type: sequenceType
+              })
+            });
+
+            orderNumber = sequenceResult.order_number;
+            console.log('✅ [app-compat] Generated order number via backend:', orderNumber);
+          } catch (seqError) {
+            console.error('❌ [app-compat] Failed to generate order number:', seqError);
+            return mockResponse({
+              success: false,
+              error: 'Failed to generate order number. Please check backend connection.'
+            }, false);
+          }
+        } else {
+          // Local-only mode: Cannot generate proper order number without backend
+          console.error('❌ [app-compat] Cannot generate order number - backend not configured');
+          return mockResponse({
+            success: false,
+            error: 'Order number generation requires backend connection. Configure VITE_RIFF_BACKEND_URL.'
+          }, false);
+        }
+      }
 
       const { data, error } = await supabase
         .from('orders')
@@ -6019,7 +6054,30 @@ export const apiClient = {
 
   generate_menu_item_code: async (params: any) => mockResponse({ success: true }),
 
-  generate_order_number: async (params: any) => mockResponse({ success: true }),
+  generate_order_number: async (params: any) => {
+    console.log('📝 [app-compat] generate_order_number called:', params);
+    if (isHybridMode) {
+      try {
+        const result = await callBackendAPI('/routes/order-sequence/generate', {
+          method: 'POST',
+          body: JSON.stringify(params)
+        });
+        return mockResponse(result);
+      } catch (error) {
+        console.error('❌ [app-compat] Failed to generate order number:', error);
+        return mockResponse({
+          success: false,
+          error: 'Failed to generate order number. Please check backend connection.'
+        }, false);
+      }
+    } else {
+      console.error('❌ [app-compat] Cannot generate order number - backend not configured');
+      return mockResponse({
+        success: false,
+        error: 'Order number generation requires backend connection.'
+      }, false);
+    }
+  },
 
   generate_receipt: async (params: any) => mockResponse({ success: true }),
 

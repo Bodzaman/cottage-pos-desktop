@@ -96,7 +96,8 @@ export interface PaymentFlowOrchestratorProps {
   isOpen: boolean;
   onClose: () => void;
   // Mode is now determined internally based on user action in OrderConfirmationView
-  orderItems: OrderItem[];
+  // 🔧 FIX: Made optional - component now subscribes to usePOSOrderStore internally
+  orderItems?: OrderItem[];
   orderTotal: number;
   orderType: 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
   tableNumber?: number;

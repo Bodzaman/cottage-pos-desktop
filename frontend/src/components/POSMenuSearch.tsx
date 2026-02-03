@@ -15,8 +15,10 @@ interface Props {
  * - Keyboard support (Esc to clear)
  * - Accessibility compliant (ARIA labels)
  * - QSAI theme styling
+ *
+ * Wrapped in React.memo to prevent unnecessary re-renders when parent updates.
  */
-export function POSMenuSearch({ className }: Props) {
+export const POSMenuSearch = React.memo(function POSMenuSearch({ className }: Props) {
   const { searchQuery, setSearchQuery } = useRealtimeMenuStoreCompat({ context: 'pos' });
   const [localValue, setLocalValue] = useState(searchQuery);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -124,6 +126,6 @@ export function POSMenuSearch({ className }: Props) {
       </span>
     </div>
   );
-}
+});
 
 export default POSMenuSearch;

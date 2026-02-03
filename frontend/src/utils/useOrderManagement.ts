@@ -1,20 +1,21 @@
 import { useCallback } from 'react';
 import type { OrderItem } from './types';
+import { usePOSOrderStore } from './posOrderStore';
 
 /**
  * Hook: useOrderManagement
- * 
+ *
  * RESPONSIBILITY:
  * Manages the order items array in POSDesktop's current active order.
  * Handles all mutations to orderItems: add, remove, update quantity, notes, and modifiers.
  * Implements duplicate detection to prevent identical items from cluttering the order.
- * 
+ *
  * DATA FLOW:
- * 1. Receives orderItems array and setOrderItems updater from POSDesktop
+ * 1. Subscribes to orderItems from usePOSOrderStore internally
  * 2. Provides handlers that wrap setOrderItems with business logic
  * 3. Handlers update orderItems via functional updates: setOrderItems(prev => ...)
- * 4. POSDesktop state updates → UI re-renders → OrderSummaryPanel displays changes
- * 
+ * 4. Store updates → components that subscribe to orderItems re-render
+ *
  * DUPLICATE DETECTION ALGORITHM:
  * When adding an item, checks if identical item exists by comparing:
  * - Same menu_item_id
@@ -24,7 +25,7 @@ import type { OrderItem } from './types';
  * - Same customizations (sorted by customization_id/id for comparison) ✅ ADDED
  * If duplicate found → increment quantity
  * If unique → add as new item
- * 
+ *
  * KEY OPERATIONS:
  * - handleAddToOrder(): Adds item with duplicate detection
  * - handleRemoveItem(): Removes item by id
@@ -32,19 +33,22 @@ import type { OrderItem } from './types';
  * - handleCustomizeItem(): Updates modifiers/notes via CustomizeOrchestrator
  * - handleClearOrder(): Resets orderItems to []
  * - calculateOrderTotal(): Sums item prices + modifier adjustments
- * 
+ *
  * DEPENDENCIES:
- * - None (pure state management)
+ * - usePOSOrderStore: Zustand store for order state
  * - Uses sonner for user feedback toasts
- * 
- * @param orderItems - Current array of items in the order
- * @param setOrderItems - State setter function from POSDesktop
+ *
+ * NOTE: This hook now subscribes to orderItems internally, removing the need
+ * for POSDesktop to pass orderItems. This prevents menu flicker when cart changes.
+ *
  * @returns Order management handlers and utilities
  */
-export function useOrderManagement(
-  orderItems: OrderItem[],
-  setOrderItems: (items: OrderItem[] | ((prev: OrderItem[]) => OrderItem[])) => void
-) {
+export function useOrderManagement() {
+  // 🔧 FIX: Only subscribe to setOrderItems - NOT orderItems!
+  // Subscribing to orderItems causes this hook to re-render when cart changes,
+  // which causes POSDesktop to re-render and flicker the menu.
+  // Instead, use usePOSOrderStore.getState().orderItems imperatively in callbacks.
+  const setOrderItems = usePOSOrderStore(state => state.setOrderItems);
   // ============================================================================
   // ADD TO ORDER - With duplicate detection
   // ============================================================================
@@ -204,13 +208,16 @@ export function useOrderManagement(
   // GET DISPLAY ORDER ITEMS
   // ============================================================================
   const getDisplayOrderItems = useCallback(() => {
-    return orderItems;
-  }, [orderItems]);
+    // 🔧 FIX: Use imperative access - no reactive subscription
+    return usePOSOrderStore.getState().orderItems;
+  }, []);  // Empty deps - stable callback
 
   // ============================================================================
   // CALCULATE ORDER TOTAL
   // ============================================================================
   const calculateOrderTotal = useCallback((): number => {
+    // 🔧 FIX: Use imperative access - no reactive subscription
+    const orderItems = usePOSOrderStore.getState().orderItems;
     return orderItems.reduce((total, item) => {
       let itemTotal = item.price * item.quantity;
 
@@ -221,7 +228,7 @@ export function useOrderManagement(
         });
       }
 
-      // ✅ FIX: Add customization prices if present
+      // Add customization prices if present
       if (item.customizations && item.customizations.length > 0) {
         item.customizations.forEach(customization => {
           itemTotal += (customization.price_adjustment || 0) * item.quantity;
@@ -230,7 +237,7 @@ export function useOrderManagement(
 
       return total + itemTotal;
     }, 0);
-  }, [orderItems]);
+  }, []);  // Empty deps - stable callback
 
   return {
     // Handlers

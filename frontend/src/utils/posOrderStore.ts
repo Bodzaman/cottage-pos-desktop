@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { OrderItem } from './types';
 
 // ============================================================================
@@ -51,7 +52,10 @@ export interface OrderStore {
 // ORDER STORE IMPLEMENTATION
 // ============================================================================
 
-export const usePOSOrderStore = create<OrderStore>((set, get) => ({
+// 🔧 FIX: Add subscribeWithSelector middleware to enable subscribe(selector, callback) pattern
+// This allows components to subscribe to specific state slices without causing re-renders
+export const usePOSOrderStore = create<OrderStore>()(
+  subscribeWithSelector((set, get) => ({
   // ============================================================================
   // INITIAL STATE
   // ============================================================================
@@ -181,4 +185,4 @@ export const usePOSOrderStore = create<OrderStore>((set, get) => ({
     const { orderItems } = get();
     return orderItems.reduce((count, item) => count + item.quantity, 0);
   }
-}));
+})));
