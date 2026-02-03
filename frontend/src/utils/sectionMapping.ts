@@ -144,6 +144,7 @@ export const FIXED_SECTIONS = [
 ] as const;
 
 export type SectionId = typeof FIXED_SECTIONS[number]['id'];
+export type Section = typeof FIXED_SECTIONS[number];
 
 /**
  * Section indicators for kitchen ticket display

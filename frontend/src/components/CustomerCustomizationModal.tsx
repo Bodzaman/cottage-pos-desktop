@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MenuItem, ItemVariant, Customization } from '../utils/types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
@@ -207,10 +208,12 @@ export function CustomerCustomizationModal({
       const defaultVariant: ItemVariant = {
         id: item.id || '',
         name: 'Standard',
-        price_adjustment: 0
+        price: price,
+        variant_name: 'Standard',
+        menu_item_id: item.id,
       };
 
-      onAddToCart(defaultVariant, [], quantity, '');
+      addToCart(item, quantity, defaultVariant, selectedCustomizations, '');
     }
 
     // Reset state (parent will handle closing via onClose)

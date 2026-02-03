@@ -419,7 +419,7 @@ export function CompactMenuList({
                       image_variants={item.image_variants}
                       alt={item.name}
                       className="w-full h-full object-cover rounded-lg"
-                      fallbackSrc='https://images.unsplash.com/photo-1546833999-b9f581a1996d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'
+                      fallbackUrl='https://images.unsplash.com/photo-1546833999-b9f581a1996d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'
                       preset="thumbnail"
                     />
                   )}

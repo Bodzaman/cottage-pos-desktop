@@ -222,6 +222,8 @@ export {
   calculateTotalItems,
   calculateTotalAmount,
   generateCartItemId,
+  toCartCustomizations,
+  toSelectedCustomizations,
 
   // Events
   type CartEvent,

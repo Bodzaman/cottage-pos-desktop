@@ -7,25 +7,10 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { CartItem as CartItemType } from 'types';
 
 interface CartItemProps {
-  item: {
-    id: string;
-    menuItem: { 
-      id: string; 
-      name: string; 
-      description: string;
-      image_url?: string;
-      active?: boolean; // Stock/availability flag
-    };
-    variant: {
-      id: string;
-      name: string;
-      price: string;
-    };
-    quantity: number;
-    specialInstructions?: string;
-  };
+  item: CartItemType;
 }
 
 // Configurable max quantity per item (can be adjusted per business rules)
@@ -35,11 +20,12 @@ const MAX_QUANTITY_PER_ITEM = 10;
 export const CartItem = React.memo(({ item }: CartItemProps) => {
   const { updateItemQuantity, removeItem, updateItemNotes } = useCartStore();
   const [showInstructions, setShowInstructions] = React.useState(false);
-  const [instructionsText, setInstructionsText] = React.useState(item.specialInstructions || item.notes || '');
+  const [instructionsText, setInstructionsText] = React.useState(item.notes || '');
   const MAX_CHARS = 200;
 
   // Check if item is available (active in database)
-  const isAvailable = item?.menuItem?.active !== false;
+  const menuItem = (item as any).menuItem;
+  const isAvailable = menuItem?.active !== false;
   const isAtMaxQuantity = item.quantity >= MAX_QUANTITY_PER_ITEM;
 
   // Quick-select instruction chips
@@ -53,17 +39,20 @@ export const CartItem = React.memo(({ item }: CartItemProps) => {
   ];
 
   // Memoize calculated values to prevent recalculation on every render
-  const price = React.useMemo(() => parseFloat(item?.variant?.price || '0'), [item?.variant?.price]);
+  const price = React.useMemo(() => {
+    const variantPrice = item?.variant?.price;
+    return typeof variantPrice === 'string' ? parseFloat(variantPrice) : (variantPrice ?? item.price ?? 0);
+  }, [item?.variant?.price, item.price]);
   
   const totalPrice = React.useMemo(() => {
     return (price * (item?.quantity || 0)).toFixed(2);
   }, [price, item?.quantity]);
 
   const displayName = React.useMemo(() => {
-    const name = item?.menuItem?.name || 'Menu item';
+    const name = item?.name || menuItem?.name || 'Menu item';
     const variantName = item?.variant?.name || '';
     return variantName ? `${name} (${variantName})` : name;
-  }, [item?.menuItem?.name, item?.variant?.name]);
+  }, [item?.name, menuItem?.name, item?.variant?.name]);
 
   // Memoize handlers to prevent recreating functions on each render
   const handleDecreaseQuantity = React.useCallback(() => {
@@ -113,8 +102,8 @@ export const CartItem = React.memo(({ item }: CartItemProps) => {
     }
   }, [item.id, updateItemNotes]);
 
-  const description = item?.menuItem?.description || '';
-  const hasCustomizations = (item?.variant?.customizations?.length || 0) > 0;
+  const description = item?.description || menuItem?.description || '';
+  const hasCustomizations = (item?.customizations?.length || 0) > 0;
   
   return (
     <ErrorBoundary fallback={
@@ -173,8 +162,8 @@ export const CartItem = React.memo(({ item }: CartItemProps) => {
             {/* Show customizations pricing if any */}
             {hasCustomizations && (
               <div className="text-xs text-gray-400 mt-1">
-                {item.variant.customizations.map((c: any) => (
-                  <span key={c.id} className="mr-2">+ {c.name} £{c.price.toFixed(2)}</span>
+                {item.customizations?.map((c: any) => (
+                  <span key={c.id} className="mr-2">+ {c.name} £{(c.price ?? c.price_adjustment ?? 0).toFixed(2)}</span>
                 ))}
               </div>
             )}

@@ -5,6 +5,8 @@ const CACHE_NAME = 'cottage-tandoori-pos-v1';
 const API_CACHE_NAME = 'cottage-tandoori-api-v1';
 const IMAGE_CACHE_NAME = 'cottage-tandoori-images-v1';
 
+const swSelf = self as unknown as ServiceWorkerGlobalScope;
+
 // App shell resources to cache immediately
 const APP_SHELL_URLS = [
   '/',
@@ -35,7 +37,7 @@ const NETWORK_TIMEOUT = 3000;
 // INSTALLATION
 // ============================================================================
 
-self.addEventListener('install', (event) => {
+swSelf.addEventListener('install', (event: ExtendableEvent) => {
   
   event.waitUntil(
     (async () => {
@@ -53,7 +55,7 @@ self.addEventListener('install', (event) => {
         await Promise.allSettled(cachePromises);
         
         // Skip waiting to activate immediately
-        await self.skipWaiting();
+        await swSelf.skipWaiting();
         
       } catch (error) {
         console.error(' [ServiceWorker] Installation failed:', error);
@@ -66,7 +68,7 @@ self.addEventListener('install', (event) => {
 // ACTIVATION
 // ============================================================================
 
-self.addEventListener('activate', (event) => {
+swSelf.addEventListener('activate', (event: ExtendableEvent) => {
   
   event.waitUntil(
     (async () => {
@@ -87,7 +89,7 @@ self.addEventListener('activate', (event) => {
         await Promise.all(deletePromises);
         
         // Take control of all open pages
-        await self.clients.claim();
+        await swSelf.clients.claim();
         
       } catch (error) {
         console.error(' [ServiceWorker] Activation failed:', error);
@@ -100,7 +102,7 @@ self.addEventListener('activate', (event) => {
 // FETCH HANDLING
 // ============================================================================
 
-self.addEventListener('fetch', (event) => {
+swSelf.addEventListener('fetch', (event: FetchEvent) => {
   const { request } = event;
   const url = new URL(request.url);
   
@@ -297,9 +299,9 @@ async function fetchWithTimeout(request, timeout) {
 // MESSAGE HANDLING
 // ============================================================================
 
-self.addEventListener('message', (event) => {
+swSelf.addEventListener('message', (event: ExtendableMessageEvent) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    swSelf.skipWaiting();
   }
   
   if (event.data && event.data.type === 'GET_VERSION') {
@@ -319,4 +321,3 @@ self.addEventListener('message', (event) => {
     });
   }
 });
-

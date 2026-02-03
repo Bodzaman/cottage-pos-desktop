@@ -85,7 +85,7 @@ export function CustomerPortalSection({ isOpen, onClose, className = '' }: Custo
     first_name: profile?.first_name || '',
     last_name: profile?.last_name || '',
     email: user?.email || '',
-    phone_number: profile?.phone_number || ''
+    phone_number: profile?.phone || ''
   });
 
   // Update form when profile changes
@@ -95,7 +95,7 @@ export function CustomerPortalSection({ isOpen, onClose, className = '' }: Custo
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
         email: user?.email || '',
-        phone_number: profile.phone_number || ''
+        phone_number: profile.phone || ''
       });
     }
   }, [profile, user]);

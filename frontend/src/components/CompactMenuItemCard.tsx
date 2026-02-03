@@ -250,7 +250,7 @@ export function CompactMenuItemCard({
               fallbackUrl={displayImage || placeholderImage}
               alt={item.name}
               className="w-full h-full object-cover"
-              preset="square"
+              preset="thumbnail"
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />

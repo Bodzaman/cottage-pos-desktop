@@ -723,7 +723,7 @@ export function AIVoiceAgentModal({ open, onClose }: AIVoiceAgentModalProps) {
                             <MultiNationalityPassportCard
                               agent={agents[0]}
                               isSelected={selectedAgentId === agents[0].id}
-                              onSelect={handleAgentSelect}
+                              onSelect={() => handleAgentSelect(agents[0].id)}
                               status={getAgentStatus(agents[0], selectedAgentId === agents[0].id, aiVoiceAgentEnabled)}
                               size="large"
                               showTestButton={true}

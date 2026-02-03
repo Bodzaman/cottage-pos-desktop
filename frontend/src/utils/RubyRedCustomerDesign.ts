@@ -97,6 +97,10 @@ export const rubyStyles = {
 
 // Recreate the rubyEffects export for backward compatibility
 export const rubyEffects = {
+  glowBorder: {
+    boxShadow: '0 0 0 1px rgba(139, 21, 56, 0.4), 0 0 12px rgba(139, 21, 56, 0.25)',
+    border: '1px solid rgba(139, 21, 56, 0.45)'
+  },
   innerGlow: (intensity: 'subtle' | 'medium' | 'strong' = 'medium') => {
     const opacityMap = { subtle: 0.1, medium: 0.15, strong: 0.2 };
     return `inset 0 0 20px rgba(139, 21, 56, ${opacityMap[intensity]})`;

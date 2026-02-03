@@ -8,6 +8,7 @@ import { mode, Mode } from "../utils/environment";
 interface Props {
   children: ReactNode;
   fallbackMessage?: string;
+  fallback?: ReactNode;
   /** Optional callback when retry is triggered */
   onRetry?: () => void;
 }
@@ -117,9 +118,12 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     const { hasError, error, retryCount, isRetrying } = this.state;
-    const { fallbackMessage } = this.props;
+    const { fallbackMessage, fallback } = this.props;
 
     if (hasError) {
+      if (fallback) {
+        return <>{fallback}</>;
+      }
       const isDev = mode === Mode.DEV;
       const canAutoRetry = retryCount < MAX_RETRY_ATTEMPTS;
 

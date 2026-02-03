@@ -71,7 +71,16 @@ export default function AIAvatarTab({
             onUpdate={onUpdate}
             mode={selectionMode === 'pick' ? 'selection' : 'view'}
             selectionType="single"
-            onAssetSelect={onAssetSelect}
+            onAssetSelect={
+              onAssetSelect
+                ? (item) => {
+                    const asset = allAvatars.find(a => a.id === item.id);
+                    if (asset) {
+                      onAssetSelect(asset);
+                    }
+                  }
+                : undefined
+            }
             emptyMessage="No assigned avatars found"
           />
         </div>
@@ -90,7 +99,16 @@ export default function AIAvatarTab({
             onUpdate={onUpdate}
             mode={selectionMode === 'pick' ? 'selection' : 'view'}
             selectionType="single"
-            onAssetSelect={onAssetSelect}
+            onAssetSelect={
+              onAssetSelect
+                ? (item) => {
+                    const asset = allAvatars.find(a => a.id === item.id);
+                    if (asset) {
+                      onAssetSelect(asset);
+                    }
+                  }
+                : undefined
+            }
             emptyMessage="No available avatars found"
           />
         </div>

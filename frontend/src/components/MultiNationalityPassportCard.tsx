@@ -21,6 +21,9 @@ interface MultiNationalityPassportCardProps {
   status?: AgentStatus;
   onSelect?: () => void;
   onTestVoice?: () => void;
+  showTestButton?: boolean;
+  onTest?: () => void;
+  size?: 'small' | 'medium' | 'large' | string;
   voiceTestState?: {
     isVoiceTesting: boolean;
     voiceCallStatus: VoiceCallStatus;

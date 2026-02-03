@@ -21,7 +21,7 @@ export interface CustomerData {
 
 // OrderType now uses underscore format to match database ENUM
 // WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
-export type OrderType = 'DINE_IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
+export type OrderType = 'DINE_IN' | 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 
 // Helper function to get customer display name
 export const getCustomerDisplayName = (customerData: CustomerData): string => {

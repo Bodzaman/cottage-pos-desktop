@@ -258,7 +258,7 @@ export function sendMessageToServiceWorker(message: any): Promise<any> {
       resolve(event.data);
     };
 
-    messageChannel.port1.onerror = (error) => {
+    messageChannel.port1.onmessageerror = (error) => {
       reject(error);
     };
 

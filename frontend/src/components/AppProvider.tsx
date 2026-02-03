@@ -17,6 +17,7 @@ import { useRealtimeMenuStoreCompat } from "utils/realtimeMenuStoreCompat";
 import { useTableOrdersStore } from "utils/tableOrdersStore";
 import { useCartStore } from "utils/cartStore";
 import { useChatVisibility } from "utils/useChatVisibility";
+import { toCartCustomizations, toSelectedCustomizations } from "types";
 import { queryClient } from "utils/queryClient";
 import { toast } from "sonner";
 import { getOrCreateSessionId } from "utils/session-manager";
@@ -88,9 +89,20 @@ function CustomerCustomizationModalWrapper() {
       addToCart={(item, quantity, variant, customizations, notes) => {
         // IMPORTANT: Update existing item, don't add new
         updateItem(editingItemId, {
-          variant,
+          variant: {
+            id: variant.id,
+            name: variant.name || variant.variant_name || 'Standard',
+            price: variant.price,
+            price_dine_in: variant.price_dine_in,
+            price_delivery: variant.price_delivery,
+            price_takeaway: variant.price_takeaway,
+            protein_type_name: variant.protein_type_name,
+            protein_type_id: variant.protein_type_id,
+            image_url: variant.image_url,
+            image_variants: variant.image_variants,
+          },
           quantity,
-          customizations,
+          customizations: toCartCustomizations(customizations || []),
           notes
         });
 
@@ -107,7 +119,7 @@ function CustomerCustomizationModalWrapper() {
       editMode={true}
       editingCartItemId={editingItemId}
       editingCartItem={editingCartItem}
-      initialCustomizations={editingCartItem.customizations || []}
+      initialCustomizations={toSelectedCustomizations(editingCartItem.customizations || [])}
     />
   );
 }

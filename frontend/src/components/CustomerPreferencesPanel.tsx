@@ -53,12 +53,12 @@ export function CustomerPreferencesPanel({ phone_number, onPreferencesUpdated }:
     
     try {
       setIsLoading(true);
-      const response = await brain.get_customer_preferences({ phone_number });
+      const response = await brain.get_customer_preferences({ phoneNumber: phone_number });
       const data = await response.json();
       
       if (data.success && data.preferences) {
         setPreferences(data.preferences);
-        setDisplayPhone(formatPhoneForDisplay(data.phone_number));
+        setDisplayPhone(formatPhoneForDisplay(data.phone_number ?? phone_number));
       } else {
         console.error("Failed to load preferences:", data.message);
       }
@@ -76,7 +76,7 @@ export function CustomerPreferencesPanel({ phone_number, onPreferencesUpdated }:
     try {
       setIsSaving(true);
       const response = await brain.update_customer_preferences(
-        { phone_number },
+        { phoneNumber: phone_number },
         preferences
       );
       const data = await response.json();

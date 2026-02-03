@@ -11,10 +11,10 @@ interface Props {
 
 // Call outcome icons and colors
 const outcomeIconMap = {
-  completed: <Badge variant="success" className="flex gap-1 items-center"><Phone className="h-3 w-3"/> Completed</Badge>,
-  reservation: <Badge variant="success" className="flex gap-1 items-center"><Calendar className="h-3 w-3"/> Reservation</Badge>,
-  order: <Badge variant="success" className="flex gap-1 items-center"><MessageSquareText className="h-3 w-3"/> Order</Badge>,
-  'in-progress': <Badge variant="warning" className="flex gap-1 items-center"><Clock className="h-3 w-3"/> In Progress</Badge>,
+  completed: <Badge variant="default" className="flex gap-1 items-center"><Phone className="h-3 w-3"/> Completed</Badge>,
+  reservation: <Badge variant="default" className="flex gap-1 items-center"><Calendar className="h-3 w-3"/> Reservation</Badge>,
+  order: <Badge variant="default" className="flex gap-1 items-center"><MessageSquareText className="h-3 w-3"/> Order</Badge>,
+  'in-progress': <Badge variant="secondary" className="flex gap-1 items-center"><Clock className="h-3 w-3"/> In Progress</Badge>,
   failed: <Badge variant="destructive" className="flex gap-1 items-center"><BarChart3 className="h-3 w-3"/> Failed</Badge>,
 };
 

@@ -23,11 +23,14 @@ export interface Category {
   name: string;
   description: string | null;
   display_order: number;
+  sort_order?: number;
   print_order: number;
   print_to_kitchen: boolean;
   image_url: string | null;
   parent_category_id: string | null;
+  parent_id?: string | null;
   active: boolean;
+  is_active?: boolean;
   is_protein_type?: boolean;
 }
 
@@ -215,6 +218,7 @@ export interface MenuItem {
   item_code?: string | null;
   display_order: number;
   active: boolean;
+  is_active?: boolean;
   inherit_category_print_settings?: boolean;
   price?: number;
   base_price?: number;
@@ -305,6 +309,13 @@ export interface ModifierSelection {
   name: string;
   price_adjustment: number;
   price?: number;
+  groupId?: string;
+  groupName?: string;
+  options?: Array<{
+    optionId?: string;
+    name: string;
+    price: number;
+  }>;
 }
 
 /**

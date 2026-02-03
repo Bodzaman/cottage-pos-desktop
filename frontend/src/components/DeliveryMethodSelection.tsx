@@ -46,14 +46,14 @@ export function DeliveryMethodSelection({ value, onChange }: Props) {
         
         <div className="relative">
           <RadioGroupItem 
-            value="pickup" 
-            id="pickup" 
+            value="collection" 
+            id="collection" 
             className="sr-only"
           />
           <Label 
-            htmlFor="pickup"
+            htmlFor="collection"
             className={`flex flex-col items-center p-6 rounded-lg border-2 cursor-pointer h-full
-              ${value === 'pickup' 
+              ${value === 'collection' 
                 ? 'bg-gray-800/80 border-tandoor-orange text-tandoor-platinum' 
                 : 'bg-gray-800/40 border-tandoor-platinum/20 text-tandoor-offwhite hover:bg-gray-800/60 hover:border-tandoor-platinum/40'}`}
           >

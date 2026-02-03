@@ -184,7 +184,7 @@ export function CustomerMenuCard({
       const orderItem = createOrderItem(selectedVariant);
 
       // Use cart store to add item
-      addItem(orderItem);
+      addItem(item, selectedVariant || null, 1);
 
       // Also call parent callback if provided
       if (onAddToCart) {
@@ -231,11 +231,25 @@ export function CustomerMenuCard({
         customizations: customizations?.map(c => ({
           id: c.id,
           name: c.name,
+          price_adjustment: c.price_adjustment,
           price: c.price_adjustment
         }))
       };
 
-      addItem(orderItem);
+      addItem(
+        item,
+        variant,
+        quantity,
+        customizations?.map(c => ({
+          id: c.id,
+          name: c.name,
+          price: c.price_adjustment,
+          price_adjustment: c.price_adjustment,
+          group: c.group
+        })) || [],
+        undefined,
+        notes
+      );
       if (onAddToCart) {
         onAddToCart(orderItem);
       }

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { CustomerData, OrderType } from './customerTypes';
 
+export type { CustomerData } from './customerTypes';
+
 interface CustomerDataStore {
   customerData: CustomerData;
   showCustomerModal: boolean;

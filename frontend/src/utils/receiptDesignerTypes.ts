@@ -42,6 +42,7 @@ export interface OrderItem {
   quantity: number;
   variant?: OrderItemVariant;
   customizations?: OrderItemCustomization[];
+  modifiers?: any[];
   total: number;
   instructions?: string;
   notes?: string;

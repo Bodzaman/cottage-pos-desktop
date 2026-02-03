@@ -102,7 +102,7 @@ export function toCartCustomizations(items: SelectedCustomization[]): CartCustom
  * Extended to be compatible with ItemVariant from types/menu.ts
  */
 export interface CartItemVariant {
-  id: string;
+  id?: string;
   name: string;
   price?: number;
   variantName?: string;

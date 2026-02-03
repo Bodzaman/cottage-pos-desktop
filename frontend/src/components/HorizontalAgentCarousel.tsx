@@ -9,6 +9,7 @@ interface HorizontalAgentCarouselProps {
   agents: AgentProfile[];
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  getAgentStatus?: (agent: AgentProfile, isSelected: boolean, isActive: boolean) => any;
   aiVoiceAgentEnabled: boolean;
   isVoiceTesting: boolean;
   testingAgentId: string | null;
@@ -20,6 +21,7 @@ export const HorizontalAgentCarousel: React.FC<HorizontalAgentCarouselProps> = (
   agents,
   selectedAgentId,
   onSelectAgent,
+  getAgentStatus,
   aiVoiceAgentEnabled,
   isVoiceTesting,
   testingAgentId,
@@ -95,6 +97,7 @@ export const HorizontalAgentCarousel: React.FC<HorizontalAgentCarouselProps> = (
                   agent={agent}
                   isSelected={isSelected}
                   isActive={aiVoiceAgentEnabled && isSelected}
+                  status={getAgentStatus ? getAgentStatus(agent, isSelected, aiVoiceAgentEnabled) : undefined}
                   onTestVoice={(e) => {
                     e.stopPropagation();
                     onTestVoice(agent.id, agent.name);

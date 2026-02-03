@@ -142,6 +142,7 @@ export const colors = {
     primary: '#7C3AED',
     primaryTransparent: 'rgba(124, 58, 237, 0.8)',
     light: '#A78BFA',
+    secondary: '#A78BFA',
     dark: '#5B21B6',
     glow: 'rgba(124, 58, 237, 0.3)'
   },

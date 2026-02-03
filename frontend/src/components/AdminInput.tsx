@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { InternalTheme } from '../utils/InternalDesignSystem';
 
-interface AdminInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface AdminInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
   description?: string;
   error?: string;

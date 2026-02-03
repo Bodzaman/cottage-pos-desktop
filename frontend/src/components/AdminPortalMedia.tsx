@@ -148,8 +148,9 @@ const AdminPortalMedia: React.FC<AdminPortalMediaProps> = () => {
         // Check storage status via direct Supabase query
         const statusResult = await getStorageStatus();
 
-        if (statusResult.success && statusResult.data) {
-          toast.success(`Media library ready: ${statusResult.data.total_assets} assets`);
+        if (statusResult.success) {
+          const assetCount = statusResult.file_count ?? 0;
+          toast.success(`Media library ready${assetCount ? `: ${assetCount} assets` : ''}`);
         } else {
           toast.success('Media library database ready');
         }

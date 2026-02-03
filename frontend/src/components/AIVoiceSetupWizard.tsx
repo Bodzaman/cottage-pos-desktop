@@ -473,7 +473,7 @@ export function AIVoiceSetupWizard({
                 <div className="flex items-center justify-between">
                   <span className="text-white">Business Hours</span>
                   <span className="text-purple-400">
-                    {Object.values(timeWindows).filter(w => w.enabled).length} days configured
+                    {Object.values(timeWindows as Record<string, { enabled: boolean }>).filter(w => w.enabled).length} days configured
                   </span>
                 </div>
               </CardContent>
