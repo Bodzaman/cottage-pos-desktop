@@ -192,5 +192,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('update-download-progress');
         ipcRenderer.removeAllListeners('update-downloaded');
         ipcRenderer.removeAllListeners('update-error');
-    }
+    },
+
+    // ============================================================================
+    // OFFLINE CREDENTIAL STORAGE (Secure offline authentication)
+    // ============================================================================
+
+    // Cache user credentials after successful online login (with hash from server)
+    // userData: { username, fullName, role }
+    offlineCredentialCache: (userId, passwordHash, userData) =>
+        ipcRenderer.invoke('offline-credential-cache', { userId, passwordHash, userData }),
+
+    // Cache user credentials from plain password (hashes locally)
+    // Use this when server doesn't return password hash
+    offlineCredentialCachePlain: (userId, plainPassword, userData) =>
+        ipcRenderer.invoke('offline-credential-cache-plain', { userId, plainPassword, userData }),
+
+    // Verify password offline against cached credentials
+    offlinePasswordVerify: (username, password) =>
+        ipcRenderer.invoke('offline-password-verify', { username, password }),
+
+    // Check if a specific user has cached credentials
+    offlineCredentialStatus: (userId) =>
+        ipcRenderer.invoke('offline-credential-status', userId),
+
+    // Get list of users with cached credentials (for offline login UI)
+    offlineCredentialUsers: () =>
+        ipcRenderer.invoke('offline-credential-users'),
+
+    // Clear cached credentials for a user
+    offlineCredentialClear: (userId) =>
+        ipcRenderer.invoke('offline-credential-clear', userId),
+
+    // Cache management password hash for offline admin access
+    managementPasswordCache: (passwordHash) =>
+        ipcRenderer.invoke('management-password-cache', passwordHash),
+
+    // Cache management password from plain text (hashes it first)
+    managementPasswordCacheFromPlain: (plainPassword) =>
+        ipcRenderer.invoke('management-password-cache-plain', plainPassword),
+
+    // Verify management password offline
+    managementPasswordVerify: (password) =>
+        ipcRenderer.invoke('management-password-verify', password),
+
+    // Check if management password is cached
+    managementPasswordStatus: () =>
+        ipcRenderer.invoke('management-password-status'),
+
+    // Get pending audit logs for sync
+    offlineAuthAuditPending: () =>
+        ipcRenderer.invoke('offline-auth-audit-pending'),
+
+    // Mark audit logs as synced
+    offlineAuthAuditMarkSynced: (ids) =>
+        ipcRenderer.invoke('offline-auth-audit-mark-synced', ids)
 });

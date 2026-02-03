@@ -16,6 +16,9 @@ const sharp = require('sharp');
 // Offline database for order queue and print queue persistence
 const offlineDb = require('./lib/offline-db');
 
+// Secure credential storage for offline authentication
+const secureCredentials = require('./lib/secure-credentials');
+
 // Section UUID mapping for receipt section separators
 // Matches the frontend sectionMapping.ts SECTION_UUID_MAP
 const SECTION_UUID_MAP = {
@@ -1320,6 +1323,10 @@ Powered by QuickServe AI`
         try {
             offlineDb.initDatabase();
             log.info('[OFFLINE-DB] Database initialized');
+
+            // Initialize credential tables for offline authentication
+            secureCredentials.initCredentialTables();
+            log.info('[SECURE-CREDS] Credential tables initialized');
         } catch (error) {
             log.error(`[OFFLINE-DB] Failed to initialize database: ${error.message}`);
             // Don't throw - app should still work, just without persistence
@@ -1476,7 +1483,144 @@ Powered by QuickServe AI`
             }
         });
 
+        // ============================================================================
+        // OFFLINE CREDENTIAL STORAGE IPC HANDLERS
+        // ============================================================================
+
+        // Cache user credentials after successful online login (with hash from server)
+        ipcMain.handle('offline-credential-cache', async (event, { userId, passwordHash, userData }) => {
+            try {
+                const success = secureCredentials.cacheUserCredentials(userId, passwordHash, userData);
+                return { success };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to cache credentials: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Cache user credentials from plain password (hashes locally)
+        ipcMain.handle('offline-credential-cache-plain', async (event, { userId, plainPassword, userData }) => {
+            try {
+                const success = await secureCredentials.cacheUserCredentialsFromPlain(userId, plainPassword, userData);
+                return { success };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to cache credentials: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Verify password offline against cached credentials
+        ipcMain.handle('offline-password-verify', async (event, { username, password }) => {
+            try {
+                const result = await secureCredentials.verifyPasswordOffline(username, password);
+                return result;
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to verify password offline: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Check if a specific user has cached credentials
+        ipcMain.handle('offline-credential-status', async (event, userId) => {
+            try {
+                const status = secureCredentials.getOfflineCredentialStatus(userId);
+                return { success: true, ...status };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to get credential status: ${error.message}`);
+                return { success: false, error: error.message, hasCached: false };
+            }
+        });
+
+        // Get list of users with cached credentials
+        ipcMain.handle('offline-credential-users', async () => {
+            try {
+                const result = secureCredentials.getAvailableOfflineUsers();
+                return { success: true, ...result };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to get offline users: ${error.message}`);
+                return { success: false, error: error.message, hasAnyCached: false, users: [] };
+            }
+        });
+
+        // Clear cached credentials for a user
+        ipcMain.handle('offline-credential-clear', async (event, userId) => {
+            try {
+                const cleared = secureCredentials.clearUserCredentials(userId);
+                return { success: true, cleared };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to clear credentials: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Cache management password hash
+        ipcMain.handle('management-password-cache', async (event, passwordHash) => {
+            try {
+                const success = secureCredentials.cacheManagementPassword(passwordHash);
+                return { success };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to cache management password: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Cache management password from plain text
+        ipcMain.handle('management-password-cache-plain', async (event, plainPassword) => {
+            try {
+                const success = await secureCredentials.cacheManagementPasswordFromPlain(plainPassword);
+                return { success };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to cache management password: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
+        // Verify management password offline
+        ipcMain.handle('management-password-verify', async (event, password) => {
+            try {
+                const result = await secureCredentials.verifyManagementPasswordOffline(password);
+                return result;
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to verify management password: ${error.message}`);
+                return { authenticated: false, error: error.message };
+            }
+        });
+
+        // Check if management password is cached
+        ipcMain.handle('management-password-status', async () => {
+            try {
+                const status = secureCredentials.hasManagementPasswordCached();
+                return { success: true, ...status };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to get management password status: ${error.message}`);
+                return { success: false, error: error.message, hasCached: false };
+            }
+        });
+
+        // Get pending audit logs for sync
+        ipcMain.handle('offline-auth-audit-pending', async () => {
+            try {
+                const logs = secureCredentials.getPendingAuditLogs();
+                return { success: true, logs };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to get pending audit logs: ${error.message}`);
+                return { success: false, error: error.message, logs: [] };
+            }
+        });
+
+        // Mark audit logs as synced
+        ipcMain.handle('offline-auth-audit-mark-synced', async (event, ids) => {
+            try {
+                const success = secureCredentials.markAuditLogsSynced(ids);
+                return { success };
+            } catch (error) {
+                log.error(`[SECURE-CREDS] Failed to mark audit logs synced: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        });
+
         log.info('[OFFLINE-DB] IPC handlers registered');
+        log.info('[SECURE-CREDS] IPC handlers registered');
     }
 
     async initializePrinter() {
