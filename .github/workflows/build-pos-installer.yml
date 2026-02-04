@@ -1,8 +1,9 @@
 name: Build POS Desktop Installer
 
+# NOTE: This workflow is for manual builds only.
+# Releases are handled by cottage-tandoori-app's build-electron-installer.yml
+# which creates releases and uploads assets to this repo.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -185,31 +186,9 @@ jobs:
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           echo "Detected version: $version"
 
-      - name: Upload installer to release
-        if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./electron/release/Cottage Tandoori POS Setup ${{ steps.package-version.outputs.VERSION }}.exe
-          asset_name: Cottage-Tandoori-POS-Setup-${{ steps.package-version.outputs.VERSION }}.exe
-          asset_content_type: application/octet-stream
-
-      # Also upload latest.yml for auto-updater
-      - name: Upload latest.yml to release
-        if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./electron/release/latest.yml
-          asset_name: latest.yml
-          asset_content_type: text/yaml
-
-      - name: Upload installer as artifact (workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
+      # Upload as artifact for manual builds (workflow_dispatch)
+      # Releases are created by cottage-tandoori-app workflow
+      - name: Upload installer as artifact
         uses: actions/upload-artifact@v4
         with:
           name: pos-installer
