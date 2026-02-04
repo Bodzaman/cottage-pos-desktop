@@ -71,6 +71,11 @@ export default defineConfig(({ mode }) => {
       'react-loading-skeleton': path.resolve(frontendNodeModules, 'react-loading-skeleton'),
       'html2canvas': path.resolve(frontendNodeModules, 'html2canvas'),
       'qrcode.react': path.resolve(frontendNodeModules, 'qrcode.react'),
+      // i18next for multi-language support
+      'i18next': path.resolve(frontendNodeModules, 'i18next'),
+      'react-i18next': path.resolve(frontendNodeModules, 'react-i18next'),
+      'i18next-browser-languagedetector': path.resolve(frontendNodeModules, 'i18next-browser-languagedetector'),
+      'i18next-http-backend': path.resolve(frontendNodeModules, 'i18next-http-backend'),
     },
     // Force deduplication to ensure only one instance of react-router-dom is used
     // This prevents context isolation issues from nested dependencies
