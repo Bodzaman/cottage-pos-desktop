@@ -1,0 +1,175 @@
+{
+  "orderTypes": {
+    "dineIn": "ÎN LOCAL",
+    "takeAway": "LA PACHET",
+    "online": "ONLINE",
+    "reservations": "REZERVĂRI"
+  },
+  "orderModes": {
+    "waiting": "În așteptare",
+    "collection": "Ridicare",
+    "delivery": "Livrare"
+  },
+  "login": {
+    "title": "Autentificare POS",
+    "pinLogin": "Autentificare PIN",
+    "passwordLogin": "Autentificare parolă",
+    "enterPin": "Introdu PIN-ul",
+    "enterPassword": "Introdu parola",
+    "password": "Parolă",
+    "forgotPassword": "Ai uitat parola?",
+    "loginButton": "Autentificare",
+    "loggingIn": "Se autentifică...",
+    "invalidPin": "PIN invalid",
+    "invalidPassword": "Parolă invalidă",
+    "teamMode": "Echipă",
+    "adminMode": "Admin",
+    "backToLogin": "Înapoi la autentificare"
+  },
+  "navigation": {
+    "orders": "Comenzi",
+    "tables": "Mese",
+    "menu": "Meniu",
+    "settings": "Setări",
+    "logout": "Deconectare",
+    "quickTools": "Unelte rapide",
+    "kitchen": "Bucătărie",
+    "reconciliation": "Reconciliere",
+    "admin": "Portal Admin"
+  },
+  "orderPanel": {
+    "yourOrder": "Comanda ta",
+    "orderSummary": "Sumar comandă",
+    "subtotal": "Subtotal",
+    "serviceCharge": "Taxă serviciu",
+    "discount": "Reducere",
+    "total": "Total",
+    "tax": "TVA",
+    "items": "Articole",
+    "noItems": "Niciun articol în comandă",
+    "addItems": "Adaugă articole pentru a începe",
+    "clearOrder": "Golește comanda",
+    "holdOrder": "Pune în așteptare",
+    "sendToKitchen": "Trimite la bucătărie",
+    "printBill": "Printează nota",
+    "processPayment": "Procesează plata",
+    "orderNotes": "Note comandă",
+    "addNote": "Adaugă notă..."
+  },
+  "payment": {
+    "paymentMethod": "Metodă de plată",
+    "cash": "Numerar",
+    "card": "Card",
+    "payLater": "Plătește mai târziu",
+    "split": "Împarte plata",
+    "amountDue": "De plătit",
+    "amountReceived": "Primit",
+    "change": "Rest",
+    "processing": "Se procesează plata...",
+    "paymentComplete": "Plată finalizată",
+    "paymentFailed": "Plată eșuată",
+    "cardNotAvailable": "Plata cu cardul nu este disponibilă offline"
+  },
+  "tables": {
+    "selectTable": "Selectează masa",
+    "tableNumber": "Masa {{number}}",
+    "seats": "{{count}} locuri",
+    "available": "Disponibilă",
+    "occupied": "Ocupată",
+    "reserved": "Rezervată",
+    "openTable": "Deschide masa",
+    "closeTable": "Închide masa",
+    "transferTable": "Transferă masa",
+    "mergeOrders": "Unește comenzile",
+    "splitBill": "Împarte nota"
+  },
+  "customer": {
+    "customerDetails": "Detalii client",
+    "customerName": "Nume client",
+    "customerPhone": "Număr telefon",
+    "customerEmail": "Email",
+    "deliveryAddress": "Adresă livrare",
+    "postcode": "Cod poștal",
+    "specialInstructions": "Instrucțiuni speciale",
+    "newCustomer": "Client nou",
+    "existingCustomer": "Client existent",
+    "searchCustomer": "Caută client..."
+  },
+  "kitchen": {
+    "newOrders": "Comenzi noi",
+    "inProgress": "În pregătire",
+    "ready": "Gata",
+    "completed": "Finalizat",
+    "startPreparing": "Începe pregătirea",
+    "markReady": "Marchează gata",
+    "orderReceived": "Comandă primită",
+    "cookingTime": "Timp preparare",
+    "priorityOrder": "Comandă prioritară",
+    "bumpOrder": "Finalizează comanda"
+  },
+  "offline": {
+    "banner": "MOD OFFLINE",
+    "message": "Comenzile sunt salvate local și vor fi sincronizate când conexiunea este restabilită",
+    "pendingSync": "{{count}} comenzi așteaptă sincronizarea",
+    "syncing": "Se sincronizează comenzile...",
+    "syncComplete": "Toate comenzile sincronizate",
+    "syncFailed": "Sincronizare eșuată - se reîncearcă",
+    "backOnline": "Înapoi online!"
+  },
+  "printing": {
+    "printReceipt": "Printează chitanță",
+    "printKitchenTicket": "Printează tichet bucătărie",
+    "printBill": "Printează nota",
+    "printerNotFound": "Imprimantă negăsită",
+    "printingFailed": "Printare eșuată",
+    "printPreview": "Previzualizare print",
+    "selectPrinter": "Selectează imprimanta"
+  },
+  "onlineOrders": {
+    "newOrder": "Comandă online nouă",
+    "incomingOrders": "Comenzi primite",
+    "acceptOrder": "Acceptă comanda",
+    "rejectOrder": "Respinge comanda",
+    "prepTime": "Timp pregătire",
+    "customerNotified": "Client notificat",
+    "readyForPickup": "Gata de ridicare",
+    "outForDelivery": "În livrare",
+    "delivered": "Livrat"
+  },
+  "modifiers": {
+    "selectOptions": "Selectează opțiuni",
+    "required": "Obligatoriu",
+    "optional": "Opțional",
+    "maxSelections": "Selectează până la {{max}}",
+    "minSelections": "Selectează minim {{min}}",
+    "addModifier": "Adaugă modificator",
+    "noModifiers": "Niciun modificator disponibil"
+  },
+  "alerts": {
+    "orderSent": "Comandă trimisă la bucătărie",
+    "orderPrinted": "Comandă printată",
+    "orderHeld": "Comandă în așteptare",
+    "orderCleared": "Comandă golită",
+    "paymentReceived": "Plată primită",
+    "tableOpened": "Masă deschisă",
+    "tableClosed": "Masă închisă"
+  },
+  "menuCard": {
+    "add": "Adaugă",
+    "customise": "Personalizează",
+    "choose": "Alege",
+    "loading": "Se încarcă articolul din meniu...",
+    "includes": "Include:",
+    "completeSetMeal": "Meniu complet"
+  },
+  "footer": {
+    "ready": "Gata",
+    "syncing": "Sincronizare",
+    "offline": "Offline",
+    "internet": "Internet",
+    "payments": "Plăți",
+    "checking": "Verificare",
+    "queued": "În coadă",
+    "issues": "Probleme"
+  }
+}

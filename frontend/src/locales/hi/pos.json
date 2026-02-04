@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "डाइन इन",
+    "takeAway": "टेक अवे",
+    "online": "ऑनलाइन",
+    "reservations": "रिजर्वेशन"
+  },
+  "orderModes": {
+    "waiting": "प्रतीक्षा",
+    "collection": "कलेक्शन",
+    "delivery": "डिलीवरी"
+  },
+  "login": {
+    "title": "POS लॉगिन",
+    "pinLogin": "पिन लॉगिन",
+    "passwordLogin": "पासवर्ड लॉगिन",
+    "enterPin": "अपना पिन दर्ज करें",
+    "enterPassword": "पासवर्ड दर्ज करें",
+    "password": "पासवर्ड",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "loginButton": "लॉगिन",
+    "loggingIn": "लॉगिन हो रहा है...",
+    "invalidPin": "अमान्य पिन",
+    "invalidPassword": "अमान्य पासवर्ड",
+    "teamMode": "टीम",
+    "adminMode": "एडमिन",
+    "backToLogin": "लॉगिन पर वापस"
+  },
+  "navigation": {
+    "orders": "ऑर्डर",
+    "tables": "टेबल",
+    "menu": "मेनू",
+    "settings": "सेटिंग्स",
+    "logout": "लॉगआउट",
+    "quickTools": "क्विक टूल्स",
+    "kitchen": "किचन",
+    "reconciliation": "रिकॉन्सिलिएशन",
+    "admin": "एडमिन पोर्टल"
+  },
+  "orderPanel": {
+    "yourOrder": "आपका ऑर्डर",
+    "orderSummary": "ऑर्डर सारांश",
+    "subtotal": "उप-योग",
+    "serviceCharge": "सर्विस चार्ज",
+    "discount": "छूट",
+    "total": "कुल",
+    "tax": "टैक्स",
+    "items": "आइटम",
+    "noItems": "ऑर्डर में कोई आइटम नहीं",
+    "addItems": "शुरू करने के लिए आइटम जोड़ें",
+    "clearOrder": "ऑर्डर साफ़ करें",
+    "holdOrder": "ऑर्डर होल्ड करें",
+    "sendToKitchen": "किचन में भेजें",
+    "printBill": "बिल प्रिंट करें",
+    "processPayment": "भुगतान प्रोसेस करें",
+    "orderNotes": "ऑर्डर नोट्स",
+    "addNote": "नोट जोड़ें..."
+  },
+  "payment": {
+    "paymentMethod": "भुगतान विधि",
+    "cash": "नकद",
+    "card": "कार्ड",
+    "payLater": "बाद में भुगतान",
+    "split": "विभाजित भुगतान",
+    "amountDue": "देय राशि",
+    "amountReceived": "प्राप्त राशि",
+    "change": "वापसी",
+    "processing": "भुगतान प्रोसेस हो रहा है...",
+    "paymentComplete": "भुगतान पूर्ण",
+    "paymentFailed": "भुगतान विफल",
+    "cardNotAvailable": "ऑफलाइन में कार्ड भुगतान उपलब्ध नहीं"
+  },
+  "tables": {
+    "selectTable": "टेबल चुनें",
+    "tableNumber": "टेबल {{number}}",
+    "seats": "{{count}} सीटें",
+    "available": "उपलब्ध",
+    "occupied": "व्यस्त",
+    "reserved": "रिजर्व्ड",
+    "openTable": "टेबल खोलें",
+    "closeTable": "टेबल बंद करें",
+    "transferTable": "टेबल ट्रांसफर",
+    "mergeOrders": "ऑर्डर मर्ज करें",
+    "splitBill": "बिल विभाजित करें"
+  },
+  "customer": {
+    "customerDetails": "ग्राहक विवरण",
+    "customerName": "ग्राहक का नाम",
+    "customerPhone": "फोन नंबर",
+    "customerEmail": "ईमेल",
+    "deliveryAddress": "डिलीवरी पता",
+    "postcode": "पिनकोड",
+    "specialInstructions": "विशेष निर्देश",
+    "newCustomer": "नया ग्राहक",
+    "existingCustomer": "मौजूदा ग्राहक",
+    "searchCustomer": "ग्राहक खोजें...",
+    "startOrder": "ऑर्डर शुरू करें",
+    "tapToStart": "नया ऑर्डर शुरू करने के लिए टैप करें",
+    "customerInfo": "ग्राहक जानकारी"
+  },
+  "kitchen": {
+    "newOrders": "नए ऑर्डर",
+    "inProgress": "प्रगति में",
+    "ready": "तैयार",
+    "completed": "पूर्ण",
+    "startPreparing": "तैयारी शुरू करें",
+    "markReady": "तैयार चिह्नित करें",
+    "orderReceived": "ऑर्डर प्राप्त",
+    "cookingTime": "पकाने का समय",
+    "priorityOrder": "प्राथमिकता ऑर्डर",
+    "bumpOrder": "बंप ऑर्डर"
+  },
+  "offline": {
+    "banner": "ऑफलाइन मोड",
+    "message": "ऑर्डर स्थानीय रूप से सहेजे जाते हैं और कनेक्शन बहाल होने पर सिंक होंगे",
+    "pendingSync": "{{count}} ऑर्डर सिंक के लिए लंबित",
+    "syncing": "ऑर्डर सिंक हो रहे हैं...",
+    "syncComplete": "सभी ऑर्डर सिंक हो गए",
+    "syncFailed": "सिंक विफल - पुनः प्रयास होगा",
+    "backOnline": "वापस ऑनलाइन!"
+  },
+  "printing": {
+    "printReceipt": "रसीद प्रिंट करें",
+    "printKitchenTicket": "किचन टिकट प्रिंट करें",
+    "printBill": "बिल प्रिंट करें",
+    "printerNotFound": "प्रिंटर नहीं मिला",
+    "printingFailed": "प्रिंटिंग विफल",
+    "printPreview": "प्रिंट प्रीव्यू",
+    "selectPrinter": "प्रिंटर चुनें"
+  },
+  "onlineOrders": {
+    "newOrder": "नया ऑनलाइन ऑर्डर",
+    "incomingOrders": "आने वाले ऑर्डर",
+    "acceptOrder": "ऑर्डर स्वीकार करें",
+    "rejectOrder": "ऑर्डर अस्वीकार करें",
+    "prepTime": "तैयारी का समय",
+    "customerNotified": "ग्राहक को सूचित किया गया",
+    "readyForPickup": "पिकअप के लिए तैयार",
+    "outForDelivery": "डिलीवरी के लिए निकला",
+    "delivered": "डिलीवर किया गया"
+  },
+  "modifiers": {
+    "selectOptions": "विकल्प चुनें",
+    "required": "आवश्यक",
+    "optional": "वैकल्पिक",
+    "maxSelections": "अधिकतम {{max}} चुनें",
+    "minSelections": "कम से कम {{min}} चुनें",
+    "addModifier": "मॉडिफायर जोड़ें",
+    "noModifiers": "कोई मॉडिफायर उपलब्ध नहीं"
+  },
+  "alerts": {
+    "orderSent": "ऑर्डर किचन में भेजा गया",
+    "orderPrinted": "ऑर्डर प्रिंट किया गया",
+    "orderHeld": "ऑर्डर होल्ड किया गया",
+    "orderCleared": "ऑर्डर साफ़ किया गया",
+    "paymentReceived": "भुगतान प्राप्त",
+    "tableOpened": "टेबल खोला गया",
+    "tableClosed": "टेबल बंद किया गया"
+  },
+  "menuCard": {
+    "add": "जोड़ें",
+    "customise": "कस्टमाइज़ करें",
+    "choose": "चुनें",
+    "loading": "मेनू लोड हो रहा है...",
+    "includes": "शामिल है:",
+    "completeSetMeal": "पूर्ण सेट मील"
+  },
+  "footer": {
+    "ready": "तैयार",
+    "syncing": "सिंक हो रहा है",
+    "offline": "ऑफलाइन",
+    "internet": "इंटरनेट",
+    "payments": "भुगतान",
+    "checking": "जांच रहा है",
+    "queued": "कतार में",
+    "issues": "समस्याएं"
+  },
+  "toasts": {
+    "kioskModeActive": "कियोस्क मोड सक्रिय",
+    "kioskModeEnabled": "कियोस्क मोड चालू",
+    "kioskModeDisabled": "कियोस्क मोड बंद",
+    "appLocked": "ऐप फुलस्क्रीन में लॉक है",
+    "normalMode": "सामान्य विंडो मोड बहाल",
+    "orderCompleted": "ऑर्डर पूर्ण",
+    "tableAvailable": "टेबल अब उपलब्ध है",
+    "failedToLoad": "ऑर्डर लोड करने में विफल",
+    "addItemsFirst": "चेकआउट से पहले आइटम जोड़ें",
+    "itemAdded": "ऑर्डर में आइटम जोड़ा गया",
+    "itemRemoved": "ऑर्डर से आइटम हटाया गया",
+    "orderSaved": "ऑर्डर सहेजा गया",
+    "orderRestored": "ऑर्डर बहाल किया गया"
+  },
+  "restoreDialog": {
+    "title": "पिछला ऑर्डर बहाल करें?",
+    "foundOrder": "{{minutes}} मिनट पहले का सहेजा हुआ ऑर्डर मिला",
+    "items": "आइटम",
+    "type": "प्रकार",
+    "table": "टेबल",
+    "total": "कुल",
+    "startFresh": "नया शुरू करें",
+    "restoreOrder": "ऑर्डर बहाल करें"
+  }
+}

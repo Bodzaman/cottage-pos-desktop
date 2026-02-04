@@ -1,0 +1,55 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "menu": "Menu Management",
+    "orders": "Orders",
+    "customers": "Customers",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "website": "Website",
+    "media": "Media Library",
+    "printStudio": "Print Studio",
+    "aiStaff": "AI Staff"
+  },
+  "menu": {
+    "title": "Menu Management",
+    "addCategory": "Add Category",
+    "addItem": "Add Item",
+    "editItem": "Edit Item",
+    "deleteItem": "Delete Item",
+    "publish": "Publish Menu",
+    "unpublish": "Unpublish",
+    "categories": "Categories",
+    "items": "Items",
+    "modifiers": "Modifiers",
+    "availability": "Availability",
+    "pricing": "Pricing",
+    "allergens": "Allergens",
+    "dietary": "Dietary Info"
+  },
+  "reconciliation": {
+    "title": "Reconciliation",
+    "period": "Period",
+    "dineIn": "Dine In",
+    "takeaway": "Takeaway",
+    "online": "Online Orders",
+    "totalSales": "Total Sales",
+    "cashSales": "Cash Sales",
+    "cardSales": "Card Sales",
+    "zBalance": "Z Balance",
+    "banking": "End of Day Banking",
+    "bankingPassword": "Enter management password",
+    "exportReport": "Export Report"
+  },
+  "settings": {
+    "general": "General Settings",
+    "businessInfo": "Business Information",
+    "openingHours": "Opening Hours",
+    "serviceCharge": "Service Charge",
+    "deliverySettings": "Delivery Settings",
+    "paymentSettings": "Payment Settings",
+    "printerSettings": "Printer Settings",
+    "managementPassword": "Management Password",
+    "notifications": "Notifications"
+  }
+}

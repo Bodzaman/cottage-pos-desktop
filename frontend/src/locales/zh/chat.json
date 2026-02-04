@@ -1,0 +1,52 @@
+{
+  "placeholder": "Ask about our menu, dietary options, or place an order...",
+  "send": "Send message",
+  "voiceCallInProgress": "Voice call in progress...",
+  "quickQuestions": "Quick questions:",
+  "tryAsking": "Try asking:",
+  "welcome": {
+    "greeting": "Hi! I'm {{agentName}}",
+    "subtitle": "Your AI waiter - ask me anything about our menu"
+  },
+  "voice": {
+    "callAgent": "CALL {{agentName}}",
+    "connecting": "Connecting to {{agentName}}...",
+    "connected": "Connected - Start speaking",
+    "reconnecting": "Reconnecting...",
+    "speaking": "{{agentName}} is speaking...",
+    "hangUp": "Hang Up",
+    "demoTitle": "Voice Ordering Demo",
+    "demoSubtitle": "See how easy it is to order with {{agentName}}",
+    "signUpFree": "Sign Up Free to Try It",
+    "maybeLater": "Maybe Later",
+    "readyTitle": "Voice Ordering Ready",
+    "readySubtitle": "Your AI waiter is ready to take your order",
+    "termsDisclaimer": "By calling, you accept the Voice Ordering Terms and consent to recording for quality and training. Audio may vary; orders are confirmed before processing."
+  },
+  "cart": {
+    "title": "Your Order",
+    "copyOrder": "Copy order summary",
+    "copiedSuccess": "Order copied to clipboard",
+    "empty": "Your cart is empty",
+    "added": "Added",
+    "removed": "Removed"
+  },
+  "error": {
+    "connectionLost": "Connection lost. Please check your internet and try again.",
+    "aiBusy": "Our AI is busy right now. Please wait a moment and try again.",
+    "timeout": "The request took too long. Please try again.",
+    "serverError": "Something went wrong on our end. Please try again in a moment.",
+    "generic": "Sorry, something went wrong. Please try again."
+  },
+  "status": {
+    "sending": "Sending",
+    "sent": "Sent",
+    "delivered": "Delivered",
+    "failed": "Failed"
+  },
+  "session": {
+    "extended": "Session extended",
+    "ended": "Voice session ended due to time limit",
+    "continue": "Continue Session"
+  }
+}

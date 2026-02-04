@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "DINE IN",
+    "takeAway": "TAKE AWAY",
+    "online": "ONLINE",
+    "reservations": "RESERVATIONS"
+  },
+  "orderModes": {
+    "waiting": "Waiting",
+    "collection": "Collection",
+    "delivery": "Delivery"
+  },
+  "login": {
+    "title": "POS Login",
+    "pinLogin": "PIN Login",
+    "passwordLogin": "Password Login",
+    "enterPin": "Enter your PIN",
+    "enterPassword": "Enter password",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "loginButton": "Login",
+    "loggingIn": "Logging in...",
+    "invalidPin": "Invalid PIN",
+    "invalidPassword": "Invalid password",
+    "teamMode": "Team",
+    "adminMode": "Admin",
+    "backToLogin": "Back to Login"
+  },
+  "navigation": {
+    "orders": "Orders",
+    "tables": "Tables",
+    "menu": "Menu",
+    "settings": "Settings",
+    "logout": "Logout",
+    "quickTools": "Quick Tools",
+    "kitchen": "Kitchen",
+    "reconciliation": "Reconciliation",
+    "admin": "Admin Portal"
+  },
+  "orderPanel": {
+    "yourOrder": "Your Order",
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "serviceCharge": "Service Charge",
+    "discount": "Discount",
+    "total": "Total",
+    "tax": "Tax",
+    "items": "Items",
+    "noItems": "No items in order",
+    "addItems": "Add items to start",
+    "clearOrder": "Clear Order",
+    "holdOrder": "Hold Order",
+    "sendToKitchen": "Send to Kitchen",
+    "printBill": "Print Bill",
+    "processPayment": "Process Payment",
+    "orderNotes": "Order Notes",
+    "addNote": "Add note..."
+  },
+  "payment": {
+    "paymentMethod": "Payment Method",
+    "cash": "Cash",
+    "card": "Card",
+    "payLater": "Pay Later",
+    "split": "Split Payment",
+    "amountDue": "Amount Due",
+    "amountReceived": "Amount Received",
+    "change": "Change",
+    "processing": "Processing payment...",
+    "paymentComplete": "Payment Complete",
+    "paymentFailed": "Payment Failed",
+    "cardNotAvailable": "Card payment not available offline"
+  },
+  "tables": {
+    "selectTable": "Select Table",
+    "tableNumber": "Table {{number}}",
+    "seats": "{{count}} seats",
+    "available": "Available",
+    "occupied": "Occupied",
+    "reserved": "Reserved",
+    "openTable": "Open Table",
+    "closeTable": "Close Table",
+    "transferTable": "Transfer Table",
+    "mergeOrders": "Merge Orders",
+    "splitBill": "Split Bill"
+  },
+  "customer": {
+    "customerDetails": "Customer Details",
+    "customerName": "Customer Name",
+    "customerPhone": "Phone Number",
+    "customerEmail": "Email",
+    "deliveryAddress": "Delivery Address",
+    "postcode": "Postcode",
+    "specialInstructions": "Special Instructions",
+    "newCustomer": "New Customer",
+    "existingCustomer": "Existing Customer",
+    "searchCustomer": "Search customer...",
+    "startOrder": "Start Order",
+    "tapToStart": "Tap to start new order",
+    "customerInfo": "Customer Info"
+  },
+  "kitchen": {
+    "newOrders": "New Orders",
+    "inProgress": "In Progress",
+    "ready": "Ready",
+    "completed": "Completed",
+    "startPreparing": "Start Preparing",
+    "markReady": "Mark Ready",
+    "orderReceived": "Order Received",
+    "cookingTime": "Cooking Time",
+    "priorityOrder": "Priority Order",
+    "bumpOrder": "Bump Order"
+  },
+  "offline": {
+    "banner": "OFFLINE MODE",
+    "message": "Orders are saved locally and will sync when connection is restored",
+    "pendingSync": "{{count}} orders pending sync",
+    "syncing": "Syncing orders...",
+    "syncComplete": "All orders synced",
+    "syncFailed": "Sync failed - will retry",
+    "backOnline": "Back online!"
+  },
+  "printing": {
+    "printReceipt": "Print Receipt",
+    "printKitchenTicket": "Print Kitchen Ticket",
+    "printBill": "Print Bill",
+    "printerNotFound": "Printer not found",
+    "printingFailed": "Printing failed",
+    "printPreview": "Print Preview",
+    "selectPrinter": "Select Printer"
+  },
+  "onlineOrders": {
+    "newOrder": "New Online Order",
+    "incomingOrders": "Incoming Orders",
+    "acceptOrder": "Accept Order",
+    "rejectOrder": "Reject Order",
+    "prepTime": "Prep Time",
+    "customerNotified": "Customer Notified",
+    "readyForPickup": "Ready for Pickup",
+    "outForDelivery": "Out for Delivery",
+    "delivered": "Delivered"
+  },
+  "modifiers": {
+    "selectOptions": "Select Options",
+    "required": "Required",
+    "optional": "Optional",
+    "maxSelections": "Select up to {{max}}",
+    "minSelections": "Select at least {{min}}",
+    "addModifier": "Add Modifier",
+    "noModifiers": "No modifiers available"
+  },
+  "alerts": {
+    "orderSent": "Order sent to kitchen",
+    "orderPrinted": "Order printed",
+    "orderHeld": "Order held",
+    "orderCleared": "Order cleared",
+    "paymentReceived": "Payment received",
+    "tableOpened": "Table opened",
+    "tableClosed": "Table closed"
+  },
+  "menuCard": {
+    "add": "Add",
+    "customise": "Customise",
+    "choose": "Choose",
+    "loading": "Loading menu item...",
+    "includes": "Includes:",
+    "completeSetMeal": "Complete Set Meal"
+  },
+  "footer": {
+    "ready": "Ready",
+    "syncing": "Syncing",
+    "offline": "Offline",
+    "internet": "Internet",
+    "payments": "Payments",
+    "checking": "Checking",
+    "queued": "Queued",
+    "issues": "Issues"
+  },
+  "toasts": {
+    "kioskModeActive": "Kiosk mode active",
+    "kioskModeEnabled": "Kiosk mode enabled",
+    "kioskModeDisabled": "Kiosk mode disabled",
+    "appLocked": "App is now locked to fullscreen",
+    "normalMode": "Normal window mode restored",
+    "orderCompleted": "Order completed",
+    "tableAvailable": "Table is now available",
+    "failedToLoad": "Failed to load order",
+    "addItemsFirst": "Add items before checkout",
+    "itemAdded": "Item added to order",
+    "itemRemoved": "Item removed from order",
+    "orderSaved": "Order saved",
+    "orderRestored": "Order restored"
+  },
+  "restoreDialog": {
+    "title": "Restore Previous Order?",
+    "foundOrder": "Found a saved order from {{minutes}} minutes ago",
+    "items": "Items",
+    "type": "Type",
+    "table": "Table",
+    "total": "Total",
+    "startFresh": "Start Fresh",
+    "restoreOrder": "Restore Order"
+  }
+}

@@ -18,8 +18,8 @@ import { ThemeProvider } from '../frontend/src/internal-components/ThemeProvider
 import { DEFAULT_THEME } from '../frontend/src/constants/default-theme';
 import '../frontend/src/index.css';
 import '../frontend/src/polyfills/react-polyfill';
-// Initialize i18n for Electron (must be imported before any component that uses translations)
-import '../frontend/src/utils/i18nConfig';
+// Initialize i18n for Electron with static imports (required for file:// protocol on Windows)
+import './lib/i18nElectron';
 
 // Lazy load POS pages - staff/admin access in Electron
 const POSDesktop = lazy(() => import('../frontend/src/pages/POSDesktop'));

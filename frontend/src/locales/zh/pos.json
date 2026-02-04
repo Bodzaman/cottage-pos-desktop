@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "堂食",
+    "takeAway": "外带",
+    "online": "在线",
+    "reservations": "预订"
+  },
+  "orderModes": {
+    "waiting": "等候",
+    "collection": "自取",
+    "delivery": "外送"
+  },
+  "login": {
+    "title": "POS登录",
+    "pinLogin": "PIN登录",
+    "passwordLogin": "密码登录",
+    "enterPin": "请输入PIN码",
+    "enterPassword": "请输入密码",
+    "password": "密码",
+    "forgotPassword": "忘记密码？",
+    "loginButton": "登录",
+    "loggingIn": "登录中...",
+    "invalidPin": "PIN码错误",
+    "invalidPassword": "密码错误",
+    "teamMode": "团队",
+    "adminMode": "管理员",
+    "backToLogin": "返回登录"
+  },
+  "navigation": {
+    "orders": "订单",
+    "tables": "餐桌",
+    "menu": "菜单",
+    "settings": "设置",
+    "logout": "退出登录",
+    "quickTools": "快捷工具",
+    "kitchen": "厨房",
+    "reconciliation": "对账",
+    "admin": "管理后台"
+  },
+  "orderPanel": {
+    "yourOrder": "您的订单",
+    "orderSummary": "订单摘要",
+    "subtotal": "小计",
+    "serviceCharge": "服务费",
+    "discount": "折扣",
+    "total": "合计",
+    "tax": "税费",
+    "items": "项目",
+    "noItems": "订单中没有项目",
+    "addItems": "添加项目以开始",
+    "clearOrder": "清空订单",
+    "holdOrder": "暂存订单",
+    "sendToKitchen": "发送到厨房",
+    "printBill": "打印账单",
+    "processPayment": "处理付款",
+    "orderNotes": "订单备注",
+    "addNote": "添加备注..."
+  },
+  "payment": {
+    "paymentMethod": "付款方式",
+    "cash": "现金",
+    "card": "卡",
+    "payLater": "稍后付款",
+    "split": "分账付款",
+    "amountDue": "应付金额",
+    "amountReceived": "已收金额",
+    "change": "找零",
+    "processing": "处理付款中...",
+    "paymentComplete": "付款完成",
+    "paymentFailed": "付款失败",
+    "cardNotAvailable": "离线模式下无法使用卡支付"
+  },
+  "tables": {
+    "selectTable": "选择餐桌",
+    "tableNumber": "{{number}}号桌",
+    "seats": "{{count}}个座位",
+    "available": "空闲",
+    "occupied": "使用中",
+    "reserved": "已预订",
+    "openTable": "开台",
+    "closeTable": "结账",
+    "transferTable": "转台",
+    "mergeOrders": "合并订单",
+    "splitBill": "分单"
+  },
+  "customer": {
+    "customerDetails": "顾客信息",
+    "customerName": "顾客姓名",
+    "customerPhone": "电话号码",
+    "customerEmail": "邮箱",
+    "deliveryAddress": "配送地址",
+    "postcode": "邮编",
+    "specialInstructions": "特殊要求",
+    "newCustomer": "新顾客",
+    "existingCustomer": "老顾客",
+    "searchCustomer": "搜索顾客...",
+    "startOrder": "开始点餐",
+    "tapToStart": "点击开始新订单",
+    "customerInfo": "顾客信息"
+  },
+  "kitchen": {
+    "newOrders": "新订单",
+    "inProgress": "制作中",
+    "ready": "已完成",
+    "completed": "已完成",
+    "startPreparing": "开始制作",
+    "markReady": "标记完成",
+    "orderReceived": "已接单",
+    "cookingTime": "烹饪时间",
+    "priorityOrder": "加急订单",
+    "bumpOrder": "完成订单"
+  },
+  "offline": {
+    "banner": "离线模式",
+    "message": "订单已本地保存，连接恢复后将自动同步",
+    "pendingSync": "{{count}}个订单等待同步",
+    "syncing": "正在同步订单...",
+    "syncComplete": "所有订单已同步",
+    "syncFailed": "同步失败 - 将重试",
+    "backOnline": "已恢复在线！"
+  },
+  "printing": {
+    "printReceipt": "打印收据",
+    "printKitchenTicket": "打印厨房小票",
+    "printBill": "打印账单",
+    "printerNotFound": "未找到打印机",
+    "printingFailed": "打印失败",
+    "printPreview": "打印预览",
+    "selectPrinter": "选择打印机"
+  },
+  "onlineOrders": {
+    "newOrder": "新在线订单",
+    "incomingOrders": "新进订单",
+    "acceptOrder": "接受订单",
+    "rejectOrder": "拒绝订单",
+    "prepTime": "准备时间",
+    "customerNotified": "已通知顾客",
+    "readyForPickup": "可自取",
+    "outForDelivery": "配送中",
+    "delivered": "已送达"
+  },
+  "modifiers": {
+    "selectOptions": "选择选项",
+    "required": "必选",
+    "optional": "可选",
+    "maxSelections": "最多选择{{max}}项",
+    "minSelections": "至少选择{{min}}项",
+    "addModifier": "添加配料",
+    "noModifiers": "没有可用配料"
+  },
+  "alerts": {
+    "orderSent": "订单已发送到厨房",
+    "orderPrinted": "订单已打印",
+    "orderHeld": "订单已暂存",
+    "orderCleared": "订单已清空",
+    "paymentReceived": "已收款",
+    "tableOpened": "已开台",
+    "tableClosed": "已结账"
+  },
+  "menuCard": {
+    "add": "添加",
+    "customise": "自定义",
+    "choose": "选择",
+    "loading": "加载菜单中...",
+    "includes": "包含：",
+    "completeSetMeal": "完整套餐"
+  },
+  "footer": {
+    "ready": "就绪",
+    "syncing": "同步中",
+    "offline": "离线",
+    "internet": "网络",
+    "payments": "付款",
+    "checking": "检查中",
+    "queued": "排队中",
+    "issues": "问题"
+  },
+  "toasts": {
+    "kioskModeActive": "自助模式已激活",
+    "kioskModeEnabled": "自助模式已开启",
+    "kioskModeDisabled": "自助模式已关闭",
+    "appLocked": "应用已锁定为全屏",
+    "normalMode": "已恢复正常窗口模式",
+    "orderCompleted": "订单完成",
+    "tableAvailable": "餐桌现已可用",
+    "failedToLoad": "加载订单失败",
+    "addItemsFirst": "请先添加项目再结账",
+    "itemAdded": "已添加到订单",
+    "itemRemoved": "已从订单中移除",
+    "orderSaved": "订单已保存",
+    "orderRestored": "订单已恢复"
+  },
+  "restoreDialog": {
+    "title": "恢复之前的订单？",
+    "foundOrder": "发现{{minutes}}分钟前的保存订单",
+    "items": "项目",
+    "type": "类型",
+    "table": "餐桌",
+    "total": "合计",
+    "startFresh": "重新开始",
+    "restoreOrder": "恢复订单"
+  }
+}

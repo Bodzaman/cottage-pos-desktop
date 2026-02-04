@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "RESTORANDA",
+    "takeAway": "PAKET",
+    "online": "ONLİNE",
+    "reservations": "REZERVASYONLAR"
+  },
+  "orderModes": {
+    "waiting": "Bekliyor",
+    "collection": "Teslim Alma",
+    "delivery": "Teslimat"
+  },
+  "login": {
+    "title": "POS Girişi",
+    "pinLogin": "PIN ile Giriş",
+    "passwordLogin": "Şifre ile Giriş",
+    "enterPin": "PIN'inizi girin",
+    "enterPassword": "Şifrenizi girin",
+    "password": "Şifre",
+    "forgotPassword": "Şifremi Unuttum?",
+    "loginButton": "Giriş Yap",
+    "loggingIn": "Giriş yapılıyor...",
+    "invalidPin": "Geçersiz PIN",
+    "invalidPassword": "Geçersiz şifre",
+    "teamMode": "Ekip",
+    "adminMode": "Yönetici",
+    "backToLogin": "Girişe Dön"
+  },
+  "navigation": {
+    "orders": "Siparişler",
+    "tables": "Masalar",
+    "menu": "Menü",
+    "settings": "Ayarlar",
+    "logout": "Çıkış Yap",
+    "quickTools": "Hızlı Araçlar",
+    "kitchen": "Mutfak",
+    "reconciliation": "Mutabakat",
+    "admin": "Yönetici Paneli"
+  },
+  "orderPanel": {
+    "yourOrder": "Siparişiniz",
+    "orderSummary": "Sipariş Özeti",
+    "subtotal": "Ara Toplam",
+    "serviceCharge": "Servis Ücreti",
+    "discount": "İndirim",
+    "total": "Toplam",
+    "tax": "KDV",
+    "items": "Ürünler",
+    "noItems": "Siparişte ürün yok",
+    "addItems": "Başlamak için ürün ekleyin",
+    "clearOrder": "Siparişi Temizle",
+    "holdOrder": "Siparişi Beklet",
+    "sendToKitchen": "Mutfağa Gönder",
+    "printBill": "Hesabı Yazdır",
+    "processPayment": "Ödeme Al",
+    "orderNotes": "Sipariş Notları",
+    "addNote": "Not ekle..."
+  },
+  "payment": {
+    "paymentMethod": "Ödeme Yöntemi",
+    "cash": "Nakit",
+    "card": "Kart",
+    "payLater": "Sonra Öde",
+    "split": "Bölünmüş Ödeme",
+    "amountDue": "Ödenecek Tutar",
+    "amountReceived": "Alınan Tutar",
+    "change": "Para Üstü",
+    "processing": "Ödeme işleniyor...",
+    "paymentComplete": "Ödeme Tamamlandı",
+    "paymentFailed": "Ödeme Başarısız",
+    "cardNotAvailable": "Çevrimdışı modda kart ödemesi yapılamaz"
+  },
+  "tables": {
+    "selectTable": "Masa Seç",
+    "tableNumber": "Masa {{number}}",
+    "seats": "{{count}} kişilik",
+    "available": "Müsait",
+    "occupied": "Dolu",
+    "reserved": "Rezerveli",
+    "openTable": "Masa Aç",
+    "closeTable": "Masa Kapat",
+    "transferTable": "Masa Aktar",
+    "mergeOrders": "Siparişleri Birleştir",
+    "splitBill": "Hesabı Böl"
+  },
+  "customer": {
+    "customerDetails": "Müşteri Bilgileri",
+    "customerName": "Müşteri Adı",
+    "customerPhone": "Telefon Numarası",
+    "customerEmail": "E-posta",
+    "deliveryAddress": "Teslimat Adresi",
+    "postcode": "Posta Kodu",
+    "specialInstructions": "Özel İstekler",
+    "newCustomer": "Yeni Müşteri",
+    "existingCustomer": "Mevcut Müşteri",
+    "searchCustomer": "Müşteri ara...",
+    "startOrder": "Sipariş Başlat",
+    "tapToStart": "Yeni sipariş için dokunun",
+    "customerInfo": "Müşteri Bilgisi"
+  },
+  "kitchen": {
+    "newOrders": "Yeni Siparişler",
+    "inProgress": "Hazırlanıyor",
+    "ready": "Hazır",
+    "completed": "Tamamlandı",
+    "startPreparing": "Hazırlamaya Başla",
+    "markReady": "Hazır İşaretle",
+    "orderReceived": "Sipariş Alındı",
+    "cookingTime": "Pişirme Süresi",
+    "priorityOrder": "Öncelikli Sipariş",
+    "bumpOrder": "Siparişi Tamamla"
+  },
+  "offline": {
+    "banner": "ÇEVRİMDIŞI MOD",
+    "message": "Siparişler yerel olarak kaydedildi ve bağlantı geri geldiğinde senkronize edilecek",
+    "pendingSync": "{{count}} sipariş senkronizasyon bekliyor",
+    "syncing": "Siparişler senkronize ediliyor...",
+    "syncComplete": "Tüm siparişler senkronize edildi",
+    "syncFailed": "Senkronizasyon başarısız - tekrar denenecek",
+    "backOnline": "Tekrar çevrimiçi!"
+  },
+  "printing": {
+    "printReceipt": "Fiş Yazdır",
+    "printKitchenTicket": "Mutfak Fişi Yazdır",
+    "printBill": "Hesabı Yazdır",
+    "printerNotFound": "Yazıcı bulunamadı",
+    "printingFailed": "Yazdırma başarısız",
+    "printPreview": "Baskı Önizleme",
+    "selectPrinter": "Yazıcı Seç"
+  },
+  "onlineOrders": {
+    "newOrder": "Yeni Online Sipariş",
+    "incomingOrders": "Gelen Siparişler",
+    "acceptOrder": "Siparişi Kabul Et",
+    "rejectOrder": "Siparişi Reddet",
+    "prepTime": "Hazırlık Süresi",
+    "customerNotified": "Müşteri Bilgilendirildi",
+    "readyForPickup": "Teslim Almaya Hazır",
+    "outForDelivery": "Yolda",
+    "delivered": "Teslim Edildi"
+  },
+  "modifiers": {
+    "selectOptions": "Seçenekleri Seç",
+    "required": "Zorunlu",
+    "optional": "İsteğe Bağlı",
+    "maxSelections": "En fazla {{max}} seçin",
+    "minSelections": "En az {{min}} seçin",
+    "addModifier": "Ek Malzeme Ekle",
+    "noModifiers": "Ek malzeme yok"
+  },
+  "alerts": {
+    "orderSent": "Sipariş mutfağa gönderildi",
+    "orderPrinted": "Sipariş yazdırıldı",
+    "orderHeld": "Sipariş bekletildi",
+    "orderCleared": "Sipariş temizlendi",
+    "paymentReceived": "Ödeme alındı",
+    "tableOpened": "Masa açıldı",
+    "tableClosed": "Masa kapandı"
+  },
+  "menuCard": {
+    "add": "Ekle",
+    "customise": "Özelleştir",
+    "choose": "Seç",
+    "loading": "Menü yükleniyor...",
+    "includes": "İçerir:",
+    "completeSetMeal": "Komple Menü"
+  },
+  "footer": {
+    "ready": "Hazır",
+    "syncing": "Senkronize ediyor",
+    "offline": "Çevrimdışı",
+    "internet": "İnternet",
+    "payments": "Ödemeler",
+    "checking": "Kontrol ediliyor",
+    "queued": "Sırada",
+    "issues": "Sorunlar"
+  },
+  "toasts": {
+    "kioskModeActive": "Kiosk modu aktif",
+    "kioskModeEnabled": "Kiosk modu açıldı",
+    "kioskModeDisabled": "Kiosk modu kapatıldı",
+    "appLocked": "Uygulama tam ekrana kilitlendi",
+    "normalMode": "Normal pencere modu geri yüklendi",
+    "orderCompleted": "Sipariş tamamlandı",
+    "tableAvailable": "Masa artık müsait",
+    "failedToLoad": "Sipariş yüklenemedi",
+    "addItemsFirst": "Ödeme öncesi ürün ekleyin",
+    "itemAdded": "Siparişe ürün eklendi",
+    "itemRemoved": "Siparişten ürün kaldırıldı",
+    "orderSaved": "Sipariş kaydedildi",
+    "orderRestored": "Sipariş geri yüklendi"
+  },
+  "restoreDialog": {
+    "title": "Önceki sipariş geri yüklensin mi?",
+    "foundOrder": "{{minutes}} dakika önceki kaydedilmiş sipariş bulundu",
+    "items": "Ürünler",
+    "type": "Tür",
+    "table": "Masa",
+    "total": "Toplam",
+    "startFresh": "Yeniden Başla",
+    "restoreOrder": "Siparişi Geri Yükle"
+  }
+}

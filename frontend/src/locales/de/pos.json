@@ -1,0 +1,175 @@
+{
+  "orderTypes": {
+    "dineIn": "VOR ORT",
+    "takeAway": "ZUM MITNEHMEN",
+    "online": "ONLINE",
+    "reservations": "RESERVIERUNGEN"
+  },
+  "orderModes": {
+    "waiting": "Wartend",
+    "collection": "Abholung",
+    "delivery": "Lieferung"
+  },
+  "login": {
+    "title": "POS-Anmeldung",
+    "pinLogin": "PIN-Anmeldung",
+    "passwordLogin": "Passwort-Anmeldung",
+    "enterPin": "Geben Sie Ihre PIN ein",
+    "enterPassword": "Passwort eingeben",
+    "password": "Passwort",
+    "forgotPassword": "Passwort vergessen?",
+    "loginButton": "Anmelden",
+    "loggingIn": "Anmeldung...",
+    "invalidPin": "Ungültige PIN",
+    "invalidPassword": "Ungültiges Passwort",
+    "teamMode": "Team",
+    "adminMode": "Admin",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "navigation": {
+    "orders": "Bestellungen",
+    "tables": "Tische",
+    "menu": "Speisekarte",
+    "settings": "Einstellungen",
+    "logout": "Abmelden",
+    "quickTools": "Schnellwerkzeuge",
+    "kitchen": "Küche",
+    "reconciliation": "Abrechnung",
+    "admin": "Admin-Portal"
+  },
+  "orderPanel": {
+    "yourOrder": "Ihre Bestellung",
+    "orderSummary": "Bestellübersicht",
+    "subtotal": "Zwischensumme",
+    "serviceCharge": "Servicegebühr",
+    "discount": "Rabatt",
+    "total": "Gesamt",
+    "tax": "MwSt.",
+    "items": "Artikel",
+    "noItems": "Keine Artikel in der Bestellung",
+    "addItems": "Artikel hinzufügen um zu beginnen",
+    "clearOrder": "Bestellung löschen",
+    "holdOrder": "Bestellung halten",
+    "sendToKitchen": "An Küche senden",
+    "printBill": "Rechnung drucken",
+    "processPayment": "Zahlung verarbeiten",
+    "orderNotes": "Bestellnotizen",
+    "addNote": "Notiz hinzufügen..."
+  },
+  "payment": {
+    "paymentMethod": "Zahlungsmethode",
+    "cash": "Bargeld",
+    "card": "Karte",
+    "payLater": "Später bezahlen",
+    "split": "Geteilte Zahlung",
+    "amountDue": "Fälliger Betrag",
+    "amountReceived": "Erhaltener Betrag",
+    "change": "Wechselgeld",
+    "processing": "Zahlung wird verarbeitet...",
+    "paymentComplete": "Zahlung abgeschlossen",
+    "paymentFailed": "Zahlung fehlgeschlagen",
+    "cardNotAvailable": "Kartenzahlung offline nicht verfügbar"
+  },
+  "tables": {
+    "selectTable": "Tisch auswählen",
+    "tableNumber": "Tisch {{number}}",
+    "seats": "{{count}} Plätze",
+    "available": "Verfügbar",
+    "occupied": "Besetzt",
+    "reserved": "Reserviert",
+    "openTable": "Tisch öffnen",
+    "closeTable": "Tisch schließen",
+    "transferTable": "Tisch übertragen",
+    "mergeOrders": "Bestellungen zusammenführen",
+    "splitBill": "Rechnung teilen"
+  },
+  "customer": {
+    "customerDetails": "Kundendaten",
+    "customerName": "Kundenname",
+    "customerPhone": "Telefonnummer",
+    "customerEmail": "E-Mail",
+    "deliveryAddress": "Lieferadresse",
+    "postcode": "Postleitzahl",
+    "specialInstructions": "Besondere Anweisungen",
+    "newCustomer": "Neuer Kunde",
+    "existingCustomer": "Bestehender Kunde",
+    "searchCustomer": "Kunden suchen..."
+  },
+  "kitchen": {
+    "newOrders": "Neue Bestellungen",
+    "inProgress": "In Bearbeitung",
+    "ready": "Bereit",
+    "completed": "Abgeschlossen",
+    "startPreparing": "Zubereitung starten",
+    "markReady": "Als fertig markieren",
+    "orderReceived": "Bestellung eingegangen",
+    "cookingTime": "Kochzeit",
+    "priorityOrder": "Prioritätsbestellung",
+    "bumpOrder": "Bestellung abschließen"
+  },
+  "offline": {
+    "banner": "OFFLINE-MODUS",
+    "message": "Bestellungen werden lokal gespeichert und synchronisiert wenn die Verbindung wiederhergestellt ist",
+    "pendingSync": "{{count}} Bestellungen warten auf Synchronisierung",
+    "syncing": "Bestellungen werden synchronisiert...",
+    "syncComplete": "Alle Bestellungen synchronisiert",
+    "syncFailed": "Synchronisierung fehlgeschlagen - wird erneut versucht",
+    "backOnline": "Wieder online!"
+  },
+  "printing": {
+    "printReceipt": "Beleg drucken",
+    "printKitchenTicket": "Küchenbon drucken",
+    "printBill": "Rechnung drucken",
+    "printerNotFound": "Drucker nicht gefunden",
+    "printingFailed": "Drucken fehlgeschlagen",
+    "printPreview": "Druckvorschau",
+    "selectPrinter": "Drucker auswählen"
+  },
+  "onlineOrders": {
+    "newOrder": "Neue Online-Bestellung",
+    "incomingOrders": "Eingehende Bestellungen",
+    "acceptOrder": "Bestellung annehmen",
+    "rejectOrder": "Bestellung ablehnen",
+    "prepTime": "Vorbereitungszeit",
+    "customerNotified": "Kunde benachrichtigt",
+    "readyForPickup": "Bereit zur Abholung",
+    "outForDelivery": "Unterwegs zur Lieferung",
+    "delivered": "Geliefert"
+  },
+  "modifiers": {
+    "selectOptions": "Optionen auswählen",
+    "required": "Erforderlich",
+    "optional": "Optional",
+    "maxSelections": "Wählen Sie bis zu {{max}}",
+    "minSelections": "Wählen Sie mindestens {{min}}",
+    "addModifier": "Modifikator hinzufügen",
+    "noModifiers": "Keine Modifikatoren verfügbar"
+  },
+  "alerts": {
+    "orderSent": "Bestellung an Küche gesendet",
+    "orderPrinted": "Bestellung gedruckt",
+    "orderHeld": "Bestellung gehalten",
+    "orderCleared": "Bestellung gelöscht",
+    "paymentReceived": "Zahlung erhalten",
+    "tableOpened": "Tisch geöffnet",
+    "tableClosed": "Tisch geschlossen"
+  },
+  "menuCard": {
+    "add": "Hinzufügen",
+    "customise": "Anpassen",
+    "choose": "Wählen",
+    "loading": "Menüeintrag wird geladen...",
+    "includes": "Enthält:",
+    "completeSetMeal": "Komplettes Menü"
+  },
+  "footer": {
+    "ready": "Bereit",
+    "syncing": "Synchronisieren",
+    "offline": "Offline",
+    "internet": "Internet",
+    "payments": "Zahlungen",
+    "checking": "Prüfen",
+    "queued": "Warteschlange",
+    "issues": "Probleme"
+  }
+}

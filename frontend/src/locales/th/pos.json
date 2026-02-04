@@ -1,0 +1,175 @@
+{
+  "orderTypes": {
+    "dineIn": "ทานที่ร้าน",
+    "takeAway": "สั่งกลับบ้าน",
+    "online": "ออนไลน์",
+    "reservations": "จองโต๊ะ"
+  },
+  "orderModes": {
+    "waiting": "รอ",
+    "collection": "รับเอง",
+    "delivery": "จัดส่ง"
+  },
+  "login": {
+    "title": "เข้าสู่ระบบ POS",
+    "pinLogin": "เข้าสู่ระบบด้วย PIN",
+    "passwordLogin": "เข้าสู่ระบบด้วยรหัสผ่าน",
+    "enterPin": "กรอก PIN ของคุณ",
+    "enterPassword": "กรอกรหัสผ่าน",
+    "password": "รหัสผ่าน",
+    "forgotPassword": "ลืมรหัสผ่าน?",
+    "loginButton": "เข้าสู่ระบบ",
+    "loggingIn": "กำลังเข้าสู่ระบบ...",
+    "invalidPin": "PIN ไม่ถูกต้อง",
+    "invalidPassword": "รหัสผ่านไม่ถูกต้อง",
+    "teamMode": "ทีม",
+    "adminMode": "แอดมิน",
+    "backToLogin": "กลับไปหน้าเข้าสู่ระบบ"
+  },
+  "navigation": {
+    "orders": "ออเดอร์",
+    "tables": "โต๊ะ",
+    "menu": "เมนู",
+    "settings": "การตั้งค่า",
+    "logout": "ออกจากระบบ",
+    "quickTools": "เครื่องมือด่วน",
+    "kitchen": "ครัว",
+    "reconciliation": "สรุปยอด",
+    "admin": "พอร์ทัลแอดมิน"
+  },
+  "orderPanel": {
+    "yourOrder": "ออเดอร์ของคุณ",
+    "orderSummary": "สรุปออเดอร์",
+    "subtotal": "รวมย่อย",
+    "serviceCharge": "ค่าบริการ",
+    "discount": "ส่วนลด",
+    "total": "รวม",
+    "tax": "ภาษี",
+    "items": "รายการ",
+    "noItems": "ไม่มีรายการในออเดอร์",
+    "addItems": "เพิ่มรายการเพื่อเริ่มต้น",
+    "clearOrder": "ล้างออเดอร์",
+    "holdOrder": "พักออเดอร์",
+    "sendToKitchen": "ส่งไปครัว",
+    "printBill": "พิมพ์บิล",
+    "processPayment": "ดำเนินการชำระเงิน",
+    "orderNotes": "หมายเหตุออเดอร์",
+    "addNote": "เพิ่มหมายเหตุ..."
+  },
+  "payment": {
+    "paymentMethod": "วิธีชำระเงิน",
+    "cash": "เงินสด",
+    "card": "บัตร",
+    "payLater": "จ่ายทีหลัง",
+    "split": "แยกชำระ",
+    "amountDue": "ยอดค้างชำระ",
+    "amountReceived": "ยอดที่รับ",
+    "change": "เงินทอน",
+    "processing": "กำลังดำเนินการชำระเงิน...",
+    "paymentComplete": "ชำระเงินเสร็จสิ้น",
+    "paymentFailed": "ชำระเงินล้มเหลว",
+    "cardNotAvailable": "ไม่สามารถชำระด้วยบัตรขณะออฟไลน์"
+  },
+  "tables": {
+    "selectTable": "เลือกโต๊ะ",
+    "tableNumber": "โต๊ะ {{number}}",
+    "seats": "{{count}} ที่นั่ง",
+    "available": "ว่าง",
+    "occupied": "มีลูกค้า",
+    "reserved": "จองแล้ว",
+    "openTable": "เปิดโต๊ะ",
+    "closeTable": "ปิดโต๊ะ",
+    "transferTable": "ย้ายโต๊ะ",
+    "mergeOrders": "รวมออเดอร์",
+    "splitBill": "แยกบิล"
+  },
+  "customer": {
+    "customerDetails": "ข้อมูลลูกค้า",
+    "customerName": "ชื่อลูกค้า",
+    "customerPhone": "เบอร์โทรศัพท์",
+    "customerEmail": "อีเมล",
+    "deliveryAddress": "ที่อยู่จัดส่ง",
+    "postcode": "รหัสไปรษณีย์",
+    "specialInstructions": "คำแนะนำพิเศษ",
+    "newCustomer": "ลูกค้าใหม่",
+    "existingCustomer": "ลูกค้าเดิม",
+    "searchCustomer": "ค้นหาลูกค้า..."
+  },
+  "kitchen": {
+    "newOrders": "ออเดอร์ใหม่",
+    "inProgress": "กำลังทำ",
+    "ready": "พร้อมเสิร์ฟ",
+    "completed": "เสร็จสิ้น",
+    "startPreparing": "เริ่มเตรียม",
+    "markReady": "เสร็จแล้ว",
+    "orderReceived": "รับออเดอร์แล้ว",
+    "cookingTime": "เวลาทำอาหาร",
+    "priorityOrder": "ออเดอร์ด่วน",
+    "bumpOrder": "เสร็จสิ้นออเดอร์"
+  },
+  "offline": {
+    "banner": "โหมดออฟไลน์",
+    "message": "ออเดอร์จะถูกบันทึกในเครื่องและจะซิงค์เมื่อเชื่อมต่ออินเทอร์เน็ตได้",
+    "pendingSync": "{{count}} ออเดอร์รอการซิงค์",
+    "syncing": "กำลังซิงค์ออเดอร์...",
+    "syncComplete": "ซิงค์ออเดอร์ทั้งหมดแล้ว",
+    "syncFailed": "ซิงค์ล้มเหลว - จะลองอีกครั้ง",
+    "backOnline": "กลับมาออนไลน์แล้ว!"
+  },
+  "printing": {
+    "printReceipt": "พิมพ์ใบเสร็จ",
+    "printKitchenTicket": "พิมพ์ใบสั่งครัว",
+    "printBill": "พิมพ์บิล",
+    "printerNotFound": "ไม่พบเครื่องพิมพ์",
+    "printingFailed": "พิมพ์ล้มเหลว",
+    "printPreview": "ตัวอย่างก่อนพิมพ์",
+    "selectPrinter": "เลือกเครื่องพิมพ์"
+  },
+  "onlineOrders": {
+    "newOrder": "ออเดอร์ออนไลน์ใหม่",
+    "incomingOrders": "ออเดอร์ที่เข้ามา",
+    "acceptOrder": "รับออเดอร์",
+    "rejectOrder": "ปฏิเสธออเดอร์",
+    "prepTime": "เวลาเตรียม",
+    "customerNotified": "แจ้งลูกค้าแล้ว",
+    "readyForPickup": "พร้อมให้รับ",
+    "outForDelivery": "กำลังจัดส่ง",
+    "delivered": "จัดส่งแล้ว"
+  },
+  "modifiers": {
+    "selectOptions": "เลือกตัวเลือก",
+    "required": "จำเป็น",
+    "optional": "ไม่บังคับ",
+    "maxSelections": "เลือกได้สูงสุด {{max}}",
+    "minSelections": "เลือกอย่างน้อย {{min}}",
+    "addModifier": "เพิ่มตัวเลือก",
+    "noModifiers": "ไม่มีตัวเลือกเพิ่มเติม"
+  },
+  "alerts": {
+    "orderSent": "ส่งออเดอร์ไปครัวแล้ว",
+    "orderPrinted": "พิมพ์ออเดอร์แล้ว",
+    "orderHeld": "พักออเดอร์แล้ว",
+    "orderCleared": "ล้างออเดอร์แล้ว",
+    "paymentReceived": "รับชำระเงินแล้ว",
+    "tableOpened": "เปิดโต๊ะแล้ว",
+    "tableClosed": "ปิดโต๊ะแล้ว"
+  },
+  "menuCard": {
+    "add": "เพิ่ม",
+    "customise": "ปรับแต่ง",
+    "choose": "เลือก",
+    "loading": "กำลังโหลดเมนู...",
+    "includes": "รวม:",
+    "completeSetMeal": "ชุดอาหารครบชุด"
+  },
+  "footer": {
+    "ready": "พร้อม",
+    "syncing": "กำลังซิงค์",
+    "offline": "ออฟไลน์",
+    "internet": "อินเทอร์เน็ต",
+    "payments": "การชำระเงิน",
+    "checking": "กำลังตรวจสอบ",
+    "queued": "อยู่ในคิว",
+    "issues": "ปัญหา"
+  }
+}

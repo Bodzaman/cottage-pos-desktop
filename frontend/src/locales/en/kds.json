@@ -1,0 +1,49 @@
+{
+  "title": "Kitchen Display System",
+  "columns": {
+    "new": "New Orders",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "completed": "Completed"
+  },
+  "orderCard": {
+    "orderNumber": "Order #{{number}}",
+    "table": "Table {{number}}",
+    "dineIn": "Dine In",
+    "takeaway": "Takeaway",
+    "delivery": "Delivery",
+    "collection": "Collection",
+    "online": "Online Order",
+    "elapsed": "{{time}} ago",
+    "items": "{{count}} items",
+    "priority": "Priority",
+    "rush": "RUSH"
+  },
+  "actions": {
+    "startPreparing": "Start",
+    "markReady": "Ready",
+    "markComplete": "Complete",
+    "bump": "Bump",
+    "recall": "Recall",
+    "print": "Print",
+    "viewDetails": "View Details"
+  },
+  "filters": {
+    "all": "All Orders",
+    "dineIn": "Dine In",
+    "takeaway": "Takeaway",
+    "online": "Online"
+  },
+  "status": {
+    "noOrders": "No orders in this queue",
+    "waitingForOrders": "Waiting for orders...",
+    "connected": "Connected",
+    "reconnecting": "Reconnecting..."
+  },
+  "alerts": {
+    "newOrder": "New order received",
+    "orderBumped": "Order bumped",
+    "orderRecalled": "Order recalled",
+    "longWait": "Order waiting over {{minutes}} minutes"
+  }
+}

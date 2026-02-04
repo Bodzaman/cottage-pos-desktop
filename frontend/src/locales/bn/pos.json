@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "ডাইন ইন",
+    "takeAway": "টেক অ্যাওয়ে",
+    "online": "অনলাইন",
+    "reservations": "রিজার্ভেশন"
+  },
+  "orderModes": {
+    "waiting": "অপেক্ষা",
+    "collection": "কালেকশন",
+    "delivery": "ডেলিভারি"
+  },
+  "login": {
+    "title": "পস লগইন",
+    "pinLogin": "পিন লগইন",
+    "passwordLogin": "পাসওয়ার্ড লগইন",
+    "enterPin": "আপনার পিন লিখুন",
+    "enterPassword": "পাসওয়ার্ড লিখুন",
+    "password": "পাসওয়ার্ড",
+    "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
+    "loginButton": "লগইন",
+    "loggingIn": "লগইন হচ্ছে...",
+    "invalidPin": "ভুল পিন",
+    "invalidPassword": "ভুল পাসওয়ার্ড",
+    "teamMode": "টিম",
+    "adminMode": "অ্যাডমিন",
+    "backToLogin": "লগইনে ফিরুন"
+  },
+  "navigation": {
+    "orders": "অর্ডার",
+    "tables": "টেবিল",
+    "menu": "মেনু",
+    "settings": "সেটিংস",
+    "logout": "লগআউট",
+    "quickTools": "কুইক টুলস",
+    "kitchen": "কিচেন",
+    "reconciliation": "রিকনসিলিয়েশন",
+    "admin": "অ্যাডমিন পোর্টাল"
+  },
+  "orderPanel": {
+    "yourOrder": "আপনার অর্ডার",
+    "orderSummary": "অর্ডার সামারি",
+    "subtotal": "সাবটোটাল",
+    "serviceCharge": "সার্ভিস চার্জ",
+    "discount": "ডিসকাউন্ট",
+    "total": "মোট",
+    "tax": "ট্যাক্স",
+    "items": "আইটেম",
+    "noItems": "অর্ডারে কোনো আইটেম নেই",
+    "addItems": "শুরু করতে আইটেম যোগ করুন",
+    "clearOrder": "অর্ডার মুছুন",
+    "holdOrder": "অর্ডার হোল্ড",
+    "sendToKitchen": "কিচেনে পাঠান",
+    "printBill": "বিল প্রিন্ট",
+    "processPayment": "পেমেন্ট প্রসেস",
+    "orderNotes": "অর্ডার নোট",
+    "addNote": "নোট যোগ করুন..."
+  },
+  "payment": {
+    "paymentMethod": "পেমেন্ট মেথড",
+    "cash": "ক্যাশ",
+    "card": "কার্ড",
+    "payLater": "পরে পে করুন",
+    "split": "স্প্লিট পেমেন্ট",
+    "amountDue": "বকেয়া পরিমাণ",
+    "amountReceived": "প্রাপ্ত পরিমাণ",
+    "change": "খুচরা",
+    "processing": "পেমেন্ট প্রসেস হচ্ছে...",
+    "paymentComplete": "পেমেন্ট সম্পন্ন",
+    "paymentFailed": "পেমেন্ট ব্যর্থ",
+    "cardNotAvailable": "অফলাইনে কার্ড পেমেন্ট উপলব্ধ নয়"
+  },
+  "tables": {
+    "selectTable": "টেবিল নির্বাচন",
+    "tableNumber": "টেবিল {{number}}",
+    "seats": "{{count}} সিট",
+    "available": "উপলব্ধ",
+    "occupied": "ব্যস্ত",
+    "reserved": "রিজার্ভড",
+    "openTable": "টেবিল খুলুন",
+    "closeTable": "টেবিল বন্ধ",
+    "transferTable": "টেবিল ট্রান্সফার",
+    "mergeOrders": "অর্ডার মার্জ",
+    "splitBill": "বিল স্প্লিট"
+  },
+  "customer": {
+    "customerDetails": "কাস্টমার তথ্য",
+    "customerName": "কাস্টমারের নাম",
+    "customerPhone": "ফোন নম্বর",
+    "customerEmail": "ইমেইল",
+    "deliveryAddress": "ডেলিভারি ঠিকানা",
+    "postcode": "পোস্টকোড",
+    "specialInstructions": "বিশেষ নির্দেশনা",
+    "newCustomer": "নতুন কাস্টমার",
+    "existingCustomer": "বিদ্যমান কাস্টমার",
+    "searchCustomer": "কাস্টমার খুঁজুন...",
+    "startOrder": "অর্ডার শুরু",
+    "tapToStart": "নতুন অর্ডার শুরু করতে ট্যাপ করুন",
+    "customerInfo": "কাস্টমার তথ্য"
+  },
+  "kitchen": {
+    "newOrders": "নতুন অর্ডার",
+    "inProgress": "প্রস্তুতিতে",
+    "ready": "প্রস্তুত",
+    "completed": "সম্পন্ন",
+    "startPreparing": "প্রস্তুতি শুরু",
+    "markReady": "প্রস্তুত চিহ্নিত",
+    "orderReceived": "অর্ডার প্রাপ্ত",
+    "cookingTime": "রান্নার সময়",
+    "priorityOrder": "প্রায়োরিটি অর্ডার",
+    "bumpOrder": "বাম্প অর্ডার"
+  },
+  "offline": {
+    "banner": "অফলাইন মোড",
+    "message": "অর্ডার স্থানীয়ভাবে সংরক্ষিত এবং সংযোগ ফিরে এলে সিঙ্ক হবে",
+    "pendingSync": "{{count}} অর্ডার সিঙ্কের অপেক্ষায়",
+    "syncing": "অর্ডার সিঙ্ক হচ্ছে...",
+    "syncComplete": "সব অর্ডার সিঙ্ক হয়েছে",
+    "syncFailed": "সিঙ্ক ব্যর্থ - আবার চেষ্টা হবে",
+    "backOnline": "অনলাইনে ফিরে এসেছে!"
+  },
+  "printing": {
+    "printReceipt": "রসিদ প্রিন্ট",
+    "printKitchenTicket": "কিচেন টিকেট প্রিন্ট",
+    "printBill": "বিল প্রিন্ট",
+    "printerNotFound": "প্রিন্টার পাওয়া যায়নি",
+    "printingFailed": "প্রিন্টিং ব্যর্থ",
+    "printPreview": "প্রিন্ট প্রিভিউ",
+    "selectPrinter": "প্রিন্টার নির্বাচন"
+  },
+  "onlineOrders": {
+    "newOrder": "নতুন অনলাইন অর্ডার",
+    "incomingOrders": "আগত অর্ডার",
+    "acceptOrder": "অর্ডার গ্রহণ",
+    "rejectOrder": "অর্ডার বাতিল",
+    "prepTime": "প্রস্তুতির সময়",
+    "customerNotified": "কাস্টমার জানানো হয়েছে",
+    "readyForPickup": "পিকআপের জন্য প্রস্তুত",
+    "outForDelivery": "ডেলিভারিতে",
+    "delivered": "ডেলিভারি হয়েছে"
+  },
+  "modifiers": {
+    "selectOptions": "অপশন নির্বাচন",
+    "required": "আবশ্যক",
+    "optional": "ঐচ্ছিক",
+    "maxSelections": "সর্বোচ্চ {{max}} নির্বাচন করুন",
+    "minSelections": "কমপক্ষে {{min}} নির্বাচন করুন",
+    "addModifier": "মডিফায়ার যোগ",
+    "noModifiers": "কোনো মডিফায়ার নেই"
+  },
+  "alerts": {
+    "orderSent": "অর্ডার কিচেনে পাঠানো হয়েছে",
+    "orderPrinted": "অর্ডার প্রিন্ট হয়েছে",
+    "orderHeld": "অর্ডার হোল্ড হয়েছে",
+    "orderCleared": "অর্ডার মুছে ফেলা হয়েছে",
+    "paymentReceived": "পেমেন্ট প্রাপ্ত",
+    "tableOpened": "টেবিল খোলা হয়েছে",
+    "tableClosed": "টেবিল বন্ধ হয়েছে"
+  },
+  "menuCard": {
+    "add": "যোগ করুন",
+    "customise": "কাস্টমাইজ",
+    "choose": "বেছে নিন",
+    "loading": "মেনু লোড হচ্ছে...",
+    "includes": "অন্তর্ভুক্ত:",
+    "completeSetMeal": "সম্পূর্ণ সেট মিল"
+  },
+  "footer": {
+    "ready": "প্রস্তুত",
+    "syncing": "সিঙ্ক হচ্ছে",
+    "offline": "অফলাইন",
+    "internet": "ইন্টারনেট",
+    "payments": "পেমেন্টস",
+    "checking": "যাচাই হচ্ছে",
+    "queued": "সারিবদ্ধ",
+    "issues": "সমস্যা"
+  },
+  "toasts": {
+    "kioskModeActive": "কিয়স্ক মোড চালু",
+    "kioskModeEnabled": "কিয়স্ক মোড সক্রিয়",
+    "kioskModeDisabled": "কিয়স্ক মোড নিষ্ক্রিয়",
+    "appLocked": "অ্যাপ ফুলস্ক্রিনে লক হয়েছে",
+    "normalMode": "সাধারণ উইন্ডো মোড পুনরুদ্ধার",
+    "orderCompleted": "অর্ডার সম্পন্ন",
+    "tableAvailable": "টেবিল এখন উপলব্ধ",
+    "failedToLoad": "অর্ডার লোড করতে ব্যর্থ",
+    "addItemsFirst": "চেকআউটের আগে আইটেম যোগ করুন",
+    "itemAdded": "অর্ডারে আইটেম যোগ হয়েছে",
+    "itemRemoved": "অর্ডার থেকে আইটেম সরানো হয়েছে",
+    "orderSaved": "অর্ডার সংরক্ষিত",
+    "orderRestored": "অর্ডার পুনরুদ্ধার হয়েছে"
+  },
+  "restoreDialog": {
+    "title": "আগের অর্ডার পুনরুদ্ধার করবেন?",
+    "foundOrder": "{{minutes}} মিনিট আগের একটি সংরক্ষিত অর্ডার পাওয়া গেছে",
+    "items": "আইটেম",
+    "type": "ধরন",
+    "table": "টেবিল",
+    "total": "মোট",
+    "startFresh": "নতুন শুরু",
+    "restoreOrder": "অর্ডার পুনরুদ্ধার"
+  }
+}

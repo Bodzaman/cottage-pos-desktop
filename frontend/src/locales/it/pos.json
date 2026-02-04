@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "AL TAVOLO",
+    "takeAway": "DA ASPORTO",
+    "online": "ONLINE",
+    "reservations": "PRENOTAZIONI"
+  },
+  "orderModes": {
+    "waiting": "In attesa",
+    "collection": "Ritiro",
+    "delivery": "Consegna"
+  },
+  "login": {
+    "title": "Accesso POS",
+    "pinLogin": "Accesso con PIN",
+    "passwordLogin": "Accesso con Password",
+    "enterPin": "Inserisci il PIN",
+    "enterPassword": "Inserisci la password",
+    "password": "Password",
+    "forgotPassword": "Password dimenticata?",
+    "loginButton": "Accedi",
+    "loggingIn": "Accesso in corso...",
+    "invalidPin": "PIN non valido",
+    "invalidPassword": "Password non valida",
+    "teamMode": "Team",
+    "adminMode": "Admin",
+    "backToLogin": "Torna al login"
+  },
+  "navigation": {
+    "orders": "Ordini",
+    "tables": "Tavoli",
+    "menu": "Menu",
+    "settings": "Impostazioni",
+    "logout": "Esci",
+    "quickTools": "Strumenti Rapidi",
+    "kitchen": "Cucina",
+    "reconciliation": "Riconciliazione",
+    "admin": "Portale Admin"
+  },
+  "orderPanel": {
+    "yourOrder": "Il Tuo Ordine",
+    "orderSummary": "Riepilogo Ordine",
+    "subtotal": "Subtotale",
+    "serviceCharge": "Servizio",
+    "discount": "Sconto",
+    "total": "Totale",
+    "tax": "IVA",
+    "items": "Articoli",
+    "noItems": "Nessun articolo nell'ordine",
+    "addItems": "Aggiungi articoli per iniziare",
+    "clearOrder": "Cancella Ordine",
+    "holdOrder": "Sospendi Ordine",
+    "sendToKitchen": "Invia in Cucina",
+    "printBill": "Stampa Conto",
+    "processPayment": "Elabora Pagamento",
+    "orderNotes": "Note Ordine",
+    "addNote": "Aggiungi nota..."
+  },
+  "payment": {
+    "paymentMethod": "Metodo di Pagamento",
+    "cash": "Contanti",
+    "card": "Carta",
+    "payLater": "Paga Dopo",
+    "split": "Dividi Pagamento",
+    "amountDue": "Importo Dovuto",
+    "amountReceived": "Importo Ricevuto",
+    "change": "Resto",
+    "processing": "Elaborazione pagamento...",
+    "paymentComplete": "Pagamento Completato",
+    "paymentFailed": "Pagamento Fallito",
+    "cardNotAvailable": "Pagamento con carta non disponibile offline"
+  },
+  "tables": {
+    "selectTable": "Seleziona Tavolo",
+    "tableNumber": "Tavolo {{number}}",
+    "seats": "{{count}} posti",
+    "available": "Disponibile",
+    "occupied": "Occupato",
+    "reserved": "Prenotato",
+    "openTable": "Apri Tavolo",
+    "closeTable": "Chiudi Tavolo",
+    "transferTable": "Trasferisci Tavolo",
+    "mergeOrders": "Unisci Ordini",
+    "splitBill": "Dividi Conto"
+  },
+  "customer": {
+    "customerDetails": "Dati Cliente",
+    "customerName": "Nome Cliente",
+    "customerPhone": "Numero di Telefono",
+    "customerEmail": "Email",
+    "deliveryAddress": "Indirizzo di Consegna",
+    "postcode": "CAP",
+    "specialInstructions": "Istruzioni Speciali",
+    "newCustomer": "Nuovo Cliente",
+    "existingCustomer": "Cliente Esistente",
+    "searchCustomer": "Cerca cliente...",
+    "startOrder": "Inizia Ordine",
+    "tapToStart": "Tocca per iniziare un nuovo ordine",
+    "customerInfo": "Info Cliente"
+  },
+  "kitchen": {
+    "newOrders": "Nuovi Ordini",
+    "inProgress": "In Preparazione",
+    "ready": "Pronto",
+    "completed": "Completato",
+    "startPreparing": "Inizia Preparazione",
+    "markReady": "Segna Pronto",
+    "orderReceived": "Ordine Ricevuto",
+    "cookingTime": "Tempo di Cottura",
+    "priorityOrder": "Ordine Prioritario",
+    "bumpOrder": "Completa Ordine"
+  },
+  "offline": {
+    "banner": "MODALITÀ OFFLINE",
+    "message": "Gli ordini vengono salvati localmente e sincronizzati quando la connessione viene ripristinata",
+    "pendingSync": "{{count}} ordini in attesa di sincronizzazione",
+    "syncing": "Sincronizzazione ordini...",
+    "syncComplete": "Tutti gli ordini sincronizzati",
+    "syncFailed": "Sincronizzazione fallita - nuovo tentativo",
+    "backOnline": "Di nuovo online!"
+  },
+  "printing": {
+    "printReceipt": "Stampa Scontrino",
+    "printKitchenTicket": "Stampa Comanda",
+    "printBill": "Stampa Conto",
+    "printerNotFound": "Stampante non trovata",
+    "printingFailed": "Stampa fallita",
+    "printPreview": "Anteprima Stampa",
+    "selectPrinter": "Seleziona Stampante"
+  },
+  "onlineOrders": {
+    "newOrder": "Nuovo Ordine Online",
+    "incomingOrders": "Ordini in Arrivo",
+    "acceptOrder": "Accetta Ordine",
+    "rejectOrder": "Rifiuta Ordine",
+    "prepTime": "Tempo di Preparazione",
+    "customerNotified": "Cliente Notificato",
+    "readyForPickup": "Pronto per Ritiro",
+    "outForDelivery": "In Consegna",
+    "delivered": "Consegnato"
+  },
+  "modifiers": {
+    "selectOptions": "Seleziona Opzioni",
+    "required": "Obbligatorio",
+    "optional": "Opzionale",
+    "maxSelections": "Seleziona fino a {{max}}",
+    "minSelections": "Seleziona almeno {{min}}",
+    "addModifier": "Aggiungi Modificatore",
+    "noModifiers": "Nessun modificatore disponibile"
+  },
+  "alerts": {
+    "orderSent": "Ordine inviato in cucina",
+    "orderPrinted": "Ordine stampato",
+    "orderHeld": "Ordine sospeso",
+    "orderCleared": "Ordine cancellato",
+    "paymentReceived": "Pagamento ricevuto",
+    "tableOpened": "Tavolo aperto",
+    "tableClosed": "Tavolo chiuso"
+  },
+  "menuCard": {
+    "add": "Aggiungi",
+    "customise": "Personalizza",
+    "choose": "Scegli",
+    "loading": "Caricamento menu...",
+    "includes": "Include:",
+    "completeSetMeal": "Menu Completo"
+  },
+  "footer": {
+    "ready": "Pronto",
+    "syncing": "Sincronizzazione",
+    "offline": "Offline",
+    "internet": "Internet",
+    "payments": "Pagamenti",
+    "checking": "Verifica",
+    "queued": "In coda",
+    "issues": "Problemi"
+  },
+  "toasts": {
+    "kioskModeActive": "Modalità chiosco attiva",
+    "kioskModeEnabled": "Modalità chiosco attivata",
+    "kioskModeDisabled": "Modalità chiosco disattivata",
+    "appLocked": "App bloccata in schermo intero",
+    "normalMode": "Modalità finestra normale ripristinata",
+    "orderCompleted": "Ordine completato",
+    "tableAvailable": "Tavolo ora disponibile",
+    "failedToLoad": "Impossibile caricare l'ordine",
+    "addItemsFirst": "Aggiungi articoli prima del pagamento",
+    "itemAdded": "Articolo aggiunto all'ordine",
+    "itemRemoved": "Articolo rimosso dall'ordine",
+    "orderSaved": "Ordine salvato",
+    "orderRestored": "Ordine ripristinato"
+  },
+  "restoreDialog": {
+    "title": "Ripristinare ordine precedente?",
+    "foundOrder": "Trovato ordine salvato di {{minutes}} minuti fa",
+    "items": "Articoli",
+    "type": "Tipo",
+    "table": "Tavolo",
+    "total": "Totale",
+    "startFresh": "Ricomincia",
+    "restoreOrder": "Ripristina Ordine"
+  }
+}

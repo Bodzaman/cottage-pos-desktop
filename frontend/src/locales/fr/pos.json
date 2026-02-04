@@ -1,0 +1,175 @@
+{
+  "orderTypes": {
+    "dineIn": "SUR PLACE",
+    "takeAway": "À EMPORTER",
+    "online": "EN LIGNE",
+    "reservations": "RÉSERVATIONS"
+  },
+  "orderModes": {
+    "waiting": "En attente",
+    "collection": "À emporter",
+    "delivery": "Livraison"
+  },
+  "login": {
+    "title": "Connexion POS",
+    "pinLogin": "Connexion PIN",
+    "passwordLogin": "Connexion mot de passe",
+    "enterPin": "Entrez votre PIN",
+    "enterPassword": "Entrez le mot de passe",
+    "password": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "loginButton": "Connexion",
+    "loggingIn": "Connexion en cours...",
+    "invalidPin": "PIN invalide",
+    "invalidPassword": "Mot de passe invalide",
+    "teamMode": "Équipe",
+    "adminMode": "Admin",
+    "backToLogin": "Retour à la connexion"
+  },
+  "navigation": {
+    "orders": "Commandes",
+    "tables": "Tables",
+    "menu": "Menu",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "quickTools": "Outils rapides",
+    "kitchen": "Cuisine",
+    "reconciliation": "Rapprochement",
+    "admin": "Portail Admin"
+  },
+  "orderPanel": {
+    "yourOrder": "Votre commande",
+    "orderSummary": "Résumé de commande",
+    "subtotal": "Sous-total",
+    "serviceCharge": "Frais de service",
+    "discount": "Réduction",
+    "total": "Total",
+    "tax": "TVA",
+    "items": "Articles",
+    "noItems": "Aucun article dans la commande",
+    "addItems": "Ajoutez des articles pour commencer",
+    "clearOrder": "Effacer la commande",
+    "holdOrder": "Mettre en attente",
+    "sendToKitchen": "Envoyer en cuisine",
+    "printBill": "Imprimer l'addition",
+    "processPayment": "Procéder au paiement",
+    "orderNotes": "Notes de commande",
+    "addNote": "Ajouter une note..."
+  },
+  "payment": {
+    "paymentMethod": "Mode de paiement",
+    "cash": "Espèces",
+    "card": "Carte",
+    "payLater": "Payer plus tard",
+    "split": "Paiement partagé",
+    "amountDue": "Montant dû",
+    "amountReceived": "Montant reçu",
+    "change": "Monnaie",
+    "processing": "Traitement du paiement...",
+    "paymentComplete": "Paiement terminé",
+    "paymentFailed": "Paiement échoué",
+    "cardNotAvailable": "Paiement par carte non disponible hors ligne"
+  },
+  "tables": {
+    "selectTable": "Sélectionner une table",
+    "tableNumber": "Table {{number}}",
+    "seats": "{{count}} places",
+    "available": "Disponible",
+    "occupied": "Occupée",
+    "reserved": "Réservée",
+    "openTable": "Ouvrir la table",
+    "closeTable": "Fermer la table",
+    "transferTable": "Transférer la table",
+    "mergeOrders": "Fusionner les commandes",
+    "splitBill": "Partager l'addition"
+  },
+  "customer": {
+    "customerDetails": "Informations client",
+    "customerName": "Nom du client",
+    "customerPhone": "Numéro de téléphone",
+    "customerEmail": "Email",
+    "deliveryAddress": "Adresse de livraison",
+    "postcode": "Code postal",
+    "specialInstructions": "Instructions spéciales",
+    "newCustomer": "Nouveau client",
+    "existingCustomer": "Client existant",
+    "searchCustomer": "Rechercher un client..."
+  },
+  "kitchen": {
+    "newOrders": "Nouvelles commandes",
+    "inProgress": "En cours",
+    "ready": "Prêt",
+    "completed": "Terminé",
+    "startPreparing": "Commencer la préparation",
+    "markReady": "Marquer comme prêt",
+    "orderReceived": "Commande reçue",
+    "cookingTime": "Temps de cuisson",
+    "priorityOrder": "Commande prioritaire",
+    "bumpOrder": "Valider la commande"
+  },
+  "offline": {
+    "banner": "MODE HORS LIGNE",
+    "message": "Les commandes sont enregistrées localement et seront synchronisées quand la connexion sera rétablie",
+    "pendingSync": "{{count}} commandes en attente de synchronisation",
+    "syncing": "Synchronisation des commandes...",
+    "syncComplete": "Toutes les commandes synchronisées",
+    "syncFailed": "Échec de la synchronisation - nouvelle tentative",
+    "backOnline": "De retour en ligne !"
+  },
+  "printing": {
+    "printReceipt": "Imprimer le reçu",
+    "printKitchenTicket": "Imprimer le ticket cuisine",
+    "printBill": "Imprimer l'addition",
+    "printerNotFound": "Imprimante non trouvée",
+    "printingFailed": "Échec de l'impression",
+    "printPreview": "Aperçu avant impression",
+    "selectPrinter": "Sélectionner l'imprimante"
+  },
+  "onlineOrders": {
+    "newOrder": "Nouvelle commande en ligne",
+    "incomingOrders": "Commandes entrantes",
+    "acceptOrder": "Accepter la commande",
+    "rejectOrder": "Refuser la commande",
+    "prepTime": "Temps de préparation",
+    "customerNotified": "Client notifié",
+    "readyForPickup": "Prêt à emporter",
+    "outForDelivery": "En livraison",
+    "delivered": "Livré"
+  },
+  "modifiers": {
+    "selectOptions": "Sélectionner les options",
+    "required": "Obligatoire",
+    "optional": "Optionnel",
+    "maxSelections": "Sélectionnez jusqu'à {{max}}",
+    "minSelections": "Sélectionnez au moins {{min}}",
+    "addModifier": "Ajouter un modificateur",
+    "noModifiers": "Aucun modificateur disponible"
+  },
+  "alerts": {
+    "orderSent": "Commande envoyée en cuisine",
+    "orderPrinted": "Commande imprimée",
+    "orderHeld": "Commande mise en attente",
+    "orderCleared": "Commande effacée",
+    "paymentReceived": "Paiement reçu",
+    "tableOpened": "Table ouverte",
+    "tableClosed": "Table fermée"
+  },
+  "menuCard": {
+    "add": "Ajouter",
+    "customise": "Personnaliser",
+    "choose": "Choisir",
+    "loading": "Chargement de l'article...",
+    "includes": "Comprend :",
+    "completeSetMeal": "Menu complet"
+  },
+  "footer": {
+    "ready": "Prêt",
+    "syncing": "Synchronisation",
+    "offline": "Hors ligne",
+    "internet": "Internet",
+    "payments": "Paiements",
+    "checking": "Vérification",
+    "queued": "En file d'attente",
+    "issues": "Problèmes"
+  }
+}

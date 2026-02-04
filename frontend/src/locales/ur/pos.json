@@ -1,0 +1,203 @@
+{
+  "orderTypes": {
+    "dineIn": "ڈائن ان",
+    "takeAway": "ٹیک اوے",
+    "online": "آن لائن",
+    "reservations": "ریزرویشن"
+  },
+  "orderModes": {
+    "waiting": "انتظار",
+    "collection": "کلیکشن",
+    "delivery": "ڈیلیوری"
+  },
+  "login": {
+    "title": "POS لاگ ان",
+    "pinLogin": "پن لاگ ان",
+    "passwordLogin": "پاس ورڈ لاگ ان",
+    "enterPin": "اپنا پن درج کریں",
+    "enterPassword": "پاس ورڈ درج کریں",
+    "password": "پاس ورڈ",
+    "forgotPassword": "پاس ورڈ بھول گئے؟",
+    "loginButton": "لاگ ان",
+    "loggingIn": "لاگ ان ہو رہا ہے...",
+    "invalidPin": "غلط پن",
+    "invalidPassword": "غلط پاس ورڈ",
+    "teamMode": "ٹیم",
+    "adminMode": "ایڈمن",
+    "backToLogin": "لاگ ان پر واپس"
+  },
+  "navigation": {
+    "orders": "آرڈرز",
+    "tables": "ٹیبلز",
+    "menu": "مینو",
+    "settings": "سیٹنگز",
+    "logout": "لاگ آؤٹ",
+    "quickTools": "فوری ٹولز",
+    "kitchen": "کچن",
+    "reconciliation": "حساب",
+    "admin": "ایڈمن پورٹل"
+  },
+  "orderPanel": {
+    "yourOrder": "آپ کا آرڈر",
+    "orderSummary": "آرڈر کا خلاصہ",
+    "subtotal": "ذیلی کل",
+    "serviceCharge": "سروس چارج",
+    "discount": "رعایت",
+    "total": "کل",
+    "tax": "ٹیکس",
+    "items": "اشیاء",
+    "noItems": "آرڈر میں کوئی آئٹم نہیں",
+    "addItems": "شروع کرنے کے لیے آئٹم شامل کریں",
+    "clearOrder": "آرڈر صاف کریں",
+    "holdOrder": "آرڈر روکیں",
+    "sendToKitchen": "کچن بھیجیں",
+    "printBill": "بل پرنٹ کریں",
+    "processPayment": "ادائیگی پروسیس کریں",
+    "orderNotes": "آرڈر نوٹس",
+    "addNote": "نوٹ شامل کریں..."
+  },
+  "payment": {
+    "paymentMethod": "ادائیگی کا طریقہ",
+    "cash": "نقد",
+    "card": "کارڈ",
+    "payLater": "بعد میں ادائیگی",
+    "split": "تقسیم ادائیگی",
+    "amountDue": "واجب الادا رقم",
+    "amountReceived": "وصول شدہ رقم",
+    "change": "واپسی",
+    "processing": "ادائیگی پروسیس ہو رہی ہے...",
+    "paymentComplete": "ادائیگی مکمل",
+    "paymentFailed": "ادائیگی ناکام",
+    "cardNotAvailable": "آف لائن میں کارڈ ادائیگی دستیاب نہیں"
+  },
+  "tables": {
+    "selectTable": "ٹیبل منتخب کریں",
+    "tableNumber": "ٹیبل {{number}}",
+    "seats": "{{count}} سیٹیں",
+    "available": "دستیاب",
+    "occupied": "مصروف",
+    "reserved": "محفوظ",
+    "openTable": "ٹیبل کھولیں",
+    "closeTable": "ٹیبل بند کریں",
+    "transferTable": "ٹیبل منتقل کریں",
+    "mergeOrders": "آرڈرز ضم کریں",
+    "splitBill": "بل تقسیم کریں"
+  },
+  "customer": {
+    "customerDetails": "گاہک کی تفصیلات",
+    "customerName": "گاہک کا نام",
+    "customerPhone": "فون نمبر",
+    "customerEmail": "ای میل",
+    "deliveryAddress": "ڈیلیوری پتہ",
+    "postcode": "پوسٹ کوڈ",
+    "specialInstructions": "خصوصی ہدایات",
+    "newCustomer": "نیا گاہک",
+    "existingCustomer": "موجودہ گاہک",
+    "searchCustomer": "گاہک تلاش کریں...",
+    "startOrder": "آرڈر شروع کریں",
+    "tapToStart": "نیا آرڈر شروع کرنے کے لیے ٹیپ کریں",
+    "customerInfo": "گاہک کی معلومات"
+  },
+  "kitchen": {
+    "newOrders": "نئے آرڈرز",
+    "inProgress": "جاری ہے",
+    "ready": "تیار",
+    "completed": "مکمل",
+    "startPreparing": "تیاری شروع کریں",
+    "markReady": "تیار نشان لگائیں",
+    "orderReceived": "آرڈر موصول",
+    "cookingTime": "پکانے کا وقت",
+    "priorityOrder": "ترجیحی آرڈر",
+    "bumpOrder": "بمپ آرڈر"
+  },
+  "offline": {
+    "banner": "آف لائن موڈ",
+    "message": "آرڈرز مقامی طور پر محفوظ ہیں اور کنکشن بحال ہونے پر سنک ہوں گے",
+    "pendingSync": "{{count}} آرڈرز سنک کے منتظر",
+    "syncing": "آرڈرز سنک ہو رہے ہیں...",
+    "syncComplete": "تمام آرڈرز سنک ہو گئے",
+    "syncFailed": "سنک ناکام - دوبارہ کوشش ہوگی",
+    "backOnline": "واپس آن لائن!"
+  },
+  "printing": {
+    "printReceipt": "رسید پرنٹ کریں",
+    "printKitchenTicket": "کچن ٹکٹ پرنٹ کریں",
+    "printBill": "بل پرنٹ کریں",
+    "printerNotFound": "پرنٹر نہیں ملا",
+    "printingFailed": "پرنٹنگ ناکام",
+    "printPreview": "پرنٹ پیش نظارہ",
+    "selectPrinter": "پرنٹر منتخب کریں"
+  },
+  "onlineOrders": {
+    "newOrder": "نیا آن لائن آرڈر",
+    "incomingOrders": "آنے والے آرڈرز",
+    "acceptOrder": "آرڈر قبول کریں",
+    "rejectOrder": "آرڈر مسترد کریں",
+    "prepTime": "تیاری کا وقت",
+    "customerNotified": "گاہک کو مطلع کیا گیا",
+    "readyForPickup": "پک اپ کے لیے تیار",
+    "outForDelivery": "ڈیلیوری کے لیے روانہ",
+    "delivered": "ڈیلیور ہو گیا"
+  },
+  "modifiers": {
+    "selectOptions": "اختیارات منتخب کریں",
+    "required": "ضروری",
+    "optional": "اختیاری",
+    "maxSelections": "زیادہ سے زیادہ {{max}} منتخب کریں",
+    "minSelections": "کم از کم {{min}} منتخب کریں",
+    "addModifier": "ترمیم کار شامل کریں",
+    "noModifiers": "کوئی ترمیم کار دستیاب نہیں"
+  },
+  "alerts": {
+    "orderSent": "آرڈر کچن بھیج دیا گیا",
+    "orderPrinted": "آرڈر پرنٹ ہو گیا",
+    "orderHeld": "آرڈر روک دیا گیا",
+    "orderCleared": "آرڈر صاف کر دیا گیا",
+    "paymentReceived": "ادائیگی موصول",
+    "tableOpened": "ٹیبل کھول دیا گیا",
+    "tableClosed": "ٹیبل بند کر دیا گیا"
+  },
+  "menuCard": {
+    "add": "شامل کریں",
+    "customise": "اپنی مرضی کے مطابق",
+    "choose": "منتخب کریں",
+    "loading": "مینو لوڈ ہو رہا ہے...",
+    "includes": "شامل ہے:",
+    "completeSetMeal": "مکمل سیٹ کھانا"
+  },
+  "footer": {
+    "ready": "تیار",
+    "syncing": "سنک ہو رہا ہے",
+    "offline": "آف لائن",
+    "internet": "انٹرنیٹ",
+    "payments": "ادائیگیاں",
+    "checking": "جانچ ہو رہی ہے",
+    "queued": "قطار میں",
+    "issues": "مسائل"
+  },
+  "toasts": {
+    "kioskModeActive": "کیوسک موڈ فعال",
+    "kioskModeEnabled": "کیوسک موڈ آن",
+    "kioskModeDisabled": "کیوسک موڈ آف",
+    "appLocked": "ایپ فل سکرین میں لاک ہے",
+    "normalMode": "عام ونڈو موڈ بحال",
+    "orderCompleted": "آرڈر مکمل",
+    "tableAvailable": "ٹیبل اب دستیاب ہے",
+    "failedToLoad": "آرڈر لوڈ کرنے میں ناکام",
+    "addItemsFirst": "چیک آؤٹ سے پہلے آئٹم شامل کریں",
+    "itemAdded": "آرڈر میں آئٹم شامل ہو گیا",
+    "itemRemoved": "آرڈر سے آئٹم ہٹا دیا گیا",
+    "orderSaved": "آرڈر محفوظ ہو گیا",
+    "orderRestored": "آرڈر بحال ہو گیا"
+  },
+  "restoreDialog": {
+    "title": "پچھلا آرڈر بحال کریں؟",
+    "foundOrder": "{{minutes}} منٹ پہلے کا محفوظ آرڈر ملا",
+    "items": "اشیاء",
+    "type": "قسم",
+    "table": "ٹیبل",
+    "total": "کل",
+    "startFresh": "نیا شروع کریں",
+    "restoreOrder": "آرڈر بحال کریں"
+  }
+}

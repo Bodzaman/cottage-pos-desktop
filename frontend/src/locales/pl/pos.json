@@ -1,0 +1,175 @@
+{
+  "orderTypes": {
+    "dineIn": "NA MIEJSCU",
+    "takeAway": "NA WYNOS",
+    "online": "ONLINE",
+    "reservations": "REZERWACJE"
+  },
+  "orderModes": {
+    "waiting": "Oczekiwanie",
+    "collection": "Odbiór",
+    "delivery": "Dostawa"
+  },
+  "login": {
+    "title": "Logowanie POS",
+    "pinLogin": "Logowanie PIN",
+    "passwordLogin": "Logowanie hasłem",
+    "enterPin": "Wprowadź PIN",
+    "enterPassword": "Wprowadź hasło",
+    "password": "Hasło",
+    "forgotPassword": "Zapomniałeś hasła?",
+    "loginButton": "Zaloguj",
+    "loggingIn": "Logowanie...",
+    "invalidPin": "Nieprawidłowy PIN",
+    "invalidPassword": "Nieprawidłowe hasło",
+    "teamMode": "Zespół",
+    "adminMode": "Admin",
+    "backToLogin": "Powrót do logowania"
+  },
+  "navigation": {
+    "orders": "Zamówienia",
+    "tables": "Stoliki",
+    "menu": "Menu",
+    "settings": "Ustawienia",
+    "logout": "Wyloguj",
+    "quickTools": "Szybkie narzędzia",
+    "kitchen": "Kuchnia",
+    "reconciliation": "Rozliczenie",
+    "admin": "Portal Admin"
+  },
+  "orderPanel": {
+    "yourOrder": "Twoje zamówienie",
+    "orderSummary": "Podsumowanie",
+    "subtotal": "Suma częściowa",
+    "serviceCharge": "Opłata serwisowa",
+    "discount": "Rabat",
+    "total": "Suma",
+    "tax": "VAT",
+    "items": "Pozycje",
+    "noItems": "Brak pozycji w zamówieniu",
+    "addItems": "Dodaj pozycje aby rozpocząć",
+    "clearOrder": "Wyczyść zamówienie",
+    "holdOrder": "Wstrzymaj zamówienie",
+    "sendToKitchen": "Wyślij do kuchni",
+    "printBill": "Drukuj rachunek",
+    "processPayment": "Płatność",
+    "orderNotes": "Notatki do zamówienia",
+    "addNote": "Dodaj notatkę..."
+  },
+  "payment": {
+    "paymentMethod": "Metoda płatności",
+    "cash": "Gotówka",
+    "card": "Karta",
+    "payLater": "Zapłać później",
+    "split": "Podziel płatność",
+    "amountDue": "Do zapłaty",
+    "amountReceived": "Otrzymano",
+    "change": "Reszta",
+    "processing": "Przetwarzanie płatności...",
+    "paymentComplete": "Płatność zakończona",
+    "paymentFailed": "Płatność nieudana",
+    "cardNotAvailable": "Płatność kartą niedostępna offline"
+  },
+  "tables": {
+    "selectTable": "Wybierz stolik",
+    "tableNumber": "Stolik {{number}}",
+    "seats": "{{count}} miejsc",
+    "available": "Wolny",
+    "occupied": "Zajęty",
+    "reserved": "Zarezerwowany",
+    "openTable": "Otwórz stolik",
+    "closeTable": "Zamknij stolik",
+    "transferTable": "Przenieś stolik",
+    "mergeOrders": "Połącz zamówienia",
+    "splitBill": "Podziel rachunek"
+  },
+  "customer": {
+    "customerDetails": "Dane klienta",
+    "customerName": "Imię klienta",
+    "customerPhone": "Numer telefonu",
+    "customerEmail": "Email",
+    "deliveryAddress": "Adres dostawy",
+    "postcode": "Kod pocztowy",
+    "specialInstructions": "Specjalne instrukcje",
+    "newCustomer": "Nowy klient",
+    "existingCustomer": "Istniejący klient",
+    "searchCustomer": "Szukaj klienta..."
+  },
+  "kitchen": {
+    "newOrders": "Nowe zamówienia",
+    "inProgress": "W przygotowaniu",
+    "ready": "Gotowe",
+    "completed": "Zakończone",
+    "startPreparing": "Rozpocznij przygotowanie",
+    "markReady": "Oznacz jako gotowe",
+    "orderReceived": "Zamówienie przyjęte",
+    "cookingTime": "Czas gotowania",
+    "priorityOrder": "Zamówienie priorytetowe",
+    "bumpOrder": "Zakończ zamówienie"
+  },
+  "offline": {
+    "banner": "TRYB OFFLINE",
+    "message": "Zamówienia są zapisywane lokalnie i zostaną zsynchronizowane po przywróceniu połączenia",
+    "pendingSync": "{{count}} zamówień oczekuje na synchronizację",
+    "syncing": "Synchronizacja zamówień...",
+    "syncComplete": "Wszystkie zamówienia zsynchronizowane",
+    "syncFailed": "Synchronizacja nieudana - ponowna próba",
+    "backOnline": "Ponownie online!"
+  },
+  "printing": {
+    "printReceipt": "Drukuj paragon",
+    "printKitchenTicket": "Drukuj bilet kuchenny",
+    "printBill": "Drukuj rachunek",
+    "printerNotFound": "Nie znaleziono drukarki",
+    "printingFailed": "Drukowanie nieudane",
+    "printPreview": "Podgląd wydruku",
+    "selectPrinter": "Wybierz drukarkę"
+  },
+  "onlineOrders": {
+    "newOrder": "Nowe zamówienie online",
+    "incomingOrders": "Przychodzące zamówienia",
+    "acceptOrder": "Przyjmij zamówienie",
+    "rejectOrder": "Odrzuć zamówienie",
+    "prepTime": "Czas przygotowania",
+    "customerNotified": "Klient powiadomiony",
+    "readyForPickup": "Gotowe do odbioru",
+    "outForDelivery": "W dostawie",
+    "delivered": "Dostarczono"
+  },
+  "modifiers": {
+    "selectOptions": "Wybierz opcje",
+    "required": "Wymagane",
+    "optional": "Opcjonalne",
+    "maxSelections": "Wybierz do {{max}}",
+    "minSelections": "Wybierz minimum {{min}}",
+    "addModifier": "Dodaj modyfikator",
+    "noModifiers": "Brak dostępnych modyfikatorów"
+  },
+  "alerts": {
+    "orderSent": "Zamówienie wysłane do kuchni",
+    "orderPrinted": "Zamówienie wydrukowane",
+    "orderHeld": "Zamówienie wstrzymane",
+    "orderCleared": "Zamówienie wyczyszczone",
+    "paymentReceived": "Płatność otrzymana",
+    "tableOpened": "Stolik otwarty",
+    "tableClosed": "Stolik zamknięty"
+  },
+  "menuCard": {
+    "add": "Dodaj",
+    "customise": "Dostosuj",
+    "choose": "Wybierz",
+    "loading": "Ładowanie pozycji menu...",
+    "includes": "Zawiera:",
+    "completeSetMeal": "Kompletny zestaw"
+  },
+  "footer": {
+    "ready": "Gotowe",
+    "syncing": "Synchronizacja",
+    "offline": "Offline",
+    "internet": "Internet",
+    "payments": "Płatności",
+    "checking": "Sprawdzanie",
+    "queued": "W kolejce",
+    "issues": "Problemy"
+  }
+}
