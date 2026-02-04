@@ -156,12 +156,12 @@ export function useMenuItemForm({
       // 🛡️ PRICING VALIDATION using unified utility
       const pricingValidation = validateItemPricing(
         {
+          has_variants: data.has_variants || false,
           price: data.price,
           price_takeaway: data.price_takeaway,
           price_dine_in: data.price_dine_in
         },
-        data.has_variants || false,
-        variants
+        (data.has_variants ? variants : []) as any
       );
 
       if (!pricingValidation.isValid) {

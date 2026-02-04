@@ -15,6 +15,7 @@ export type SimpleUser = {
   first_name?: string; // Convenience property
   last_name?: string; // Convenience property
   phone?: string; // Convenience property
+  is_admin?: boolean; // Admin role flag
   user_metadata?: {
     full_name?: string;
     first_name?: string;
@@ -23,18 +24,24 @@ export type SimpleUser = {
     image_url?: string;
     avatar_url?: string;
   };
+  profile?: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    image_url?: string;
+  };
 };
 
 export type CustomerProfile = {
   id: string;
   email: string;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  customer_reference_number: string | null;
-  is_admin: boolean;
-  created_at: string;
-  updated_at: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  customer_reference_number?: string | null;
+  is_admin?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   image_url?: string | null;
   google_profile_image?: string | null;
   auth_provider?: string | null;
@@ -42,16 +49,27 @@ export type CustomerProfile = {
 
 export type CustomerAddress = {
   id: string;
-  customer_id: string;
+  customer_id?: string;
+  customerId?: string; // camelCase alias
   address_line1: string;
-  address_line2: string | null;
-  city: string;
-  postal_code: string;
-  address_type: string;
-  is_default: boolean;
-  delivery_instructions: string | null;
-  created_at: string;
-  updated_at: string;
+  addressLine1?: string; // camelCase alias
+  address_line2?: string | null;
+  addressLine2?: string | null; // camelCase alias
+  city?: string;
+  postal_code?: string;
+  postcode?: string; // Alias for postal_code
+  country?: string;
+  address_type?: string;
+  is_default?: boolean;
+  isDefault?: boolean; // camelCase alias
+  delivery_instructions?: string | null;
+  deliveryNotes?: string; // camelCase alias
+  latitude?: number;
+  longitude?: number;
+  place_id?: string;
+  label?: string; // e.g., "Home", "Work"
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CustomerFavorite = {
@@ -68,6 +86,7 @@ export type CustomerFavorite = {
 // New types for favorite lists
 export type FavoriteListItem = {
   id: string;
+  favorite_id: string; // Alias for id, required by data-contracts
   menu_item_id: string;
   menu_item_name: string;
   menu_item_price: number | null;
@@ -97,6 +116,7 @@ type SimpleAuthContextType = {
   
   // Simple role checks
   isAdmin: boolean;
+  isStaff: boolean; // POS staff or admin
   isCustomer: boolean;
   isAuthenticated: boolean;
   
@@ -160,6 +180,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
   // Simple computed values
   const isAuthenticated = !!user;
   const isAdmin = profile?.is_admin || false;
+  const isStaff = isAdmin; // Staff = admin (for customer context, POS uses usePOSAuth)
   const isCustomer = isAuthenticated && !isAdmin;
 
   // Initialize auth state (gate behind ensured Supabase config)
@@ -1019,6 +1040,7 @@ export function SimpleAuthProvider({ children }: SimpleAuthProviderProps) {
     favoriteLists,
     isLoading,
     isAdmin,
+    isStaff,
     isCustomer,
     isAuthenticated,
     signUp,

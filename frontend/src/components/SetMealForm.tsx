@@ -449,8 +449,8 @@ const SetMealForm: React.FC<SetMealFormProps> = ({
       <SetMealItemSelector
         isOpen={itemSelectorOpen}
         onClose={() => setItemSelectorOpen(false)}
-        selectedItems={formData.items}
-        onItemsChange={handleItemsChange}
+        selectedItems={formData.items as any}
+        onItemsChange={handleItemsChange as any}
       />
     </>
   );

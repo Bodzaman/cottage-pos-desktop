@@ -4,8 +4,7 @@ import { useLocation } from 'react-router-dom';
 // Check if running in Electron environment (evaluated once at module load)
 const isElectron = typeof window !== 'undefined' &&
   (window.navigator.userAgent.toLowerCase().includes('electron') ||
-   // @ts-expect-error - electronAPI is injected by Electron preload
-   typeof window.electronAPI !== 'undefined');
+   typeof (window as any).electronAPI !== 'undefined');
 
 /**
  * Internal hook that calls useLocation - only used in web builds

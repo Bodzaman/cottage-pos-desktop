@@ -14,7 +14,7 @@ interface WizardProgressStepperProps {
 interface StepConfig {
   key: WizardStage;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   number: number;
 }
 

@@ -27,7 +27,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
 import { offlineSync, SyncStatus } from '../utils/offlineSync';
-import { globalColors, designColors } from '../utils/QSAIDesign';
+import { globalColors, colors } from '../utils/QSAIDesign';
 
 interface OfflineStatusProps {
   variant?: 'badge' | 'full' | 'minimal';
@@ -161,7 +161,7 @@ export function OfflineStatusIndicator({
 
   // Full variant - comprehensive status display
   return (
-    <Card className={`${className}`} style={{ borderColor: designColors.border.primary }}>
+    <Card className={`${className}`} style={{ borderColor: colors.border.primary }}>
       <CardContent className="p-4">
         <div className="space-y-4">
           {/* Header Status */}

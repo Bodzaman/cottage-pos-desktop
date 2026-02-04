@@ -702,9 +702,9 @@ export function POSMenuCard({
                                 )}
                                 
                                 {/* Variant-specific allergens - compact display */}
-                                {variant.allergens && variant.allergens.length > 0 && (
+                                {variant.allergens && (Array.isArray(variant.allergens) ? variant.allergens.length > 0 : Object.keys(variant.allergens).length > 0) && (
                                   <AllergenDisplay
-                                    allergens={variant.allergens}
+                                    allergens={Array.isArray(variant.allergens) ? variant.allergens : Object.keys(variant.allergens)}
                                     allergenNotes={variant.allergen_notes}
                                     compact={true}
                                     maxDisplay={2}

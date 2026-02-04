@@ -418,12 +418,13 @@ export const ManagementHeader: React.FC<Props> = ({
               phone: selectedOrder.customer_phone || '',
               email: selectedOrder.customer_email || ''
             },
-            items: selectedOrder.items?.map(item => ({
+            items: selectedOrder.items?.map((item: any) => ({
+              id: item.id || `item-${item.menu_item_id || Math.random()}`,
               name: item.name || 'Unknown Item',
               quantity: item.quantity || 1,
               price: item.price || 0,
-              modifications: item.modifications || [],
-              specialInstructions: item.notes || ''
+              modifiers: item.modifications || [],
+              notes: item.notes || ''
             })) || [],
             total: selectedOrder.total,
             subtotal: selectedOrder.subtotal,
@@ -431,22 +432,24 @@ export const ManagementHeader: React.FC<Props> = ({
             tip: selectedOrder.tip || 0,
             discount: selectedOrder.discount || 0,
             type: selectedOrder.order_type.toLowerCase() as 'delivery' | 'pickup' | 'dine-in',
-            source: selectedOrder.order_source === 'AI_VOICE' ? 'ai-voice' : 
-                   selectedOrder.order_source === 'ONLINE' || selectedOrder.order_source === 'CUSTOMER_ONLINE_MENU' ? 'online' : 'pos',
-            status: selectedOrder.status.toLowerCase(),
+            source: (selectedOrder.order_source === 'AI_VOICE' || selectedOrder.order_source === 'ONLINE' || selectedOrder.order_source === 'CUSTOMER_ONLINE_MENU') ? 'online' : 'pos',
+            status: selectedOrder.status.toLowerCase() as "completed" | "cancelled" | "pending" | "confirmed" | "preparing" | "ready",
             createdAt: selectedOrder.created_at,
             estimatedReady: selectedOrder.pickup_time || undefined,
             paymentMethod: selectedOrder.payment?.method || 'Unknown',
             notes: selectedOrder.notes || '',
             tableNumber: selectedOrder.table_number || undefined
-          }}
+          } as any}
           open={showOrderDialog}
           onOpenChange={(open) => {
             setShowOrderDialog(open);
             if (!open) setSelectedOrder(null);
           }}
-          orderSource={selectedOrder.order_source === 'AI_VOICE' ? 'ai-voice' : 
+          orderSource={selectedOrder.order_source === 'AI_VOICE' ? 'ai-voice' :
                      selectedOrder.order_source === 'ONLINE' || selectedOrder.order_source === 'CUSTOMER_ONLINE_MENU' ? 'online' : 'pos'}
+          onEdit={() => {}}
+          onPrint={() => {}}
+          onRefund={() => {}}
         />
       )}
     </header>

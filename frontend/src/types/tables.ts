@@ -95,16 +95,25 @@ export interface PersistentTableOrder {
 export interface CustomerTab {
   id: string;
   tableId: number;
+  table_id?: number; // Snake_case alias
   name: string;
+  tab_name?: string; // Snake_case alias for name
   items: OrderItem[];
+  order_items?: any[]; // Snake_case alias for items (API compatibility)
   subtotal: number;
   total: number;
   paymentStatus: PaymentStatus;
+  payment_status?: PaymentStatus; // Snake_case alias
   paymentMethod?: string;
+  payment_method?: string; // Snake_case alias
   paidAmount?: number;
+  paid_amount?: number; // Snake_case alias
   createdAt: string;
+  created_at?: string; // Snake_case alias
   updatedAt?: string;
+  updated_at?: string; // Snake_case alias
   isActive: boolean;
+  is_active?: boolean; // Snake_case alias
 }
 
 /**

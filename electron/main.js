@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, dialog, powerMonitor, screen, nativeTheme } = require('electron');
-nativeTheme.themeSource = 'dark';
+// Note: nativeTheme.themeSource is set inside app.whenReady() to avoid initialization errors
 // Note: electron-updater is lazily loaded after app.whenReady() to avoid initialization errors
 let autoUpdater = null;
 // Flag to track if update check was triggered manually (show dialogs) vs automatic startup (silent)
@@ -669,6 +669,8 @@ class CottageTandooriPOS {
         });
 
         app.whenReady().then(() => {
+            // Set dark theme after app is ready
+            nativeTheme.themeSource = 'dark';
             this.createSplashScreen();
             this.sendSplashProgress(20, 'Loading application...');
             this.createMainWindow();

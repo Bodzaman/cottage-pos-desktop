@@ -211,8 +211,8 @@ export default function CustomerDashboard({
   }, [orderHistory]);
 
   // Get default address label
-  const defaultAddressLabel = useMemo(() => {
-    const defaultAddr = addresses?.find(a => a.is_default);
+  const defaultAddressLabel = useMemo((): string => {
+    const defaultAddr = addresses?.find((a: { is_default?: boolean }) => a.is_default);
     if (defaultAddr?.label) return defaultAddr.label;
     if (defaultAddr?.address_line1) {
       return defaultAddr.address_line1.substring(0, 20) + (defaultAddr.address_line1.length > 20 ? '...' : '');

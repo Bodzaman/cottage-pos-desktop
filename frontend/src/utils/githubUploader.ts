@@ -1,5 +1,13 @@
 import brain from 'brain';
-import { UploadFileRequest } from 'types';
+
+// GitHub-specific upload request (different from generic UploadFileRequest which is for binary files)
+interface GitHubFileUploadRequest {
+  path: string;
+  content: string;
+  message: string;
+  branch: string;
+  encoding: string;
+}
 
 // Utility to upload files to QSAI-Printer-Helper repository
 export class GitHubUploader {
@@ -8,7 +16,7 @@ export class GitHubUploader {
 
   async uploadFile(path: string, content: string, message: string): Promise<boolean> {
     try {
-      const request: UploadFileRequest = {
+      const request: GitHubFileUploadRequest = {
         path,
         content,
         message,
@@ -31,7 +39,7 @@ export class GitHubUploader {
   }
 
   async uploadMultipleFiles(files: Array<{path: string, content: string, message: string}>): Promise<boolean> {
-    const requests: UploadFileRequest[] = files.map(file => ({
+    const requests: GitHubFileUploadRequest[] = files.map(file => ({
       path: file.path,
       content: file.content,
       message: file.message,

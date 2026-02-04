@@ -17,6 +17,8 @@ const stateLabel: Record<GeminiVoiceState, string> = {
   connected: "Connected",
   listening: "Listening...",
   stopping: "Stopping...",
+  error: "Error",
+  closed: "Closed",
 };
 
 export default function GeminiVoiceOrderingModal({ isOpen, onClose }: Props) {
@@ -28,7 +30,7 @@ export default function GeminiVoiceOrderingModal({ isOpen, onClose }: Props) {
     if (isOpen && !clientRef.current) {
       clientRef.current = new GeminiVoiceClient({
         onStateChange: setState,
-        onTranscript: setTranscript,
+        onServerText: setTranscript,
       });
     }
 

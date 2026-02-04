@@ -30,6 +30,7 @@ interface ExtractedAddress {
   formatted_address: string;
   latitude: number;
   longitude: number;
+  place_id?: string;
   source: 'autocomplete' | 'geocoding' | 'manual';
 }
 
@@ -323,7 +324,7 @@ export const GooglePlacesAutocompleteEnhanced: React.FC<Props> = ({
             },
             (place, status) => {
               if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-                const extractedAddress = extractAddressFromPlace(place, description);
+                const extractedAddress = extractAddressFromPlace(place as PlaceResult, description);
                 resolve(extractedAddress);
               } else {
                 console.warn('Places API failed, falling back to basic geocoding');

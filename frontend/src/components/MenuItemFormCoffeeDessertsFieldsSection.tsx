@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ServingSizesSelector } from './ServingSizesSelector';
-import { FieldError as RHFFieldError } from './FieldError';
+import { RHFFieldError } from './FieldError';
 import type { UseFormRegister, UseFormSetValue, FieldErrors, Control } from 'react-hook-form';
 import { useWatch } from 'react-hook-form';
 import type { MenuItemFormInput } from '../utils/menuFormValidation';
@@ -102,7 +102,7 @@ export const CoffeeDessertsFields = React.memo<CoffeeDessertsFieldsSectionProps>
             </Label>
             <Select
               value={formTemperature}
-              onValueChange={(value) => setValue('temperature', value, { shouldDirty: true })}
+              onValueChange={(value) => setValue('temperature', value as "hot" | "cold" | "room", { shouldDirty: true })}
               aria-label="Recommended serving temperature"
               aria-describedby="temperature-help"
             >

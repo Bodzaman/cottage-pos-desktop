@@ -39,9 +39,14 @@ interface Props {
 
 // ✅ NEW: Helper function to check if variant has any food details configured
 const hasAnyFoodDetails = (target: ItemVariant): boolean => {
+  const hasAllergens = target.allergens && (
+    Array.isArray(target.allergens)
+      ? target.allergens.length > 0
+      : Object.keys(target.allergens).length > 0
+  );
   return (
-    (target.spice_level && target.spice_level > 0) ||
-    (target.allergens && target.allergens.length > 0) ||
+    (target.spice_level && Number(target.spice_level) > 0) ||
+    hasAllergens ||
     !!(target.allergen_notes?.trim()) ||
     target.is_vegetarian === true ||
     target.is_vegan === true ||
@@ -485,21 +490,36 @@ export function CustomerVariantSelector({
                               )}
                               
                               {/* Allergen Badges */}
-                              {itemVariant.allergens && itemVariant.allergens.length > 0 && (
-                                itemVariant.allergens.map((allergen, idx) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{
-                                      backgroundColor: PremiumTheme.colors.dark[800],
-                                      borderColor: PremiumTheme.colors.gold[500],
-                                      color: PremiumTheme.colors.text.secondary
-                                    }}
-                                  >
-                                    {allergen}
-                                  </Badge>
-                                ))
+                              {itemVariant.allergens && (
+                                Array.isArray(itemVariant.allergens)
+                                  ? itemVariant.allergens.map((allergen, idx) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="text-xs"
+                                        style={{
+                                          backgroundColor: PremiumTheme.colors.dark[800],
+                                          borderColor: PremiumTheme.colors.gold[500],
+                                          color: PremiumTheme.colors.text.secondary
+                                        }}
+                                      >
+                                        {allergen}
+                                      </Badge>
+                                    ))
+                                  : Object.keys(itemVariant.allergens).map((allergen, idx) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="text-xs"
+                                        style={{
+                                          backgroundColor: PremiumTheme.colors.dark[800],
+                                          borderColor: PremiumTheme.colors.gold[500],
+                                          color: PremiumTheme.colors.text.secondary
+                                        }}
+                                      >
+                                        {allergen}
+                                      </Badge>
+                                    ))
                               )}
                               
                               {/* Dietary Flag Badges */}

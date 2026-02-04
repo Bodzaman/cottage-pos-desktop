@@ -52,7 +52,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 
 function categorizeItem(item: MenuItem): string {
   const nameLower = (item.name || '').toLowerCase();
-  const categoryLower = (item.category || '').toLowerCase();
+  const categoryLower = (item.category_name || item.categoryName || '').toLowerCase();
   const combined = `${nameLower} ${categoryLower}`;
 
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {

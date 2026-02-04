@@ -311,9 +311,8 @@ const SignatureDishSectionComponent: React.FC = () => {
               <button
                 onClick={toggleExpanded}
                 className="text-sm font-medium mt-2 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 relative z-20"
-                style={{ 
-                  color: PremiumTheme.colors.burgundy[400],
-                  focusRingColor: PremiumTheme.colors.burgundy[400]
+                style={{
+                  color: PremiumTheme.colors.burgundy[400]
                 }}
                 aria-expanded={isExpanded}
                 aria-controls={descriptionId}

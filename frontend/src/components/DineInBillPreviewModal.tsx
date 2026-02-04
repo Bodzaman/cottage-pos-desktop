@@ -111,10 +111,15 @@ export function DineInBillPreviewModal({
             price_adjustment: 0
           } : undefined,
           // EnrichedDineInOrderItem uses customizations, not modifiers
+          // Include all required fields matching ThermalPreview expectations
           customizations: (item.customizations || item.modifiers)?.map((c: any) => ({
             id: c.customization_id || c.id || `mod-${Date.now()}`,
+            customization_id: c.customization_id || c.id,
             name: c.name,
-            price: c.price_adjustment ?? c.price ?? 0
+            price: c.price_adjustment ?? c.price ?? 0,
+            price_adjustment: c.price_adjustment ?? c.price ?? 0,
+            group: c.group || '',
+            is_free: c.is_free || ((c.price_adjustment ?? c.price ?? 0) === 0)
           })) || [],
           instructions: item.notes || undefined
         };

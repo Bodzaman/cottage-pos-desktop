@@ -101,7 +101,11 @@ export const KitchenOrderItem = ({ item, orderType, onUpdateItemStatus }: Kitche
                   <p className="text-gray-400 mb-1">Variations:</p>
                   <ul className="list-disc list-inside pl-2">
                     {item.variations.map((variation, index) => (
-                      <li key={index}>{variation.name}: {variation.option}</li>
+                      <li key={index}>
+                        {typeof variation === 'string'
+                          ? variation
+                          : `${variation.name}: ${variation.option}`}
+                      </li>
                     ))}
                   </ul>
                 </div>

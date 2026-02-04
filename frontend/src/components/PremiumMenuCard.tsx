@@ -34,10 +34,13 @@ import { useMenuItemImage } from 'utils/useMenuItemImage';
 // Helper function to check if a variant has any food details configured
 const variantHasFoodDetails = (variant: ItemVariant): boolean => {
   const hasSpice = (variant.spice_level || 0) > 0;
-  const hasAllergens = (variant.allergens || []).length > 0;
+  // Handle both array and Record allergen formats
+  const rawAllergens = variant.allergens;
+  const allergensArray = !rawAllergens ? [] : Array.isArray(rawAllergens) ? rawAllergens : Object.keys(rawAllergens);
+  const hasAllergens = allergensArray.length > 0;
   const hasAllergenNotes = !!(variant.allergen_notes && variant.allergen_notes.trim());
   const hasDietaryFlags = !!(variant.is_vegetarian || variant.is_vegan || variant.is_gluten_free || variant.is_halal || variant.is_dairy_free || variant.is_nut_free);
-  
+
   return hasSpice || hasAllergens || hasAllergenNotes || hasDietaryFlags;
 };
 
@@ -769,7 +772,9 @@ export const PremiumMenuCard = React.memo(function PremiumMenuCard({
                           const variantName = getVariantDisplayName(variant);
                           const variantSpiceLevel = variant.spice_level || 0;
                           const variantSpiceEmojis = variantSpiceLevel > 0 ? getSpiceEmoji(variantSpiceLevel).repeat(Math.min(variantSpiceLevel, 3)) : '';
-                          const allergens = variant.allergens || [];
+                          // Handle both array and Record allergen formats
+                          const rawAllergens = variant.allergens;
+                          const allergens: string[] = !rawAllergens ? [] : Array.isArray(rawAllergens) ? rawAllergens : Object.keys(rawAllergens);
                           
                           const dietaryFlags = [
                             variant.is_vegetarian && { label: 'Vegetarian', emoji: '🥬' },

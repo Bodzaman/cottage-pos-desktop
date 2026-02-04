@@ -185,7 +185,7 @@ export function SetMealCustomizeModal({ isOpen, onClose, setMealItem, onSave }: 
         substitutions,
         price_adjustment: priceAdjustment,
         final_unit_price: finalPrice / quantity
-      }
+      } as any
     };
     
     onSave(orderItem);

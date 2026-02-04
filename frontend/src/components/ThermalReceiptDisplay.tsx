@@ -60,6 +60,10 @@ interface OrderData {
   guestCount?: number;
   // Payment status for PAID badge display
   paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
+  // Order source for channel badge display
+  orderSource?: 'POS' | 'ONLINE';
+  // CRM customer reference number (CTRxxxxx)
+  customerReference?: string;
 }
 
 interface ThermalReceiptDisplayProps {
@@ -109,19 +113,18 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     id: item.id,
     name: item.name,
     basePrice: item.basePrice || item.price || 0,
-    price: item.basePrice || item.price || 0, // Add price field for ThermalPreview calculations
+    price: item.basePrice || item.price || 0,
     quantity: item.quantity,
-    total: item.total || ((item.basePrice || item.price || 0) * item.quantity), // Ensure total is set
+    total: item.total || ((item.basePrice || item.price || 0) * item.quantity),
     variant: item.variant,
     customizations: item.customizations || [],
     instructions: item.instructions,
-    // Section divider support - pass through for ThermalPreview grouping
     category_id: item.category_id,
     menu_item_id: item.menu_item_id
   }));
   
   // Build complete FormData with merged data
-  const formData: FormData = {
+  const formData = {
     // Business info from template
     businessName: baseFormData.businessName || 'Cottage Tandoori',
     vatNumber: baseFormData.vatNumber || '',
@@ -152,10 +155,10 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     // Order details from orderData
     orderType: orderTypeMap[orderData.orderType] || 'collection',
     orderMode: orderData.orderType,
-    orderSource: 'POS',
+    orderSource: orderData.orderSource || 'POS',
     receiptNumber: orderData.orderNumber || orderData.orderId,
-    tableNumber: orderData.tableNumber,
-    queueNumber: orderData.queueNumber,
+    tableNumber: String(orderData.tableNumber || ''),
+    queueNumber: orderData.queueNumber ? String(orderData.queueNumber) : undefined,
     guestCount: orderData.guestCount,
     
     // Customer info from orderData
@@ -163,7 +166,8 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     customerPhone: orderData.customerPhone || '',
     customerEmail: orderData.customerEmail,
     deliveryAddress: orderData.deliveryAddress,
-    
+    customerReference: orderData.customerReference,
+
     // Timing
     collectionTime: orderData.collectionTime,
     estimatedDeliveryTime: orderData.estimatedDeliveryTime,
@@ -203,8 +207,8 @@ function mapOrderToFormData(orderData: OrderData, template: Template, receiptFor
     receiptFont: baseFormData.receiptFont || 'JetBrains Mono',
     itemsFont: baseFormData.itemsFont || 'JetBrains Mono',
     useItemsFont: baseFormData.useItemsFont ?? false
-  };
-  
+  } as unknown as FormData;
+
   return formData;
 }
 
@@ -390,7 +394,7 @@ const ThermalReceiptDisplay = forwardRef<HTMLDivElement, ThermalReceiptDisplayPr
   return (
     <div ref={ref} className={className}>
       <ThermalPreview
-        formData={formData}
+        formData={formData as any}
         paperWidth={paperWidth}
         mode="form"
         receiptFormat={previewFormat}

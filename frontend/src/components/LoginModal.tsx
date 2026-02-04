@@ -190,12 +190,6 @@ export function LoginModal({
           type="button"
           onClick={handleGoogleSignIn}
           className="w-full h-12 bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 text-white transition-all duration-200 rounded-lg flex items-center justify-center gap-3"
-          style={{
-            ':hover': {
-              borderColor: '#8B1538',
-              boxShadow: '0 0 0 2px rgba(139, 21, 56, 0.1)'
-            }
-          }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#8B1538';
             e.currentTarget.style.boxShadow = '0 0 0 2px rgba(139, 21, 56, 0.1)';

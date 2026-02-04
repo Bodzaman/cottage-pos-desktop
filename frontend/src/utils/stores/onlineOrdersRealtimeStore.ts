@@ -47,6 +47,7 @@ export interface OnlineOrder {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerReference?: string;  // CRM reference (CTRxxxxx)
   deliveryAddress?: string;
   items: OrderItem[];
   subtotal: number;
@@ -195,6 +196,8 @@ function transformOrder(rawOrder: any): OnlineOrder {
     customerName: rawOrder.customer_name || 'Customer',
     customerPhone: rawOrder.customer_phone,
     customerEmail: rawOrder.customer_email,
+    // Extract CRM reference from joined customers table or direct field
+    customerReference: rawOrder.customers?.customer_reference_number || rawOrder.customer_reference_number,
     deliveryAddress: typeof rawOrder.delivery_address === 'string'
       ? rawOrder.delivery_address
       : rawOrder.delivery_address?.formatted || '',

@@ -28,7 +28,7 @@ export function MultiCustomDetailsModal({
   onClose,
   onEditPortion,
   triggerElement
-}: MultiCustomDetailsModalProps) {
+}: MultiCustomDetailsModalProps): JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close on escape key
@@ -60,6 +60,7 @@ export function MultiCustomDetailsModal({
     return null;
   }
 
+  // Cast to ReactElement for JSX compatibility
   return createPortal(
     <AnimatePresence>
       {/* Backdrop */}
@@ -290,5 +291,5 @@ export function MultiCustomDetailsModal({
       </motion.div>
     </AnimatePresence>,
     document.body
-  );
+  ) as JSX.Element;
 }

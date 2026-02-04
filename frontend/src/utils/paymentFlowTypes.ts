@@ -24,7 +24,7 @@ export enum PaymentFlowStep {
 /**
  * Payment method types supported in the orchestrator
  */
-export type PaymentMethod = 'CASH' | 'STRIPE';
+export type PaymentMethod = 'CASH' | 'STRIPE' | 'ADYEN' | 'CARD';
 
 /**
  * Customer data for payment processing
@@ -36,8 +36,10 @@ export interface CustomerData {
   email?: string;
   address?: string;
   street?: string;
+  city?: string;
   postcode?: string;
   deliveryInstructions?: string;
+  deliveryNotes?: string;  // Alias for deliveryInstructions
 }
 
 /**

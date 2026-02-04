@@ -5,6 +5,7 @@ interface Props {
   children: ReactNode;
   threshold?: number;
   className?: string;
+  delay?: number;
 }
 
 export function AnimatedSection({ children, threshold = 0.1, className = "" }: Props) {

@@ -5,6 +5,9 @@ import { toast } from 'sonner';
 import { usePOSCustomerStore } from './posCustomerStore';
 import { useCustomerDataStore } from './customerDataStore';
 
+// Re-export RecentOrder for components that need it
+export type { RecentOrder };
+
 // Extended types for our store
 export interface CustomerIntelligenceProfile extends CustomerProfile {
   default_address?: AppApisCustomerProfileApiCustomerAddress | null;
@@ -40,6 +43,7 @@ interface CustomerIntelligenceState {
   // Results
   customerProfile: CustomerIntelligenceProfile | null;
   searchResults: CustomerSearchResult[];  // Multiple results from name search
+  orderHistory?: any[];  // Customer's order history
 
   // UI State
   isSearching: boolean;
@@ -50,6 +54,7 @@ interface CustomerIntelligenceState {
   setSearchQuery: (field: keyof SearchQuery, value: string) => void;
   searchCustomer: (field: keyof SearchQuery, value: string) => Promise<void>;
   selectCustomer: (customer: CustomerSearchResult) => Promise<void>;  // Select from dropdown
+  loadCustomerById?: (customerId: string) => Promise<void>;  // Load customer by ID
   clearSearch: () => void;
   clearSearchResults: () => void;  // Clear dropdown results
   clearCustomer: () => void;

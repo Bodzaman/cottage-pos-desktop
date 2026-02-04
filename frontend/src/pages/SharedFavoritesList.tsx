@@ -71,7 +71,7 @@ export default function SharedFavoritesList() {
         name: 'Standard',
         price: item.price || 0,
         price_adjustment: 0
-      }, [], 1, '');
+      }, 1, [], undefined, '');
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add item to cart');
@@ -135,7 +135,7 @@ export default function SharedFavoritesList() {
             <div className="text-right">
               <div className="flex items-center gap-2 text-sm text-[#8B92A0]">
                 <User className="h-4 w-4" />
-                <span>Shared by {listData.shared_by}</span>
+                <span>Shared by {listData.shared_by_name}</span>
               </div>
             </div>
           </div>

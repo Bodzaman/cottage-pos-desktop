@@ -110,7 +110,7 @@ export function validateField(
   if (rules.required && !val) {
     return {
       isValid: false,
-      error: rules.errorMessages.required,
+      error: (rules.errorMessages as { required?: string }).required || 'This field is required',
     };
   }
 
@@ -123,7 +123,7 @@ export function validateField(
   if ('minLength' in rules && val.length < rules.minLength) {
     return {
       isValid: false,
-      error: rules.errorMessages.minLength,
+      error: (rules.errorMessages as { minLength?: string }).minLength || `Minimum length is ${rules.minLength}`,
     };
   }
 

@@ -141,8 +141,9 @@ export const VariantTableEditor: React.FC<VariantTableEditorProps> = ({
 
   // Validate variants whenever they change
   useEffect(() => {
-    const errors = validateVariantPricing(variants);
-    setValidationErrors(errors);
+    const result = validateVariantPricing(variants);
+    // Combine warnings and errors for display
+    setValidationErrors([...result.errors, ...result.warnings]);
   }, [variants]);
 
   /**

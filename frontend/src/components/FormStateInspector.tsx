@@ -246,7 +246,7 @@ export const FormStateInspector: React.FC<FormStateInspectorProps> = ({
                       <div className="space-y-1 text-xs text-gray-300">
                         <div>Name: <span className="text-white">{variant.name}</span></div>
                         {variant.protein_type && (
-                          <div>Protein: <span className="text-white">{variant.protein_type}</span></div>
+                          <div>Protein: <span className="text-white">{typeof variant.protein_type === 'object' ? (variant.protein_type as { name?: string }).name || JSON.stringify(variant.protein_type) : String(variant.protein_type)}</span></div>
                         )}
                         <div>Prices:</div>
                         <div className="pl-3 space-y-0.5">

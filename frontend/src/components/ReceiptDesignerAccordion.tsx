@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -671,6 +672,42 @@ export function ReceiptDesignerAccordion({ className = '', isLoadingSettings = f
               <p className="text-[10px]" style={{ color: QSAITheme.text.muted }}>
                 Configure what appears on kitchen tickets
               </p>
+
+              {/* Ticket Rail Margin Settings */}
+              <div className="space-y-2 pb-3 border-b" style={{ borderColor: QSAITheme.border.light }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs block" style={mutedStyle}>Ticket Rail Margin</span>
+                    <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Top space for ticket rails ({formData.kitchenTicketRailMargin ?? 15}mm)</span>
+                  </div>
+                </div>
+                <Slider
+                  value={[formData.kitchenTicketRailMargin ?? 15]}
+                  onValueChange={([value]) => updateField('kitchenTicketRailMargin', value)}
+                  min={0}
+                  max={30}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-[10px]" style={{ color: QSAITheme.text.muted }}>
+                  <span>0mm</span>
+                  <span>30mm</span>
+                </div>
+
+                {(formData.kitchenTicketRailMargin ?? 15) > 0 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <span className="text-xs block" style={mutedStyle}>Show Pull Tab</span>
+                      <span className="text-[10px]" style={{ color: QSAITheme.text.muted }}>Chevron arrows in margin area</span>
+                    </div>
+                    <Switch
+                      checked={formData.kitchenShowPullTab !== false}
+                      onCheckedChange={(checked) => updateField('kitchenShowPullTab', checked)}
+                      className="scale-90"
+                    />
+                  </div>
+                )}
+              </div>
 
               {/* Receipt Number Visibility */}
               <div className="flex items-center justify-between">

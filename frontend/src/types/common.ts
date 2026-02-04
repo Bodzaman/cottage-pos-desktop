@@ -13,18 +13,18 @@
 
 /**
  * Order mode for cart and checkout
- * Standardized to lowercase per project conventions
+ * Includes both lowercase (preferred) and uppercase (legacy) formats
  */
-export type OrderMode = 'delivery' | 'collection' | 'dine-in';
+export type OrderMode = 'delivery' | 'collection' | 'dine-in' | 'DELIVERY' | 'COLLECTION' | 'DINE-IN' | 'DINE_IN';
 
 /**
  * Order type for database storage (uppercase underscore format)
  * Matches database enum: order_type_enum
  *
- * NOTE: Changed from 'DINE-IN' to 'DINE_IN' to match database enum
+ * NOTE: Includes 'DINE-IN' for legacy compatibility, prefer 'DINE_IN' for new code
  * WAITING is no longer a valid order type - use order_subtype='WAITING' instead
  */
-export type OrderType = 'DINE_IN' | 'COLLECTION' | 'DELIVERY';
+export type OrderType = 'DINE_IN' | 'DINE-IN' | 'COLLECTION' | 'DELIVERY' | 'WAITING';
 
 /**
  * Legacy order type for backwards compatibility
@@ -215,6 +215,7 @@ export type PaymentMethodType =
 
 /**
  * Payment status - matches database enum: payment_status_enum
+ * Includes legacy values for backwards compatibility
  */
 export type PaymentStatus =
   | 'PENDING'     // Order created, no payment yet
@@ -222,7 +223,9 @@ export type PaymentStatus =
   | 'PAID'        // Payment confirmed
   | 'FAILED'      // Payment declined
   | 'REFUNDED'    // Payment refunded
-  | 'CANCELLED';  // Cancelled before processing
+  | 'CANCELLED'   // Cancelled before processing
+  | 'UNPAID'      // Legacy: same as PENDING
+  | 'PARTIAL';    // Legacy: partial payment received
 
 /**
  * Legacy payment status for backwards compatibility

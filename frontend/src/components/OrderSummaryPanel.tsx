@@ -1010,7 +1010,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
       <OrderConfirmationModal
         isOpen={!!showOrderConfirmation}
         onClose={handleOrderConfirmationClose}
-        orderItems={items}
+        orderItems={items as any}
         orderType={orderType}
         tableNumber={tableNumber}
         guestCount={guestCount}
@@ -1192,7 +1192,7 @@ const OrderSummaryPanel = React.memo(function OrderSummaryPanel({
               setCustomizingOrderItem(null);
               setCustomizingItemIndex(-1);
             }}
-            onAddToOrder={handleCustomizationConfirm}
+            onAddToOrder={handleCustomizationConfirm as any}
             orderType={orderType}
             initialVariant={variant}
             initialQuantity={customizingOrderItem.quantity}

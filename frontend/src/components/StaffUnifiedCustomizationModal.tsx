@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MenuItem, ItemVariant, Customization, OrderItem } from '../utils/types';
+import { MenuItem, ItemVariant, Customization } from '../utils/types';
+import type { OrderItem } from 'types';
 import { useRealtimeMenuStoreCompat } from '../utils/realtimeMenuStoreCompat';
 import { FIXED_SECTIONS, findRootSection } from '../utils/sectionMapping';
 import { cn } from '../utils/cn';
@@ -403,6 +404,7 @@ export function StaffUnifiedCustomizationModal({
         customization_id: c.id,
         name: c.name,
         price: c.price_adjustment,
+        priceAdjustment: c.price_adjustment, // Required camelCase field
         price_adjustment: c.price_adjustment,
         group: c.group || '',
         is_free: c.is_free || c.price_adjustment === 0,

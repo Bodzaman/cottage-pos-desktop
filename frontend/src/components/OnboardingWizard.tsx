@@ -49,6 +49,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onNavigateToSection
     postal_code: '',
     address_type: 'home',
     is_default: true,
+    delivery_instructions: null as string | null,
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     place_id: undefined as string | undefined

@@ -110,6 +110,11 @@ export function useChatAnalytics() {
             }
           },
           topIntents: conversationData.topIntents || [],
+          systemHealth: {
+            apiStatus: statsData.api_status || 'operational',
+            databaseStatus: statsData.database_status || 'connected',
+            aiModelsStatus: statsData.ai_models_status || 'available'
+          },
           escalationDetails: {
             complexOrders: conversationData.escalationDetails?.complexOrders || 0,
             allergenQueries: conversationData.escalationDetails?.allergenQueries || 0,

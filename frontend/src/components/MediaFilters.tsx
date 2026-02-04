@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Filter } from 'lucide-react';
-import { SortOption } from '../pages/MediaLibrary';
+
+// Sort option type for media library
+export type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc';
 
 interface MediaFiltersProps {
   onFilterChange: (filters: any) => void;

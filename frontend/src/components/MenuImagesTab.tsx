@@ -1,7 +1,8 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { MediaGalleryGrid } from 'components/MediaGalleryGrid';
-import { MediaAsset, MenuSection } from '../utils/mediaHierarchyUtils';
+import { MenuSection } from '../utils/mediaHierarchyUtils';
+import { MediaAsset } from '../utils/mediaLibraryUtils';
 
 interface MenuImagesTabProps {
   sections: MenuSection[];

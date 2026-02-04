@@ -303,7 +303,13 @@ export function OnlineMenuCard({
   // ✅ VARIANT-AWARE ALLERGENS: Show variant allergens if selected
   const getDisplayAllergens = (): string[] => {
     if (isMultiVariant && selectedVariant?.allergens) {
-      return selectedVariant.allergens;
+      const allergens = selectedVariant.allergens;
+      // Handle both array and Record formats
+      if (Array.isArray(allergens)) {
+        return allergens;
+      }
+      // Convert Record to array of keys (allergen names)
+      return Object.keys(allergens);
     }
     return []; // Item-level allergens not stored in MenuItem
   };
@@ -927,7 +933,7 @@ export function OnlineMenuCard({
                     price_delivery: item.price_delivery ?? item.price_takeaway ?? item.price ?? 0
                   };
                 }
-                addItem(item, variantForCart, quantity, '');
+                addItem(item, variantForCart, quantity, [], undefined, '');
                 const message = quantity > 1 ? `Added ${quantity} items to cart!` : 'Added to cart!';
                 toast.success(message);
                 setQuantity(1);
@@ -1004,7 +1010,12 @@ export function OnlineMenuCard({
         onClose={() => setIsCustomizationModalOpen(false)}
         addToCart={(menuItem, qty, variant, customizations) => {
           // Pass to addItem: (item, variant, qty, customizations, mode, notes)
-          addItem(menuItem as any, variant as any, qty, customizations || [], mode, '');
+          // Map SelectedCustomization to CartCustomization, ensuring price is set
+          const cartCustomizations = (customizations || []).map(c => ({
+            ...c,
+            price: c.price ?? c.price_adjustment ?? 0,
+          }));
+          addItem(menuItem as any, variant as any, qty, cartCustomizations, mode, '');
           toast.success(`Added ${qty}x ${variant?.name || menuItem.name} to cart`);
           setIsCustomizationModalOpen(false);
           setQuantity(1);

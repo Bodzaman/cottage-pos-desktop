@@ -31,50 +31,71 @@ import type { ModifierSelection, CustomizationSelection } from './menu';
  * Order item definition
  * Represents a single item in an order
  *
- * NOTE: Snake_case aliases removed - use mapper functions for API conversion
+ * NOTE: Includes snake_case aliases for API compatibility and direct object construction.
+ * Use mapper functions (mapOrderItemToApi, mapApiOrderItemToOrderItem) for formal conversions.
  */
 export interface OrderItem {
-  // Core fields - REQUIRED
-  id: string;
-  menuItemId: string;
+  // Core fields - id is optional to support both new and existing items
+  id?: string;
+  menuItemId?: string;
+  menu_item_id?: string; // Snake_case alias
   variantId?: string | null;
+  variant_id?: string | null; // Snake_case alias
   name: string;
   quantity: number;
   price: number;
+  total?: number; // Computed total (quantity * price + customizations)
 
   // Variant info
   variantName?: string;
+  variant_name?: string; // Snake_case alias
 
   // Notes and customizations
   notes?: string;
   proteinType?: string;
+  protein_type?: string; // Snake_case alias
   imageUrl?: string;
-  modifiers: ModifierSelection[];
+  image_url?: string; // Snake_case alias
+  modifiers?: ModifierSelection[];
   customizations?: CustomizationSelection[];
 
   // Category tracking for receipt organization - important for printing
   categoryId?: string;
+  category_id?: string; // Snake_case alias
   categoryName?: string;
+  category_name?: string; // Snake_case alias
 
   // Set meal fields
   itemType?: 'menu_item' | 'set_meal';
+  item_type?: 'menu_item' | 'set_meal'; // Snake_case alias
   setMealCode?: string;
+  set_meal_code?: string; // Snake_case alias
   setMealItems?: Array<{
     menuItemName: string;
     quantity: number;
     categoryName?: string;
   }>;
+  set_meal_items?: Array<{
+    menu_item_name: string;
+    quantity: number;
+    category_name?: string;
+  }>; // Snake_case alias
 
   // Customer identification for kitchen tickets (dine-in split billing)
   customerName?: string;
+  customer_name?: string; // Snake_case alias
   customerNumber?: number;
+  customer_number?: number; // Snake_case alias
   customerTabId?: string;
+  customer_tab_id?: string; // Snake_case alias
 
   // Kitchen display
   kitchenDisplayName?: string | null;
+  kitchen_display_name?: string | null; // Snake_case alias
 
   // Display order
   displayOrder?: number;
+  display_order?: number; // Snake_case alias
 
   // Kitchen status tracking
   status?: 'NEW' | 'PREPARING' | 'READY' | 'SERVED';
@@ -82,6 +103,21 @@ export interface OrderItem {
   // Section override for "Serve With" feature
   // When set, item prints/displays in this section instead of natural category section
   serveWithSectionId?: string | null;
+  serve_with_section_id?: string | null; // Snake_case alias
+
+  // For linked table billing - tracks which table the item came from
+  sourceTableNumber?: number;
+  source_table_number?: number; // Snake_case alias
+
+  // Nested variant object for backend compatibility (dine_in_commands expects nested variant)
+  variant?: {
+    id: string;
+    name: string;
+    price?: number;
+    protein_type?: string;
+    protein_type_name?: string;
+    price_adjustment?: number;
+  };
 }
 
 /**
@@ -166,8 +202,11 @@ export interface CompletedOrder {
   subtotal: number;
   discount?: number;
   discountCode?: string;
+  discount_code?: string;  // Snake_case alias
   deliveryFee?: number;
+  delivery_fee?: number;  // Snake_case alias
   serviceFee?: number;
+  service_fee?: number;  // Snake_case alias
   tax?: number;  // NEW: Calculated tax amount
   tip?: number;
   total: number;
@@ -188,9 +227,13 @@ export interface CompletedOrder {
 
   // AI Voice order fields
   isVoiceOrder?: boolean;
+  is_voice_order?: boolean;  // Snake_case alias
   voiceTranscript?: string;
+  voice_transcript?: string;  // Snake_case alias
   voiceAgentId?: string;
+  voice_agent_id?: string;  // Snake_case alias
   voiceConfidence?: number;
+  voice_confidence?: number;  // Snake_case alias
 
   // Timestamps
   createdAt: string;
@@ -198,6 +241,7 @@ export interface CompletedOrder {
   completedAt?: string;
   scheduledFor?: string;
   acceptedAt?: string;  // NEW: When order was accepted
+  estimated_time?: number;  // Estimated completion time in minutes
 
   // Notes
   specialInstructions?: string;
@@ -248,14 +292,19 @@ export interface KitchenOrder {
  */
 export interface DeliveryAddress {
   id?: string;
-  addressLine1: string;
+  addressLine1?: string;
+  address_line1?: string; // Snake_case alias - at least one should be present
   addressLine2?: string;
+  address_line2?: string; // Snake_case alias
   city?: string;
-  postcode: string;
+  postcode?: string;
+  postal_code?: string; // Snake_case alias
   latitude?: number;
   longitude?: number;
   isDefault?: boolean;
+  is_default?: boolean; // Snake_case alias
   deliveryNotes?: string;
+  delivery_instructions?: string; // Snake_case alias
 }
 
 /**
@@ -263,7 +312,13 @@ export interface DeliveryAddress {
  */
 export interface CustomerAddress extends DeliveryAddress {
   customerId?: string;
+  customer_id?: string; // Snake_case alias
   label?: string; // e.g., "Home", "Work"
+  address_type?: string;
+  country?: string;
+  place_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**

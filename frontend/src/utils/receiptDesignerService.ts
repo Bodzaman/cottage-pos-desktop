@@ -20,6 +20,7 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  warning?: string;  // For partial success scenarios (e.g., kitchen variant failed)
 }
 
 // ==================== Template Service ====================

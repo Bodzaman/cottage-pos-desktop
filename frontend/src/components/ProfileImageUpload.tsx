@@ -126,7 +126,6 @@ export const ProfileImageUpload: React.FC<Props> = ({
     reader.onloadend = () => {
       setPreviewImage(reader.result as string);
       setSelectedFile(file);
-      setShowUploadModal(false);
       setShowCropModal(true); // Show crop modal instead of uploading directly
     };
     reader.readAsDataURL(file);
@@ -252,7 +251,7 @@ export const ProfileImageUpload: React.FC<Props> = ({
         setShowCropModal(false);
         setPreviewImage(null);
         setSelectedFile(null);
-        setCropState({ crop: { x: 0, y: 0 }, zoom: 1, croppedAreaPixels: null });
+        setCropState({ crop: { x: 0, y: 0 }, zoom: 1, rotation: 0, croppedAreaPixels: null });
       } else {
         throw new Error(data.error || 'Failed to upload image');
       }
@@ -268,7 +267,7 @@ export const ProfileImageUpload: React.FC<Props> = ({
     setShowCropModal(false);
     setPreviewImage(null);
     setSelectedFile(null);
-    setCropState({ crop: { x: 0, y: 0 }, zoom: 1, croppedAreaPixels: null });
+    setCropState({ crop: { x: 0, y: 0 }, zoom: 1, rotation: 0, croppedAreaPixels: null });
   };
 
   return (

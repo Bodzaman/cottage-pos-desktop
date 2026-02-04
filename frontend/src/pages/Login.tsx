@@ -182,7 +182,7 @@ export default function Login() {
               inputMode="email"
               autoComplete="email"
               autoFocus
-              error={errors.email?.message}
+              error={errors.email?.message as string | undefined}
               {...register("email")}
             />
 
@@ -193,7 +193,7 @@ export default function Login() {
               placeholder="Enter your password"
               autoComplete="current-password"
               showPasswordToggle
-              error={errors.password?.message}
+              error={errors.password?.message as string | undefined}
               {...register("password")}
             />
 

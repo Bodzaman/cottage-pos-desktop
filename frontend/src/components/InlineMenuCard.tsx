@@ -13,11 +13,14 @@ import { MenuItem, ItemVariant } from '../utils/types';
 import { useVariantImageCarousel } from 'utils/useVariantImageCarousel';
 import { computeUnitPrice } from 'utils/priceUtils';
 
-interface InlineMenuCardProps {
-  itemId: string; // UUID of menu_item
+export interface InlineMenuCardProps {
+  itemId?: string; // UUID of menu_item
+  menuItemId?: string; // Alias for itemId (for compatibility with VoiceActivityPanel)
   itemData?: MenuItem; // Direct item data (bypasses store lookup when provided)
   className?: string;
   animationDelay?: number; // ✅ NEW: Delay in ms for staggered animations (default: 0)
+  orderMode?: string; // Optional order mode override (uses cart store default)
+  compact?: boolean; // Optional compact mode (unused, for API compatibility)
 }
 
 /**
@@ -35,7 +38,9 @@ interface InlineMenuCardProps {
  * - Expandable description with "See more/See less"
  * - Supports both variant-based and single items
  */
-export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0 }: InlineMenuCardProps) {
+export function InlineMenuCard({ itemId, menuItemId, itemData, className, animationDelay = 0, orderMode, compact }: InlineMenuCardProps) {
+  // Support both itemId and menuItemId props for compatibility
+  const resolvedItemId = itemId || menuItemId || '';
   // ✅ CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // This ensures consistent hook call order on every render (React Rules of Hooks)
   const { menuItems, itemVariants, proteinTypes, customizations, isLoading } = useRealtimeMenuStoreCompat({ context: 'online' });
@@ -47,11 +52,11 @@ export function InlineMenuCard({ itemId, itemData, className, animationDelay = 0
   const [quantity, setQuantity] = React.useState(1);
 
   // Use provided item data or fall back to store lookup by UUID
-  const menuItem = itemData || menuItems?.find(item => item.id === itemId);
+  const menuItem = itemData || menuItems?.find(item => item.id === resolvedItemId);
 
   // Get variants for this item (may be empty for single items)
   // Note: itemVariants from realtimeMenuStore use snake_case fields (menu_item_id, is_active)
-  const variants = itemVariants?.filter(variant => variant.menu_item_id === itemId && variant.is_active) || [];
+  const variants = itemVariants?.filter(variant => variant.menu_item_id === resolvedItemId && variant.is_active) || [];
   const activeVariants = variants.filter(v => v.is_active).sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
   const isVariantBased = activeVariants.length > 0;
   const defaultVariant = activeVariants.find(v => v.is_default) || activeVariants[0];

@@ -20,6 +20,7 @@ export interface ExtractedAddress {
   formatted_address: string;
   latitude: number;
   longitude: number;
+  place_id?: string;
   source: 'autocomplete' | 'geocoding' | 'manual' | 'postcode-lookup';
 }
 

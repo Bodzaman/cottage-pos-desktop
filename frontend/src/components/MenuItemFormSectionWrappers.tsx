@@ -44,7 +44,7 @@ export const MenuItemFormErrorDisplay = React.memo<ErrorDisplayProps>(({
             <ul className="list-disc list-inside mt-2 space-y-1">
               {Object.entries(errors).map(([field, error]) => (
                 <li key={field} className="text-sm">
-                  {field}: {error?.message}
+                  {field}: {typeof error === 'string' ? error : (error as { message?: string })?.message}
                 </li>
               ))}
             </ul>

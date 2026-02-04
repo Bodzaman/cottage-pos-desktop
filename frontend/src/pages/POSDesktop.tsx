@@ -568,7 +568,7 @@ export default function POSDesktop() {
 
     isPersistingRef.current = true;
     try {
-      for (const item of dineInStagingItems) await addItemToDineIn(item);
+      for (const item of dineInStagingItems) await addItemToDineIn(item as any);
       setDineInStagingItems([]);
       return true;
     } catch { return false; }
@@ -857,9 +857,9 @@ export default function POSDesktop() {
     if (customerId) {
       // Known customer - load their profile
       try {
-        const profile = await usePOSCustomerIntelligence.getState().loadCustomerById(customerId);
+        await usePOSCustomerIntelligence.getState().loadCustomerById?.(customerId);
+        const profile = usePOSCustomerIntelligence.getState().customerProfile;
         if (profile) {
-          usePOSCustomerIntelligence.getState().selectCustomer(profile);
           toast.success('Customer loaded', {
             description: `Ready to take order for ${profile.first_name || 'customer'}`
           });
@@ -1051,8 +1051,8 @@ export default function POSDesktop() {
       shouldRestoreMenuScrollRef.current = true;
     }
 
-    if (orderType === 'DINE-IN') addItemToDineInRef.current(item);
-    else orderManagementRef.current.handleAddToOrder(item);
+    if (orderType === 'DINE-IN') addItemToDineInRef.current(item as any);
+    else orderManagementRef.current.handleAddToOrder(item as any);
   }, [orderType]);  // NOTE: No addItemToDineIn - using ref instead
 
   const handleClearOrder = useCallback(async () => {
@@ -1332,13 +1332,16 @@ export default function POSDesktop() {
         p_order_data: {
           orderNumber: order.orderNumber,
           orderType: order.orderType,
+          orderSource: 'ONLINE',  // Mark as online order for badge display
           items: order.items,
           subtotal: order.subtotal,
           deliveryFee: order.deliveryFee,
           total: order.total,
           customerName: order.customerName,
           customerPhone: order.customerPhone,
+          customerReference: order.customerReference,  // CRM reference (CTRxxxxx)
           deliveryAddress: order.deliveryAddress,
+          specialInstructions: order.specialInstructions,
         },
         p_printer_id: null,
         p_priority: 5,

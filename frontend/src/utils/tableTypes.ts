@@ -92,7 +92,7 @@ export interface TableOrderItem extends OrderItem {
   lastKitchenPrintAt?: Date | null; // When this item was last printed on a kitchen ticket
   lastUpdatedAt?: Date; // When this item was last updated
   // Kitchen display fields
-  variations?: string[]; // Item variations/customizations for kitchen display
+  variations?: Array<{ name: string; option: string }> | string[]; // Item variations/customizations for kitchen display
   specialInstructions?: string; // Special instructions for kitchen
 }
 

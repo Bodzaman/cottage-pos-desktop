@@ -15,7 +15,7 @@ interface ModifierGroup {
   description?: string;
   selection_type: 'SINGLE' | 'MULTIPLE';
   is_required: boolean;
-  menu_item_id: string;
+  menu_item_id?: string;
   modifiers: Modifier[];
 }
 

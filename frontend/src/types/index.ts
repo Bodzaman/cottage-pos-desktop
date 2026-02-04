@@ -8,8 +8,9 @@
  * import { MenuItem, OrderItem, CartItem, OrderMode } from 'types';
  */
 
-// Import base CustomerProfile for extension
+// Import base types for extension
 import type { CustomerProfile as BaseCustomerProfileType } from '../brain/data-contracts';
+import type { AgentProfileOutput as BaseAgentProfileType } from '../brain/data-contracts';
 
 // ================================
 // COMMON TYPES
@@ -52,14 +53,13 @@ export {
 // API TYPES (Re-exports from data-contracts)
 // ================================
 export type {
-  // Agent profiles
-  AgentProfileOutput as AgentProfile,
+  // Agent profiles (base types)
   AgentProfileOutput,
   AgentProfileInput,
   AgentProfilesResponse,
 
-  // Tables
-  PosTableResponse,
+  // Tables (base types from API)
+  PosTableResponse as BasePosTableResponse,
   TablesResponse,
 
   // Enriched types
@@ -101,11 +101,28 @@ export type OrderModelResponse = {
   total?: number;
 };
 
+// Extended PosTableResponse with linked table properties
+// The base type from API doesn't include all linked table fields
+import type { PosTableResponse as BasePosTableResponseType } from '../brain/data-contracts';
+export interface PosTableResponse extends BasePosTableResponseType {
+  linked_table_group_id?: string | null;
+  linked_with_tables?: number[] | null;
+  updated_at?: string;
+}
+
 // Extended CustomerProfile with additional fields for profile image and auth provider
 export interface CustomerProfile extends BaseCustomerProfileType {
   image_url?: string | null;
   google_profile_image?: string | null;
   auth_provider?: string | null;
+}
+
+// Extended AgentProfile with additional fields
+export interface AgentProfile extends BaseAgentProfileType {
+  agent_role?: string | null;
+  agent_type?: string | null;
+  expertise?: string[] | null;
+  date_of_expiry?: string | null; // For passport-style display
 }
 
 // ================================

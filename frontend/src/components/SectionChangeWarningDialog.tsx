@@ -6,14 +6,19 @@ import { AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface SectionChangeWarningDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  open?: boolean; // Alias for isOpen
+  onClose?: () => void;
+  onOpenChange?: (open: boolean) => void; // Alias for onClose
+  onCancel?: () => void; // Alias for onClose
   onConfirm: () => void;
   categoryName: string;
-  oldSectionName: string | null;
-  newSectionName: string;
-  itemsAffected: number;
-  subcategoriesAffected: number;
+  oldSectionName?: string | null;
+  currentSection?: string | null; // Alias for oldSectionName
+  newSectionName?: string;
+  newSection?: string; // Alias for newSectionName
+  itemsAffected: number | any;
+  subcategoriesAffected: number | any;
   isLoading?: boolean;
 }
 

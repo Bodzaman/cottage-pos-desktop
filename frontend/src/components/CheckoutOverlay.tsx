@@ -438,9 +438,9 @@ export default function CheckoutOverlay({ isOpen, orderMode, onClose, onBack }: 
           address_line2: null,
           city: customerDetails.city || 'London',
           postal_code: customerDetails.postcode,
-          country: 'GB',
           address_type: 'home',
-          is_default: false
+          is_default: false,
+          delivery_instructions: null
         });
         toast.success('Address saved to your account!');
       }

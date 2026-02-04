@@ -7,7 +7,7 @@ import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colors } from 'utils/designSystem';
 
-interface NumberStepperInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
+interface NumberStepperInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'size' | 'onChange'> {
   label?: string;
   description?: string;
   error?: string;

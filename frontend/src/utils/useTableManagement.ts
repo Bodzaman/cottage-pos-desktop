@@ -42,6 +42,11 @@ export interface Table {
   lastBillPrintedAt: Date | null;
   lastSentToKitchenAt: Date | null;
   splitBills: SplitBill[];
+  // Table linking support
+  linkedTableNumbers: number[];
+  isLinkedTable: boolean;
+  isLinkedPrimary: boolean;
+  linkedGroupId: string | null;
 }
 
 export interface UseTableManagementReturn {
@@ -95,7 +100,12 @@ const initializeTable = (tableNumber: number, capacity: number, status: Table['s
   billPrinted: false,
   lastBillPrintedAt: null,
   lastSentToKitchenAt: null,
-  splitBills: []
+  splitBills: [],
+  // Linked table properties
+  linkedTableNumbers: [],
+  isLinkedTable: false,
+  isLinkedPrimary: false,
+  linkedGroupId: null
 });
 
 /**
@@ -359,8 +369,8 @@ export const useTableManagement = (): UseTableManagementReturn => {
     ));
     
     // Sync with kitchen service
-    kitchenService.updateOrderStatus(tableData.activeOrderId, 'IN_KITCHEN');
-    kitchenService.syncWithPOS(tables);
+    kitchenService.updateOrderStatus(tableData.activeOrderId, 'PREPARING');
+    kitchenService.syncWithPOS(tables as any);
     
     toast.success(`Order sent to kitchen for Table ${selectedTableNumber}`);
   }, [selectedTableNumber, getCurrentTableData, tables]);

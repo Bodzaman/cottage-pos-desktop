@@ -106,5 +106,3 @@ export function LazyRechartsWrapper({
     </Suspense>
   );
 }
-
-export { LazyRechartsWrapper };

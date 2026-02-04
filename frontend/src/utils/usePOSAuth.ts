@@ -15,6 +15,7 @@ export type UserRole = 'staff' | 'admin';
 
 interface POSStaffUser {
   userId: string;
+  id?: string; // Alias for userId
   username: string;
   fullName: string;
   role: UserRole;
@@ -24,6 +25,7 @@ interface POSAuthStore {
   user: POSStaffUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  userId?: string | null; // Convenience property for user?.id
 
   // PIN state (persisted)
   pinEnabled: boolean;
@@ -56,6 +58,7 @@ export const usePOSAuth = create<POSAuthStore>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      get userId() { return get().user?.id ?? null; },
       pinEnabled: false,
       lastUserId: null,
       lastUserName: null,

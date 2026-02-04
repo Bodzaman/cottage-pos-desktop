@@ -35,7 +35,10 @@ export function PaymentNotification({
       setRefreshing(false);
     }
   };
-  
+
+  // Alias for button click handler
+  const handleRefresh = loadNotifications;
+
   // Load notifications on initial render
   useEffect(() => {
     loadNotifications();

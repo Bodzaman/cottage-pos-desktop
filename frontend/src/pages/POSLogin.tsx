@@ -347,7 +347,7 @@ export default function POSLogin() {
               </div>
               <PINPad
                 mode="login"
-                staffName={lastUserName || undefined}
+                staffName={lastUserRole === 'staff' ? 'Team' : lastUserName || undefined}
                 delayAnimation={isInitialMount.current && isElectron}
                 onSubmit={async (pin) => {
                   const success = await loginWithPin(pin);

@@ -20,7 +20,7 @@ interface MultiNationalityPassportCardProps {
   isActive?: boolean;
   status?: AgentStatus;
   onSelect?: () => void;
-  onTestVoice?: () => void;
+  onTestVoice?: (e?: React.MouseEvent) => void;
   showTestButton?: boolean;
   onTest?: () => void;
   size?: 'small' | 'medium' | 'large' | string;
@@ -29,6 +29,9 @@ interface MultiNationalityPassportCardProps {
     voiceCallStatus: VoiceCallStatus;
     disabled: boolean;
   };
+  // Direct props for backwards compatibility with older call sites
+  isTestingVoice?: boolean;
+  voiceCallStatus?: VoiceCallStatus;
   className?: string;
   mode?: 'display' | 'testing';
   style?: React.CSSProperties;

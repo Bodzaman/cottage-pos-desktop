@@ -86,7 +86,7 @@ export function CustomerTabsList({
               key={customerTab.id}
               variant={isActive ? "default" : "outline"}
               size="sm"
-              onClick={() => onCustomerTabSelect(customerTab)}
+              onClick={() => onCustomerTabSelect(customerTab as any)}
               className="flex items-center gap-2 relative"
               style={{
                 backgroundColor: isActive ? QSAITheme.purple.primary : 'transparent',

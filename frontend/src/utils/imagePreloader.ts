@@ -51,7 +51,7 @@ class ImagePreloaderService {
           url: item.image_thumb_url,
           priority: (item.image_priority as ImagePriority) || 'deferred',
           order: item.preload_order || 999,
-          estimatedLoadTime: item.estimated_load_time || 500,
+          estimatedLoadTime: item.estimated_load_time_ms || 500,
           resolve: () => {},
           reject: () => {}
         });

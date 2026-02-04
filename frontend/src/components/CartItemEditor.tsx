@@ -52,6 +52,7 @@ export const CartItemEditor: React.FC<CartItemEditorProps> = ({
         {
           id: customization.id,
           name: customization.name,
+          price: customization.price || 0,
           price_adjustment: customization.price || 0,
         }
       ]);
@@ -63,6 +64,16 @@ export const CartItemEditor: React.FC<CartItemEditorProps> = ({
     const basePrice = selectedVariant?.price ?? item.price;
     const customizationsTotal = selectedCustomizations.reduce((sum, c) => sum + c.price_adjustment, 0);
     return (basePrice + customizationsTotal) * quantity;
+  };
+
+  // Handle save button click
+  const handleSave = () => {
+    onSave({
+      variant: selectedVariant,
+      customizations: selectedCustomizations,
+      quantity,
+      notes,
+    });
   };
 
   return (

@@ -21,10 +21,8 @@ import {
   isMenuCardElement,
   isRecommendationSetElement
 } from 'utils/structuredResponseTypes';
-import {
-  useStreamingStructuredParser,
-  DEFAULT_PARSING_CONFIG
-} from 'utils/structuredResponseParser';
+import { useStreamingStructuredParser } from 'utils/structuredResponseParser';
+import { DEFAULT_PARSING_CONFIG } from 'utils/structuredResponseTypes';
 import {
   MenuContextManager,
   MenuItemValidator,

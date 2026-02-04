@@ -131,12 +131,17 @@ export const OrderSchedulingInput: React.FC<OrderSchedulingInputProps> = ({
   });
 
   // Safe color access with fallbacks
+  // Handle success which might be a string or object
+  const successColor = typeof globalColors?.success === 'string'
+    ? { primary: globalColors.success }
+    : (globalColors?.success || fallbackColors.success);
+
   const safeColors = {
     background: globalColors?.background || fallbackColors.background,
     text: globalColors?.text || fallbackColors.text,
     border: globalColors?.border || fallbackColors.border,
     purple: globalColors?.purple || fallbackColors.purple,
-    success: globalColors?.success || fallbackColors.success
+    success: successColor
   };
 
   // Update parent when data changes

@@ -48,13 +48,14 @@ export function OrderItemCard({
 
   // Resolve variant image using correct hierarchy
   const resolveImageUrl = (): string | null => {
-    let resolvedImageUrl = item.image_url; // Default fallback
+    // Type assertion for image_url since it may exist on the item even if not in the strict type
+    let resolvedImageUrl = (item as any).image_url as string | undefined; // Default fallback
 
     if (item.variant_id && itemVariants) {
       const variantObj = itemVariants.find(v => v.id === item.variant_id);
       if (variantObj) {
         // Priority: display_image_url (backend-resolved) → image_url (raw) → item fallback
-        resolvedImageUrl = (variantObj as any).display_image_url || variantObj.image_url || item.image_url;
+        resolvedImageUrl = (variantObj as any).display_image_url || variantObj.image_url || (item as any).image_url;
       }
     }
 

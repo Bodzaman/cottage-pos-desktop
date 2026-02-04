@@ -542,11 +542,12 @@ export default function GeminiVoiceLab() {
     try {
 
       // ✅ FIX: Enforce EITHER/OR constraint
-      const payload: UpdateQuantityRequest = {
+      // Cast needed because the backend accepts cart_item_id as alternative to item_name
+      const payload = {
         cart_item_id: cartItemId,
         new_quantity: quantity,
         session_id: user?.id ? undefined : (useCartStore.getState().sessionId || undefined),
-      };
+      } as unknown as UpdateQuantityRequest;
       
       const response = await (brain as any).update_item_quantity(payload);
       const data = await response.json();
@@ -1530,7 +1531,6 @@ export default function GeminiVoiceLab() {
                             ? QSAITheme.purple.primary + '30'
                             : QSAITheme.background.panel,
                           border: `1px solid ${selectedTemplateId === template.id ? QSAITheme.purple.primary : QSAITheme.border.medium}`,
-                          ringColor: QSAITheme.purple.primary,
                         }}
                         onClick={() => handleSelectTemplate(template.id)}
                       >
@@ -1582,7 +1582,6 @@ export default function GeminiVoiceLab() {
                         style={{
                           background: QSAITheme.purple.primary + '30',
                           border: `1px solid ${QSAITheme.purple.primary}`,
-                          ringColor: QSAITheme.purple.primary,
                         }}
                       >
                         <div className="flex items-center gap-2">
@@ -1969,7 +1968,6 @@ export default function GeminiVoiceLab() {
                             color: templateDefaultTraits.includes(trait)
                               ? QSAITheme.purple.light
                               : QSAITheme.text.muted,
-                            ringColor: QSAITheme.purple.primary,
                           }}
                           onClick={() => {
                             if (templateDefaultTraits.includes(trait)) {

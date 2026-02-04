@@ -415,6 +415,7 @@ export function EnhancedMenuGrid({
                                       variants={variants}
                                       proteinTypes={proteinTypes}
                                       orderType={orderMode}
+                                      themeColor="#7C3AED"
                                     />
                                   )}
                                 </div>

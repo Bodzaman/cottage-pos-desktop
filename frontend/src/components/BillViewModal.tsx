@@ -39,7 +39,7 @@ export function BillViewModal({
 
   // Calculate bill summary
   const billSummary = useMemo(() => {
-    return calculateBillSummary(orderItems, customerTabs, {
+    return calculateBillSummary(orderItems as any, customerTabs as any, {
       taxRate: 0, // VAT already included in menu prices
       serviceChargePercent: 0 // No service charge by default
     });

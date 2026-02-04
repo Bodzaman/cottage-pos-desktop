@@ -93,7 +93,7 @@ export const checkMediaMigrationStatus = async (): Promise<{
   }
 };// Centralized Media Library integration utilities
 import { toast } from 'sonner';
-import { MediaItem, uploadMedia, updateMediaAsset, updateMediaAssetUsage } from './mediaLibraryUtils';
+import { MediaItem, uploadMedia, updateMediaAsset } from './mediaLibraryUtils';
 import brain from 'brain';
 
 /**
@@ -177,8 +177,8 @@ export const getRecentMedia = async (limit: number = 5): Promise<MediaItem[]> =>
  */
 export const trackMediaUsage = async (mediaItemId: string, usage: string, description?: string): Promise<boolean> => {
   try {
-    // Use the updateMediaAssetUsage helper function from mediaLibraryUtils
-    await updateMediaAssetUsage(mediaItemId, { usage, description });
+    // Use the updateMediaAsset helper function from mediaLibraryUtils
+    await updateMediaAsset(mediaItemId, { usage, description });
     return true;
   } catch (error) {
     console.error('Error tracking media usage:', error);

@@ -142,6 +142,7 @@ export const colors = {
     primary: '#7C3AED',
     primaryTransparent: 'rgba(124, 58, 237, 0.8)',
     light: '#A78BFA',
+    medium: '#9277FF', // Medium shade between primary and light
     secondary: '#A78BFA',
     dark: '#5B21B6',
     glow: 'rgba(124, 58, 237, 0.3)'
@@ -154,6 +155,8 @@ export const colors = {
     magenta_light: 'rgba(167, 139, 250, 0.8)',
     turquoise_light: 'rgba(91, 33, 182, 0.8)',
     secondary: '#A78BFA', // Secondary accent color
+    primary: '#7C3AED', // Primary accent color alias
+    purple: '#7C3AED', // Purple accent alias
   },
   text: {
     primary: '#FFFFFF',

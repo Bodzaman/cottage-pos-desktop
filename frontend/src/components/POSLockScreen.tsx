@@ -13,7 +13,7 @@ interface POSLockScreenProps {
 
 export function POSLockScreen({ onUnlock }: POSLockScreenProps) {
   const navigate = useNavigate();
-  const { loginWithPin, lastUserName, isLoading, logout } = usePOSAuth();
+  const { loginWithPin, lastUserName, lastUserRole, isLoading, logout } = usePOSAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Update clock every second
@@ -115,7 +115,7 @@ export function POSLockScreen({ onUnlock }: POSLockScreenProps) {
         <AnimatedNucleus size={48} />
         <PINPad
           mode="login"
-          staffName={lastUserName || undefined}
+          staffName={lastUserRole === 'staff' ? 'Team' : lastUserName || undefined}
           onSubmit={async (pin) => {
             const success = await loginWithPin(pin);
             if (success) {

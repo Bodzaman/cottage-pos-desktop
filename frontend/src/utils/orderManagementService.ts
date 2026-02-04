@@ -43,6 +43,7 @@ export interface PaymentInfo {
 
 export interface CompletedOrder {
   order_id: string;
+  id?: string; // Alias for order_id
   order_number: string;
   order_type: string;
   order_source: string;
@@ -66,6 +67,7 @@ export interface CompletedOrder {
   tax: number;
   service_charge: number;
   discount: number;
+  delivery_fee?: number;
   tip: number;
   total: number;
   total_amount: number;
@@ -75,6 +77,7 @@ export interface CompletedOrder {
   status: string;
   notes?: string;
   staff_id?: string;
+  estimated_time?: number;  // Estimated completion time in minutes
   
   // Order history tracking
   history?: Array<{
@@ -97,6 +100,7 @@ export interface CompletedOrder {
   call_transcript?: string;
   voice_recording_url?: string;
   confidence_score?: number;
+  voice_confidence?: number; // Alias for confidence_score
   main_order_id?: string | null;
   assigned_station?: string;
 }

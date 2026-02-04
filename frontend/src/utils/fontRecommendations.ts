@@ -13,7 +13,7 @@ export interface RecommendationCriteria {
   templateType: 'kitchen' | 'foh';
   paperWidth: 58 | 80;
   elementType: 'header' | 'items' | 'totals' | 'footer' | 'notes';
-  priority: 'speed' | 'readability' | 'branding' | 'compliance';
+  priority?: 'speed' | 'readability' | 'branding' | 'compliance'; // Defaults to 'readability'
 }
 
 // Advanced font recommendation engine

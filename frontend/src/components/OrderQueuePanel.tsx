@@ -407,7 +407,7 @@ export function OrderQueuePanel({
                       {order.items.length} {order.items.length === 1 ? 'item' : 'items'}: 
                       {order.items.slice(0, 2).map(item => (
                         <span key={item.item_id || Math.random()}>
-                          {item.quantity}x {item.item_name?.substring(0, 15) || item.name?.substring(0, 15)}
+                          {item.quantity}x {((item as any).item_name || item.name)?.substring(0, 15)}
                         </span>
                       )).join(', ')}
                       {order.items.length > 2 && '...'}

@@ -222,7 +222,7 @@ export function OrderModeAssignmentModal({
             description: 'Please refresh and select valid templates'
           });
           // Reload templates to get fresh list
-          loadTemplates();
+          loadData();
           return;
         }
       }

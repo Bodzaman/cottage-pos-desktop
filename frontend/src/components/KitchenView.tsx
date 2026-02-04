@@ -135,24 +135,22 @@ export function KitchenView({ onBack }: POSViewProps) {
   
   // Mark order as delayed (update status)
   const markOrderDelayed = (orderId: string) => {
-    const success = kitchenService.updateOrderStatus(orderId, 'DELAYED');
-    
-    if (success) {
+    try {
+      kitchenService.updateOrderStatus(orderId, 'DELAYED');
       toast.warning(`Order marked as delayed - kitchen alerted`);
       // Refresh orders from the service (should happen via subscription)
-    } else {
+    } catch {
       toast.error('Failed to mark order as delayed');
     }
   };
-  
+
   // Function to handle marking order as completed
   const markOrderCompleted = (orderId: string) => {
-    const success = kitchenService.updateOrderStatus(orderId, 'COMPLETED');
-    
-    if (success) {
+    try {
+      kitchenService.updateOrderStatus(orderId, 'COMPLETED');
       toast.success(`Order completed and removed from active queue`);
       // Refresh orders from the service (though this should happen via subscription)
-    } else {
+    } catch {
       toast.error('Failed to complete order');
     }
   };

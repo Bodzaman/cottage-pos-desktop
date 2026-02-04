@@ -76,10 +76,10 @@ export const ItemInfoModal: React.FC<Props> = ({ isOpen, onClose, item, itemVari
   const fallbackImage = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80';
   
   // ✅ NEW: Reactive hero image based on selected variant
-  const displayImage = useMemo(() => {
+  const displayImage = useMemo((): string => {
     if (selectedVariant) {
       // Priority: variant display_image_url > variant image_url > item image_url > fallback
-      return (selectedVariant as any).display_image_url || selectedVariant.image_url || item.image_url || fallbackImage;
+      return (selectedVariant as { display_image_url?: string; image_url?: string }).display_image_url || selectedVariant.image_url || item.image_url || fallbackImage;
     }
     return item.image_url || fallbackImage;
   }, [selectedVariant, item.image_url, fallbackImage]);

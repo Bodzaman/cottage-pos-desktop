@@ -31,6 +31,7 @@ interface EnhancedReceiptDesignerHeaderProps extends ReceiptDesignerHeaderProps 
   onDuplicate: () => void;
   onTemplateReloaded?: () => Promise<void>; // Add callback for reloading templates
   formatToggle?: 'front_of_house' | 'kitchen_customer'; // Current template format
+  onBuildSampleOrder?: () => void; // Build a sample order for preview
 }
 
 export function ReceiptDesignerHeader({

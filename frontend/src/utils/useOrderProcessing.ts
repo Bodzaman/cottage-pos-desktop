@@ -272,7 +272,7 @@ export function useOrderProcessing(
       try {
         const { outboxSyncManager } = await import('./outboxSyncManager');
         const offlineOrderId = await outboxSyncManager.queueOrderCreation({
-          order_type: orderType,
+          order_type: orderType as 'DELIVERY' | 'COLLECTION' | 'DINE-IN' | 'WAITING',
           table_number: selectedTableNumber ?? undefined,
           guest_count: guestCount,
           items: orderItems,

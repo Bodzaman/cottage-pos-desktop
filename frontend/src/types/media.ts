@@ -21,21 +21,28 @@ export type AssetCategory =
 
 /**
  * Media asset representing an uploaded file
+ * Includes camelCase aliases for MediaItem compatibility
  */
 export interface MediaAsset {
   id: string;
+  asset_id?: string; // Alias for id
   file_name: string;
+  name?: string; // camelCase alias for file_name
   friendly_name?: string;
+  friendlyName?: string; // camelCase alias for friendly_name
   type: string;
   url: string;
   tags: string[];
   description?: string;
   usage?: string;
   upload_date?: string;
+  updatedAt?: string; // camelCase alias for upload_date
   file_size?: number;
+  size?: number; // camelCase alias for file_size
   width?: number;
   height?: number;
   aspect_ratio?: string;
+  aspectRatio?: string; // camelCase alias for aspect_ratio
 
   // Hierarchical organization fields
   asset_category?: AssetCategory;
@@ -45,6 +52,7 @@ export interface MediaAsset {
   // Usage tracking fields
   linked_items?: string[];
   usage_count?: number;
+  usageCount?: number; // camelCase alias for usage_count
   usage_context?: Record<string, unknown>;
 }
 
@@ -96,15 +104,20 @@ export interface MediaImagePreviewMetadata {
 
 /**
  * Media item for library display
+ * Fields are optional to allow compatibility with MediaAsset
  */
 export interface MediaItem {
   id: string;
-  name: string;
-  friendlyName: string;
-  size: number;
-  type: string;
+  name?: string;
+  file_name?: string; // Snake_case alias
+  friendlyName?: string;
+  friendly_name?: string; // Snake_case alias
+  size?: number;
+  file_size?: number; // Snake_case alias
+  type?: string;
   url: string;
-  updatedAt: string;
+  updatedAt?: string;
+  upload_date?: string; // Snake_case alias
   description?: string;
   tags?: string[];
   usage?: string;
@@ -112,8 +125,10 @@ export interface MediaItem {
   width?: number;
   height?: number;
   aspectRatio?: string;
+  aspect_ratio?: string; // Snake_case alias
   metadata?: unknown;
   usageCount?: number;
+  usage_count?: number; // Snake_case alias
   usageDetails?: {
     usage: string;
     objectId: string;

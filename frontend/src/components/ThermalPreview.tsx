@@ -296,12 +296,14 @@ interface ThermalReceiptFormData {
   orderSource?: 'POS' | 'ONLINE' | 'AI_VOICE';
 
   // Enhanced Order Mode Support (matching thermal printer engine)
-  orderMode?: 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
+  // Accepts both dash and underscore formats for compatibility
+  orderMode?: 'DINE-IN' | 'DINE_IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
 
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
   deliveryAddress?: string;
+  customerReference?: string;  // CRM reference number (CTRxxxxx)
 
   // Delivery-specific fields
   deliveryPostcode?: string;
@@ -393,6 +395,10 @@ interface ThermalReceiptFormData {
   kitchenShowSpecialInstructions?: boolean;
   kitchenShowTotals?: boolean;
   kitchenShowFooter?: boolean;
+
+  // Kitchen Ticket Rail Settings
+  kitchenTicketRailMargin?: number;
+  kitchenShowPullTab?: boolean;
 
   // Kitchen Order Label
   showKitchenOrderLabel?: boolean;
@@ -822,6 +828,38 @@ function renderFormBasedReceipt(
         </div>
       )}
 
+      {/* Kitchen Ticket Rail Pull Tab - Top margin for physical ticket rails */}
+      {isKitchenReceipt && (data.kitchenTicketRailMargin ?? 15) > 0 && (
+        <div
+          style={{
+            height: `${data.kitchenTicketRailMargin ?? 15}mm`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            paddingBottom: '2mm'
+          }}
+        >
+          {data.kitchenShowPullTab !== false && (
+            <>
+              <div style={{
+                fontSize: '14px',
+                letterSpacing: '8px',
+                color: '#9CA3AF',
+                fontFamily: receiptFont.cssFamily
+              }}>
+                ▲▲▲
+              </div>
+              <div style={{
+                width: '100%',
+                borderBottom: '1px solid #D1D5DB',
+                marginTop: '2mm'
+              }} />
+            </>
+          )}
+        </div>
+      )}
+
       {/* Order Information */}
       <div className={`mb-1 text-sm`} style={{ marginBottom: isKitchenReceipt ? '8px' : '4px' }}>
         {/* ORDER TYPE HEADER - Kitchen only, large & prominent */}
@@ -873,66 +911,84 @@ function renderFormBasedReceipt(
             </span>
           )}
           
-          {/* Channel Badge */}
-          {/* Hide 'POS' badge for dine-in orders since all dine-in orders are POS orders (redundant) */}
-          {data.orderSource && 
-            !(data.orderSource === 'POS' && 
-              (data.orderMode === 'DINE-IN' || 
-               (!data.orderMode && data.orderType === 'dine_in'))) && (
-            <span 
+          {/* Channel Badge - Only show for ONLINE orders */}
+          {data.orderSource === 'ONLINE' && (
+            <span
               className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
               style={{
-                backgroundColor: data.orderSource === 'AI_VOICE' ? '#8B5CF6' : 
-                              data.orderSource === 'ONLINE' ? '#10B981' : '#6B7280',
+                backgroundColor: '#10B981',
                 color: 'white',
                 fontSize: isKitchenReceipt ? '12px' : '10px'
               }}
             >
-              {data.orderSource === 'AI_VOICE' ? 'Voice' : data.orderSource}
+              ONLINE
             </span>
           )}
           
           {/* Conditional contextual chips based on Order Mode */}
-          {/* Dine-In → [Table 12] [4 pax] - Prominent styling for kitchen visibility */}
+          {/* Dine-In → Table & Covers info */}
+          {/* Kitchen: Plain bold text for readability | FOH: Purple badges */}
           {/* Controlled by shouldShowTableInfo toggle for kitchen receipts */}
           {shouldShowTableInfo && (data.orderMode === 'DINE-IN' || (!data.orderMode && data.orderType === 'dine_in')) && (
             <>
-              {data.tableNumber && (
+              {isKitchenReceipt ? (
+                /* Kitchen: Plain bold text - TABLE 2 • 3 COVERS */
                 <span
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
                   style={{
-                    backgroundColor: '#7C3AED',
-                    color: 'white',
-                    fontSize: isKitchenReceipt ? '14px' : '10px'
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: 'black',
+                    fontFamily: receiptFont.cssFamily
                   }}
                 >
-                  TABLE {data.tableNumber}
+                  {data.tableNumber && `TABLE ${data.tableNumber}`}
+                  {data.tableNumber && data.guestCount && data.guestCount > 0 && '  •  '}
+                  {data.guestCount && data.guestCount > 0 && `${data.guestCount} COVERS`}
+                  {data.linkedTables && data.linkedTables.length > 0 && (
+                    <>  •  {data.linkedTables.map(t => `T${t}`).join(' + ')}</>
+                  )}
                 </span>
-              )}
-              {data.guestCount && data.guestCount > 0 && (
-                <span
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
-                  style={{
-                    backgroundColor: '#7C3AED',
-                    color: 'white',
-                    fontSize: isKitchenReceipt ? '14px' : '10px'
-                  }}
-                >
-                  {data.guestCount} Covers
-                </span>
-              )}
-              {/* Linked Tables Display */}
-              {data.linkedTables && data.linkedTables.length > 0 && (
-                <span
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-bold"
-                  style={{
-                    backgroundColor: '#2563EB',
-                    color: 'white',
-                    fontSize: isKitchenReceipt ? '14px' : '10px'
-                  }}
-                >
-                  {data.linkedTables.map(t => `T${t}`).join(' + ')}
-                </span>
+              ) : (
+                /* FOH: Purple badges */
+                <>
+                  {data.tableNumber && (
+                    <span
+                      className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
+                      style={{
+                        backgroundColor: '#7C3AED',
+                        color: 'white',
+                        fontSize: '10px'
+                      }}
+                    >
+                      TABLE {data.tableNumber}
+                    </span>
+                  )}
+                  {data.guestCount && data.guestCount > 0 && (
+                    <span
+                      className="inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase"
+                      style={{
+                        backgroundColor: '#7C3AED',
+                        color: 'white',
+                        fontSize: '10px'
+                      }}
+                    >
+                      {data.guestCount} Covers
+                    </span>
+                  )}
+                  {/* Linked Tables Display */}
+                  {data.linkedTables && data.linkedTables.length > 0 && (
+                    <span
+                      className="inline-flex items-center px-2 py-1 rounded text-xs font-bold"
+                      style={{
+                        backgroundColor: '#2563EB',
+                        color: 'white',
+                        fontSize: '10px'
+                      }}
+                    >
+                      {data.linkedTables.map(t => `T${t}`).join(' + ')}
+                    </span>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1062,6 +1118,12 @@ function renderFormBasedReceipt(
               <div className="flex justify-between">
                 <span>Phone:</span>
                 <span>{data.customerPhone}</span>
+              </div>
+            )}
+            {data.customerReference && (
+              <div className="flex justify-between">
+                <span>Ref:</span>
+                <span className={itemNameWeight}>{data.customerReference}</span>
               </div>
             )}
           </div>
@@ -1254,10 +1316,10 @@ function renderFormBasedReceipt(
                                       {/* Only show price for customizations with actual cost (hide £0.00 for free items) */}
                                       {!(isKitchenReceipt && data.orderMode === 'DINE-IN') &&
                                         !customization.is_free &&
-                                        customization.price_adjustment != null &&
-                                        customization.price_adjustment > 0 && (
+                                        (customization.price_adjustment ?? customization.price) != null &&
+                                        (customization.price_adjustment ?? customization.price) > 0 && (
                                         <span className={`${isKitchenReceipt ? 'font-bold text-orange-800' : 'font-normal'} text-gray-700`}>
-                                          £{customization.price_adjustment.toFixed(2)}
+                                          £{(customization.price_adjustment ?? customization.price).toFixed(2)}
                                         </span>
                                       )}
                                     </div>

@@ -1087,7 +1087,16 @@ export default function DineInFullReviewModal({
                 price_adjustment: 0,
               }
             : undefined,
-        customizations: item.customizations || [],
+        // Transform customizations to ensure correct format for ThermalPreview
+        customizations: (item.customizations || []).map((c: any) => ({
+          id: c.id || c.customization_id || `cust-${Date.now()}`,
+          customization_id: c.customization_id || c.id,
+          name: c.name,
+          price: c.price_adjustment ?? c.price ?? 0,
+          price_adjustment: c.price_adjustment ?? c.price ?? 0,
+          group: c.group || '',
+          is_free: c.is_free || ((c.price_adjustment ?? c.price ?? 0) === 0)
+        })),
         instructions: item.notes,
       })),
       subtotal,

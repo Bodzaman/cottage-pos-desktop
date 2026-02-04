@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { HierarchicalMediaData } from './mediaHierarchyUtils';
 
 // Tab types for media library navigation
-export type MediaLibraryTab = 'menu-images' | 'ai-avatars' | 'general';
+export type MediaLibraryTab = 'all' | 'menu-images' | 'ai-avatars' | 'general';
 
 // Filter state for menu images
 interface MenuImageFilters {
@@ -12,25 +12,25 @@ interface MenuImageFilters {
 }
 
 // NEW: Unified filter state for sidebar filter system (Phase 1)
-interface UnifiedFilters {
+export interface UnifiedFilters {
   // Asset type (replaces activeTab system)
   selectedAssetType: 'all' | 'menu-item' | 'ai-avatar' | 'general';
-  
+
   // Image type filter (menu items only) - Phase 3 MYA-1476
-  selectedImageType: 'all' | 'menu-item' | 'menu-item-variant';
-  
+  selectedImageType?: 'all' | 'menu-item' | 'menu-item-variant';
+
   // Hierarchy filters (menu items only)
   selectedSectionId: string | null;
   selectedCategoryId: string | null;
   selectedMenuItemId?: string | null; // Phase 2
-  
+
   // Status toggles
   showUncategorized: boolean;
   showLinked: boolean;
   showInUse: boolean;
   showMultiUse: boolean; // NEW: Phase 2 - Assets used in 2+ items
   showOrphaned: boolean; // NEW: Phase 2 - Linked to deleted/inactive items
-  
+
   // Search query (Phase 2)
   searchQuery: string;
 }

@@ -3520,7 +3520,7 @@ export async function initializeUnifiedAgentConfig(): Promise<{ success: boolean
  */
 export async function updateUnifiedAgentConfig(
   updates: Partial<UnifiedAgentConfig>
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; error?: string }> {
   try {
     // First get the actual config ID (UUID)
     const { data: existing, error: fetchError } = await supabase
@@ -3562,7 +3562,7 @@ export async function updateUnifiedAgentConfig(
     return { success: true };
   } catch (error) {
     console.error(' [supabaseQueries] updateUnifiedAgentConfig failed:', error);
-    return { success: false };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 

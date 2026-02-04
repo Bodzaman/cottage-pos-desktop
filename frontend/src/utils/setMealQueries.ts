@@ -24,16 +24,27 @@ export const setMealKeys = {
 // TYPES
 // ==============================================================================
 
-export interface SetMealItem {
+/**
+ * Local SetMealItem type for display purposes
+ * Different from menu.types.ts SetMealItem which is for database schema
+ */
+export interface SetMealItemDisplay {
   id: string;
   name: string;
   description?: string;
   image_url?: string;
   quantity: number;
+  // Add required fields for compatibility with menu.types.SetMealItem
+  menu_item_id?: string;
+  menu_item_name?: string;
+  item_price?: number;
 }
 
-export interface SetMealWithItems extends SetMeal {
-  items: SetMealItem[];
+/**
+ * Set meal with display items and calculated total
+ */
+export interface SetMealWithItems extends Omit<SetMeal, 'items'> {
+  items: SetMealItemDisplay[];
   total_individual_price: number;
 }
 
@@ -53,7 +64,7 @@ async function fetchSetMealDetails(setMealId: string): Promise<SetMealWithItems 
     return null;
   }
 
-  const items: SetMealItem[] = (setMeal.set_meal_items || []).map((item: any) => ({
+  const items: SetMealItemDisplay[] = (setMeal.set_meal_items || []).map((item: any) => ({
     id: item.id,
     name: item.menu_items?.name || 'Unknown item',
     description: item.menu_items?.description,

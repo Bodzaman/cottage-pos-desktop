@@ -15,10 +15,13 @@ export interface TipSelection {
   percentage?: number; // Original percentage if type is 'percentage'
 }
 
-interface POSTipSelectorProps {
-  subtotal: number;
-  onTipSelected: (tipSelection: TipSelection) => void;
+export interface POSTipSelectorProps {
+  subtotal?: number;
+  orderTotal?: number; // Alias for subtotal for compatibility
+  onTipSelected?: (tipSelection: TipSelection) => void;
   initialTip?: TipSelection;
+  selectedTip?: TipSelection; // Alternative prop name
+  onTipChange?: (tipSelection: TipSelection) => void; // Alternative callback name
 }
 
 /**
@@ -27,21 +30,29 @@ interface POSTipSelectorProps {
  */
 export function POSTipSelector({
   subtotal,
+  orderTotal,
   onTipSelected,
-  initialTip
+  initialTip,
+  selectedTip: controlledTip,
+  onTipChange
 }: POSTipSelectorProps) {
+  // Use orderTotal if subtotal not provided (for compatibility)
+  const baseAmount = subtotal ?? orderTotal ?? 0;
+  // Use onTipChange if onTipSelected not provided (for compatibility)
+  const handleTipChange = onTipSelected ?? onTipChange ?? (() => {});
+
   const [selectedTip, setSelectedTip] = useState<TipSelection>(
-    initialTip || { type: 'none', amount: 0 }
+    controlledTip ?? initialTip ?? { type: 'none', amount: 0 }
   );
   const [customAmount, setCustomAmount] = useState<string>('');
-  
+
   // Predefined tip percentages
   const tipPercentages = [10, 15, 20, 25];
-  
+
   // Calculate tip amount for percentage
   const calculateTipAmount = (percentage: number): number => {
-    if (!isValidFinancialAmount(subtotal)) return 0;
-    return (subtotal * percentage) / 100;
+    if (!isValidFinancialAmount(baseAmount)) return 0;
+    return (baseAmount * percentage) / 100;
   };
   
   // Handle percentage tip selection
@@ -53,26 +64,26 @@ export function POSTipSelector({
       percentage
     };
     setSelectedTip(tip);
-    onTipSelected(tip);
+    handleTipChange(tip);
   };
-  
+
   // Handle custom tip amount
   const handleCustomTip = (value: string) => {
     setCustomAmount(value);
     const amount = parseFloat(value) || 0;
-    
+
     if (isValidFinancialAmount(amount) && amount > 0) {
       const tip: TipSelection = {
         type: 'custom',
         amount
       };
       setSelectedTip(tip);
-      onTipSelected(tip);
+      handleTipChange(tip);
     } else {
       handleNoTip();
     }
   };
-  
+
   // Handle no tip selection
   const handleNoTip = () => {
     const tip: TipSelection = {
@@ -80,10 +91,10 @@ export function POSTipSelector({
       amount: 0
     };
     setSelectedTip(tip);
-    onTipSelected(tip);
+    handleTipChange(tip);
     setCustomAmount('');
   };
-  
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -93,7 +104,7 @@ export function POSTipSelector({
           <h3 className="text-xl font-bold text-white">Add Tip</h3>
         </div>
         <p className="text-sm text-gray-400">
-          Subtotal: <span className="font-semibold text-white">{safeCurrency(subtotal)}</span>
+          Subtotal: <span className="font-semibold text-white">{safeCurrency(baseAmount)}</span>
         </p>
       </div>
       
@@ -119,9 +130,9 @@ export function POSTipSelector({
                       ? 'text-white border-purple-500' 
                       : 'border-white/20 text-white/80 hover:border-purple-500/50'
                   }`}
-                  style={isSelected 
+                  style={isSelected
                     ? { ...styles.frostedGlassStyle, background: QSAITheme.purple.primary, boxShadow: effects.outerGlow('medium') }
-                    : { ...styles.frostedGlassStyle, '&:hover': { borderColor: QSAITheme.purple.primary + '80' } }
+                    : { ...styles.frostedGlassStyle }
                   }
                 >
                   <span className="text-lg font-bold">{percentage}%</span>
@@ -209,7 +220,7 @@ export function POSTipSelector({
                 <div className="flex justify-between items-center text-lg">
                   <span className="text-white/80">Total with Tip:</span>
                   <span className="font-bold" style={{ color: QSAITheme.purple.primary }}>
-                    {safeCurrency(subtotal + selectedTip.amount)}
+                    {safeCurrency(baseAmount + selectedTip.amount)}
                   </span>
                 </div>
                 <div className="text-sm text-white/60 mt-1">

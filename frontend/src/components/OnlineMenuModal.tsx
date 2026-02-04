@@ -523,7 +523,12 @@ const OnlineMenuModal: React.FC<OnlineMenuModalProps> = ({ isOpen, onClose }) =>
                             {/* Allergen Information - collected from variants */}
                             {(() => {
                               const variantAllergens = item.variants
-                                ?.flatMap(v => v.allergens || [])
+                                ?.flatMap(v => {
+                                  const a = v.allergens;
+                                  if (!a) return [];
+                                  // Handle both array and Record formats
+                                  return Array.isArray(a) ? a : Object.keys(a);
+                                })
                                 .filter((a, i, arr) => arr.indexOf(a) === i) || [];
                               return variantAllergens.length > 0 ? (
                                 <div className="p-2 rounded-md" style={{
@@ -536,7 +541,7 @@ const OnlineMenuModal: React.FC<OnlineMenuModalProps> = ({ isOpen, onClose }) =>
                                     </span>
                                   </div>
                                   <div className="flex flex-wrap gap-1">
-                                    {variantAllergens.map(allergen => (
+                                    {variantAllergens.map((allergen: string) => (
                                       <Badge
                                         key={allergen}
                                         className="text-xs px-1.5 py-0.5"

@@ -92,7 +92,7 @@ export function OrderTimeline({ status, orderType, timestamps, compact = false }
                     background: isCompleted
                       ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[500]} 0%, ${PremiumTheme.colors.burgundy[600]} 100%)`
                       : 'rgba(255, 255, 255, 0.1)',
-                    ringColor: isCurrent ? PremiumTheme.colors.burgundy[500] : 'transparent'
+                    boxShadow: isCurrent ? `0 0 0 2px ${PremiumTheme.colors.burgundy[500]}` : 'none'
                   }}
                 >
                   <Icon
@@ -179,7 +179,7 @@ export function OrderTimeline({ status, orderType, timestamps, compact = false }
                     background: isCompleted
                       ? `linear-gradient(135deg, ${PremiumTheme.colors.burgundy[500]} 0%, ${PremiumTheme.colors.burgundy[600]} 100%)`
                       : 'rgba(255, 255, 255, 0.1)',
-                    ringColor: isCurrent ? PremiumTheme.colors.burgundy[500] : 'transparent'
+                    boxShadow: isCurrent ? `0 0 0 2px ${PremiumTheme.colors.burgundy[500]}` : 'none'
                   }}
                 >
                   <Icon

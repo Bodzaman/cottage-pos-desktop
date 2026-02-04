@@ -140,9 +140,9 @@ export function getTableName(legacyName: string): string {
  * Validate that a table name follows our naming conventions
  */
 export function validateTableName(tableName: string): boolean {
-  const allTables = Object.values(Tables);
-  const allLegacyTables = Object.values(LEGACY_TABLE_MAPPING);
-  return allTables.includes(tableName as TableName) || allLegacyTables.includes(tableName as TableName);
+  const allTables = Object.values(Tables) as string[];
+  const allLegacyTables = Object.values(LEGACY_TABLE_MAPPING) as string[];
+  return allTables.includes(tableName) || allLegacyTables.includes(tableName);
 }
 
 /**

@@ -28,15 +28,19 @@ interface OptimizedMediaResponse {
 }
 
 // Types
-// Media asset schema
+// Media asset schema - fields made optional for MediaAsset compatibility
 export interface MediaItem {
   id: string;
-  name: string;
-  friendlyName: string;
-  size: number;
-  type: string; // 'image' or 'video'
+  name?: string;
+  file_name?: string; // Snake_case alias
+  friendlyName?: string;
+  friendly_name?: string; // Snake_case alias
+  size?: number;
+  file_size?: number; // Snake_case alias
+  type?: string; // 'image' or 'video'
   url: string;
-  updatedAt: string;
+  updatedAt?: string;
+  upload_date?: string; // Snake_case alias
   description?: string;
   tags?: string[];
   usage?: string;
@@ -44,8 +48,10 @@ export interface MediaItem {
   width?: number;
   height?: number;
   aspectRatio?: string; // 'square', 'widescreen', etc.
+  aspect_ratio?: string; // Snake_case alias
   metadata?: any; // For storing additional info
   usageCount?: number;
+  usage_count?: number; // Snake_case alias
   usageDetails?: {
     usage: string;
     objectId: string;
@@ -63,6 +69,7 @@ export interface MediaMetadata {
 
 export interface MediaAsset {
   id: string;
+  asset_id?: string; // Alias for id
   file_name: string;
   friendly_name?: string;
   type: string;
@@ -1013,7 +1020,7 @@ export const prepareImageForUpload = async (
 
 // Enhanced display functions for smart naming system
 // Accepts Partial<MediaItem> to allow usage with AssetUsageInfo and similar types
-export const getSmartDisplayName = (item: Partial<MediaItem> & { name: string }): string => {
+export const getSmartDisplayName = (item: Partial<MediaItem>): string => {
   // Priority 1: Use friendlyName if explicitly set
   if (item.friendlyName && item.friendlyName.trim() !== '') {
     return item.friendlyName;
@@ -1021,7 +1028,7 @@ export const getSmartDisplayName = (item: Partial<MediaItem> & { name: string })
 
   // Priority 2: Use metadata from the enhanced API call if available
   if (item.metadata?.enhanced) {
-    return item.metadata.display_name || formatFilenameForDisplay(item.name);
+    return item.metadata.display_name || formatFilenameForDisplay(item.name || item.file_name || 'Unknown');
   }
 
   // Priority 3: Fallback logic for older data structure or failed enhanced fetch
@@ -1031,25 +1038,25 @@ export const getSmartDisplayName = (item: Partial<MediaItem> & { name: string })
   }
 
   // Priority 4: Format the filename as last resort
-  return formatFilenameForDisplay(item.name);
+  return formatFilenameForDisplay(item.name || item.file_name || 'Unknown');
 };
 
-export const getSmartSecondaryText = (item: MediaItem): string => {
+export const getSmartSecondaryText = (item: Partial<MediaItem>): string => {
   // Use metadata from the enhanced API call if available
   if (item.metadata?.enhanced) {
     return item.metadata.secondary_info || `Uploaded: ${formatDate(item.updatedAt)}`;
   }
-  
+
   // Fallback for unlinked assets
   if (!item.usageDetails || item.usageDetails.length === 0) {
     return `Uploaded: ${formatDate(item.updatedAt)}`;
   }
 
   // Fallback for linked items
-  return item.name;
+  return item.name || item.file_name || 'Unknown';
 };
 
-export const getUsageIndicator = (item: MediaItem): { text: string; type: 'linked' | 'unused' | 'multiple' } => {
+export const getUsageIndicator = (item: Partial<MediaItem>): { text: string; type: 'linked' | 'unused' | 'multiple' } => {
   const count = item.usageCount || 0;
 
   if (count === 0) {

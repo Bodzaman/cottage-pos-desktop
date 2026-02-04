@@ -257,10 +257,10 @@ export function MenuSetupWizard({ setupStatus, onStepComplete, onClose, isOpen, 
     });
     
     // Add new spotlight effect
-    const targetElement = document.querySelector(selector);
+    const targetElement = document.querySelector(selector) as HTMLElement | null;
     if (targetElement) {
       targetElement.classList.add('wizard-spotlight');
-      
+
       // Add pulsing effect
       targetElement.style.setProperty('--spotlight-glow', colors.brand.purple);
     }

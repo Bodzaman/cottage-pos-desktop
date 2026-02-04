@@ -221,7 +221,7 @@ export async function logWarning(
       scope.setLevel('warning');
       if (context.page) scope.setTag('page', context.page);
       if (context.component) scope.setTag('component', context.component);
-      scope.setExtras(context);
+      scope.setExtras(context as Record<string, unknown>);
       Sentry.captureMessage(message);
     });
   } catch (error) {

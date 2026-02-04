@@ -221,21 +221,42 @@ export function OrderConfirmationView({
         // Handles both modern format (variant in name) and legacy format (separate fields)
         const displayName = resolveItemDisplayName(item);
         
+        // Get customizations from either customizations or modifiers array
+        const itemCustomizations = item.customizations || item.modifiers || [];
+
+        // Calculate customization total for this item
+        const customizationTotal = itemCustomizations.reduce(
+          (sum: number, c: any) => sum + (c.price_adjustment ?? c.price ?? 0), 0
+        );
+
+        // Base price for the item (without customizations)
+        const basePrice = item.price || 0;
+
+        // Total including customizations × quantity
+        const itemTotal = (basePrice + customizationTotal) * (item.quantity || 1);
+
         return {
           id: item.id || item.menu_item_id || `item-${Date.now()}`,
           name: displayName, // ✅ Use generated display name
-          price: item.price,
+          basePrice: basePrice,
+          price: basePrice,
           quantity: item.quantity,
+          total: itemTotal,
           variant: item.variantName ? {
             id: item.id,
             name: item.variantName,
             price_adjustment: 0
           } : undefined,
-          customizations: item.modifiers?.map(mod => ({
-            id: mod.id || `mod-${Date.now()}`,
-            name: mod.name,
-            price: mod.price || 0
-          })) || [],
+          // Include all required fields matching ThermalPreview expectations
+          customizations: itemCustomizations.map((c: any) => ({
+            id: c.id || c.customization_id || `mod-${Date.now()}`,
+            customization_id: c.customization_id || c.id,
+            name: c.name,
+            price: c.price_adjustment ?? c.price ?? 0,
+            price_adjustment: c.price_adjustment ?? c.price ?? 0,
+            group: c.group || '',
+            is_free: c.is_free || ((c.price_adjustment ?? c.price ?? 0) === 0)
+          })),
           instructions: item.notes || undefined,
           // Category tracking for receipt section organization
           category_id: item.category_id,

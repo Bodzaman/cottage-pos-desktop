@@ -198,7 +198,7 @@ const MultiChannelMenuDashboard: React.FC = () => {
 
         {/* Card 2: POS System Preview */}
         <POSSystemCard
-          menuData={menuData}
+          menuData={menuData as any}
           menuStatus={menuStatus}
           isLoading={isLoading}
         />

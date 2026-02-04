@@ -9,23 +9,7 @@
  */
 
 import html2canvas from 'html2canvas';
-
-// Type declarations for Electron API exposed via preload
-declare global {
-  interface Window {
-    electronAPI?: {
-      printReceiptWYSIWYG: (data: WYSIWYGPrintData) => Promise<PrintResult>;
-      printReceiptESCPOS: (data: ESCPOSPrintData) => Promise<ESCPOSPrintResult>;
-      printReceiptRaster: (data: RasterPrintData) => Promise<RasterPrintResult>;
-      printReceipt: (data: unknown) => Promise<PrintResult>;
-      printTest: () => Promise<PrintResult>;
-      getPrinters: () => Promise<PrinterInfo[]>;
-      getConfig: () => Promise<unknown>;
-      saveConfig: (config: unknown) => Promise<unknown>;
-      platform: string;
-    };
-  }
-}
+// ElectronAPI type is declared globally in src/types/electron.ts
 
 export interface PrintResult {
   success: boolean;

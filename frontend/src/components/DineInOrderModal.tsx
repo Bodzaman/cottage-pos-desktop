@@ -1875,11 +1875,11 @@ export function DineInOrderModal({
                     {stagingItems.map((item, index) => (
                       <OrderItemCard
                         key={item.id}
-                        item={item}
+                        item={item as any}
                         index={index}
                         onQuantityChange={handleQuantityUpdate}
                         onRemove={handleRemoveItem}
-                        onCustomize={handleCustomizeStagingItem}
+                        onCustomize={handleCustomizeStagingItem as any}
                         showCustomizeButton={true}
                         showRemoveButton={true}
                       />
@@ -1956,7 +1956,7 @@ export function DineInOrderModal({
         isOpen={showBillView}
         onClose={() => setShowBillView(false)}
         tableNumber={selectedTableTab}
-        orderItems={eventDrivenOrder?.items || []}
+        orderItems={(eventDrivenOrder?.items || []) as any}
         customerTabs={currentTableCustomerTabs as any}
         onProcessPayment={handleProcessPayment}
       />
@@ -2020,7 +2020,7 @@ export function DineInOrderModal({
         orderItems={enrichedItems}
         tableNumber={selectedTableTab}
         guestCount={currentTableCustomerTabs.length || 1}
-        orderTotal={enrichedItems.reduce((sum, item) => sum + (item.line_total ?? ((item.unit_price || item.price || 0) * item.quantity)), 0)}
+        orderTotal={enrichedItems.reduce((sum, item) => sum + (item.line_total ?? ((item.unit_price || 0) * item.quantity)), 0)}
         onPrintBill={handleBillPrint}
       />
       
@@ -2111,7 +2111,7 @@ export function DineInOrderModal({
               setIsCustomizationModalOpen(false);
               setCustomizingItem(null);
             }}
-            onAddToOrder={handleCustomizationConfirm}
+            onAddToOrder={handleCustomizationConfirm as any}
             orderType="DINE-IN"
             initialVariant={selectedVariant}
             initialQuantity={customizingItem.quantity}

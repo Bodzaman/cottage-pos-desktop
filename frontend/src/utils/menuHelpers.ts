@@ -18,7 +18,9 @@ export interface HierarchicalMenu {
 export interface MenuSection {
   id: string;
   name: string;
+  section_name?: string; // Snake_case alias for name
   displayName: string;
+  display_name?: string; // Snake_case alias
   categories: MenuCategoryGroup[];
 }
 

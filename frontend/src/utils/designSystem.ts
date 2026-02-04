@@ -96,6 +96,7 @@ const colors = {
     light: 'rgba(255, 255, 255, 0.07)',
     medium: 'rgba(255, 255, 255, 0.12)',
     strong: 'rgba(255, 255, 255, 0.15)',
+    primary: 'rgba(255, 255, 255, 0.12)', // Alias for medium
     purple: 'rgba(124, 93, 250, 0.3)',
     silver: 'rgba(192, 192, 192, 0.3)',  // Silver border (replaces gold)
     platinum: 'rgba(229, 229, 229, 0.3)', // Platinum border

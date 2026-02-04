@@ -5,6 +5,8 @@ interface GoogleMapsContextType {
   isLoaded: boolean;
   isLoading: boolean;
   error: string | null;
+  apiKey?: string;
+  google?: typeof google | null;
 }
 
 const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(undefined);

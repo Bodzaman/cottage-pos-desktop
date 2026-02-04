@@ -69,6 +69,7 @@ export interface GeminiVoiceClientOptions {
   onServerText?: (text: string) => void;
   onError?: (err: string) => void;
   onCartUpdate?: (action: 'add' | 'remove', item: any) => void;
+  onItemAction?: (action: 'add' | 'remove', item: any) => void; // Alias for onCartUpdate
   onFunctionCall?: (name: string, args: any) => void;
   onSessionWarning?: (message: string, timeRemainingMs: number, canExtend: boolean) => void;
   onMicIssue?: (message: string) => void;

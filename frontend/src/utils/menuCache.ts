@@ -603,7 +603,7 @@ export function useMenuData() {
   const fetchMenuItemsByCategory = async (categoryId: string, publishedOnly: boolean = true): Promise<MenuItem[]> => {
     try {
       // Check if we have a valid cache first
-      const menuItemsByCategory = get().getMenuItemsByCategory(categoryId);
+      const menuItemsByCategory = useMenuCache.getState().getMenuItemsByCategory(categoryId);
       if (menuItemsByCategory) return menuItemsByCategory;
 
       // If not in cache, fetch from database
@@ -632,7 +632,7 @@ export function useMenuData() {
       }));
 
       // Update cache
-      get().setMenuItemsByCategory(categoryId, processedItems);
+      useMenuCache.getState().setMenuItemsByCategory(categoryId, processedItems);
 
       return processedItems;
     } catch (error) {

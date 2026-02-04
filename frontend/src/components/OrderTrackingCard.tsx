@@ -163,7 +163,7 @@ export function OrderTrackingCard({
 
         return {
           ...prev,
-          current_status: update.status,
+          current_status: update.status as typeof prev.current_status,
           estimated_completion: update.estimated_completion || prev.estimated_completion,
           progress_percentage: update.progress_percentage || prev.progress_percentage
         };

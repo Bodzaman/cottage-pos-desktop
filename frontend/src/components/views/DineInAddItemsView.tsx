@@ -331,11 +331,11 @@ export function DineInAddItemsView({
               {stagingItems.map((item, index) => (
                 <OrderItemCard
                   key={item.id}
-                  item={item}
+                  item={item as any}
                   index={index}
                   onQuantityChange={handleQuantityUpdate}
                   onRemove={handleRemoveItem}
-                  onCustomize={handleCustomizeStagingItem}
+                  onCustomize={handleCustomizeStagingItem as any}
                   showCustomizeButton={!!onCustomizeItem}
                   showRemoveButton={true}
                 />

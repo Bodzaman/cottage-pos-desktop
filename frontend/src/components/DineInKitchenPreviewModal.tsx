@@ -109,10 +109,15 @@ export function DineInKitchenPreviewModal({
             name: item.variantName,
             price_adjustment: 0
           } : undefined,
-          customizations: item.modifiers?.map(mod => ({
-            id: mod.id || `mod-${Date.now()}`,
-            name: mod.name,
-            price: mod.price ?? mod.price_adjustment ?? 0
+          // Include all required fields matching ThermalPreview expectations
+          customizations: (item.customizations || item.modifiers)?.map((c: any) => ({
+            id: c.id || c.customization_id || `mod-${Date.now()}`,
+            customization_id: c.customization_id || c.id,
+            name: c.name,
+            price: c.price_adjustment ?? c.price ?? 0,
+            price_adjustment: c.price_adjustment ?? c.price ?? 0,
+            group: c.group || '',
+            is_free: c.is_free || ((c.price_adjustment ?? c.price ?? 0) === 0)
           })) || [],
           instructions: item.notes || undefined,
           // Pass kitchen_display_name for kitchen receipts (shorter name for thermal printing)

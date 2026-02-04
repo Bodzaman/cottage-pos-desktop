@@ -46,11 +46,11 @@ interface ModifierGroup {
 }
 
 // Extended OrderItem for POS-specific fields not in the base type
-interface POSOrderItem extends Omit<OrderItem, 'modifiers'> {
+interface POSOrderItem extends Omit<OrderItem, 'modifiers' | 'variant'> {
   isNewItem?: boolean;
   sentToKitchen?: boolean;
   printedOnTicket?: boolean;
-  variant?: string;
+  variant?: string | { id: string; name: string; price?: number; protein_type?: string; protein_type_name?: string; price_adjustment?: number };
   variant_name?: string;
   variant_price?: number;
   proteinType?: string;
@@ -1271,7 +1271,7 @@ export function POSOrderSummary({
                               {/* Variant Information */}
                               {item.variant && (
                                 <div className="flex items-center mt-1 text-xs" style={{ color: globalColors.purple.primary }}>
-                                  <span className="font-medium">{item.variant}</span>
+                                  <span className="font-medium">{typeof item.variant === 'string' ? item.variant : item.variant.name}</span>
                                   {item.variant_price && item.variant_price > 0 && (
                                     <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium" style={{
                                       background: `${globalColors.purple.primaryTransparent}20`,
@@ -1743,7 +1743,20 @@ export function POSOrderSummary({
           protein_type: item.protein_type || null,
           image_url: item.image_url || null,
           modifiers: [],
-          customizations: item.customizations || []
+          // Transform modifiers (grouped structure) into customizations (flat array)
+          // POS stores add-ons as modifiers: [{name: "Group", options: [{name, price}]}]
+          // Thermal receipt expects customizations: [{id, name, price_adjustment}]
+          customizations: (item.modifiers || []).flatMap((group: any, groupIdx: number) =>
+            (group.options || []).map((option: any, optIdx: number) => ({
+              id: `mod-${groupIdx}-${optIdx}`,
+              customization_id: `mod-${groupIdx}-${optIdx}`,
+              name: option.name,
+              price: option.price || 0,
+              price_adjustment: option.price || 0,
+              group: group.name,
+              is_free: (option.price || 0) === 0
+            }))
+          )
         }))}
         orderType={orderType}
         tableNumber={tableNumber}

@@ -18,6 +18,8 @@ interface OrderItem {
   notes?: string;
   menu_item_id?: string;
   variant_id?: string | null;
+  variantId?: string | null; // camelCase alias
+  variantName?: string | null; // camelCase alias
   category_id?: string;
   kitchen_display_name?: string | null;
   display_order?: number;

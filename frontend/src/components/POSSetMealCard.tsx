@@ -90,7 +90,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
             </h3>
             <div className="flex items-center gap-2">
               <Badge className="bg-[rgba(124,93,250,0.2)] text-[#7C5DFA] border-[rgba(124,93,250,0.3)] text-xs">
-                {setMeal.set_meal_code}
+                {setMeal.code}
               </Badge>
               <span className="text-xs text-[#BBC3E1]">
                 {setMeal.item_count} items
@@ -326,7 +326,7 @@ export function POSSetMealCard({ setMeal, onAddToOrder, orderType, viewMode = 'c
           {/* Info */}
           <div className="flex items-center gap-2 mb-3">
             <Badge className="bg-[rgba(124,93,250,0.2)] text-[#7C5DFA] border-[rgba(124,93,250,0.3)] text-xs">
-              {setMeal.set_meal_code}
+              {setMeal.code}
             </Badge>
             <span className="text-xs text-[#BBC3E1]">
               {setMeal.item_count} items

@@ -50,9 +50,9 @@ export const convertOrderItemsToTableItems = (orderItems: OrderItem[]): TableOrd
     sentToKitchen: false,
     addedAt: new Date(),
     printedOnTicket: false,
-    itemStatus: 'NEW',
+    itemStatus: 'NEW' as const,
     isNewItem: true,
-  }));
+  } as TableOrderItem));
 };
 
 // Generates a formatted order/bill number for printing
@@ -76,7 +76,10 @@ export interface OrderTrackingResult {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   lastEvent: {
     type: string;
+    eventType?: 'INSERT' | 'UPDATE' | 'DELETE';
     orderId?: string;
+    orderData?: any;
+    previousData?: any;
     timestamp: Date;
   } | null;
 }

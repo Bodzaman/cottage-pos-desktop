@@ -48,11 +48,12 @@ export const CartItem = React.memo(({ item }: CartItemProps) => {
     return (price * (item?.quantity || 0)).toFixed(2);
   }, [price, item?.quantity]);
 
-  const displayName = React.useMemo(() => {
+  const displayName = React.useMemo((): string => {
     const name = item?.name || menuItem?.name || 'Menu item';
     const variantName = item?.variant?.name || '';
     return variantName ? `${name} (${variantName})` : name;
-  }, [item?.name, menuItem?.name, item?.variant?.name]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.name, (menuItem as {name?: string})?.name, item?.variant?.name]);
 
   // Memoize handlers to prevent recreating functions on each render
   const handleDecreaseQuantity = React.useCallback(() => {

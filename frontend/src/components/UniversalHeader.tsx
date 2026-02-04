@@ -29,6 +29,7 @@ interface UniversalHeaderProps {
   overrideConfig?: boolean;
   showAuthButtons?: boolean;
   showCart?: boolean;
+  showThemeToggle?: boolean; // Optional theme toggle (not currently implemented)
   transparent?: boolean;
   className?: string;
   onCartClick?: () => void; // NEW: Custom cart click handler
@@ -158,12 +159,12 @@ export function UniversalHeader({
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive(item.path)) {
-                    e.target.style.color = PremiumTheme.colors.burgundy[500];
+                    (e.target as HTMLElement).style.color = PremiumTheme.colors.burgundy[500];
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive(item.path)) {
-                    e.target.style.color = PremiumTheme.colors.text.secondary;
+                    (e.target as HTMLElement).style.color = PremiumTheme.colors.text.secondary;
                   }
                 }}
               >
@@ -349,12 +350,12 @@ export function UniversalHeader({
                         }}
                         onMouseEnter={(e) => {
                           if (!isActive(item.path)) {
-                            e.target.style.color = PremiumTheme.colors.burgundy[500];
+                            (e.target as HTMLElement).style.color = PremiumTheme.colors.burgundy[500];
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isActive(item.path)) {
-                            e.target.style.color = PremiumTheme.colors.text.secondary;
+                            (e.target as HTMLElement).style.color = PremiumTheme.colors.text.secondary;
                           }
                         }}
                       >

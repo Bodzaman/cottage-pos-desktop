@@ -22,12 +22,12 @@ export const WIZARD_TARGETS = {
  * Add pulsing indicator to an element
  */
 export function addPulsingIndicator(selector: string, color: string = colors.brand.purple) {
-  const element = document.querySelector(selector);
+  const element = document.querySelector(selector) as HTMLElement | null;
   if (!element) return;
-  
+
   // Remove existing indicators
   document.querySelectorAll('.wizard-pulse-indicator').forEach(el => el.remove());
-  
+
   const indicator = document.createElement('div');
   indicator.className = 'wizard-pulse-indicator';
   indicator.style.cssText = `
@@ -42,7 +42,7 @@ export function addPulsingIndicator(selector: string, color: string = colors.bra
     z-index: 50;
     pointer-events: none;
   `;
-  
+
   element.style.position = 'relative';
   element.appendChild(indicator);
 }

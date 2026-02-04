@@ -28,6 +28,7 @@ interface ExtractedAddress {
   formatted_address: string;
   latitude: number;
   longitude: number;
+  place_id?: string;
 }
 
 interface Props {

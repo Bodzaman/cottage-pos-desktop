@@ -234,11 +234,7 @@ const QuickToolsModal: React.FC<QuickToolsModalProps> = ({ isOpen, onClose }) =>
                     className="p-4 rounded-lg text-left transition-all duration-200 group"
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.06)',
-                      ':hover': {
-                        backgroundColor: 'rgba(124, 93, 250, 0.1)',
-                        borderColor: 'rgba(124, 93, 250, 0.3)'
-                      }
+                      border: '1px solid rgba(255, 255, 255, 0.06)'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'rgba(124, 93, 250, 0.1)';

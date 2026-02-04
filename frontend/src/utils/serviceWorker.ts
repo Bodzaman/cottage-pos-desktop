@@ -1,11 +1,13 @@
+/// <reference lib="webworker" />
 // POSDesktop Service Worker
 // Handles offline caching for app shell, static assets, and API responses
+
+// TypeScript service worker self reference
+const swSelf = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE_NAME = 'cottage-tandoori-pos-v1';
 const API_CACHE_NAME = 'cottage-tandoori-api-v1';
 const IMAGE_CACHE_NAME = 'cottage-tandoori-images-v1';
-
-const swSelf = self as unknown as ServiceWorkerGlobalScope;
 
 // App shell resources to cache immediately
 const APP_SHELL_URLS = [

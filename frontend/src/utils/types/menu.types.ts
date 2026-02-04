@@ -62,9 +62,11 @@ export interface SetMealItem {
   id: string;
   menu_item_id: string;
   menu_item_name: string;
+  name?: string; // Alias for menu_item_name
   menu_item_image_url?: string | null;
   quantity: number;
   item_price: number;
+  price?: number; // Alias for item_price
   category_name?: string | null;
 }
 
@@ -139,11 +141,15 @@ export type VariantImageSource = 'variant' | 'inherited' | 'none';
 export interface ItemVariant {
   id?: string;
   menu_item_id?: string;
+  menuItemId?: string; // camelCase alias
 
   // Protein/variant identification
   protein_type_id?: string;
+  proteinTypeId?: string; // camelCase alias
   protein_type_name?: string;
+  proteinTypeName?: string; // camelCase alias
   variant_name?: string;
+  variantName?: string; // camelCase alias
   name: string;
 
   // Description (with inheritance)
@@ -152,8 +158,9 @@ export interface ItemVariant {
   description_state?: VariantInheritanceState;       // 'inherited' | 'custom'
 
   // Pricing
-  price: number;
+  price?: number;
   price_dine_in?: number;
+  dine_in_price?: number; // Alternative alias
   price_delivery?: number;
   price_takeaway?: number;
 
@@ -161,6 +168,7 @@ export interface ItemVariant {
   is_default?: boolean;
   is_active?: boolean;
   display_order?: number;
+  order?: number; // Legacy alias for display_order
 
   // Image (with inheritance)
   image_url?: string;                                // Base image URL
@@ -169,6 +177,7 @@ export interface ItemVariant {
   display_image_url?: string | null;                 // Final resolved image URL
   image_state?: VariantInheritanceState;             // 'inherited' | 'custom'
   image_source?: VariantImageSource;                 // Where image comes from
+  image_variants?: ImageVariants | null;             // Responsive image variants
 
   // Spice level (with override)
   spice_level?: number;                              // Base/inherited spice level
@@ -223,6 +232,7 @@ export interface MenuItem {
   price?: number;
   base_price?: number;
   price_dine_in?: number;
+  dine_in_price?: number; // Alternative alias
   price_takeaway?: number;
   takeaway_price?: number;
   price_delivery?: number;
@@ -230,8 +240,11 @@ export interface MenuItem {
   set_meal_id?: string | null;
   set_meal_code?: string | null;
   has_variants?: boolean;
+  hasVariants?: boolean; // camelCase alias
   default_variant?: ItemVariant | null;
+  defaultVariant?: ItemVariant | null; // camelCase alias
   is_available?: boolean;
+  isAvailable?: boolean; // camelCase alias
   vegetarian?: boolean;
   is_vegetarian?: boolean;
   vegan?: boolean;
@@ -305,9 +318,12 @@ export interface Modifier {
 export interface ModifierSelection {
   id: string;
   modifier_id: string;
+  modifierId?: string; // camelCase alias
   option_id?: string;
+  optionId?: string; // camelCase alias
   name: string;
   price_adjustment: number;
+  priceAdjustment?: number; // camelCase alias
   price?: number;
   groupId?: string;
   groupName?: string;
@@ -385,8 +401,8 @@ export interface OrderItemVariant {
  */
 export interface OrderItem {
   id?: string;
-  menu_item_id: string;
-  variant_id: string | null;
+  menu_item_id?: string;
+  variant_id?: string | null;
   menuItemId?: string;
   variantId?: string | null;
   name: string;
@@ -397,21 +413,46 @@ export interface OrderItem {
   variantName?: string | null;
   notes?: string;
   protein_type?: string;
+  proteinType?: string; // camelCase alias
   image_url?: string;
+  imageUrl?: string; // camelCase alias
   modifiers?: ModifierSelection[];
   customizations?: CustomizationSelection[];
   category_id?: string;
+  categoryId?: string; // camelCase alias
   category_name?: string;
+  categoryName?: string; // camelCase alias
   item_type?: 'menu_item' | 'set_meal';
+  itemType?: 'menu_item' | 'set_meal'; // camelCase alias
   set_meal_code?: string;
+  setMealCode?: string; // camelCase alias
   set_meal_items?: OrderSetMealItem[];
+  setMealItems?: OrderSetMealItem[]; // camelCase alias
   customer_name?: string;
+  customerName?: string; // camelCase alias
   customer_number?: number;
+  customerNumber?: number; // camelCase alias
   customer_tab_id?: string;
+  customerTabId?: string; // camelCase alias
   kitchen_display_name?: string | null;
+  kitchenDisplayName?: string | null; // camelCase alias
   serve_with_section_id?: string | null;
   serveWithSectionId?: string | null;
   variant?: OrderItemVariant;
+  // For linked table billing - tracks which table the item came from
+  sourceTableNumber?: number;
+  source_table_number?: number;
+  // Display order
+  display_order?: number;
+  displayOrder?: number; // camelCase alias
+  // Kitchen status tracking
+  status?: 'NEW' | 'PREPARING' | 'READY' | 'SERVED';
+  // Set meal data for full set meal details
+  set_meal_data?: {
+    code?: string;
+    items?: OrderSetMealItem[];
+    [key: string]: any;
+  };
 }
 
 // ============================================================================
@@ -526,15 +567,20 @@ export type PaymentMethod =
 
 /**
  * Payment result interface for POS transactions
+ * Supports both camelCase and snake_case naming conventions for compatibility
  */
 export interface PaymentResult {
   method: PaymentMethod;
   amount: number;
   change?: number;
   cash_received?: number;
+  cashReceived?: number; // camelCase alias
   reference?: string;
   tip_amount?: number;
+  tipAmount?: number; // camelCase alias
   total_with_tip?: number;
+  totalWithTip?: number; // camelCase alias
+  changeGiven?: number; // For cash payments
 }
 
 // ============================================================================

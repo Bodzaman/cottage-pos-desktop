@@ -2,11 +2,12 @@ import { useEffect } from "react";
 // Dev components were removed - creating stubs
 // import { MessageEmitter } from "../dev-components/Beacon";
 // import { InternalErrorBoundary } from "../dev-components/InternalErrorBoundary";
-import { UserErrorBoundary } from "../dev-components/UserErrorBoundary";
+// import { UserErrorBoundary } from "../dev-components/UserErrorBoundary";
 
 // Stubs for removed components
 const MessageEmitter = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 const InternalErrorBoundary = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+const UserErrorBoundary = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
 interface Props {
   children: React.ReactNode;

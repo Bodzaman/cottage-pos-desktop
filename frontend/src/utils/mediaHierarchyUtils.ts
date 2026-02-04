@@ -317,10 +317,10 @@ export const filterMediaUnified = (
   allMedia: HierarchicalMediaData,
   filters: {
     selectedAssetType: 'all' | 'menu-item' | 'ai-avatar' | 'general';
-    selectedImageType: 'all' | 'menu-item' | 'menu-item-variant'; // NEW: Phase 3 MYA-1476
+    selectedImageType?: 'all' | 'menu-item' | 'menu-item-variant'; // NEW: Phase 3 MYA-1476 (optional, defaults to 'all')
     selectedSectionId: string | null;
     selectedCategoryId: string | null;
-    selectedMenuItemId: string | null;
+    selectedMenuItemId?: string | null;
     showUncategorized: boolean;
     showLinked: boolean;
     showInUse: boolean;

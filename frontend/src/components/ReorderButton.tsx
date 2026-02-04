@@ -111,7 +111,7 @@ export function ReorderButton({
               price: currentPrice
             };
 
-            addItem(menuItem, variant, item.quantity, item.notes || '');
+            addItem(menuItem, variant, item.quantity, undefined, undefined, item.notes || '');
             addedCount++;
           }
         } catch (itemError) {

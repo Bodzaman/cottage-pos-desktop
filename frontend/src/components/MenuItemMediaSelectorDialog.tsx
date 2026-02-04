@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MediaGalleryGrid } from 'components/MediaGalleryGrid';
 import { useMediaLibraryStore } from 'utils/mediaLibraryStore';
-import { fetchHierarchicalMedia, filterMediaUnified } from 'utils/mediaHierarchyUtils';
+import { fetchHierarchicalMedia, filterMediaUnified, HierarchicalMediaData } from 'utils/mediaHierarchyUtils';
 import { MediaItem } from 'utils/mediaLibraryUtils';
 import { 
   Image, 

@@ -15,7 +15,7 @@ export interface RestaurantSettingsStore {
 }
 
 // Create the store with persistence
-export const useSettingsStore = create<RestaurantSettingsStore>(
+export const useSettingsStore = create<RestaurantSettingsStore>()(
   persist(
     (set) => ({
       settings: {

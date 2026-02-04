@@ -3,8 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-react';
 import { QSAITheme } from 'utils/QSAIDesign';
-import { FormData } from 'utils/receiptDesignerTypes';
-import { ReceiptFormat } from 'utils/receiptDesignerStoreV2';
+import { FormData, ReceiptFormat } from 'utils/receiptDesignerTypes';
 import ThermalPreview from 'components/ThermalPreview';
 
 interface ReceiptPreviewV2Props {
@@ -68,9 +67,9 @@ export function ReceiptPreviewV2({
             </div>
           ) : (
             <ThermalPreview
-              formData={mergedFormData}
+              formData={mergedFormData as any}
               receiptFormat={formatToggle}
-              paperWidth={paperWidth}
+              paperWidth={paperWidth as 58 | 80}
               mode="form"
               elements={null}
               orderData={null}

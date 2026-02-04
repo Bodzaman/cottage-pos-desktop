@@ -26,7 +26,11 @@ interface EnhancedMenuCategoriesProps {
   categories: Category[];
   menuItems: MenuItem[];
   selectedParentCategory: string | null;
+  selectedCategory?: string | null; // Additional selection state
+  searchQuery?: string; // Search query for filtering
   onParentCategorySelect: (parentCategoryId: string) => void;
+  onCategorySelect?: (categoryId: string) => void; // Category selection handler
+  onSearchChange?: (query: string) => void; // Search change handler
   onShowAllItems: () => void;
   className?: string;
   setMealsCount?: number; // Number of active set meals

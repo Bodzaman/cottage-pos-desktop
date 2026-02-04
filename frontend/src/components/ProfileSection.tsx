@@ -132,7 +132,7 @@ export default function ProfileSection({
     toast.error('Account deletion not configured');
   };
   const { signOut } = useSimpleAuth();
-  const profileCompletion = calculateProfileCompletion(profile, addresses);
+  const profileCompletion = calculateProfileCompletion(profile, addresses as any);
   const completionColor = getCompletionColor(profileCompletion.percentage);
   const completionMessage = getCompletionMessage(profileCompletion);
 

@@ -314,7 +314,7 @@ export function StaffVariantSelector({
           itemVariants={variants}
           isOpen={isCustomizationModalOpen}
           onClose={() => setIsCustomizationModalOpen(false)}
-          onAddToOrder={handleAddToOrderFromModal}
+          onAddToOrder={handleAddToOrderFromModal as any}
           orderType={orderType}
           initialVariant={selectedVariant}
           initialQuantity={variantQuantities[selectedVariant.id] || 1}

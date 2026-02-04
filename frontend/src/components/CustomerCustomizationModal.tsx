@@ -13,8 +13,8 @@ import { PremiumTheme } from '../utils/premiumTheme';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
 
-// OrderMode type for mode prop
-type OrderMode = 'delivery' | 'collection' | 'dine-in';
+// OrderMode type for mode prop - supports both lowercase and uppercase
+type OrderMode = 'delivery' | 'collection' | 'dine-in' | 'DELIVERY' | 'COLLECTION' | 'DINE-IN' | 'DINE_IN';
 
 // Flexible variant type that accepts both ItemVariant and CartItemVariant
 type FlexibleVariant = Partial<ItemVariant> | null;

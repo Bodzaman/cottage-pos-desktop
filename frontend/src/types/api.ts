@@ -76,6 +76,7 @@ export interface UploadFileResponse {
 
 export interface CreateAuthenticatedVoiceCartSessionRequest {
   customer_id?: string;
+  user_id?: string; // Alias for customer_id
   session_id?: string;
   phone_number?: string;
 }
@@ -94,10 +95,14 @@ export interface VoiceCartSessionResponse {
 export interface EnrichedOrderItem {
   id: string;
   menu_item_id: string;
+  menuItemId?: string; // camelCase alias
+  variant_id?: string | null;
+  variantId?: string | null; // camelCase alias
   name: string;
   quantity: number;
   price: number;
   variant_name?: string;
+  variantName?: string; // camelCase alias
   customizations?: Array<{
     id: string;
     name: string;

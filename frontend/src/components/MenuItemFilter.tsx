@@ -80,7 +80,7 @@ export const MenuItemFilter = forwardRef<HTMLButtonElement, MenuItemFilterProps>
 
       sections.forEach(section => {
         section.categories?.forEach(category => {
-          map.set(category.category_id, `${section.section_name} → ${category.category_name}`);
+          map.set(category.id, `${section.name} → ${category.name}`);
         });
       });
 

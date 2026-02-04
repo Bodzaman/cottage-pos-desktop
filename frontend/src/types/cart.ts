@@ -108,6 +108,7 @@ export interface CartItemVariant {
   variantName?: string;
   variant_name?: string; // Snake_case alias
   imageUrl?: string;
+  image_url?: string; // Snake_case alias
   displayImageUrl?: string;
   customizations?: CartCustomization[];
 
@@ -116,6 +117,8 @@ export interface CartItemVariant {
   menu_item_id?: string;
   proteinTypeId?: string | null;
   protein_type_id?: string | null;
+  proteinTypeName?: string; // Protein type name
+  protein_type_name?: string; // Snake_case alias
   isDefault?: boolean;
   is_default?: boolean;
   priceDineIn?: number | null;
@@ -124,6 +127,18 @@ export interface CartItemVariant {
   price_delivery?: number | null;
   priceTakeaway?: number | null;
   price_takeaway?: number | null;
+
+  // Image variants for responsive images
+  imageVariants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null;
+  image_variants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null; // Snake_case alias
 }
 
 /**

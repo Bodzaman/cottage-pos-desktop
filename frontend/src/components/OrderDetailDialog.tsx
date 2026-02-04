@@ -69,7 +69,7 @@ interface OrderDetailDialogProps {
   onRefund: (order: OrderData) => void;
   onDelete?: (order: OrderData) => void;
   onComplete?: (order: OrderData) => void;
-  orderSource: "online" | "pos";
+  orderSource: "online" | "pos" | "ai-voice";
 }
 
 const statusColors = {

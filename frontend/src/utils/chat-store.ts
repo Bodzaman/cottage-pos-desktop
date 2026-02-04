@@ -44,6 +44,7 @@ export enum VoiceCallStatus {
   IDLE = 'idle',
   CONNECTING = 'connecting',
   CONNECTED = 'connected',
+  SPEAKING = 'speaking',
   DISCONNECTED = 'disconnected',
   FAILED = 'failed'
 }
@@ -463,6 +464,23 @@ export const useChatStore = create<ChatState>()(
           }
         }
       },
+
+      // Update the last message content and metadata
+      updateLastMessage: (content, metadata) => {
+        set((state) => {
+          const messages = [...state.messages];
+          if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            messages[messages.length - 1] = {
+              ...lastMessage,
+              content,
+              metadata: metadata ? { ...lastMessage.metadata, ...metadata } : lastMessage.metadata
+            };
+          }
+          return { messages };
+        });
+      },
+
       setLoading: (loading) => set({ isLoading: loading }),
       setStreaming: (streaming) => set({ isStreaming: streaming }),
 
@@ -979,7 +997,7 @@ export const useChatStore = create<ChatState>()(
             set((state) => ({
               messages: state.messages
                 .filter(msg => msg.id !== typingMessageId)
-                .map(msg => msg.id === botMessageId ? { ...msg, isStreaming: false } : msg),
+                .map(msg => msg.id === typingMessageId ? { ...msg, isStreaming: false } : msg),
               isLoading: false,
               isStreaming: false,
               isTyping: false,

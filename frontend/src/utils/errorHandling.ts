@@ -108,9 +108,10 @@ export const safeAsync = async <T>(
 export const checkBrowserCompatibility = () => {
   const userAgent = navigator.userAgent;
   const warnings: string[] = [];
-  
+
   // Check for known problematic extensions
-  if (window.chrome && window.chrome.runtime) {
+  const chromeWindow = window as Window & { chrome?: { runtime?: unknown } };
+  if (chromeWindow.chrome && chromeWindow.chrome.runtime) {
     warnings.push('Chrome extensions detected - some errors may be suppressed');
   }
   

@@ -62,7 +62,7 @@ export default function VoiceTester({
       onStateChange: setState,
       onServerText: setAssistantText,
       onFunctionCall: (name, args) => {
-        setFunctionCalls((prev) => [...prev, { name, args, timestamp: new Date() }]);
+        setFunctionCalls((prev) => [...prev, { name, args, timestamp: new Date().toISOString() }]);
       },
       onItemAction: (action, item) => {
         if (action === 'add') {

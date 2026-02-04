@@ -111,6 +111,9 @@ export interface VariantRowProps {
   /** Parent item image for inheritance */
   baseItemImage: string;
 
+  /** Parent item image asset ID for inheritance */
+  baseItemImageAssetId?: string | null;
+
   /** Whether auto-name generation is enabled */
   autoGenerateNames: boolean;
 

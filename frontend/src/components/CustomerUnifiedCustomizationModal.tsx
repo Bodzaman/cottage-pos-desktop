@@ -14,8 +14,8 @@ import { cn } from '../utils/cn';
 import { toast } from 'sonner';
 import { convertSpiceIndicatorsToEmoji } from '../utils/spiceLevelUtils';
 
-// OrderMode type for mode prop
-type OrderMode = 'delivery' | 'collection' | 'dine-in';
+// OrderMode type for mode prop - supports both lowercase and uppercase
+type OrderMode = 'delivery' | 'collection' | 'dine-in' | 'DELIVERY' | 'COLLECTION' | 'DINE-IN' | 'DINE_IN';
 
 export interface SelectedCustomization {
   id: string;
@@ -45,8 +45,8 @@ interface CustomerUnifiedCustomizationModalProps {
 // Helper function to check if variant has any food details
 const hasAnyFoodDetails = (target: ItemVariant): boolean => {
   return (
-    (target.spice_level && target.spice_level > 0) ||
-    (target.allergens && target.allergens.length > 0) ||
+    (target.spice_level && Number(target.spice_level) > 0) ||
+    (target.allergens && (Array.isArray(target.allergens) ? target.allergens.length > 0 : Object.keys(target.allergens).length > 0)) ||
     !!(target.allergen_notes?.trim()) ||
     target.is_vegetarian === true ||
     target.is_vegan === true ||

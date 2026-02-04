@@ -90,8 +90,6 @@ export default function UncategorizedSection({
               usage: asset.usage,
               description: asset.description,
             }))}
-            onDelete={undefined} // Disable delete from uncategorized section
-            onSelect={undefined} // Disable select from uncategorized section
           />
         </div>
       )}

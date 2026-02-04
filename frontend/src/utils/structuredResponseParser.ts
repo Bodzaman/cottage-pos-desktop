@@ -225,7 +225,7 @@ export class StreamingStructuredParser {
   private parser: StructuredResponseParser;
   private currentContent = '';
   private currentElements: StructuredElement[] = [];
-  private onUpdate?: (parsed: ParsedStructuredMessage) => void;
+  public onUpdate?: (parsed: ParsedStructuredMessage) => void;
 
   constructor(
     config: ParsingConfig = DEFAULT_PARSING_CONFIG,

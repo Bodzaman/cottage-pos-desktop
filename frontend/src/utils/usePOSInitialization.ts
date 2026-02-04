@@ -210,9 +210,9 @@ export function usePOSInitialization({ onViewChange }: UsePOSInitializationProps
   // ============================================================================
   useEffect(() => {
     if (!onViewChange) return;
-    
-    const cleanup = useHeaderViewChange((event) => {
-      switch (event.view) {
+
+    const cleanup = useHeaderViewChange((view) => {
+      switch (view) {
         case 'pos':
           onViewChange('pos');
           break;
@@ -220,10 +220,10 @@ export function usePOSInitialization({ onViewChange }: UsePOSInitializationProps
           onViewChange('reservations');
           break;
         default:
-          console.warn('[POSDesktop] Unknown view:', event.view);
+          console.warn('[POSDesktop] Unknown view:', view);
       }
     })();
-    
+
     return cleanup;
   }, [onViewChange]);
 

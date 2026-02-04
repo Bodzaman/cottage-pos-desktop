@@ -18,15 +18,26 @@ import type { InheritanceState, ImageSource, ItemType } from './common';
  */
 export interface MenuCategory {
   id: string;
+  category_id?: string; // Alias for id
   name: string;
+  category_name?: string; // Alias for name
   description?: string | null;
   menuOrder: number;
+  menu_order?: number; // Snake_case alias
+  display_order?: number; // Snake_case alias for menuOrder
   printOrder?: number;
+  print_order?: number; // Snake_case alias
   printToKitchen: boolean;
+  print_to_kitchen?: boolean; // Snake_case alias
   imageUrl?: string | null;
+  image_url?: string | null; // Snake_case alias
   parentCategoryId?: string | null;
+  parent_category_id?: string | null; // Snake_case alias
+  parent_id?: string | null; // Alternative snake_case alias
   active: boolean;
+  is_active?: boolean; // Snake_case alias
   isProteinType?: boolean;
+  is_protein_type?: boolean; // Snake_case alias
 
   // Extended properties for UI
   children?: MenuCategory[];
@@ -70,7 +81,7 @@ export interface ProteinType {
  */
 export interface ItemVariant {
   id: string;
-  menuItemId: string;
+  menuItemId?: string; // Optional for form contexts where menu item doesn't exist yet
   menu_item_id?: string; // Snake_case alias
   proteinTypeId?: string | null;
   protein_type_id?: string | null; // Snake_case alias
@@ -110,6 +121,18 @@ export interface ItemVariant {
   display_image_url?: string | null; // Snake_case alias
   imageSource?: ImageSource;
   image_source?: ImageSource; // Snake_case alias
+
+  // Image variants for responsive images
+  imageVariants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null;
+  image_variants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null; // Snake_case alias
 
   // Description with inheritance state
   description?: string | null;
@@ -154,6 +177,7 @@ export interface ItemVariant {
   variant_code?: string | null; // Snake_case alias
   displayOrder?: number;
   display_order?: number; // Snake_case alias
+  order?: number; // Short alias for displayOrder (used in some forms)
   featured?: boolean;
   createdAt?: string;
   created_at?: string; // Snake_case alias
@@ -200,6 +224,11 @@ export interface MenuItem {
     widescreen?: { webp?: string | null; jpeg?: string | null };
     thumbnail?: { webp?: string | null; jpeg?: string | null };
   } | null;
+  image_variants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null; // Snake_case alias
   spiceIndicators?: string | null;
   spice_indicators?: string | null; // Snake_case alias
   defaultSpiceLevel?: number | null;
@@ -208,6 +237,9 @@ export interface MenuItem {
   categoryId: string;
   category_id?: string; // Snake_case alias
   categoryName?: string;
+  category_name?: string; // Snake_case alias
+  sectionName?: string; // Section name for grouping
+  section_name?: string; // Snake_case alias
   featured: boolean;
   dietaryTags?: string[] | null;
   dietary_tags?: string[] | null; // Snake_case alias
@@ -298,11 +330,18 @@ export interface SuggestedMenuItem {
 export interface SetMealItem {
   id: string;
   menuItemId: string;
+  menu_item_id?: string; // Snake_case alias
   menuItemName: string;
+  menu_item_name?: string; // Snake_case alias
+  name?: string; // Short alias for menuItemName
   menuItemImageUrl?: string | null;
+  menu_item_image_url?: string | null; // Snake_case alias
   quantity: number;
   itemPrice: number;
+  item_price?: number; // Snake_case alias
+  price?: number; // Short alias for itemPrice
   categoryName?: string | null;
+  category_name?: string | null; // Snake_case alias
 }
 
 /**
@@ -367,9 +406,12 @@ export interface Modifier {
 export interface ModifierSelection {
   id: string;
   modifierId: string;
+  modifier_id?: string; // Snake_case alias for modifierId
   optionId?: string;
+  option_id?: string; // Snake_case alias for optionId
   name: string;
   priceAdjustment: number;
+  price_adjustment?: number; // Snake_case alias for priceAdjustment
   price?: number; // Alias for priceAdjustment for compatibility
 }
 
@@ -379,11 +421,14 @@ export interface ModifierSelection {
 export interface CustomizationSelection {
   id: string;
   customizationId?: string;
+  customization_id?: string; // Snake_case alias
   name: string;
   priceAdjustment: number;
   price?: number; // Alias for priceAdjustment for compatibility
   price_adjustment?: number; // Snake_case alias
   group?: string;
+  is_free?: boolean; // Marks free customizations
+  is_adhoc?: boolean; // Marks ad-hoc (custom entered) customizations
 }
 
 // ================================
@@ -395,55 +440,97 @@ export interface CustomizationSelection {
  */
 export interface MenuItemFormData {
   id?: string;
-  name: string;
+  name?: string;
   kitchenDisplayName?: string;
+  kitchen_display_name?: string; // Snake_case alias
   description?: string;
-  categoryId: string;
+  menu_item_description?: string; // Snake_case alias
+  categoryId?: string;
+  category_id?: string; // Snake_case alias
   spiceIndicators?: string;
+  spice_indicators?: string; // Snake_case alias
   featured?: boolean;
+  active?: boolean;
   dietaryTags?: string[];
+  dietary_tags?: string[]; // Snake_case alias
   itemCode?: string;
+  item_code?: string; // Snake_case alias
   menuOrder?: number;
+  menu_order?: number; // Snake_case alias
+  display_order?: number; // Snake_case alias
 
   // Food-specific fields
   spiceLevel?: number;
+  spice_level?: number; // Snake_case alias
   allergens?: Record<string, "contains" | "may_contain"> | string[] | null;
   allergenWarnings?: string;
+  allergen_warnings?: string; // Snake_case alias
   specialtyNotes?: string;
+  specialty_notes?: string; // Snake_case alias
   chefsSpecial?: boolean;
+  chefs_special?: boolean; // Snake_case alias
+
+  // Kitchen print settings
+  printToKitchen?: boolean;
+  print_to_kitchen?: boolean; // Snake_case alias
+  inheritCategoryPrintSettings?: boolean;
+  inherit_category_print_settings?: boolean; // Snake_case alias
 
   // Pricing
   price?: number;
+  base_price?: number; // Snake_case alias
   priceDineIn?: number;
+  price_dine_in?: number; // Snake_case alias
   priceDelivery?: number;
+  price_delivery?: number; // Snake_case alias
   priceTakeaway?: number;
+  price_takeaway?: number; // Snake_case alias
 
   // Variants
   variants?: ItemVariant[];
+  has_variants?: boolean;
 
   // Drinks & Wine serving sizes
   servingSize125ml?: boolean;
+  serving_size_125ml?: boolean; // Snake_case alias
   servingSize125mlPrice?: number;
+  serving_size_125ml_price?: number; // Snake_case alias
   servingSize175ml?: boolean;
+  serving_size_175ml?: boolean; // Snake_case alias
   servingSize175mlPrice?: number;
+  serving_size_175ml_price?: number; // Snake_case alias
   servingSize250ml?: boolean;
+  serving_size_250ml?: boolean; // Snake_case alias
   servingSize250mlPrice?: number;
+  serving_size_250ml_price?: number; // Snake_case alias
   servingSizeBottle?: boolean;
+  serving_size_bottle?: boolean; // Snake_case alias
   servingSizeBottlePrice?: number;
+  serving_size_bottle_price?: number; // Snake_case alias
 
   // Coffee & Desserts serving sizes
   servingSizeRegular?: boolean;
+  serving_size_regular?: boolean; // Snake_case alias
   servingSizeRegularPrice?: number;
+  serving_size_regular_price?: number; // Snake_case alias
   servingSizeLarge?: boolean;
+  serving_size_large?: boolean; // Snake_case alias
   servingSizeLargePrice?: number;
+  serving_size_large_price?: number; // Snake_case alias
   servingSizeDecaf?: boolean;
+  serving_size_decaf?: boolean; // Snake_case alias
   servingSizeDecafPrice?: number;
+  serving_size_decaf_price?: number; // Snake_case alias
 
   // Beer serving sizes
   servingSizeHalfPint?: boolean;
+  serving_size_half_pint?: boolean; // Snake_case alias
   servingSizeHalfPintPrice?: number;
+  serving_size_half_pint_price?: number; // Snake_case alias
   servingSizePint?: boolean;
+  serving_size_pint?: boolean; // Snake_case alias
   servingSizePintPrice?: number;
+  serving_size_pint_price?: number; // Snake_case alias
 }
 
 // ================================

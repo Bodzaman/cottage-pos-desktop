@@ -29,7 +29,8 @@ export interface OrderItemCustomization {
   id: string;
   customization_id?: string;
   name: string;
-  price_adjustment: number;
+  price_adjustment?: number;
+  price?: number; // Alias for price_adjustment
   category?: string;
   group?: string;
   is_free?: boolean;
@@ -74,7 +75,8 @@ export interface CustomerTabInfo {
 
 export type ReceiptFormat = 'front_of_house' | 'kitchen_customer';
 // OrderMode must match database order_type_enum (uppercase underscore format)
-export type OrderMode = 'DINE_IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY';
+// Includes hyphenated versions for backwards compatibility
+export type OrderMode = 'DINE_IN' | 'DINE-IN' | 'WAITING' | 'COLLECTION' | 'DELIVERY' | 'ONLINE_ORDERS';
 export type OrderSource = 'POS' | 'ONLINE' | 'AI_VOICE';
 export type OrderType = 'dine_in' | 'collection' | 'delivery' | 'waiting' | 'online_orders';
 export type DineInTemplateType = 'kitchen_copy' | 'final_bill';
@@ -134,6 +136,7 @@ export interface FormData {
 
   // Dine-In Fields
   tableNumber: string;
+  queueNumber?: string;             // Queue number for WAITING orders
   guestCount: number;
   dineInTemplateType: DineInTemplateType;
   linkedTables: number[];           // Linked table numbers (e.g., [1, 2, 3] for merged tables)
@@ -187,6 +190,10 @@ export interface FormData {
   kitchenShowTotals?: boolean;          // Default: depends on order mode (false for dine-in)
   kitchenShowFooter?: boolean;          // Default: false - Hide footer on kitchen
 
+  // Kitchen Ticket Rail Settings (for physical ticket rails in kitchen)
+  kitchenTicketRailMargin?: number;     // Top margin in mm (0-30, default 15)
+  kitchenShowPullTab?: boolean;         // Show chevron pull tab design (default true)
+
   // Kitchen Order Label
   showKitchenOrderLabel?: boolean;      // Default: true - Show "KITCHEN ORDER" label
   kitchenOrderLabelText?: string;       // Default: "KITCHEN ORDER" - Customizable text
@@ -209,14 +216,14 @@ export interface FormData {
 // ==================== Template Metadata ====================
 
 export interface TemplateMetadata {
-  id: string;
+  id?: string; // Optional - auto-generated on create
   name: string;
-  description: string;
-  category: string;
-  template_type: string;
+  description?: string; // Optional - can be empty
+  category?: string; // Optional - defaults to 'custom'
+  template_type?: string; // Optional - defaults to 'custom'
   order_types?: string[];
   tags?: string[];
-  created_at: string;
+  created_at?: string; // Optional - auto-generated
   updated_at?: string;
   created_by?: string;
 }
@@ -271,6 +278,10 @@ export interface ReceiptDesignerState {
   loadTemplate: (template: Template) => void;
   resetForm: () => void;
   markAsSaved: () => void;
+
+  // Additional actions for business data initialization and form field updates
+  initializeBusinessData?: (data: Partial<FormData>) => void;
+  updateFormField?: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
 
 // ==================== Service Layer Types ====================
@@ -437,6 +448,10 @@ export const DEFAULT_FORM_DATA: FormData = {
   kitchenShowSpecialInstructions: true, // Always show special instructions
   kitchenShowTotals: false,          // Default off for dine-in (FOH handles billing)
   kitchenShowFooter: false,          // Kitchen doesn't need footer
+
+  // Kitchen Ticket Rail Settings
+  kitchenTicketRailMargin: 15,       // Default 15mm top margin for ticket rails
+  kitchenShowPullTab: true,          // Show chevron pull tab by default
 
   // Kitchen Order Label
   showKitchenOrderLabel: true,       // Show "KITCHEN ORDER" label by default

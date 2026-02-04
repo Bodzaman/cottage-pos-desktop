@@ -266,12 +266,6 @@ export function POSGuestCountModal({
                   background: QSAITheme.background.secondary,
                   border: `1px solid ${QSAITheme.border.accent}`,
                   color: QSAITheme.text.secondary,
-                  '&:hover': {
-                    background: QSAITheme.background.tertiary,
-                    border: `1px solid ${QSAITheme.purple.primary}`,
-                    transform: 'translateY(-1px)',
-                    boxShadow: effects.outerGlow('subtle')
-                  }
                 }}
               >
                 <span className="text-lg font-bold">−</span>
@@ -308,12 +302,6 @@ export function POSGuestCountModal({
                   background: QSAITheme.background.secondary,
                   border: `1px solid ${QSAITheme.border.accent}`,
                   color: QSAITheme.text.secondary,
-                  '&:hover': {
-                    background: QSAITheme.background.tertiary,
-                    border: `1px solid ${QSAITheme.purple.primary}`,
-                    transform: 'translateY(-1px)',
-                    boxShadow: effects.outerGlow('subtle')
-                  }
                 }}
               >
                 <span className="text-lg font-bold">+</span>

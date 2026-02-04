@@ -128,6 +128,10 @@ export const AuthTheme = {
       hidden: { opacity: 0, scale: 0.95 },
       visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: 'easeOut' } },
     },
+    scaleIn: {
+      hidden: { opacity: 0, scale: 0.95 },
+      visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: 'easeOut' } },
+    },
     elementSlide: {
       hidden: { opacity: 0, x: -10 },
       visible: { opacity: 1, x: 0, transition: { duration: 0.4 } },
@@ -256,6 +260,12 @@ export const PremiumTheme = {
       warning: '#F59E0B',
       error: '#EF4444',
       info: '#3B82F6'
+    },
+    // Additional color aliases for compatibility
+    emerald: {
+      50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 300: '#6EE7B7',
+      400: '#34D399', 500: '#10B981', 600: '#059669', 700: '#047857',
+      800: '#065F46', 900: '#064E3B'
     }
   },
   shadows: {

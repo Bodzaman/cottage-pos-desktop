@@ -46,6 +46,11 @@ export interface MenuItem {
   menu_item_description?: string | null; // Unified description field
   long_description?: string | null; // Extended description
   image_url?: string | null;
+  image_variants?: {
+    square?: { webp?: string | null; jpeg?: string | null };
+    widescreen?: { webp?: string | null; jpeg?: string | null };
+    thumbnail?: { webp?: string | null; jpeg?: string | null };
+  } | null; // Optimized image variants
   spice_indicators?: string | null;
   category_id: string;
   categoryId?: string; // CamelCase alias
@@ -144,6 +149,8 @@ export interface MenuItemVariant {
 
   // Display flags
   featured?: boolean;
+  display_order?: number; // Display order for variant list
+  order?: number; // Alias for display_order
 
   // System fields
   variant_code?: string | null;
@@ -424,6 +431,10 @@ export interface MenuItemFormData {
   item_code?: string;
   menu_order?: number; // Unified ordering field - replaces display_order
   display_order?: number; // Alias for menu_order
+
+  // Kitchen print settings
+  print_to_kitchen?: boolean; // Whether item should be sent to kitchen printer
+  inherit_category_print_settings?: boolean; // Inherit print settings from category
 
   // ✅ NEW: Food-specific fields (matches database schema)
   spice_level?: number; // Replaces old default_spice_level

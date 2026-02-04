@@ -6,7 +6,7 @@ interface MenuItemDeleteButtonProps {
   itemId: string;
   onDelete: (itemId: string) => void;
   isDeleting?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'default' | 'lg' | 'icon';
   className?: string;
 }
 

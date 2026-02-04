@@ -11,6 +11,14 @@ import { Card } from "@/components/ui/card";
 const voiceOrderEvents = {
   emit: (event: string, data?: any) => {
     console.log('Voice order event:', event, data);
+  },
+  simulateOrder: async (scenario: string) => {
+    console.log('Simulating voice order:', scenario);
+    return Promise.resolve();
+  },
+  refreshOrders: async () => {
+    console.log('Refreshing voice orders');
+    return Promise.resolve();
   }
 };
 import { Wand2, Loader2 } from "lucide-react";

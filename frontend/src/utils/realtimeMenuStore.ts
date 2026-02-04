@@ -306,7 +306,7 @@ function isCacheFresh(lastFetched?: number): boolean {
   return age < CACHE_TTL;
 }
 
-export const useRealtimeMenuStore = create<MenuStoreState>(
+export const useRealtimeMenuStore = create<MenuStoreState>()(
   persist(
     (set, get) => ({
       // Initial state

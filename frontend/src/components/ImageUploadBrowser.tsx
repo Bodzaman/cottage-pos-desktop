@@ -10,7 +10,7 @@ import { ImageIcon, Upload, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import brain from 'brain';
 import { MediaAsset } from 'types';
-import { MediaLibraryResponse, FileUploadResponse } from '../brain/data-contracts';
+import { FileUploadResponse } from '../brain/data-contracts';
 
 // Simple response type for API calls
 interface SimpleApiResponse {
@@ -18,10 +18,11 @@ interface SimpleApiResponse {
   message?: string;
 }
 
-// Local response type for media library
-interface MediaLibraryResponse {
+// Local response type for media library (different from data-contracts)
+interface LocalMediaLibraryResponse {
   success: boolean;
   items?: MediaAsset[];
+  assets?: MediaAsset[];
   error?: string;
 }
 
@@ -68,10 +69,10 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
     setLoading(true);
     try {
       const response = await (brain as any).get_media_library({ tags: JSON.stringify(["avatar"]) });
-      const data: MediaLibraryResponse = await response.json();
-      
-      if (data.success && data.assets) {
-        setImages(data.assets);
+      const data: LocalMediaLibraryResponse = await response.json();
+
+      if (data.success && (data.assets || data.items)) {
+        setImages(data.assets || data.items || []);
       } else {
         toast.error('Failed to load images');
       }
@@ -315,7 +316,7 @@ export const ImageUploadBrowser: React.FC<ImageUploadBrowserProps> = ({
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {images.map((image, index) => (
                   <Card
-                    key={image.id || image.asset_id || image.file_name || `image-${index}`}
+                    key={image.id || image.file_name || `image-${index}`}
                     className={`cursor-pointer transition-all hover:shadow-md group ${
                       localSelectedImage === image.url
                         ? 'ring-2 ring-blue-500 shadow-md'

@@ -14,6 +14,7 @@ interface WebRTCVoiceClient {
   startCall: () => Promise<void>;
   endCall: () => void;
   getStatus: () => VoiceCallStatus;
+  getCallId?: () => string | null;
 }
 
 interface VoiceSessionConfig {
@@ -542,7 +543,7 @@ const VoiceOrderGlassOverlay: React.FC<VoiceOrderGlassOverlayProps> = ({
                     <Checkbox
                       id="terms"
                       checked={termsAccepted}
-                      onCheckedChange={setTermsAccepted}
+                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
                       className="mt-1 flex-shrink-0"
                       style={{
                         borderColor: PremiumTheme.colors.burgundy[600],

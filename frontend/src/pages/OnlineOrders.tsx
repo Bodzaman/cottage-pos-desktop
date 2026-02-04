@@ -978,7 +978,7 @@ export default function OnlineOrders() {
   
   // Get all sections for tabs (sorted by order for consistent display)
   const parentCategoriesForTabs = useMemo(() => {
-    return FIXED_SECTIONS.sort((a, b) => a.order - b.order);
+    return [...FIXED_SECTIONS].sort((a, b) => a.order - b.order);
   }, []);
 
   // Filter items based on selected category using proper section mapping
@@ -1046,7 +1046,7 @@ export default function OnlineOrders() {
         categoryMap.set(category.id, []);
       }
 
-      categoryMap.get(category.id)!.push(item);
+      categoryMap.get(category.id)!.push(item as MenuItem);
     });
 
     // Convert to array format

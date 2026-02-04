@@ -73,10 +73,10 @@ export const useKDSAuth = create<KDSAuthState>()(
         removeItem: (name) => sessionStorage.removeItem(name),
       },
       // Persist lock state and settings during browser session
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         isLocked: state.isLocked, // Persist to prevent reset on rerender
-        autoLockMinutes: state.autoLockMinutes 
-      }),
+        autoLockMinutes: state.autoLockMinutes
+      } as KDSAuthState),
     }
   )
 );

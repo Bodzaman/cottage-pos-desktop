@@ -996,7 +996,7 @@ export function CustomerTabsCompact({
           isOpen={showBillReview}
           onClose={() => setShowBillReview(false)}
           tableNumber={tableNumber}
-          orderItems={activeCustomerTab.order_items || []}
+          orderItems={(activeCustomerTab.order_items || []) as any}
           onPrintFinalBill={handleTabFinalBillPrint}
         />
       )}

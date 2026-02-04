@@ -30,10 +30,14 @@ export default function UpdateKDS() {
     platform: string;
     arch: string;
     version: string;
+    userAgent?: string;
+    screenResolution?: string;
   }>({
     platform: '',
     arch: '',
-    version: ''
+    version: '',
+    userAgent: '',
+    screenResolution: ''
   });
 
   // Load latest KDS release information

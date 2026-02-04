@@ -27,6 +27,16 @@ export function calculateSubtotal(orderItems: OrderItem[]): number {
 }
 
 /**
+ * Calculate tax amount (VAT is included in prices, this calculates the included VAT portion)
+ * Default UK VAT rate is 20%
+ */
+export function calculateTax(subtotal: number, vatRate: number = 0.20): number {
+  // VAT is included in prices, so we calculate the VAT portion from the gross amount
+  // Formula: VAT = Gross - (Gross / (1 + VAT Rate))
+  return subtotal - (subtotal / (1 + vatRate));
+}
+
+/**
  * Calculate discount amount
  */
 export function calculateDiscount(subtotal: number, discountAmount: number = 0, discountPercent: number = 0): number {

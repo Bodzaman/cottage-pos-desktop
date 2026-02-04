@@ -145,7 +145,7 @@ const DishDetailsModal: React.FC<Props> = ({ dish, isOpen, onClose }) => {
                 style={{ backgroundColor: PremiumTheme.colors.burgundy[500], color: 'white' }}
                 className="hover:opacity-90"
               >
-                Add to Order (£{(parseFloat(currentPrice) * quantity).toFixed(2)})
+                Add to Order (£{(parseFloat(String(currentPrice)) * quantity || 0).toFixed(2)})
               </Button>
             </DialogFooter>
           </div>

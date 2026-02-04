@@ -47,10 +47,26 @@ const getOrderPrefix = (orderType: string, orderSource: 'POS' | 'ONLINE' = 'POS'
   return prefixMap[orderSource]?.[orderType] || 'XX';
 };
 
+// Extended type to include customizations and additional fields from POS store
+type OrderItemWithCustomizations = AppApisTableOrdersOrderItem & {
+  customizations?: Array<{
+    id?: string;
+    customization_id?: string;
+    name: string;
+    price?: number;
+    price_adjustment?: number;
+    is_free?: boolean;
+    group?: string;
+  }>;
+  category_id?: string;
+  menu_item_id?: string;
+  variant_id?: string;
+};
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  orderItems: AppApisTableOrdersOrderItem[];
+  orderItems: OrderItemWithCustomizations[];
   orderType: "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING";
   tableNumber?: number;
   guestCount?: number;
@@ -121,48 +137,81 @@ export function OrderConfirmationModal({
 
   /**
    * Map current order data to ThermalReceiptDisplay format
+   * Follows the working pattern from BuildSampleOrderModal
    */
   const mapToReceiptOrderData = () => {
+    const mappedItems = orderItems.map(item => {
+      // Get customizations from the item (they should exist from the store)
+      const itemCustomizations = item.customizations || [];
+
+      // Calculate customization total for this item
+      const customizationTotal = itemCustomizations.reduce(
+        (sum: number, c) => sum + (c.price_adjustment ?? c.price ?? 0), 0
+      );
+
+      // Base price for the item (without customizations)
+      const basePrice = item.price || 0;
+
+      // Total including customizations × quantity
+      const itemTotal = (basePrice + customizationTotal) * (item.quantity || 1);
+
+      return {
+        id: item.id || item.menu_item_id || `item-${Date.now()}`,
+        name: item.name,
+        // CRITICAL: Add basePrice field to match working pattern from BuildSampleOrderModal
+        basePrice: basePrice,
+        price: basePrice,
+        quantity: item.quantity || 1,
+        total: itemTotal,
+        variant: item.variant_name ? {
+          id: item.variant_id || item.id || `variant-${Date.now()}`,
+          name: item.variant_name,
+          price_adjustment: 0
+        } : undefined,
+        // Map customizations with all required fields matching ThermalPreview expectations
+        customizations: (item.customizations || []).map(c => ({
+          id: c.id || c.customization_id || `cust-${Date.now()}`,
+          customization_id: c.customization_id || c.id,
+          name: c.name,
+          price: c.price_adjustment ?? c.price ?? 0,
+          price_adjustment: c.price_adjustment ?? c.price ?? 0,
+          group: c.group || '',
+          is_free: c.is_free || (c.price_adjustment === 0 && c.price === 0)
+        })),
+        instructions: item.notes || undefined,
+        // Pass through category info for section grouping
+        category_id: item.category_id,
+        menu_item_id: item.menu_item_id
+      };
+    });
+
+    // Calculate subtotal from mapped items (ensures consistency with displayed items)
+    const calculatedSubtotal = mappedItems.reduce((sum, item) => sum + item.total, 0);
+
     return {
       orderId: `POS-${Date.now()}`,
       orderNumber: `${getOrderPrefix(orderType, 'POS')}-${Math.floor(Math.random() * 9000) + 1000}`,
       orderType: orderType,
-      items: orderItems.map(item => ({
-        id: item.id || item.menu_item_id || `item-${Date.now()}`,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        variant: item.variant_name ? {
-          id: item.id || `variant-${Date.now()}`,
-          name: item.variant_name,
-          price_adjustment: 0
-        } : undefined,
-        customizations: item.modifiers?.map(mod => ({
-          id: mod.id || `mod-${Date.now()}`,
-          name: mod.name,
-          price: mod.price || 0
-        })) || [],
-        instructions: item.notes || undefined
-      })),
-      subtotal,
+      items: mappedItems,
+      subtotal: calculatedSubtotal,
       serviceCharge: serviceCharge || 0,
       deliveryFee: deliveryFee || 0,
-      total,
-      
+      total: calculatedSubtotal + (serviceCharge || 0) + (deliveryFee || 0),
+
       // Conditional fields based on order type
       tableNumber: orderType === 'DINE-IN' ? tableNumber?.toString() : undefined,
       guestCount: orderType === 'DINE-IN' ? guestCount : undefined,
-      
-      customerName: customerFirstName && customerLastName 
-        ? `${customerFirstName} ${customerLastName}` 
+
+      customerName: customerFirstName && customerLastName
+        ? `${customerFirstName} ${customerLastName}`
         : customerFirstName || customerLastName,
       customerPhone: customerPhone || undefined,
       customerEmail: customerEmail || undefined,
-      
+
       deliveryAddress: orderType === 'DELIVERY' && (customerAddress || customerStreet || customerPostcode)
         ? [customerAddress, customerStreet, customerPostcode].filter(Boolean).join(', ')
         : undefined,
-        
+
       collectionTime: schedulingData?.pickup_time?.toLocaleString() || undefined,
       timestamp: new Date().toISOString()
     };

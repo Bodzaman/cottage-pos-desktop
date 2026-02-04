@@ -35,8 +35,9 @@ import { QSAITheme, styles, effects } from '../utils/QSAIDesign';
 import { POSViewType } from './POSViewContainer';
 
 // OrderType uses underscore format to match database ENUM
+// Includes both 'DINE_IN' and 'DINE-IN' for compatibility
 // WAITING is handled as order_subtype='WAITING' with order_type='COLLECTION'
-export type OrderType = "DINE_IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
+export type OrderType = "DINE_IN" | "DINE-IN" | "COLLECTION" | "DELIVERY" | "WAITING" | "ONLINE_ORDERS";
 
 interface POSSidebarProps {
   activeView: POSViewType;

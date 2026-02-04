@@ -210,7 +210,7 @@ export function useMenuItemForm({
         price_takeaway: formData.price_takeaway,
         price_delivery: formData.price_delivery,
       },
-      hasVariantsValue ? variants : []
+      hasVariantsValue ? (variants as unknown as MenuItemVariant[]) : []
     );
 
     setHasPricingError(!validation.isValid);
@@ -236,10 +236,10 @@ export function useMenuItemForm({
       const submitData: MenuItemFormData = {
         ...formData,
         has_variants: hasVariantsValue,
-        variants: hasVariantsValue ? variants.map((v, i) => ({
+        variants: hasVariantsValue ? (variants.map((v, i) => ({
           ...v,
           display_order: i,
-        })) : [],
+        })) as unknown as MenuItemVariant[]) : [],
       };
 
       // Use custom save handler or default API

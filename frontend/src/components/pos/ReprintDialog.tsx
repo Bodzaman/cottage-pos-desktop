@@ -230,6 +230,9 @@ export async function saveReceiptToHistory(
     tableNumber?: number | string;
     customerName?: string;
     itemCount: number;
+    guestCount?: number;
+    serviceCharge?: number;
+    paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL' | string;
   }
 ): Promise<void> {
   const electronAPI = (window as any).electronAPI;

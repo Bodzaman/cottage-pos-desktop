@@ -427,7 +427,7 @@ export function VoiceOrderingPanel({
           <motion.div className="flex-1">
             <Button
               onClick={startVoiceCall}
-              disabled={!isVisible || voiceCallStatus === VoiceCallStatus.CONNECTING}
+              disabled={!isVisible}
               className={cn(
                 "w-full gap-2 py-3 font-medium",
                 isVisible
@@ -435,12 +435,8 @@ export function VoiceOrderingPanel({
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
               )}
             >
-              {voiceCallStatus === VoiceCallStatus.CONNECTING ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <PhoneCall className="h-4 w-4" />
-              )}
-              {voiceCallStatus === VoiceCallStatus.CONNECTING ? 'Connecting...' : `Call ${getAgentDisplayName()}`}
+              <PhoneCall className="h-4 w-4" />
+              {`Call ${getAgentDisplayName()}`}
             </Button>
           </motion.div>
         ) : (

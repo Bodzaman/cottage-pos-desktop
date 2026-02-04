@@ -12,6 +12,8 @@ export interface OrderTrackingSubscription {
   staff_id?: string;
   notes?: string;
   estimated_time?: number;
+  estimated_completion?: string;
+  progress_percentage?: number;
 }
 
 export interface OrderStatusUpdate {
